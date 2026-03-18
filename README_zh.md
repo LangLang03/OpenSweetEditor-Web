@@ -43,6 +43,8 @@
 
 > Android 原始截图分辨率较小，因此这里刻意采用较小展示宽度。
 
+---
+
 ## 项目定位
 
 SweetEditor 是一套跨平台代码编辑基础设施引擎，面向需要在 Android、iOS、macOS、Windows、Swing 上保持一致编辑行为的产品（Web/OHOS 正在接入中）。
@@ -96,6 +98,30 @@ SweetEditor 是一套跨平台代码编辑基础设施引擎，面向需要在 A
 | **OHOS** | `platform/OHOS` | - | 🚧 目录占位 |
 
 核心接入要求是实现测量回调、输入事件转发、二进制协议解码与平台绘制；编辑语义、布局与渲染模型由 C++ 内核统一生成。
+
+---
+
+## 开发者群聊
+
+<table width="100%">
+  <tr>
+    <td width="33%" valign="top" align="center">
+      <strong>QQ</strong><br><br>
+      <img src="docs/imgs/qrcode_qq_group.jpg" alt="QQ群二维码" width="150"/>
+      <p>QQ群号：1090609035</p>
+    </td>
+    <td width="33%" valign="top" align="center">
+      <strong>微信</strong><br><br>
+      <img src="docs/imgs/qrcode_wechat.png" alt="微信群二维码" width="200"/>
+    </td>
+    <td width="33%" valign="top" align="center">
+      <strong>Discord</strong><br><br>
+      <a href="https://discord.gg/q5u4tGMgKQ" target="_blank">加入Discord：https://discord.gg/q5u4tGMgKQ</a>
+    </td>
+  </tr>
+</table>
+
+---
 
 ## 当前功能全量清单（2026-03）
 
