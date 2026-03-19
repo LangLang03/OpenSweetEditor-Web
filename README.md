@@ -1,6 +1,6 @@
 <div align="center">
 
-**Simplified Chinese** | [English](README.md)
+**English** | [简体中文](README_zh.md)
 
 # SweetEditor
 
@@ -73,7 +73,7 @@ It is well suited for long-term evolving editor infrastructure in IDEs, AI progr
 
 SweetEditor uses a **unified-core, separated-rendering** architecture: the C++ core handles editing logic and layout, while platform layers only deal with input bridging and native drawing.
 
-> For the full architecture documentation, see [Architecture Design (Chinese)](docs/zh/architecture.md) / [Architecture (English)](docs/en/architecture.md)
+> For the full architecture documentation, see [Architecture](docs/en/architecture.md)
 
 ## Core Capabilities
 
@@ -86,7 +86,7 @@ SweetEditor uses a **unified-core, separated-rendering** architecture: the C++ c
 * **Platform extension mechanisms**: DecorationProvider, CompletionProvider, asynchronous refresh, and completion UI support
 * **Performance infrastructure**: SIMD Unicode transcoding, measurement cache, font metrics cache, viewport-level rebuild and rendering
 
-For the complete capability list, see: [Feature Overview (Chinese)](docs/zh/api-editor-core.md) / [EditorCore API (EN)](docs/en/api-editor-core.md)
+For the complete capability list, see: [EditorCore API](docs/en/api-editor-core.md)
 
 ## Quick Start
 
@@ -143,16 +143,16 @@ Testing uses [Catch2](https://github.com/catchorg/Catch2).
 
 | Document                                                                                                     | Description                                                                          |
 | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
-| [Architecture Design (Chinese)](docs/zh/architecture.md) / [Architecture (EN)](docs/en/architecture.md)      | Core architecture, module design, data flow, and rendering pipeline                  |
-| [EditorCore API (Chinese)](docs/zh/api-editor-core.md) / [EditorCore API (EN)](docs/en/api-editor-core.md)   | Reference for the C++ core layer and C API                                           |
-| [Platform API Index (Chinese)](docs/zh/api-platform.md) / [Platform API Index (EN)](docs/en/api-platform.md) | Entry point for Android / Swing / Apple / WinForms platform API documentation        |
-| [Contributing (Chinese)](docs/zh/join.md) / [Contributing (EN)](docs/en/join.md)                             | Repository structure, reading entry points, and platform synchronization checkpoints |
+| [Architecture](docs/en/architecture.md)      | Core architecture, module design, data flow, and rendering pipeline                  |
+| [EditorCore API](docs/en/api-editor-core.md)   | Reference for the C++ core layer and C API                                           |
+| [Platform API Index](docs/en/api-platform.md) | Entry point for Android / Swing / Apple / WinForms platform API documentation        |
+| [Contributing](docs/en/join.md)                             | Repository structure, reading entry points, and platform synchronization checkpoints |
 
 ## Contributing
 
 SweetEditor is building an open ecosystem for cross-platform editor infrastructure, and contributions are welcome.
 
-See [Contributing Guide (Chinese)](docs/zh/join.md) / [Contributing Guide (EN)](docs/en/join.md) for details.
+See [Contributing Guide](docs/en/join.md) for details.
 
 ## Community
 
