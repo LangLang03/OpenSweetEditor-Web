@@ -734,7 +734,6 @@ public class SweetEditor extends JPanel implements EditorCore.TextMeasureCallbac
         Color thumbColor = withAlpha(currentTheme.lineNumberColor, 170);
 
         float verticalTrackX = 0f;
-        float verticalTrackY = 0f;
         float verticalTrackWidth = 0f;
         float horizontalTrackY = 0f;
         float horizontalTrackHeight = 0f;
@@ -745,7 +744,6 @@ public class SweetEditor extends JPanel implements EditorCore.TextMeasureCallbac
             float thumbX = vertical.thumb.origin != null ? vertical.thumb.origin.x : 0f;
             float thumbY = vertical.thumb.origin != null ? vertical.thumb.origin.y : 0f;
             verticalTrackX = trackX;
-            verticalTrackY = trackY;
             verticalTrackWidth = vertical.track.width;
             g.setColor(trackColor);
             g.fill(new Rectangle2D.Float(trackX, trackY, vertical.track.width, vertical.track.height));

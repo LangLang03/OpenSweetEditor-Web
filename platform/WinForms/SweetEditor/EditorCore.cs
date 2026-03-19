@@ -1542,7 +1542,6 @@ namespace SweetEditor {
 		private GCHandle inlayHintMeasurerGCHandle;
 		private GCHandle iconMeasurerGCHandle;
 		private GCHandle fontMetricsGCHandle;
-		private bool hasNativeSerializeMetric = true;
 		private Document? currentDocument;
 
 		#region Delegate/callback types
