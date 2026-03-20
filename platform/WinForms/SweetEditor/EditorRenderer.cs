@@ -61,8 +61,8 @@ namespace SweetEditor {
 
 		public EditorTheme Theme => currentTheme;
 		public Font RegularFont => regularFont;
-		public MeasurePerfStats PerfMeasureStats => perfMeasureStats;
-		public PerfOverlay PerfOverlay => perfOverlay;
+		internal MeasurePerfStats PerfMeasureStats => perfMeasureStats;
+		internal PerfOverlay PerfOverlay => perfOverlay;
 
 		public EditorCore.TextMeasurer GetTextMeasurer() {
 			return new EditorCore.TextMeasurer {
@@ -210,41 +210,42 @@ namespace SweetEditor {
 			g.Clear(theme.BackgroundColor);
 			perf.Mark(PerfStepRecorder.StepClear);
 
-			if (model == null) {
+			if (!model.HasValue) {
 				perf.Finish();
 				EditorPerf.LogSlow("Render(no-model)", perf.TotalTicks, EditorPerf.WarnPaintMs);
 				perfOverlay.RecordDraw(perf);
 				perfOverlay.Draw(g, clientSize.Width);
 				return;
 			}
+			EditorRenderModel modelValue = model.Value;
 			g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
 			g.SmoothingMode = SmoothingMode.AntiAlias;
 
-			DrawCurrentLineHighlight(g, model, clientSize.Width);
+			DrawCurrentLineHighlight(g, modelValue, clientSize.Width);
 			perf.Mark(PerfStepRecorder.StepCurrent);
-			DrawSelectionRects(g, model);
+			DrawSelectionRects(g, modelValue);
 			perf.Mark(PerfStepRecorder.StepSelection);
-			DrawLines(g, model);
+			DrawLines(g, modelValue);
 			perf.Mark(PerfStepRecorder.StepLines);
-			DrawGuideSegments(g, model);
+			DrawGuideSegments(g, modelValue);
 			perf.Mark(PerfStepRecorder.StepGuides);
-			if (model.CompositionDecoration.Active) {
-				DrawCompositionDecoration(g, model.CompositionDecoration);
+			if (modelValue.CompositionDecoration.Active) {
+				DrawCompositionDecoration(g, modelValue.CompositionDecoration);
 				perf.Mark(PerfStepRecorder.StepComposition);
 			}
-			DrawDiagnosticDecorations(g, model);
+			DrawDiagnosticDecorations(g, modelValue);
 			perf.Mark(PerfStepRecorder.StepDiagnostics);
-			DrawLinkedEditingRects(g, model);
+			DrawLinkedEditingRects(g, modelValue);
 			perf.Mark(PerfStepRecorder.StepLinkedEditing);
-			DrawBracketHighlightRects(g, model);
+			DrawBracketHighlightRects(g, modelValue);
 			perf.Mark(PerfStepRecorder.StepBracket);
-			DrawCursor(g, model);
+			DrawCursor(g, modelValue);
 			perf.Mark(PerfStepRecorder.StepCursor);
-			DrawGutterOverlay(g, model, clientSize.Height);
+			DrawGutterOverlay(g, modelValue, clientSize.Height);
 			perf.Mark(PerfStepRecorder.StepGutter);
-			DrawLineNumbers(g, model);
+			DrawLineNumbers(g, modelValue);
 			perf.Mark(PerfStepRecorder.StepLineNumber);
-			DrawScrollbars(g, model);
+			DrawScrollbars(g, modelValue);
 			perf.Mark(PerfStepRecorder.StepScrollbar);
 			perf.Mark(PerfStepRecorder.StepPopup);
 
