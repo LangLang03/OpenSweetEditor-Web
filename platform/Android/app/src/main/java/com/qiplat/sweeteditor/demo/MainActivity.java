@@ -110,10 +110,16 @@ public class MainActivity extends AppCompatActivity {
         });
 
         updateStatus("Document loaded");
+
+        try {
+            DemoDecorationProvider.ensureSweetLineReady(this);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private void loadSampleDocument() {
-        String code = loadAsset("sample.cpp");
+        String code = loadAsset("files/sample.cpp");
         Document document = new Document(code);
         mEditor.loadDocument(document);
     }

@@ -58,16 +58,20 @@ namespace SweetEditor {
 		public TextRange? WordRange { get; }
 		/// <summary>Current language configuration (from LanguageConfiguration).</summary>
 		public LanguageConfiguration? LanguageConfiguration { get; }
+		/// <summary>Current editor metadata (from EditorControl).</summary>
+		public IEditorMetadata? EditorMetadata { get; }
 
 		public CompletionContext(CompletionTriggerKind triggerKind, string? triggerCharacter,
 								 TextPosition cursorPosition, string lineText, TextRange? wordRange,
-								 LanguageConfiguration? languageConfiguration = null) {
+								 LanguageConfiguration? languageConfiguration = null,
+								 IEditorMetadata? editorMetadata = null) {
 			TriggerKind = triggerKind;
 			TriggerCharacter = triggerCharacter;
 			CursorPosition = cursorPosition;
 			LineText = lineText;
 			WordRange = wordRange;
 			LanguageConfiguration = languageConfiguration;
+			EditorMetadata = editorMetadata;
 		}
 	}
 
@@ -195,7 +199,14 @@ namespace SweetEditor {
 			var doc = editor.GetDocument();
 			string lineText = doc?.GetLineText(cursor.Line) ?? "";
 			var wordRange = editor.GetWordRangeAtCursor();
-			return new CompletionContext(kind, triggerChar, cursor, lineText, wordRange, editor.GetLanguageConfiguration());
+			return new CompletionContext(
+				kind,
+				triggerChar,
+				cursor,
+				lineText,
+				wordRange,
+				editor.GetLanguageConfiguration(),
+				editor.Metadata);
 		}
 
 		private void OnReceiverAccept(ICompletionProvider provider, CompletionResult result, int receiverGen) {
@@ -254,6 +265,12 @@ namespace SweetEditor {
 		PhantomText = 1 << 10,
 	}
 
+	public enum DecorationApplyMode {
+		MERGE = 0,
+		REPLACE_ALL = 1,
+		REPLACE_RANGE = 2,
+	}
+
 	public sealed class DecorationContext {
 		public int VisibleStartLine { get; }
 		public int VisibleEndLine { get; }
@@ -262,14 +279,18 @@ namespace SweetEditor {
 		public IReadOnlyList<TextChange> TextChanges { get; }
 		/// <summary>Current language configuration (from LanguageConfiguration).</summary>
 		public LanguageConfiguration? LanguageConfiguration { get; }
+		/// <summary>Current editor metadata (from EditorControl).</summary>
+		public IEditorMetadata? EditorMetadata { get; }
 
 		public DecorationContext(int visibleStartLine, int visibleEndLine, int totalLineCount,
-								 IReadOnlyList<TextChange> textChanges, LanguageConfiguration? languageConfiguration = null) {
+								 IReadOnlyList<TextChange> textChanges, LanguageConfiguration? languageConfiguration = null,
+								 IEditorMetadata? editorMetadata = null) {
 			VisibleStartLine = visibleStartLine;
 			VisibleEndLine = visibleEndLine;
 			TotalLineCount = totalLineCount;
 			TextChanges = textChanges;
 			LanguageConfiguration = languageConfiguration;
+			EditorMetadata = editorMetadata;
 		}
 	}
 
@@ -296,6 +317,18 @@ namespace SweetEditor {
 		public Dictionary<int, List<int>>? GutterIcons { get; set; }
 		public Dictionary<int, List<PhantomTextItem>>? PhantomTexts { get; set; }
 
+		public DecorationApplyMode SyntaxSpansMode { get; set; } = DecorationApplyMode.MERGE;
+		public DecorationApplyMode SemanticSpansMode { get; set; } = DecorationApplyMode.MERGE;
+		public DecorationApplyMode InlayHintsMode { get; set; } = DecorationApplyMode.MERGE;
+		public DecorationApplyMode DiagnosticsMode { get; set; } = DecorationApplyMode.MERGE;
+		public DecorationApplyMode IndentGuidesMode { get; set; } = DecorationApplyMode.MERGE;
+		public DecorationApplyMode BracketGuidesMode { get; set; } = DecorationApplyMode.MERGE;
+		public DecorationApplyMode FlowGuidesMode { get; set; } = DecorationApplyMode.MERGE;
+		public DecorationApplyMode SeparatorGuidesMode { get; set; } = DecorationApplyMode.MERGE;
+		public DecorationApplyMode FoldRegionsMode { get; set; } = DecorationApplyMode.MERGE;
+		public DecorationApplyMode GutterIconsMode { get; set; } = DecorationApplyMode.MERGE;
+		public DecorationApplyMode PhantomTextsMode { get; set; } = DecorationApplyMode.MERGE;
+
 		public DecorationResult Clone() {
 			return new DecorationResult {
 				SyntaxSpans = CopyMap(SyntaxSpans),
@@ -309,6 +342,17 @@ namespace SweetEditor {
 				FoldRegions = FoldRegions == null ? null : new List<FoldRegionItem>(FoldRegions),
 				GutterIcons = CopyMap(GutterIcons),
 				PhantomTexts = CopyMap(PhantomTexts),
+				SyntaxSpansMode = SyntaxSpansMode,
+				SemanticSpansMode = SemanticSpansMode,
+				InlayHintsMode = InlayHintsMode,
+				DiagnosticsMode = DiagnosticsMode,
+				IndentGuidesMode = IndentGuidesMode,
+				BracketGuidesMode = BracketGuidesMode,
+				FlowGuidesMode = FlowGuidesMode,
+				SeparatorGuidesMode = SeparatorGuidesMode,
+				FoldRegionsMode = FoldRegionsMode,
+				GutterIconsMode = GutterIconsMode,
+				PhantomTextsMode = PhantomTextsMode,
 			};
 		}
 
@@ -343,24 +387,37 @@ namespace SweetEditor {
 		}
 	}
 
-	internal sealed class DecorationProviderManager {
-		private readonly EditorControl editor;
-		private readonly List<IDecorationProvider> providers = new();
-		private readonly Dictionary<IDecorationProvider, ProviderState> states = new();
-		private readonly System.Windows.Forms.Timer debounceTimer;
+		internal sealed class DecorationProviderManager {
+			private readonly EditorControl editor;
+			private readonly List<IDecorationProvider> providers = new();
+			private readonly Dictionary<IDecorationProvider, ProviderState> states = new();
+			private readonly System.Windows.Forms.Timer debounceTimer;
+			private readonly System.Windows.Forms.Timer scrollRefreshTimer;
 
-		private readonly List<TextChange> pendingTextChanges = new();
-		private bool applyScheduled;
-		private int generation;
+			private readonly List<TextChange> pendingTextChanges = new();
+			private bool applyScheduled;
+			private int generation;
+			private int lastVisibleStartLine;
+			private int lastVisibleEndLine = -1;
+			private bool scrollRefreshScheduled;
+			private long lastScrollRefreshTickMs;
 
-		public DecorationProviderManager(EditorControl editor) {
-			this.editor = editor;
-			debounceTimer = new System.Windows.Forms.Timer { Interval = 50 };
-			debounceTimer.Tick += (_, _) => {
-				debounceTimer.Stop();
-				DoRefresh();
-			};
-		}
+			public DecorationProviderManager(EditorControl editor) {
+				this.editor = editor;
+				debounceTimer = new System.Windows.Forms.Timer { Interval = 50 };
+				debounceTimer.Tick += (_, _) => {
+					debounceTimer.Stop();
+					DoRefresh();
+				};
+				scrollRefreshTimer = new System.Windows.Forms.Timer { Interval = 1 };
+				scrollRefreshTimer.Tick += (_, _) => {
+					scrollRefreshTimer.Stop();
+					scrollRefreshScheduled = false;
+					debounceTimer.Stop();
+					DoRefresh();
+					lastScrollRefreshTickMs = Environment.TickCount64;
+				};
+			}
 
 		public void AddProvider(IDecorationProvider provider) {
 			if (providers.Contains(provider)) return;
@@ -369,37 +426,73 @@ namespace SweetEditor {
 			RequestRefresh();
 		}
 
-		public void RemoveProvider(IDecorationProvider provider) {
-			providers.Remove(provider);
-			if (states.TryGetValue(provider, out var st) && st.ActiveReceiver != null) {
-				st.ActiveReceiver.Cancel();
+			public void RemoveProvider(IDecorationProvider provider) {
+				providers.Remove(provider);
+				if (states.TryGetValue(provider, out var st) && st.ActiveReceiver != null) {
+					st.ActiveReceiver.Cancel();
+				}
+				states.Remove(provider);
+				ScheduleApply();
 			}
-			states.Remove(provider);
-			ScheduleApply();
-		}
 
-		public void RequestRefresh() => ScheduleRefresh(0, null);
-		public void OnDocumentLoaded() => ScheduleRefresh(0, null);
-		public void OnScrollChanged() => ScheduleRefresh(50, null);
-		public void OnTextChanged(List<TextChange>? changes) => ScheduleRefresh(50, changes);
+			public void RequestRefresh() => ScheduleRefresh(0, null);
+			public void OnDocumentLoaded() => ScheduleRefresh(0, null);
+			public void OnScrollChanged() => ScheduleScrollRefresh();
+			public void OnTextChanged(List<TextChange>? changes) => ScheduleRefresh(50, changes);
 
-		private void ScheduleRefresh(int delayMs, List<TextChange>? changes) {
-			if (changes != null) {
-				pendingTextChanges.AddRange(changes);
+			private void ScheduleRefresh(int delayMs, List<TextChange>? changes) {
+				if (changes != null) {
+					pendingTextChanges.AddRange(changes);
+				}
+				if (scrollRefreshScheduled) {
+					scrollRefreshTimer.Stop();
+					scrollRefreshScheduled = false;
+				}
+				debounceTimer.Stop();
+				debounceTimer.Interval = Math.Max(1, delayMs == 0 ? 1 : delayMs);
+				debounceTimer.Start();
 			}
-			debounceTimer.Stop();
-			debounceTimer.Interval = Math.Max(1, delayMs == 0 ? 1 : delayMs);
-			debounceTimer.Start();
-		}
+
+			private void ScheduleScrollRefresh() {
+				long now = Environment.TickCount64;
+				long elapsed = now - lastScrollRefreshTickMs;
+				int minInterval = GetScrollRefreshMinIntervalMs();
+				int delay = elapsed >= minInterval
+					? 1
+					: (int)Math.Max(1, minInterval - elapsed);
+				if (scrollRefreshScheduled) {
+					return;
+				}
+				scrollRefreshScheduled = true;
+				scrollRefreshTimer.Stop();
+				scrollRefreshTimer.Interval = delay;
+				scrollRefreshTimer.Start();
+			}
 
 		private void DoRefresh() {
 			generation++;
 			int currentGeneration = generation;
 
-			var visible = editor.GetVisibleLineRange();
-			var changes = new List<TextChange>(pendingTextChanges).AsReadOnly();
-			pendingTextChanges.Clear();
-			var context = new DecorationContext(visible.start, visible.end, editor.GetTotalLineCount(), changes, editor.GetLanguageConfiguration());
+				var visible = editor.GetVisibleLineRange();
+				lastVisibleStartLine = visible.start;
+				lastVisibleEndLine = visible.end;
+				var changes = new List<TextChange>(pendingTextChanges).AsReadOnly();
+				pendingTextChanges.Clear();
+				int total = editor.GetTotalLineCount();
+				int contextStart = visible.start;
+				int contextEnd = visible.end;
+				if (total > 0 && visible.end >= visible.start) {
+					int overscanLines = CalculateOverscanLines(visible.start, visible.end);
+					contextStart = Math.Max(0, visible.start - overscanLines);
+					contextEnd = Math.Min(total - 1, visible.end + overscanLines);
+				}
+				var context = new DecorationContext(
+					contextStart,
+					contextEnd,
+					total,
+					changes,
+					editor.GetLanguageConfiguration(),
+					editor.Metadata);
 
 			foreach (var provider in providers) {
 				if (!states.TryGetValue(provider, out var state)) {
@@ -436,29 +529,74 @@ namespace SweetEditor {
 			var foldRegions = new List<DecorationResult.FoldRegionItem>();
 			var gutterIcons = new Dictionary<int, List<int>>();
 			var phantomTexts = new Dictionary<int, List<DecorationResult.PhantomTextItem>>();
+			DecorationApplyMode syntaxMode = DecorationApplyMode.MERGE;
+			DecorationApplyMode semanticMode = DecorationApplyMode.MERGE;
+			DecorationApplyMode inlayMode = DecorationApplyMode.MERGE;
+			DecorationApplyMode diagnosticMode = DecorationApplyMode.MERGE;
+			DecorationApplyMode indentMode = DecorationApplyMode.MERGE;
+			DecorationApplyMode bracketMode = DecorationApplyMode.MERGE;
+			DecorationApplyMode flowMode = DecorationApplyMode.MERGE;
+			DecorationApplyMode separatorMode = DecorationApplyMode.MERGE;
+			DecorationApplyMode foldMode = DecorationApplyMode.MERGE;
+			DecorationApplyMode gutterMode = DecorationApplyMode.MERGE;
+			DecorationApplyMode phantomMode = DecorationApplyMode.MERGE;
 
 			foreach (var provider in providers) {
 				if (!states.TryGetValue(provider, out var st) || st.Snapshot == null) continue;
 				var r = st.Snapshot;
-				AppendMap(syntaxSpans, r.SyntaxSpans);
-				AppendMap(semanticSpans, r.SemanticSpans);
-				AppendMap(inlayHints, r.InlayHints);
-				AppendMap(diagnostics, r.Diagnostics);
-				AppendMap(gutterIcons, r.GutterIcons);
-				AppendMap(phantomTexts, r.PhantomTexts);
+				syntaxMode = MergeMode(syntaxMode, r.SyntaxSpansMode);
+				if (r.SyntaxSpans != null) {
+					AppendMap(syntaxSpans, r.SyntaxSpans);
+				}
+				semanticMode = MergeMode(semanticMode, r.SemanticSpansMode);
+				if (r.SemanticSpans != null) {
+					AppendMap(semanticSpans, r.SemanticSpans);
+				}
+				inlayMode = MergeMode(inlayMode, r.InlayHintsMode);
+				if (r.InlayHints != null) {
+					AppendMap(inlayHints, r.InlayHints);
+				}
+				diagnosticMode = MergeMode(diagnosticMode, r.DiagnosticsMode);
+				if (r.Diagnostics != null) {
+					AppendMap(diagnostics, r.Diagnostics);
+				}
+				gutterMode = MergeMode(gutterMode, r.GutterIconsMode);
+				if (r.GutterIcons != null) {
+					AppendMap(gutterIcons, r.GutterIcons);
+				}
+				phantomMode = MergeMode(phantomMode, r.PhantomTextsMode);
+				if (r.PhantomTexts != null) {
+					AppendMap(phantomTexts, r.PhantomTexts);
+				}
 
-				if (r.IndentGuides != null) indentGuides = new List<DecorationResult.IndentGuideItem>(r.IndentGuides);
-				if (r.BracketGuides != null) bracketGuides = new List<DecorationResult.BracketGuideItem>(r.BracketGuides);
-				if (r.FlowGuides != null) flowGuides = new List<DecorationResult.FlowGuideItem>(r.FlowGuides);
-				if (r.SeparatorGuides != null) separatorGuides = new List<DecorationResult.SeparatorGuideItem>(r.SeparatorGuides);
-				if (r.FoldRegions != null) foldRegions.AddRange(r.FoldRegions);
+				indentMode = MergeMode(indentMode, r.IndentGuidesMode);
+				if (r.IndentGuides != null) {
+					indentGuides = new List<DecorationResult.IndentGuideItem>(r.IndentGuides);
+				}
+				bracketMode = MergeMode(bracketMode, r.BracketGuidesMode);
+				if (r.BracketGuides != null) {
+					bracketGuides = new List<DecorationResult.BracketGuideItem>(r.BracketGuides);
+				}
+				flowMode = MergeMode(flowMode, r.FlowGuidesMode);
+				if (r.FlowGuides != null) {
+					flowGuides = new List<DecorationResult.FlowGuideItem>(r.FlowGuides);
+				}
+				separatorMode = MergeMode(separatorMode, r.SeparatorGuidesMode);
+				if (r.SeparatorGuides != null) {
+					separatorGuides = new List<DecorationResult.SeparatorGuideItem>(r.SeparatorGuides);
+				}
+				foldMode = MergeMode(foldMode, r.FoldRegionsMode);
+				if (r.FoldRegions != null) {
+					foldRegions.AddRange(r.FoldRegions);
+				}
 			}
 
-			editor.ClearHighlights();
+			ApplySpanMode(SpanLayer.SYNTAX, syntaxMode);
+			ApplySpanMode(SpanLayer.SEMANTIC, semanticMode);
 			ApplySpans(syntaxSpans, SpanLayer.SYNTAX);
 			ApplySpans(semanticSpans, SpanLayer.SEMANTIC);
 
-			editor.ClearInlayHints();
+			ApplyInlayMode(inlayMode);
 			foreach (var (line, items) in inlayHints) {
 				var hints = new List<InlayHint>(items.Count);
 				foreach (var item in items) {
@@ -477,7 +615,7 @@ namespace SweetEditor {
 				editor.SetLineInlayHints(line, hints);
 			}
 
-			editor.ClearDiagnostics();
+			ApplyDiagnosticMode(diagnosticMode);
 			foreach (var (line, items) in diagnostics) {
 				var diagItems = new List<DiagnosticItem>(items.Count);
 				for (int i = 0; i < items.Count; i++) {
@@ -486,23 +624,59 @@ namespace SweetEditor {
 				editor.SetLineDiagnostics(line, diagItems);
 			}
 
-			editor.ClearGuides();
-			if (indentGuides != null) {
+			if (indentMode == DecorationApplyMode.REPLACE_ALL || indentMode == DecorationApplyMode.REPLACE_RANGE) {
+				if (indentGuides != null) {
+					var guides = new List<IndentGuide>(indentGuides.Count);
+					foreach (var item in indentGuides) guides.Add(new IndentGuide(item.Start, item.End));
+					editor.SetIndentGuides(guides);
+				} else {
+					editor.SetIndentGuides(new List<IndentGuide>());
+				}
+			} else if (indentGuides != null) {
 				var guides = new List<IndentGuide>(indentGuides.Count);
 				foreach (var item in indentGuides) guides.Add(new IndentGuide(item.Start, item.End));
 				editor.SetIndentGuides(guides);
 			}
-			if (bracketGuides != null) {
+
+			if (bracketMode == DecorationApplyMode.REPLACE_ALL || bracketMode == DecorationApplyMode.REPLACE_RANGE) {
+				if (bracketGuides != null) {
+					var guides = new List<BracketGuide>(bracketGuides.Count);
+					foreach (var item in bracketGuides) guides.Add(new BracketGuide(item.Parent, item.End, item.Children));
+					editor.SetBracketGuides(guides);
+				} else {
+					editor.SetBracketGuides(new List<BracketGuide>());
+				}
+			} else if (bracketGuides != null) {
 				var guides = new List<BracketGuide>(bracketGuides.Count);
 				foreach (var item in bracketGuides) guides.Add(new BracketGuide(item.Parent, item.End, item.Children));
 				editor.SetBracketGuides(guides);
 			}
-			if (flowGuides != null) {
+
+			if (flowMode == DecorationApplyMode.REPLACE_ALL || flowMode == DecorationApplyMode.REPLACE_RANGE) {
+				if (flowGuides != null) {
+					var guides = new List<FlowGuide>(flowGuides.Count);
+					foreach (var item in flowGuides) guides.Add(new FlowGuide(item.Start, item.End));
+					editor.SetFlowGuides(guides);
+				} else {
+					editor.SetFlowGuides(new List<FlowGuide>());
+				}
+			} else if (flowGuides != null) {
 				var guides = new List<FlowGuide>(flowGuides.Count);
 				foreach (var item in flowGuides) guides.Add(new FlowGuide(item.Start, item.End));
 				editor.SetFlowGuides(guides);
 			}
-			if (separatorGuides != null) {
+
+			if (separatorMode == DecorationApplyMode.REPLACE_ALL || separatorMode == DecorationApplyMode.REPLACE_RANGE) {
+				if (separatorGuides != null) {
+					var guides = new List<SeparatorGuide>(separatorGuides.Count);
+					foreach (var item in separatorGuides) {
+						guides.Add(new SeparatorGuide(item.Line, item.Style, item.Count, item.TextEndColumn));
+					}
+					editor.SetSeparatorGuides(guides);
+				} else {
+					editor.SetSeparatorGuides(new List<SeparatorGuide>());
+				}
+			} else if (separatorGuides != null) {
 				var guides = new List<SeparatorGuide>(separatorGuides.Count);
 				foreach (var item in separatorGuides) {
 					guides.Add(new SeparatorGuide(item.Line, item.Style, item.Count, item.TextEndColumn));
@@ -510,7 +684,14 @@ namespace SweetEditor {
 				editor.SetSeparatorGuides(guides);
 			}
 
-			if (foldRegions.Count > 0) {
+			if (foldMode == DecorationApplyMode.REPLACE_ALL || foldMode == DecorationApplyMode.REPLACE_RANGE) {
+				var regions = new List<FoldRegion>(foldRegions.Count);
+				for (int i = 0; i < foldRegions.Count; i++) {
+					var r = foldRegions[i];
+					regions.Add(new FoldRegion(r.StartLine, r.EndLine, r.Collapsed));
+				}
+				editor.SetFoldRegions(regions);
+			} else if (foldRegions.Count > 0) {
 				var regions = new List<FoldRegion>(foldRegions.Count);
 				for (int i = 0; i < foldRegions.Count; i++) {
 					var r = foldRegions[i];
@@ -519,14 +700,14 @@ namespace SweetEditor {
 				editor.SetFoldRegions(regions);
 			}
 
-			editor.ClearGutterIcons();
+			ApplyGutterMode(gutterMode);
 			foreach (var (line, icons) in gutterIcons) {
 				var iconList = new List<GutterIcon>(icons.Count);
 				foreach (var icon in icons) iconList.Add(new GutterIcon(icon));
 				editor.SetLineGutterIcons(line, iconList);
 			}
 
-			editor.ClearPhantomTexts();
+			ApplyPhantomMode(phantomMode);
 			foreach (var (line, items) in phantomTexts) {
 				var phantomList = new List<PhantomText>(items.Count);
 				foreach (var item in items) phantomList.Add(new PhantomText(item.Column, item.Text));
@@ -534,6 +715,110 @@ namespace SweetEditor {
 			}
 
 			editor.Flush();
+		}
+
+		private void ApplySpanMode(SpanLayer layer, DecorationApplyMode mode) {
+			if (mode == DecorationApplyMode.REPLACE_ALL) {
+				editor.ClearHighlights(layer);
+			} else if (mode == DecorationApplyMode.REPLACE_RANGE) {
+				ClearSpanRange(layer, lastVisibleStartLine, lastVisibleEndLine);
+			}
+		}
+
+		private void ApplyInlayMode(DecorationApplyMode mode) {
+			if (mode == DecorationApplyMode.REPLACE_ALL) {
+				editor.ClearInlayHints();
+			} else if (mode == DecorationApplyMode.REPLACE_RANGE) {
+				ClearInlayRange(lastVisibleStartLine, lastVisibleEndLine);
+			}
+		}
+
+		private void ApplyDiagnosticMode(DecorationApplyMode mode) {
+			if (mode == DecorationApplyMode.REPLACE_ALL) {
+				editor.ClearDiagnostics();
+			} else if (mode == DecorationApplyMode.REPLACE_RANGE) {
+				ClearDiagnosticRange(lastVisibleStartLine, lastVisibleEndLine);
+			}
+		}
+
+		private void ApplyGutterMode(DecorationApplyMode mode) {
+			if (mode == DecorationApplyMode.REPLACE_ALL) {
+				editor.ClearGutterIcons();
+			} else if (mode == DecorationApplyMode.REPLACE_RANGE) {
+				ClearGutterRange(lastVisibleStartLine, lastVisibleEndLine);
+			}
+		}
+
+		private void ApplyPhantomMode(DecorationApplyMode mode) {
+			if (mode == DecorationApplyMode.REPLACE_ALL) {
+				editor.ClearPhantomTexts();
+			} else if (mode == DecorationApplyMode.REPLACE_RANGE) {
+				ClearPhantomRange(lastVisibleStartLine, lastVisibleEndLine);
+			}
+		}
+
+		private void ClearSpanRange(SpanLayer layer, int startLine, int endLine) {
+			var empty = BuildEmptyRangeMap<StyleSpan>(startLine, endLine);
+			if (empty.Count == 0) return;
+			editor.SetBatchLineSpans(layer, empty);
+		}
+
+		private void ClearInlayRange(int startLine, int endLine) {
+			var empty = BuildEmptyRangeMap<InlayHint>(startLine, endLine);
+			if (empty.Count == 0) return;
+			editor.SetBatchLineInlayHints(empty);
+		}
+
+		private void ClearDiagnosticRange(int startLine, int endLine) {
+			var empty = BuildEmptyRangeMap<DiagnosticItem>(startLine, endLine);
+			if (empty.Count == 0) return;
+			editor.SetBatchLineDiagnostics(empty);
+		}
+
+		private void ClearGutterRange(int startLine, int endLine) {
+			var empty = BuildEmptyRangeMap<GutterIcon>(startLine, endLine);
+			if (empty.Count == 0) return;
+			editor.SetBatchLineGutterIcons(empty);
+		}
+
+		private void ClearPhantomRange(int startLine, int endLine) {
+			var empty = BuildEmptyRangeMap<PhantomText>(startLine, endLine);
+			if (empty.Count == 0) return;
+			editor.SetBatchLinePhantomTexts(empty);
+		}
+
+		private static Dictionary<int, IList<T>> BuildEmptyRangeMap<T>(int startLine, int endLine) {
+			var outMap = new Dictionary<int, IList<T>>();
+			if (endLine < startLine) return outMap;
+			IList<T> empty = Array.Empty<T>();
+			for (int line = startLine; line <= endLine; line++) {
+				outMap[line] = empty;
+			}
+			return outMap;
+		}
+
+		private static DecorationApplyMode MergeMode(DecorationApplyMode current, DecorationApplyMode next) {
+			return ModePriority(next) > ModePriority(current) ? next : current;
+		}
+
+		private static int ModePriority(DecorationApplyMode mode) {
+			return mode switch {
+				DecorationApplyMode.MERGE => 0,
+				DecorationApplyMode.REPLACE_RANGE => 1,
+				DecorationApplyMode.REPLACE_ALL => 2,
+				_ => 0
+			};
+		}
+
+		private int GetScrollRefreshMinIntervalMs() {
+			return Math.Max(0, editor.Settings.GetDecorationScrollRefreshMinIntervalMs());
+		}
+
+		private int CalculateOverscanLines(int visibleStart, int visibleEnd) {
+			int viewportLineCount = visibleEnd >= visibleStart ? (visibleEnd - visibleStart + 1) : 0;
+			if (viewportLineCount <= 0) return 0;
+			float multiplier = Math.Max(0f, editor.Settings.GetDecorationOverscanViewportMultiplier());
+			return Math.Max(0, (int)Math.Ceiling(viewportLineCount * multiplier));
 		}
 
 		private void ApplySpans(Dictionary<int, List<DecorationResult.SpanItem>> map, SpanLayer layer) {
@@ -569,25 +854,83 @@ namespace SweetEditor {
 		}
 
 		private static void MergePatch(DecorationResult target, DecorationResult patch) {
-			if (patch.SyntaxSpans != null) target.SyntaxSpans = CopyMap(patch.SyntaxSpans);
-			if (patch.SemanticSpans != null) target.SemanticSpans = CopyMap(patch.SemanticSpans);
-			if (patch.InlayHints != null) target.InlayHints = CopyMap(patch.InlayHints);
-			if (patch.Diagnostics != null) target.Diagnostics = CopyMap(patch.Diagnostics);
-			if (patch.IndentGuides != null) target.IndentGuides = new List<DecorationResult.IndentGuideItem>(patch.IndentGuides);
-			if (patch.BracketGuides != null) target.BracketGuides = new List<DecorationResult.BracketGuideItem>(patch.BracketGuides);
-			if (patch.FlowGuides != null) target.FlowGuides = new List<DecorationResult.FlowGuideItem>(patch.FlowGuides);
-			if (patch.SeparatorGuides != null) target.SeparatorGuides = new List<DecorationResult.SeparatorGuideItem>(patch.SeparatorGuides);
-			if (patch.FoldRegions != null) target.FoldRegions = new List<DecorationResult.FoldRegionItem>(patch.FoldRegions);
-			if (patch.GutterIcons != null) target.GutterIcons = CopyMap(patch.GutterIcons);
-			if (patch.PhantomTexts != null) target.PhantomTexts = CopyMap(patch.PhantomTexts);
-		}
-
-		private static Dictionary<int, List<T>> CopyMap<T>(Dictionary<int, List<T>> source) {
-			var outMap = new Dictionary<int, List<T>>(source.Count);
-			foreach (var (k, v) in source) {
-				outMap[k] = v == null ? new List<T>() : new List<T>(v);
+			if (patch.SyntaxSpans != null) {
+				target.SyntaxSpans = patch.SyntaxSpans;
+				target.SyntaxSpansMode = patch.SyntaxSpansMode;
+			} else if (patch.SyntaxSpansMode != DecorationApplyMode.MERGE) {
+				target.SyntaxSpans = null;
+				target.SyntaxSpansMode = patch.SyntaxSpansMode;
 			}
-			return outMap;
+			if (patch.SemanticSpans != null) {
+				target.SemanticSpans = patch.SemanticSpans;
+				target.SemanticSpansMode = patch.SemanticSpansMode;
+			} else if (patch.SemanticSpansMode != DecorationApplyMode.MERGE) {
+				target.SemanticSpans = null;
+				target.SemanticSpansMode = patch.SemanticSpansMode;
+			}
+			if (patch.InlayHints != null) {
+				target.InlayHints = patch.InlayHints;
+				target.InlayHintsMode = patch.InlayHintsMode;
+			} else if (patch.InlayHintsMode != DecorationApplyMode.MERGE) {
+				target.InlayHints = null;
+				target.InlayHintsMode = patch.InlayHintsMode;
+			}
+			if (patch.Diagnostics != null) {
+				target.Diagnostics = patch.Diagnostics;
+				target.DiagnosticsMode = patch.DiagnosticsMode;
+			} else if (patch.DiagnosticsMode != DecorationApplyMode.MERGE) {
+				target.Diagnostics = null;
+				target.DiagnosticsMode = patch.DiagnosticsMode;
+			}
+			if (patch.IndentGuides != null) {
+				target.IndentGuides = patch.IndentGuides;
+				target.IndentGuidesMode = patch.IndentGuidesMode;
+			} else if (patch.IndentGuidesMode != DecorationApplyMode.MERGE) {
+				target.IndentGuides = null;
+				target.IndentGuidesMode = patch.IndentGuidesMode;
+			}
+			if (patch.BracketGuides != null) {
+				target.BracketGuides = patch.BracketGuides;
+				target.BracketGuidesMode = patch.BracketGuidesMode;
+			} else if (patch.BracketGuidesMode != DecorationApplyMode.MERGE) {
+				target.BracketGuides = null;
+				target.BracketGuidesMode = patch.BracketGuidesMode;
+			}
+			if (patch.FlowGuides != null) {
+				target.FlowGuides = patch.FlowGuides;
+				target.FlowGuidesMode = patch.FlowGuidesMode;
+			} else if (patch.FlowGuidesMode != DecorationApplyMode.MERGE) {
+				target.FlowGuides = null;
+				target.FlowGuidesMode = patch.FlowGuidesMode;
+			}
+			if (patch.SeparatorGuides != null) {
+				target.SeparatorGuides = patch.SeparatorGuides;
+				target.SeparatorGuidesMode = patch.SeparatorGuidesMode;
+			} else if (patch.SeparatorGuidesMode != DecorationApplyMode.MERGE) {
+				target.SeparatorGuides = null;
+				target.SeparatorGuidesMode = patch.SeparatorGuidesMode;
+			}
+			if (patch.FoldRegions != null) {
+				target.FoldRegions = patch.FoldRegions;
+				target.FoldRegionsMode = patch.FoldRegionsMode;
+			} else if (patch.FoldRegionsMode != DecorationApplyMode.MERGE) {
+				target.FoldRegions = null;
+				target.FoldRegionsMode = patch.FoldRegionsMode;
+			}
+			if (patch.GutterIcons != null) {
+				target.GutterIcons = patch.GutterIcons;
+				target.GutterIconsMode = patch.GutterIconsMode;
+			} else if (patch.GutterIconsMode != DecorationApplyMode.MERGE) {
+				target.GutterIcons = null;
+				target.GutterIconsMode = patch.GutterIconsMode;
+			}
+			if (patch.PhantomTexts != null) {
+				target.PhantomTexts = patch.PhantomTexts;
+				target.PhantomTextsMode = patch.PhantomTextsMode;
+			} else if (patch.PhantomTextsMode != DecorationApplyMode.MERGE) {
+				target.PhantomTexts = null;
+				target.PhantomTextsMode = patch.PhantomTextsMode;
+			}
 		}
 
 		private sealed class ProviderState {
@@ -641,12 +984,17 @@ namespace SweetEditor {
 		public string LineText { get; }
 		/// <summary>Language configuration (nullable).</summary>
 		public LanguageConfiguration? LanguageConfig { get; }
+		/// <summary>Editor metadata (nullable).</summary>
+		public IEditorMetadata? EditorMetadata { get; }
 
-		public NewLineContext(int lineNumber, int column, string lineText, LanguageConfiguration? languageConfig) {
+		public NewLineContext(int lineNumber, int column, string lineText,
+							  LanguageConfiguration? languageConfig,
+							  IEditorMetadata? editorMetadata = null) {
 			LineNumber = lineNumber;
 			Column = column;
 			LineText = lineText;
 			LanguageConfig = languageConfig;
+			EditorMetadata = editorMetadata;
 		}
 	}
 
@@ -661,7 +1009,12 @@ namespace SweetEditor {
 
 	/// <summary>Manages new-line providers as a chain and uses the first provider that returns a non-null result.</summary>
 	internal sealed class NewLineActionProviderManager {
+		private readonly EditorControl editor;
 		private readonly List<INewLineActionProvider> providers = new();
+
+		public NewLineActionProviderManager(EditorControl editor) {
+			this.editor = editor;
+		}
 
 		public void AddProvider(INewLineActionProvider provider) {
 			providers.Add(provider);
@@ -672,7 +1025,16 @@ namespace SweetEditor {
 		}
 
 		/// <summary>Iterates all providers and returns the first non-null NewLineAction; returns null if all providers return null.</summary>
-		public NewLineAction? ProvideNewLineAction(NewLineContext context) {
+		public NewLineAction? ProvideNewLineAction() {
+			var cursor = editor.GetCursorPosition();
+			var doc = editor.GetDocument();
+			string lineText = doc?.GetLineText(cursor.Line) ?? "";
+			var context = new NewLineContext(
+				cursor.Line,
+				cursor.Column,
+				lineText,
+				editor.GetLanguageConfiguration(),
+				editor.Metadata);
 			foreach (var provider in providers) {
 				var action = provider.ProvideNewLineAction(context);
 				if (action != null) return action;

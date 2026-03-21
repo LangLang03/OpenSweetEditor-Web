@@ -17,6 +17,8 @@ namespace SweetEditor {
 		private AutoIndentMode autoIndentMode = AutoIndentMode.NONE;
 		private bool readOnly = false;
 		private int maxGutterIcons = 0;
+		private int decorationScrollRefreshMinIntervalMs = 16;
+		private float decorationOverscanViewportMultiplier = 1.5f;
 
 		internal EditorSettings(EditorControl editor) {
 			this.editor = editor;
@@ -92,5 +94,23 @@ namespace SweetEditor {
 
 		/// <summary>Gets max gutter icons.</summary>
 		public int GetMaxGutterIcons() => maxGutterIcons;
+
+		/// <summary>Sets minimum interval for scroll-triggered decoration refresh (milliseconds).</summary>
+		public void SetDecorationScrollRefreshMinIntervalMs(int intervalMs) {
+			decorationScrollRefreshMinIntervalMs = System.Math.Max(0, intervalMs);
+			editor.RequestDecorationRefresh();
+		}
+
+		/// <summary>Gets minimum interval for scroll-triggered decoration refresh (milliseconds).</summary>
+		public int GetDecorationScrollRefreshMinIntervalMs() => decorationScrollRefreshMinIntervalMs;
+
+		/// <summary>Sets decoration overscan multiplier relative to viewport line count.</summary>
+		public void SetDecorationOverscanViewportMultiplier(float multiplier) {
+			decorationOverscanViewportMultiplier = System.Math.Max(0f, multiplier);
+			editor.RequestDecorationRefresh();
+		}
+
+		/// <summary>Gets decoration overscan multiplier relative to viewport line count.</summary>
+		public float GetDecorationOverscanViewportMultiplier() => decorationOverscanViewportMultiplier;
 	}
 }

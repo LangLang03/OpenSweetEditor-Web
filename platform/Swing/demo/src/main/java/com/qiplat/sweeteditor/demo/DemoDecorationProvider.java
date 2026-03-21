@@ -57,8 +57,8 @@ public class DemoDecorationProvider implements DecorationProvider {
         phantoms.put(48, Collections.singletonList(new PhantomText(1, " // end main")));
 
         receiver.accept(new DecorationResult.Builder()
-                .inlayHints(hints)
-                .phantomTexts(phantoms)
+                .inlayHints(hints, DecorationResult.ApplyMode.REPLACE_ALL)
+                .phantomTexts(phantoms, DecorationResult.ApplyMode.REPLACE_ALL)
                 .build());
 
         System.out.println("[DemoProvider] 同步推送完毕: InlayHint + PhantomText");
@@ -87,7 +87,7 @@ public class DemoDecorationProvider implements DecorationProvider {
             ));
 
             receiver.accept(new DecorationResult.Builder()
-                    .diagnostics(diags)
+                    .diagnostics(diags, DecorationResult.ApplyMode.REPLACE_ALL)
                     .build());
 
             System.out.println("[DemoProvider] 异步推送完毕: Diagnostic（延迟 500ms）");

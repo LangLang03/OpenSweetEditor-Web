@@ -402,7 +402,7 @@ namespace SweetEditor {
 		// ==================== NewLineActionProvider API ====================
 
 		public void AddNewLineActionProvider(INewLineActionProvider provider) {
-			newLineActionProviderManager ??= new NewLineActionProviderManager();
+			newLineActionProviderManager ??= new NewLineActionProviderManager(this);
 			newLineActionProviderManager.AddProvider(provider);
 		}
 
@@ -983,12 +983,7 @@ namespace SweetEditor {
 			// Let NewLineActionProvider handle Enter first.
 			// If it returns null, fall back to core default behavior.
 			if (keyCode == 13 && newLineActionProviderManager != null) {
-				var cursor = editorCore.GetCursorPosition();
-				var doc = editorCore.GetDocument();
-				string lineText = doc?.GetLineText(cursor.Line) ?? "";
-				var ctx = new NewLineContext(cursor.Line, cursor.Column, lineText,
-					GetLanguageConfiguration());
-				var action = newLineActionProviderManager.ProvideNewLineAction(ctx);
+				var action = newLineActionProviderManager.ProvideNewLineAction();
 				if (action != null) {
 					var editResult = editorCore.InsertText(action.Text);
 					FireTextChanged(TextChangeAction.Key, editResult);

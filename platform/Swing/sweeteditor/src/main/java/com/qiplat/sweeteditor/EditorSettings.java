@@ -21,6 +21,8 @@ public class EditorSettings {
     private AutoIndentMode mAutoIndentMode = AutoIndentMode.NONE;
     private boolean mReadOnly = false;
     private int mMaxGutterIcons = 0;
+    private int mDecorationScrollRefreshMinIntervalMs = 16;
+    private float mDecorationOverscanViewportMultiplier = 1.5f;
 
     EditorSettings(SweetEditor editor) {
         mEditor = editor;
@@ -96,5 +98,23 @@ public class EditorSettings {
 
     public int getMaxGutterIcons() {
         return mMaxGutterIcons;
+    }
+
+    public void setDecorationScrollRefreshMinIntervalMs(int intervalMs) {
+        mDecorationScrollRefreshMinIntervalMs = Math.max(0, intervalMs);
+        mEditor.requestDecorationRefresh();
+    }
+
+    public int getDecorationScrollRefreshMinIntervalMs() {
+        return mDecorationScrollRefreshMinIntervalMs;
+    }
+
+    public void setDecorationOverscanViewportMultiplier(float multiplier) {
+        mDecorationOverscanViewportMultiplier = Math.max(0f, multiplier);
+        mEditor.requestDecorationRefresh();
+    }
+
+    public float getDecorationOverscanViewportMultiplier() {
+        return mDecorationOverscanViewportMultiplier;
     }
 }

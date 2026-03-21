@@ -65,7 +65,6 @@ import com.qiplat.sweeteditor.decoration.DecorationProviderManager;
 import com.qiplat.sweeteditor.newline.NewLineAction;
 import com.qiplat.sweeteditor.newline.NewLineActionProvider;
 import com.qiplat.sweeteditor.newline.NewLineActionProviderManager;
-import com.qiplat.sweeteditor.newline.NewLineContext;
 import com.qiplat.sweeteditor.event.ContextMenuEvent;
 import com.qiplat.sweeteditor.event.CursorChangedEvent;
 import com.qiplat.sweeteditor.event.DocumentLoadedEvent;
@@ -1276,7 +1275,7 @@ public class SweetEditor extends View {
 
     public void addNewLineActionProvider(@NonNull NewLineActionProvider provider) {
         if (mNewLineActionProviderManager == null) {
-            mNewLineActionProviderManager = new NewLineActionProviderManager();
+            mNewLineActionProviderManager = new NewLineActionProviderManager(this);
         }
         mNewLineActionProviderManager.addProvider(provider);
     }
@@ -1557,23 +1556,14 @@ public class SweetEditor extends View {
             // Give priority to NewLineActionProvider to handle Enter (Provider decides indentation),
             // if no Provider or returns null, fallback to Core layer default behavior
             if (nativeKeyCode == 13 && mNewLineActionProviderManager != null) {
-                TextPosition cursor = mEditorCore.getCursorPosition();
-                if (cursor != null) {
-                    Document doc = mEditorCore.getDocument();
-                    String lineText = (doc != null) ? doc.getLineText(cursor.line) : "";
-                    if (lineText == null) lineText = "";
-                    NewLineContext ctx = new NewLineContext(
-                            cursor.line, cursor.column, lineText,
-                            mLanguageConfiguration);
-                    NewLineAction action = mNewLineActionProviderManager.provideNewLineAction(ctx);
-                    if (action != null) {
-                        EditorCore.TextEditResult editResult = mEditorCore.insertText(action.text);
-                        dispatchTextChanged(TextChangeAction.KEY, editResult);
-                        resetCursorBlink();
-                        flush();
-                        logInputPerf(t0, "key-enter");
-                        return;
-                    }
+                NewLineAction action = mNewLineActionProviderManager.provideNewLineAction();
+                if (action != null) {
+                    EditorCore.TextEditResult editResult = mEditorCore.insertText(action.text);
+                    dispatchTextChanged(TextChangeAction.KEY, editResult);
+                    resetCursorBlink();
+                    flush();
+                    logInputPerf(t0, "key-enter");
+                    return;
                 }
             }
             int modifiers = 0;

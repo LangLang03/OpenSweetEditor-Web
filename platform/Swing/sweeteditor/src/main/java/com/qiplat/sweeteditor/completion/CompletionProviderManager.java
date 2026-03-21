@@ -140,7 +140,14 @@ public class CompletionProviderManager {
         int[] wr = editor.getWordRangeAtCursor();
         wordRange.start = new TextPosition(wr[0], wr[1]);
         wordRange.end = new TextPosition(wr[2], wr[3]);
-        return new CompletionContext(triggerKind, triggerCharacter, cursor, lineText, wordRange, editor.getLanguageConfiguration());
+        return new CompletionContext(
+                triggerKind,
+                triggerCharacter,
+                cursor,
+                lineText,
+                wordRange,
+                editor.getLanguageConfiguration(),
+                editor.getMetadata());
     }
 
     private void onProviderResult(CompletionProvider provider, CompletionResult result, int receiverGeneration) {

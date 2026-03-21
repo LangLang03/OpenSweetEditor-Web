@@ -1,13 +1,13 @@
 package com.qiplat.sweeteditor.demo;
 
 import android.content.Context;
-import android.util.Log;
 import android.util.SparseArray;
 
 import androidx.annotation.NonNull;
 
 import com.qiplat.sweeteditor.SweetEditor;
 import com.qiplat.sweeteditor.core.Document;
+import com.qiplat.sweeteditor.core.EditorCore;
 import com.qiplat.sweeteditor.core.adornment.DiagnosticItem;
 import com.qiplat.sweeteditor.core.adornment.FoldRegion;
 import com.qiplat.sweeteditor.core.adornment.GutterIcon;
@@ -17,11 +17,13 @@ import com.qiplat.sweeteditor.core.adornment.PhantomText;
 import com.qiplat.sweeteditor.core.adornment.SeparatorGuide;
 import com.qiplat.sweeteditor.core.adornment.StyleSpan;
 import com.qiplat.sweeteditor.core.foundation.TextPosition;
+import com.qiplat.sweeteditor.core.foundation.TextRange;
 import com.qiplat.sweeteditor.decoration.DecorationContext;
 import com.qiplat.sweeteditor.decoration.DecorationProvider;
 import com.qiplat.sweeteditor.decoration.DecorationReceiver;
 import com.qiplat.sweeteditor.decoration.DecorationResult;
 import com.qiplat.sweeteditor.decoration.DecorationType;
+import com.qiplat.sweetline.DocumentAnalyzer;
 import com.qiplat.sweetline.DocumentHighlight;
 import com.qiplat.sweetline.HighlightConfig;
 import com.qiplat.sweetline.HighlightEngine;
@@ -29,7 +31,6 @@ import com.qiplat.sweetline.IndentGuideLine;
 import com.qiplat.sweetline.IndentGuideResult;
 import com.qiplat.sweetline.LineHighlight;
 import com.qiplat.sweetline.SyntaxCompileError;
-import com.qiplat.sweetline.TextAnalyzer;
 import com.qiplat.sweetline.TokenSpan;
 
 import java.io.BufferedReader;
@@ -37,7 +38,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -49,7 +55,6 @@ import java.util.concurrent.Executors;
  */
 public class DemoDecorationProvider implements DecorationProvider {
 
-    private static final String TAG = "DemoDecorationProvider";
     private static final String CPP_SYNTAX_ASSET = "syntaxes/cpp.json";
     private static final String CPP_SYNTAX_NAME = "cpp";
     private static final int STYLE_KEYWORD = 1;
@@ -68,8 +73,9 @@ public class DemoDecorationProvider implements DecorationProvider {
     private final SweetEditor editor;
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
-    private HighlightEngine sweetLineEngine;
-    private TextAnalyzer sweetLineAnalyzer;
+    private static HighlightEngine highlightEngine;
+    private DocumentAnalyzer documentAnalyzer;
+    private DocumentHighlight cacheHighlight;
 
     public DemoDecorationProvider(@NonNull Context context, @NonNull SweetEditor editor) {
         this.appContext = context.getApplicationContext();
@@ -91,24 +97,21 @@ public class DemoDecorationProvider implements DecorationProvider {
 
     @Override
     public void provideDecorations(@NonNull DecorationContext context, @NonNull DecorationReceiver receiver) {
-        Log.d(TAG, "provideDecorations: visible=" + context.visibleStartLine + "-" + context.visibleEndLine);
-
         SparseArray<List<PhantomText>> phantoms = new SparseArray<>();
         phantoms.put(15, Collections.singletonList(
                 new PhantomText(5, "\n    void warn(const std::string& m) {\n        log(WARN, m);\n    }")));
 
-        DecorationResult sweetLineResult = buildSweetLineDecorationResult();
+        DecorationResult sweetLineResult = buildSweetLineDecorationResult(context);
         SparseArray<List<InlayHint>> mergedHints = sweetLineResult.getInlayHints();
         receiver.accept(new DecorationResult.Builder()
-                .inlayHints(mergedHints)
-                .phantomTexts(phantoms)
-                .syntaxSpans(sweetLineResult.getSyntaxSpans())
-                .indentGuides(sweetLineResult.getIndentGuides())
-                .foldRegions(sweetLineResult.getFoldRegions())
-                .separatorGuides(sweetLineResult.getSeparatorGuides())
-                .gutterIcons(sweetLineResult.getGutterIcons())
+                .inlayHints(mergedHints, DecorationResult.ApplyMode.REPLACE_RANGE)
+                .phantomTexts(phantoms, DecorationResult.ApplyMode.REPLACE_ALL)
+                .syntaxSpans(sweetLineResult.getSyntaxSpans(), DecorationResult.ApplyMode.MERGE)
+                .indentGuides(sweetLineResult.getIndentGuides(), DecorationResult.ApplyMode.REPLACE_ALL)
+                .foldRegions(sweetLineResult.getFoldRegions(), DecorationResult.ApplyMode.REPLACE_ALL)
+                .separatorGuides(sweetLineResult.getSeparatorGuides(), DecorationResult.ApplyMode.REPLACE_ALL)
+                .gutterIcons(sweetLineResult.getGutterIcons(), DecorationResult.ApplyMode.REPLACE_ALL)
                 .build());
-        Log.d(TAG, "Synchronous push complete: InlayHint + PhantomText + SweetLine");
 
         executor.submit(() -> {
             try {
@@ -117,7 +120,6 @@ public class DemoDecorationProvider implements DecorationProvider {
             }
 
             if (receiver.isCancelled()) {
-                Log.d(TAG, "Asynchronous Diagnostic cancelled (document changed)");
                 return;
             }
 
@@ -133,15 +135,13 @@ public class DemoDecorationProvider implements DecorationProvider {
             ));
 
             receiver.accept(new DecorationResult.Builder()
-                    .diagnostics(diags)
+                    .diagnostics(diags, DecorationResult.ApplyMode.REPLACE_ALL)
                     .build());
-
-            Log.d(TAG, "Asynchronous push complete: Diagnostic (500ms delay)");
         });
     }
 
     @NonNull
-    private DecorationResult buildSweetLineDecorationResult() {
+    private DecorationResult buildSweetLineDecorationResult(DecorationContext context) {
         SparseArray<List<StyleSpan>> syntaxSpans = new SparseArray<>();
         SparseArray<List<InlayHint>> colorInlayHints = new SparseArray<>();
         SparseArray<List<GutterIcon>> gutterIcons = new SparseArray<>();
@@ -150,36 +150,36 @@ public class DemoDecorationProvider implements DecorationProvider {
         List<SeparatorGuide> separatorGuides = new ArrayList<>();
         Set<String> seenColorHints = new HashSet<>();
 
-        try {
-            if (!ensureSweetLineReady()) {
-                return new DecorationResult.Builder()
-                        .syntaxSpans(syntaxSpans)
-                        .inlayHints(colorInlayHints)
-                        .indentGuides(indentGuides)
-                        .foldRegions(foldRegions)
-                        .separatorGuides(separatorGuides)
-                        .gutterIcons(gutterIcons)
-                        .build();
+        Document editorDocument = editor.getDocument();
+        String text = editorDocument != null ? editorDocument.getText() : "";
+
+        if (cacheHighlight == null || documentAnalyzer == null) {
+            documentAnalyzer = highlightEngine.loadDocument(new com.qiplat.sweetline.Document("http://sample.cpp", text));
+            cacheHighlight = documentAnalyzer.analyze();
+        } else if (!context.textChanges.isEmpty()) {
+            for (EditorCore.TextChange change : context.textChanges) {
+                cacheHighlight = documentAnalyzer.analyzeIncremental(
+                        convertAsSLTextRange(change.range),
+                        change.newText
+                );
             }
-
-            Document editorDocument = editor.getDocument();
-            String text = editorDocument != null ? editorDocument.getText() : "";
-
-            DocumentHighlight highlight = sweetLineAnalyzer.analyzeText(text);
-            if (highlight != null && highlight.lines != null) {
-                for (LineHighlight lineHighlight : highlight.lines) {
-                    if (lineHighlight == null || lineHighlight.spans == null) continue;
-                    for (TokenSpan token : lineHighlight.spans) {
-                        appendStyleSpan(syntaxSpans, token);
-                        appendColorInlayHint(colorInlayHints, seenColorHints, editorDocument, token);
-                        appendTextInlayHint(colorInlayHints, editorDocument, token);
-                        appendSeparator(separatorGuides, editorDocument, token);
-                        appendGutterIcons(gutterIcons, editorDocument, token);
-                    }
-                }
+        }
+        int renderStartLine = Math.max(0, context.visibleStartLine);
+        int maxLine = Math.min(context.visibleEndLine, cacheHighlight.lines.size() - 1);
+        for (int i = renderStartLine; i <= maxLine; i++) {
+            LineHighlight lineHighlight = cacheHighlight.lines.get(i);
+            for (TokenSpan token : lineHighlight.spans) {
+                appendStyleSpan(syntaxSpans, token);
+                appendColorInlayHint(colorInlayHints, seenColorHints, editorDocument, token);
+                appendTextInlayHint(colorInlayHints, editorDocument, token);
+                appendSeparator(separatorGuides, editorDocument, token);
+                appendGutterIcons(gutterIcons, editorDocument, token);
             }
+        }
 
-            IndentGuideResult guideResult = sweetLineAnalyzer.analyzeIndentGuides(text);
+        // Only analyze indent guides under 2048 lines
+        if (context.totalLineCount < 2048) {
+            IndentGuideResult guideResult = documentAnalyzer.analyzeIndentGuides();
             if (guideResult != null && guideResult.guideLines != null) {
                 Set<String> seenFolds = new HashSet<>();
                 for (IndentGuideLine guide : guideResult.guideLines) {
@@ -199,93 +199,64 @@ public class DemoDecorationProvider implements DecorationProvider {
                     }
                 }
             }
-        } catch (Throwable t) {
-            Log.e(TAG, "SweetLine analyze failed", t);
         }
 
         return new DecorationResult.Builder()
-                .syntaxSpans(syntaxSpans)
-                .inlayHints(colorInlayHints)
-                .indentGuides(indentGuides)
-                .foldRegions(foldRegions)
-                .separatorGuides(separatorGuides)
-                .gutterIcons(gutterIcons)
+                .syntaxSpans(syntaxSpans, DecorationResult.ApplyMode.MERGE)
+                .inlayHints(colorInlayHints, DecorationResult.ApplyMode.REPLACE_RANGE)
+                .indentGuides(indentGuides, DecorationResult.ApplyMode.REPLACE_ALL)
+                .foldRegions(foldRegions, DecorationResult.ApplyMode.REPLACE_ALL)
+                .separatorGuides(separatorGuides, DecorationResult.ApplyMode.REPLACE_ALL)
+                .gutterIcons(gutterIcons, DecorationResult.ApplyMode.REPLACE_ALL)
                 .build();
     }
 
     private void appendStyleSpan(@NonNull SparseArray<List<StyleSpan>> syntaxSpans,
                                  TokenSpan token) {
-        if (token == null || token.range == null || token.range.start == null || token.range.end == null) {
-            return;
-        }
         if (token.styleId <= 0) {
             return;
         }
-
-        int startLine = token.range.start.line;
-        int endLine = token.range.end.line;
-        int startColumn = token.range.start.column;
-        int endColumn = token.range.end.column;
-        if (startLine != endLine) {
-            return;
-        }
-        int length = endColumn - startColumn;
-        if (startLine < 0 || startColumn < 0 || length <= 0) {
+        TokenRangeInfo range = extractSingleLineTokenRange(token);
+        if (range == null) {
             return;
         }
 
-        List<StyleSpan> lineSpans = syntaxSpans.get(startLine);
+        List<StyleSpan> lineSpans = syntaxSpans.get(range.line);
         if (lineSpans == null) {
             lineSpans = new ArrayList<>();
-            syntaxSpans.put(startLine, lineSpans);
+            syntaxSpans.put(range.line, lineSpans);
         }
-        lineSpans.add(new StyleSpan(startColumn, length, token.styleId));
+        lineSpans.add(new StyleSpan(range.startColumn, range.length(), token.styleId));
     }
 
     private void appendColorInlayHint(@NonNull SparseArray<List<InlayHint>> colorHints,
                                       @NonNull Set<String> seenHints,
                                       @NonNull Document editorDocument,
                                       TokenSpan token) {
-        if (token == null || token.range == null || token.range.start == null || token.range.end == null) {
-            return;
-        }
         if (token.styleId != STYLE_COLOR) {
             return;
         }
-
-        int startLine = token.range.start.line;
-        int endLine = token.range.end.line;
-        int startColumn = token.range.start.column;
-        int endColumn = token.range.end.column;
-        if (startLine < 0 || startLine != endLine || startColumn < 0 || endColumn <= startColumn) {
+        TokenRangeInfo range = extractSingleLineTokenRange(token);
+        if (range == null) {
             return;
         }
-
-        String lineText = editorDocument.getLineText(startLine);
-        if (lineText == null) {
-            return;
-        }
-        if (endColumn > lineText.length()) {
-            return;
-        }
-
-        String literal = lineText.substring(startColumn, endColumn);
+        String literal = getTokenLiteral(editorDocument, range);
         Integer color = parseColorLiteral(literal);
         if (color == null) {
             return;
         }
 
-        String key = startLine + ":" + startColumn + ":" + literal;
+        String key = range.line + ":" + range.startColumn + ":" + literal;
         if (!seenHints.add(key)) {
             return;
         }
 
-        List<InlayHint> lineHints = colorHints.get(startLine);
+        List<InlayHint> lineHints = colorHints.get(range.line);
         if (lineHints == null) {
             lineHints = new ArrayList<>();
-            colorHints.put(startLine, lineHints);
+            colorHints.put(range.line, lineHints);
         }
-        lineHints.add(InlayHint.color(startColumn, color));
+        lineHints.add(InlayHint.color(range.startColumn, color));
     }
 
     private Integer parseColorLiteral(@NonNull String literal) {
@@ -300,60 +271,43 @@ public class DemoDecorationProvider implements DecorationProvider {
     }
 
     private void appendTextInlayHint(@NonNull SparseArray<List<InlayHint>> colorHints,
-                                      @NonNull Document editorDocument, TokenSpan token) {
-        if (token == null || token.range == null || token.range.start == null || token.range.end == null) {
-            return;
-        }
+                                     @NonNull Document editorDocument, TokenSpan token) {
         if (token.styleId != STYLE_KEYWORD) {
             return;
         }
-
-        int startLine = token.range.start.line;
-        int endLine = token.range.end.line;
-        int startColumn = token.range.start.column;
-        int endColumn = token.range.end.column;
-        if (startLine < 0 || startLine != endLine || startColumn < 0 || endColumn <= startColumn) {
+        TokenRangeInfo range = extractSingleLineTokenRange(token);
+        if (range == null) {
             return;
         }
-
-        String lineText = editorDocument.getLineText(startLine);
-        if (lineText == null) {
-            return;
-        }
-        if (endColumn > lineText.length()) {
-            return;
-        }
-
-        List<InlayHint> lineHints = colorHints.get(startLine);
+        String literal = getTokenLiteral(editorDocument, range);
+        List<InlayHint> lineHints = colorHints.get(range.line);
         if (lineHints == null) {
             lineHints = new ArrayList<>();
-            colorHints.put(startLine, lineHints);
+            colorHints.put(range.line, lineHints);
         }
-        String literal = lineText.substring(startColumn, endColumn);
         if ("const".equals(literal)) {
-            lineHints.add(InlayHint.text(endColumn + 1, "immutable"));
+            lineHints.add(InlayHint.text(range.endColumn + 1, "immutable"));
         } else if ("return".equals(literal)) {
-            lineHints.add(InlayHint.text(endColumn + 1, "value: "));
+            lineHints.add(InlayHint.text(range.endColumn + 1, "value: "));
         } else if ("case".equals(literal)) {
-            lineHints.add(InlayHint.text(endColumn + 1, "condition: "));
+            lineHints.add(InlayHint.text(range.endColumn + 1, "condition: "));
         }
     }
 
     private void appendSeparator(@NonNull List<SeparatorGuide> separatorGuides,
                                  @NonNull Document editorDocument, TokenSpan token) {
-        if (token == null || token.range == null || token.range.start == null || token.range.end == null) {
-            return;
-        }
         if (token.styleId != STYLE_COMMENT) {
             return;
         }
-        int startLine = token.range.start.line;
-        int endColumn = token.range.end.column;
-        String lineText = editorDocument.getLineText(startLine);
+        TokenRangeInfo range = extractSingleLineTokenRange(token);
+        if (range == null) {
+            return;
+        }
+        String lineText = editorDocument.getLineText(range.line);
         if (lineText == null) {
             return;
         }
-        if (endColumn > lineText.length()) {
+        if (range.endColumn > lineText.length()) {
             return;
         }
         int count = -1;
@@ -380,44 +334,71 @@ public class DemoDecorationProvider implements DecorationProvider {
             }
         }
         if (count > 0) {
-            SeparatorGuide separatorGuide = new SeparatorGuide(startLine, isDouble ? 1 : 0, count, lineText.length());
+            SeparatorGuide separatorGuide = new SeparatorGuide(range.line, isDouble ? 1 : 0, count, lineText.length());
             separatorGuides.add(separatorGuide);
         }
     }
 
     private void appendGutterIcons(@NonNull SparseArray<List<GutterIcon>> gutterIcons,
-                                 @NonNull Document editorDocument, TokenSpan token) {
-        if (token == null || token.range == null || token.range.start == null || token.range.end == null) {
-            return;
-        }
+                                   @NonNull Document editorDocument, TokenSpan token) {
         if (token.styleId != STYLE_KEYWORD) {
             return;
         }
-
-        int startLine = token.range.start.line;
-        int startColumn = token.range.start.column;
-        int endColumn = token.range.end.column;
-
-        String lineText = editorDocument.getLineText(startLine);
-        if (lineText == null) {
+        TokenRangeInfo range = extractSingleLineTokenRange(token);
+        if (range == null) {
             return;
         }
-        if (endColumn > lineText.length()) {
-            return;
-        }
-        String literal = lineText.substring(startColumn, endColumn);
+        String literal = getTokenLiteral(editorDocument, range);
         if ("class".equals(literal) || "struct".equals(literal)) {
-            List<GutterIcon> lineIcons = gutterIcons.get(startLine);
+            List<GutterIcon> lineIcons = gutterIcons.get(range.line);
             if (lineIcons == null) {
                 lineIcons = new ArrayList<>();
-                gutterIcons.put(startLine, lineIcons);
+                gutterIcons.put(range.line, lineIcons);
             }
             lineIcons.add(new GutterIcon(ICON_CLASS));
         }
     }
 
-    private boolean ensureSweetLineReady() throws IOException {
-        if (sweetLineAnalyzer != null) {
+    private static final class TokenRangeInfo {
+        final int line;
+        final int startColumn;
+        final int endColumn;
+
+        TokenRangeInfo(int line, int startColumn, int endColumn) {
+            this.line = line;
+            this.startColumn = startColumn;
+            this.endColumn = endColumn;
+        }
+
+        int length() {
+            return endColumn - startColumn;
+        }
+    }
+
+    private static TokenRangeInfo extractSingleLineTokenRange(TokenSpan token) {
+        if (token == null || token.range == null || token.range.start == null || token.range.end == null) {
+            return null;
+        }
+        int startLine = token.range.start.line;
+        int endLine = token.range.end.line;
+        int startColumn = token.range.start.column;
+        int endColumn = token.range.end.column;
+        if (startLine < 0 || startLine != endLine || startColumn < 0 || endColumn <= startColumn) {
+            return null;
+        }
+        return new TokenRangeInfo(startLine, startColumn, endColumn);
+    }
+
+    private static String getTokenLiteral(@NonNull Document editorDocument, @NonNull TokenRangeInfo range) {
+        String lineText = editorDocument.getLineText(range.line);
+        if (lineText == null || range.endColumn > lineText.length()) {
+            return "";
+        }
+        return lineText.substring(range.startColumn, range.endColumn);
+    }
+
+    public static boolean ensureSweetLineReady(Context context) throws IOException {
+        if (highlightEngine != null) {
             return true;
         }
 
@@ -425,24 +406,18 @@ public class DemoDecorationProvider implements DecorationProvider {
         HighlightEngine engine = new HighlightEngine(config);
         registerDemoStyleMap(engine);
 
-        String syntaxJson = loadAssetText(CPP_SYNTAX_ASSET);
+        String syntaxJson = loadAssetText(context, CPP_SYNTAX_ASSET);
         try {
             engine.compileSyntaxFromJson(syntaxJson);
         } catch (SyntaxCompileError e) {
             throw new RuntimeException(e);
         }
 
-        TextAnalyzer analyzer = engine.createAnalyzerByName(CPP_SYNTAX_NAME);
-        if (analyzer == null) {
-            return false;
-        }
-
-        sweetLineEngine = engine;
-        sweetLineAnalyzer = analyzer;
+        highlightEngine = engine;
         return true;
     }
 
-    private void registerDemoStyleMap(@NonNull HighlightEngine engine) {
+    private static void registerDemoStyleMap(@NonNull HighlightEngine engine) {
         engine.registerStyleName("keyword", STYLE_KEYWORD);
         engine.registerStyleName("type", STYLE_TYPE);
         engine.registerStyleName("string", STYLE_STRING);
@@ -459,9 +434,9 @@ public class DemoDecorationProvider implements DecorationProvider {
     }
 
     @NonNull
-    private String loadAssetText(@NonNull String assetPath) throws IOException {
+    private static String loadAssetText(Context context, String assetPath) throws IOException {
         StringBuilder builder = new StringBuilder();
-        try (InputStream is = appContext.getAssets().open(assetPath);
+        try (InputStream is = context.getAssets().open(assetPath);
              BufferedReader reader = new BufferedReader(new InputStreamReader(is))) {
             String line;
             while ((line = reader.readLine()) != null) {
@@ -472,5 +447,11 @@ public class DemoDecorationProvider implements DecorationProvider {
             }
         }
         return builder.toString();
+    }
+
+    private static com.qiplat.sweetline.TextRange convertAsSLTextRange(TextRange seRange) {
+        com.qiplat.sweetline.TextPosition slStart = new com.qiplat.sweetline.TextPosition(seRange.start.line, seRange.start.column);
+        com.qiplat.sweetline.TextPosition slEnd = new com.qiplat.sweetline.TextPosition(seRange.end.line, seRange.end.column);
+        return new com.qiplat.sweetline.TextRange(slStart, slEnd);
     }
 }

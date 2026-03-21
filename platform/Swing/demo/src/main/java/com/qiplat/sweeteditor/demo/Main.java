@@ -9,6 +9,11 @@ import com.qiplat.sweeteditor.core.foundation.WrapMode;
 
 import javax.swing.*;
 import java.awt.*;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.List;
 
@@ -83,7 +88,7 @@ public class Main extends JFrame {
         statusLabel.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 4));
 
         // Auto-load document and decorations at startup.
-        Document doc = new Document(SAMPLE_CODE);
+        Document doc = new Document(loadSampleCode());
         editor.loadDocument(doc);
         applyAllDecorations();
 
@@ -126,6 +131,40 @@ public class Main extends JFrame {
         btn.setMargin(new Insets(2, 6, 2, 6));
         btn.addActionListener(action);
         return btn;
+    }
+
+    private static String loadSampleCode() {
+        Path sampleFile = resolveDemoFile("files/sample.cpp");
+        if (sampleFile != null) {
+            try {
+                return Files.readString(sampleFile, StandardCharsets.UTF_8);
+            } catch (IOException ignored) {
+                // Fallback to built-in sample text.
+            }
+        }
+        return SAMPLE_CODE;
+    }
+
+    private static Path resolveDemoFile(String relativePath) {
+        String resDir = System.getProperty("sweeteditor.demo.res.dir");
+        if (resDir != null && !resDir.isEmpty()) {
+            Path candidate = Paths.get(resDir).resolve(relativePath).normalize();
+            if (Files.isRegularFile(candidate)) {
+                return candidate;
+            }
+        }
+        Path cwd = Paths.get("").toAbsolutePath().normalize();
+        for (Path dir = cwd; dir != null; dir = dir.getParent()) {
+            Path candidate = dir.resolve("_res").resolve(relativePath);
+            if (Files.isRegularFile(candidate)) {
+                return candidate;
+            }
+            candidate = dir.resolve("platform").resolve("_res").resolve(relativePath);
+            if (Files.isRegularFile(candidate)) {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     private void updateStatus(String message) {

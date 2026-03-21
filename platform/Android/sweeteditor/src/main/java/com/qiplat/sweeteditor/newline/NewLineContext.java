@@ -3,6 +3,7 @@ package com.qiplat.sweeteditor.newline;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.qiplat.sweeteditor.EditorMetadata;
 import com.qiplat.sweeteditor.LanguageConfiguration;
 
 /**
@@ -19,12 +20,17 @@ public class NewLineContext {
     /** Language configuration (may be null) */
     @Nullable
     public final LanguageConfiguration languageConfiguration;
+    /** Editor metadata (may be null) */
+    @Nullable
+    public final EditorMetadata editorMetadata;
 
     public NewLineContext(int lineNumber, int column, @NonNull String lineText,
-                          @Nullable LanguageConfiguration languageConfiguration) {
+                          @Nullable LanguageConfiguration languageConfiguration,
+                          @Nullable EditorMetadata editorMetadata) {
         this.lineNumber = lineNumber;
         this.column = column;
         this.lineText = lineText;
         this.languageConfiguration = languageConfiguration;
+        this.editorMetadata = editorMetadata;
     }
 }

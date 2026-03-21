@@ -1,5 +1,6 @@
 package com.qiplat.sweeteditor.decoration;
 
+import com.qiplat.sweeteditor.EditorMetadata;
 import com.qiplat.sweeteditor.LanguageConfiguration;
 import com.qiplat.sweeteditor.core.foundation.TextChange;
 
@@ -14,13 +15,17 @@ public final class DecorationContext {
     public final List<TextChange> textChanges;
     /** Current language configuration (from LanguageConfiguration) */
     public final LanguageConfiguration languageConfiguration;
+    /** Current editor metadata (from SweetEditor) */
+    public final EditorMetadata editorMetadata;
 
     public DecorationContext(int visibleStartLine, int visibleEndLine, int totalLineCount,
-                             List<TextChange> textChanges, LanguageConfiguration languageConfiguration) {
+                             List<TextChange> textChanges, LanguageConfiguration languageConfiguration,
+                             EditorMetadata editorMetadata) {
         this.visibleStartLine = visibleStartLine;
         this.visibleEndLine = visibleEndLine;
         this.totalLineCount = totalLineCount;
         this.textChanges = Collections.unmodifiableList(textChanges);
         this.languageConfiguration = languageConfiguration;
+        this.editorMetadata = editorMetadata;
     }
 }

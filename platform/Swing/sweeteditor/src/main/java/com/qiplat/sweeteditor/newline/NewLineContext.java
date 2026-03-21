@@ -1,5 +1,6 @@
 package com.qiplat.sweeteditor.newline;
 
+import com.qiplat.sweeteditor.EditorMetadata;
 import com.qiplat.sweeteditor.LanguageConfiguration;
 
 /**
@@ -14,12 +15,16 @@ public class NewLineContext {
     public final String lineText;
     /** Language configuration (may be null) */
     public final LanguageConfiguration languageConfiguration;
+    /** Editor metadata (may be null) */
+    public final EditorMetadata editorMetadata;
 
     public NewLineContext(int lineNumber, int column, String lineText,
-                          LanguageConfiguration languageConfiguration) {
+                          LanguageConfiguration languageConfiguration,
+                          EditorMetadata editorMetadata) {
         this.lineNumber = lineNumber;
         this.column = column;
         this.lineText = lineText;
         this.languageConfiguration = languageConfiguration;
+        this.editorMetadata = editorMetadata;
     }
 }

@@ -13,7 +13,6 @@ import com.qiplat.sweeteditor.decoration.DecorationProviderManager;
 import com.qiplat.sweeteditor.newline.NewLineAction;
 import com.qiplat.sweeteditor.newline.NewLineActionProvider;
 import com.qiplat.sweeteditor.newline.NewLineActionProviderManager;
-import com.qiplat.sweeteditor.newline.NewLineContext;
 import com.qiplat.sweeteditor.event.*;
 
 import javax.swing.*;
@@ -392,7 +391,7 @@ public class SweetEditor extends JPanel {
 
     public void addNewLineActionProvider(NewLineActionProvider provider) {
         if (newLineActionProviderManager == null) {
-            newLineActionProviderManager = new NewLineActionProviderManager();
+            newLineActionProviderManager = new NewLineActionProviderManager(this);
         }
         newLineActionProviderManager.addProvider(provider);
     }
@@ -502,23 +501,14 @@ public class SweetEditor extends JPanel {
                 // Prioritize letting NewLineActionProvider handle Enter (Provider decides indentation),
                 // if no Provider or returns null then fallback to Core layer default behavior
                 if (keyCode == 13 && newLineActionProviderManager != null) {
-                    int[] cursor = editorCore.getCursorPosition();
-                    if (cursor != null) {
-                        Document doc = editorCore.getDocument();
-                        String lineText = (doc != null) ? doc.getLineText(cursor[0]) : "";
-                        if (lineText == null) lineText = "";
-                        NewLineContext ctx = new NewLineContext(
-                                cursor[0], cursor[1], lineText,
-                                getLanguageConfiguration());
-                        NewLineAction action = newLineActionProviderManager.provideNewLineAction(ctx);
-                        if (action != null) {
-                            TextEditResult editResult = editorCore.insertText(action.text);
-                            e.consume();
-                            dispatchTextChanged(TextChangeAction.KEY, editResult);
-                            resetCursorBlink();
-                            flush();
-                            return;
-                        }
+                    NewLineAction action = newLineActionProviderManager.provideNewLineAction();
+                    if (action != null) {
+                        TextEditResult editResult = editorCore.insertText(action.text);
+                        e.consume();
+                        dispatchTextChanged(TextChangeAction.KEY, editResult);
+                        resetCursorBlink();
+                        flush();
+                        return;
                     }
                 }
 

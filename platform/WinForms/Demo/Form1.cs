@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading.Tasks;
 using SweetEditor;
 
@@ -71,7 +72,7 @@ using SweetEditor;
 			SetupToolbar();
 
 			// Auto-load the document and decorations on startup.
-			Document doc = new Document(SAMPLE_CODE);
+			Document doc = new Document(LoadSampleCode());
 			editorControl1.LoadDocument(doc);
 			ApplyAllDecorations();
 
@@ -142,6 +143,46 @@ using SweetEditor;
 			};
 			btn.Click += click;
 			return btn;
+		}
+
+		private static string LoadSampleCode() {
+			string? samplePath = ResolveDemoFile("files/sample.cpp");
+			if (!string.IsNullOrEmpty(samplePath)) {
+				try {
+					return File.ReadAllText(samplePath);
+				} catch {
+					// Fallback to built-in sample text.
+				}
+			}
+			return SAMPLE_CODE;
+		}
+
+		private static string? ResolveDemoFile(string relativePath) {
+			var candidates = new List<DirectoryInfo>();
+			try {
+				candidates.Add(new DirectoryInfo(AppContext.BaseDirectory));
+			} catch {
+				// ignore
+			}
+			try {
+				candidates.Add(new DirectoryInfo(Directory.GetCurrentDirectory()));
+			} catch {
+				// ignore
+			}
+
+			foreach (var start in candidates) {
+				for (DirectoryInfo? dir = start; dir != null; dir = dir.Parent) {
+					string p1 = Path.Combine(dir.FullName, "_res", relativePath);
+					if (File.Exists(p1)) {
+						return p1;
+					}
+					string p2 = Path.Combine(dir.FullName, "platform", "_res", relativePath);
+					if (File.Exists(p2)) {
+						return p2;
+					}
+				}
+			}
+			return null;
 		}
 
 		private void UpdateStatus(string message) {

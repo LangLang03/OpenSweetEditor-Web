@@ -172,7 +172,14 @@ public class CompletionProviderManager {
         if (lineText == null) lineText = "";
 
         TextRange wordRange = editor.getWordRangeAtCursor();
-        return new CompletionContext(triggerKind, triggerCharacter, cursor, lineText, wordRange, editor.getLanguageConfiguration());
+        return new CompletionContext(
+                triggerKind,
+                triggerCharacter,
+                cursor,
+                lineText,
+                wordRange,
+                editor.getLanguageConfiguration(),
+                editor.getMetadata());
     }
 
     private void onProviderResult(@NonNull CompletionProvider provider,

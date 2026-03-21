@@ -112,11 +112,11 @@ centralPortal {
     name = "sweeteditor"
 
     pom {
-        url = "https://github.com/FinalScave/SweetEditor"
+        url = "https://github.com/FinalScave/OpenSweetEditor"
         licenses {
             license {
-                name = "MIT License"
-                url = "https://www.mit-license.org"
+                name = "LGPL-2.1-or-later"
+                url = "https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html"
             }
         }
         developers {
@@ -128,9 +128,9 @@ centralPortal {
             }
         }
         scm {
-            connection = "scm:git:https://github.com/FinalScave/SweetEditor.git"
-            developerConnection = "scm:git:https://github.com/FinalScave/SweetEditor"
-            url = "https://github.com/FinalScave/SweetEditor"
+            connection = "scm:git:https://github.com/FinalScave/OpenSweetEditor.git"
+            developerConnection = "scm:git:https://github.com/FinalScave/OpenSweetEditor"
+            url = "https://github.com/FinalScave/OpenSweetEditor"
         }
     }
 }

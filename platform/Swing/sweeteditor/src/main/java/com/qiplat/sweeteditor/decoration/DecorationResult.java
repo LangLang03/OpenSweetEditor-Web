@@ -17,6 +17,12 @@ import java.util.List;
 import java.util.Map;
 
 public class DecorationResult {
+    public enum ApplyMode {
+        MERGE,
+        REPLACE_ALL,
+        REPLACE_RANGE
+    }
+
     private Map<Integer, List<StyleSpan>> syntaxSpans;
     private Map<Integer, List<StyleSpan>> semanticSpans;
     private Map<Integer, List<InlayHint>> inlayHints;
@@ -29,6 +35,18 @@ public class DecorationResult {
     private Map<Integer, List<GutterIcon>> gutterIcons;
     private Map<Integer, List<PhantomText>> phantomTexts;
 
+    private ApplyMode syntaxSpansMode = ApplyMode.MERGE;
+    private ApplyMode semanticSpansMode = ApplyMode.MERGE;
+    private ApplyMode inlayHintsMode = ApplyMode.MERGE;
+    private ApplyMode diagnosticsMode = ApplyMode.MERGE;
+    private ApplyMode indentGuidesMode = ApplyMode.MERGE;
+    private ApplyMode bracketGuidesMode = ApplyMode.MERGE;
+    private ApplyMode flowGuidesMode = ApplyMode.MERGE;
+    private ApplyMode separatorGuidesMode = ApplyMode.MERGE;
+    private ApplyMode foldRegionsMode = ApplyMode.MERGE;
+    private ApplyMode gutterIconsMode = ApplyMode.MERGE;
+    private ApplyMode phantomTextsMode = ApplyMode.MERGE;
+
     public Map<Integer, List<StyleSpan>> getSyntaxSpans() { return syntaxSpans; }
     public Map<Integer, List<StyleSpan>> getSemanticSpans() { return semanticSpans; }
     public Map<Integer, List<InlayHint>> getInlayHints() { return inlayHints; }
@@ -40,6 +58,17 @@ public class DecorationResult {
     public List<FoldRegion> getFoldRegions() { return foldRegions; }
     public Map<Integer, List<GutterIcon>> getGutterIcons() { return gutterIcons; }
     public Map<Integer, List<PhantomText>> getPhantomTexts() { return phantomTexts; }
+    public ApplyMode getSyntaxSpansMode() { return syntaxSpansMode; }
+    public ApplyMode getSemanticSpansMode() { return semanticSpansMode; }
+    public ApplyMode getInlayHintsMode() { return inlayHintsMode; }
+    public ApplyMode getDiagnosticsMode() { return diagnosticsMode; }
+    public ApplyMode getIndentGuidesMode() { return indentGuidesMode; }
+    public ApplyMode getBracketGuidesMode() { return bracketGuidesMode; }
+    public ApplyMode getFlowGuidesMode() { return flowGuidesMode; }
+    public ApplyMode getSeparatorGuidesMode() { return separatorGuidesMode; }
+    public ApplyMode getFoldRegionsMode() { return foldRegionsMode; }
+    public ApplyMode getGutterIconsMode() { return gutterIconsMode; }
+    public ApplyMode getPhantomTextsMode() { return phantomTextsMode; }
 
     void setSyntaxSpans(Map<Integer, List<StyleSpan>> v) { this.syntaxSpans = v; }
     void setSemanticSpans(Map<Integer, List<StyleSpan>> v) { this.semanticSpans = v; }
@@ -52,6 +81,17 @@ public class DecorationResult {
     void setFoldRegions(List<FoldRegion> v) { this.foldRegions = v; }
     void setGutterIcons(Map<Integer, List<GutterIcon>> v) { this.gutterIcons = v; }
     void setPhantomTexts(Map<Integer, List<PhantomText>> v) { this.phantomTexts = v; }
+    void setSyntaxSpansMode(ApplyMode mode) { this.syntaxSpansMode = mode; }
+    void setSemanticSpansMode(ApplyMode mode) { this.semanticSpansMode = mode; }
+    void setInlayHintsMode(ApplyMode mode) { this.inlayHintsMode = mode; }
+    void setDiagnosticsMode(ApplyMode mode) { this.diagnosticsMode = mode; }
+    void setIndentGuidesMode(ApplyMode mode) { this.indentGuidesMode = mode; }
+    void setBracketGuidesMode(ApplyMode mode) { this.bracketGuidesMode = mode; }
+    void setFlowGuidesMode(ApplyMode mode) { this.flowGuidesMode = mode; }
+    void setSeparatorGuidesMode(ApplyMode mode) { this.separatorGuidesMode = mode; }
+    void setFoldRegionsMode(ApplyMode mode) { this.foldRegionsMode = mode; }
+    void setGutterIconsMode(ApplyMode mode) { this.gutterIconsMode = mode; }
+    void setPhantomTextsMode(ApplyMode mode) { this.phantomTextsMode = mode; }
 
     public DecorationResult copy() {
         DecorationResult out = new DecorationResult();
@@ -66,6 +106,17 @@ public class DecorationResult {
         out.foldRegions = copyList(foldRegions);
         out.gutterIcons = copyMapOfLists(gutterIcons);
         out.phantomTexts = copyMapOfLists(phantomTexts);
+        out.syntaxSpansMode = syntaxSpansMode;
+        out.semanticSpansMode = semanticSpansMode;
+        out.inlayHintsMode = inlayHintsMode;
+        out.diagnosticsMode = diagnosticsMode;
+        out.indentGuidesMode = indentGuidesMode;
+        out.bracketGuidesMode = bracketGuidesMode;
+        out.flowGuidesMode = flowGuidesMode;
+        out.separatorGuidesMode = separatorGuidesMode;
+        out.foldRegionsMode = foldRegionsMode;
+        out.gutterIconsMode = gutterIconsMode;
+        out.phantomTextsMode = phantomTextsMode;
         return out;
     }
 
@@ -86,17 +137,17 @@ public class DecorationResult {
     public static class Builder {
         private final DecorationResult result = new DecorationResult();
 
-        public Builder syntaxSpans(Map<Integer, List<StyleSpan>> value) { result.syntaxSpans = value; return this; }
-        public Builder semanticSpans(Map<Integer, List<StyleSpan>> value) { result.semanticSpans = value; return this; }
-        public Builder inlayHints(Map<Integer, List<InlayHint>> value) { result.inlayHints = value; return this; }
-        public Builder diagnostics(Map<Integer, List<DiagnosticItem>> value) { result.diagnostics = value; return this; }
-        public Builder indentGuides(List<IndentGuide> value) { result.indentGuides = value; return this; }
-        public Builder bracketGuides(List<BracketGuide> value) { result.bracketGuides = value; return this; }
-        public Builder flowGuides(List<FlowGuide> value) { result.flowGuides = value; return this; }
-        public Builder separatorGuides(List<SeparatorGuide> value) { result.separatorGuides = value; return this; }
-        public Builder foldRegions(List<FoldRegion> value) { result.foldRegions = value; return this; }
-        public Builder gutterIcons(Map<Integer, List<GutterIcon>> value) { result.gutterIcons = value; return this; }
-        public Builder phantomTexts(Map<Integer, List<PhantomText>> value) { result.phantomTexts = value; return this; }
+        public Builder syntaxSpans(Map<Integer, List<StyleSpan>> value, ApplyMode mode) { result.syntaxSpans = value; result.syntaxSpansMode = mode; return this; }
+        public Builder semanticSpans(Map<Integer, List<StyleSpan>> value, ApplyMode mode) { result.semanticSpans = value; result.semanticSpansMode = mode; return this; }
+        public Builder inlayHints(Map<Integer, List<InlayHint>> value, ApplyMode mode) { result.inlayHints = value; result.inlayHintsMode = mode; return this; }
+        public Builder diagnostics(Map<Integer, List<DiagnosticItem>> value, ApplyMode mode) { result.diagnostics = value; result.diagnosticsMode = mode; return this; }
+        public Builder indentGuides(List<IndentGuide> value, ApplyMode mode) { result.indentGuides = value; result.indentGuidesMode = mode; return this; }
+        public Builder bracketGuides(List<BracketGuide> value, ApplyMode mode) { result.bracketGuides = value; result.bracketGuidesMode = mode; return this; }
+        public Builder flowGuides(List<FlowGuide> value, ApplyMode mode) { result.flowGuides = value; result.flowGuidesMode = mode; return this; }
+        public Builder separatorGuides(List<SeparatorGuide> value, ApplyMode mode) { result.separatorGuides = value; result.separatorGuidesMode = mode; return this; }
+        public Builder foldRegions(List<FoldRegion> value, ApplyMode mode) { result.foldRegions = value; result.foldRegionsMode = mode; return this; }
+        public Builder gutterIcons(Map<Integer, List<GutterIcon>> value, ApplyMode mode) { result.gutterIcons = value; result.gutterIconsMode = mode; return this; }
+        public Builder phantomTexts(Map<Integer, List<PhantomText>> value, ApplyMode mode) { result.phantomTexts = value; result.phantomTextsMode = mode; return this; }
 
         public DecorationResult build() { return result; }
     }
