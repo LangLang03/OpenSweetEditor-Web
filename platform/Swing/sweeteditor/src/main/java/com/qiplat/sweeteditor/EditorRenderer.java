@@ -16,14 +16,7 @@ import java.lang.foreign.ValueLayout;
  * Owns all Font objects, implements TextMeasureCallback, and contains all draw methods.
  * SweetEditor delegates all rendering to this class.
  */
-public class EditorRenderer implements EditorCore.TextMeasureCallback {
-
-    /**
-     * Icon provider interface for gutter icons and InlayHint ICON types.
-     */
-    public interface EditorIconProvider {
-        Image getIconImage(int iconId);
-    }
+final class EditorRenderer implements EditorCore.TextMeasureCallback {
 
     private EditorTheme theme;
 

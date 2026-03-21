@@ -1335,10 +1335,12 @@ public final class EditorNative {
     }
 
     /** Create upcall stub */
-    public static MemorySegment createUpcallStub(Arena arena, Object target, String methodName,
-                                                  MethodType methodType, FunctionDescriptor desc) {
+    public static MemorySegment createUpcallStub(Arena arena, Object target, Class<?> ownerType,
+                                                  String methodName, MethodType methodType, FunctionDescriptor desc) {
         try {
-            MethodHandle mh = MethodHandles.lookup().bind(target, methodName, methodType);
+            MethodHandle mh = MethodHandles.publicLookup()
+                    .findVirtual(ownerType, methodName, methodType)
+                    .bindTo(target);
             return LINKER.upcallStub(mh, desc, arena);
         } catch (Throwable t) { throw new RuntimeException(t); }
     }

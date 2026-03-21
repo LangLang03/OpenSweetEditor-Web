@@ -1,12 +1,13 @@
 package com.qiplat.sweeteditor.demo;
 
 import android.graphics.Typeface;
-import android.graphics.drawable.Drawable;
-import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.util.Log;
-import android.util.SparseArray;
+import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -18,10 +19,6 @@ import com.qiplat.sweeteditor.EditorSettings;
 import com.qiplat.sweeteditor.EditorTheme;
 import com.qiplat.sweeteditor.SweetEditor;
 import com.qiplat.sweeteditor.core.Document;
-import com.qiplat.sweeteditor.core.adornment.GutterIcon;
-import com.qiplat.sweeteditor.core.adornment.InlayHint;
-import com.qiplat.sweeteditor.core.adornment.InlayType;
-import com.qiplat.sweeteditor.core.adornment.PhantomText;
 import com.qiplat.sweeteditor.core.foundation.FoldArrowMode;
 import com.qiplat.sweeteditor.core.foundation.WrapMode;
 import com.qiplat.sweeteditor.event.GutterIconClickEvent;
@@ -32,20 +29,20 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
+    private static final int STYLE_COLOR = 9;
+    private static final String DEMO_FILES_ASSET_DIR = "files";
+    private static final String FALLBACK_FILE_NAME = "sample.cpp";
+
     private SweetEditor mEditor;
     private TextView mStatusBar;
     private boolean mIsDarkTheme = true;
     private WrapMode mWrapModePreset = WrapMode.NONE;
-
-    // Gutter icon ID constants
-    private static final int GUTTER_ICON_BREAKPOINT = 1;
-    private static final int GUTTER_ICON_ERROR = 2;
-    private static final int GUTTER_ICON_WARNING = 3;
-    private static final int GUTTER_ICON_BOOKMARK = 4;
-    private static final int STYLE_COLOR = 9;
+    private final List<String> mDemoFiles = new ArrayList<>();
 
     private DemoDecorationProvider mDemoProvider;
     private DemoCompletionProvider mDemoCompletionProvider;
@@ -58,7 +55,6 @@ public class MainActivity extends AppCompatActivity {
         mEditor = findViewById(R.id.editor);
         mStatusBar = findViewById(R.id.tv_status);
 
-        // Set editor initial properties
         EditorSettings settings = mEditor.getSettings();
         settings.setTypeface(Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL));
         settings.setEditorTextSize(36f);
@@ -66,18 +62,18 @@ public class MainActivity extends AppCompatActivity {
         settings.setMaxGutterIcons(1);
         registerColorStyleForCurrentTheme();
 
-        // Load initial document and apply decorations
-        loadSampleDocument();
+        try {
+            DemoDecorationProvider.ensureSweetLineReady(this);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
 
-        // Register DecorationProvider (demonstrates Receiver callback mode)
-        mDemoProvider = new DemoDecorationProvider(this, mEditor);
+        mDemoProvider = new DemoDecorationProvider(mEditor);
         mEditor.addDecorationProvider(mDemoProvider);
 
-        // Register CompletionProvider (demonstrates completion callback mode)
         mDemoCompletionProvider = new DemoCompletionProvider();
         mEditor.addCompletionProvider(mDemoCompletionProvider);
 
-        // Provide icon for editor
         mEditor.setEditorIconProvider(iconId -> {
             if (iconId == DemoDecorationProvider.ICON_CLASS) {
                 return ContextCompat.getDrawable(this, R.mipmap.ic_gutter_icon1);
@@ -85,43 +81,94 @@ public class MainActivity extends AppCompatActivity {
             return null;
         });
 
-        // Bind toolbar buttons
         setupToolbar();
+        setupFileSpinner();
+        subscribeEditorEvents();
+    }
 
-        // Listen to text change events
+    private void subscribeEditorEvents() {
         mEditor.subscribe(TextChangedEvent.class, e -> {
             String rangeStr = e.changeRange != null
                     ? e.changeRange.start.line + ":" + e.changeRange.start.column
-                      + "-" + e.changeRange.end.line + ":" + e.changeRange.end.column
+                    + "-" + e.changeRange.end.line + ":" + e.changeRange.end.column
                     : "null";
             String textPreview = e.text != null
-                    ? (e.text.length() > 50 ? e.text.substring(0, 50) + "..." : e.text).replace("\n", "↵")
+                    ? (e.text.length() > 50 ? e.text.substring(0, 50) + "..." : e.text).replace("\n", "\\n")
                     : "null";
             Log.d("SweetEditor", "[TextChanged] action=" + e.action.name() + " range=" + rangeStr + " text=" + textPreview);
         });
         mEditor.subscribe(InlayHintClickEvent.class, e -> {
             if (e.isColor) {
-                Toast.makeText(this, "Click color: "
-                        + String.format("0X%X", e.colorValue), Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Click color: " + String.format("0X%X", e.colorValue), Toast.LENGTH_SHORT).show();
             }
         });
-        mEditor.subscribe(GutterIconClickEvent.class, e -> {
-            Toast.makeText(this, "Click icon at line: " + e.line, Toast.LENGTH_SHORT).show();
+        mEditor.subscribe(GutterIconClickEvent.class, e ->
+                Toast.makeText(this, "Click icon at line: " + e.line, Toast.LENGTH_SHORT).show());
+    }
+
+    private void setupFileSpinner() {
+        Spinner fileSpinner = findViewById(R.id.spn_files);
+        mDemoFiles.clear();
+        mDemoFiles.addAll(listDemoFiles());
+        if (mDemoFiles.isEmpty()) {
+            mDemoFiles.add(FALLBACK_FILE_NAME);
+        }
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, mDemoFiles);
+        fileSpinner.setAdapter(adapter);
+
+        fileSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (position < 0 || position >= mDemoFiles.size()) {
+                    return;
+                }
+                loadDemoFile(mDemoFiles.get(position));
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                // no-op
+            }
         });
 
-        updateStatus("Document loaded");
-
-        try {
-            DemoDecorationProvider.ensureSweetLineReady(this);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+        if (!mDemoFiles.isEmpty()) {
+            fileSpinner.setSelection(0);
         }
     }
 
-    private void loadSampleDocument() {
-        String code = loadAsset("files/sample.cpp");
-        Document document = new Document(code);
-        mEditor.loadDocument(document);
+    private List<String> listDemoFiles() {
+        List<String> files = new ArrayList<>();
+        try {
+            String[] entries = getAssets().list(DEMO_FILES_ASSET_DIR);
+            if (entries == null) {
+                return files;
+            }
+            for (String name : entries) {
+                if (name == null || name.trim().isEmpty()) {
+                    continue;
+                }
+                String assetPath = DEMO_FILES_ASSET_DIR + "/" + name;
+                try (InputStream ignored = getAssets().open(assetPath)) {
+                    files.add(name);
+                } catch (IOException ignored) {
+                    // Ignore directory entries under assets/files.
+                }
+            }
+            Collections.sort(files, String.CASE_INSENSITIVE_ORDER);
+        } catch (IOException e) {
+            Log.e("SweetEditor", "Failed to list demo files", e);
+        }
+        return files;
+    }
+
+    private void loadDemoFile(String fileName) {
+        String assetPath = DEMO_FILES_ASSET_DIR + "/" + fileName;
+        String code = loadAsset(assetPath);
+        mEditor.loadDocument(new Document(code));
+        mEditor.setMetadata(new DemoFileMetadata(fileName));
+        mEditor.post(mEditor::requestDecorationRefresh);
+        updateStatus("Loaded: " + fileName);
     }
 
     private String loadAsset(String fileName) {
@@ -130,7 +177,9 @@ public class MainActivity extends AppCompatActivity {
              BufferedReader reader = new BufferedReader(new InputStreamReader(is))) {
             String line;
             while ((line = reader.readLine()) != null) {
-                if (sb.length() > 0) sb.append('\n');
+                if (sb.length() > 0) {
+                    sb.append('\n');
+                }
                 sb.append(line);
             }
         } catch (IOException e) {
@@ -140,7 +189,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setupToolbar() {
-        // Undo
         Button btnUndo = findViewById(R.id.btn_undo);
         btnUndo.setOnClickListener(v -> {
             if (mEditor.canUndo()) {
@@ -151,7 +199,6 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // Redo
         Button btnRedo = findViewById(R.id.btn_redo);
         btnRedo.setOnClickListener(v -> {
             if (mEditor.canRedo()) {
@@ -162,29 +209,6 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // Select All
-        Button btnSelectAll = findViewById(R.id.btn_select_all);
-        btnSelectAll.setOnClickListener(v -> {
-            mEditor.selectAll();
-            updateStatus("All selected");
-        });
-
-        // Get Selection
-        Button btnGetSelection = findViewById(R.id.btn_get_selection);
-        btnGetSelection.setOnClickListener(v -> {
-            String selected = mEditor.getSelectedText();
-            if (selected != null && !selected.isEmpty()) {
-                String preview = selected.length() > 100
-                        ? selected.substring(0, 100) + "..."
-                        : selected;
-                updateStatus("Selection: " + preview.replace("\n", "↵"));
-                Toast.makeText(this, "Selection length: " + selected.length() + " chars", Toast.LENGTH_SHORT).show();
-            } else {
-                updateStatus("No selection");
-            }
-        });
-
-        // Toggle theme
         Button btnSwitchTheme = findViewById(R.id.btn_switch_theme);
         btnSwitchTheme.setOnClickListener(v -> {
             mIsDarkTheme = !mIsDarkTheme;
@@ -193,7 +217,6 @@ public class MainActivity extends AppCompatActivity {
             updateStatus(mIsDarkTheme ? "Switched to dark theme" : "Switched to light theme");
         });
 
-        // WrapMode
         Button btnWrapMode = findViewById(R.id.btn_wrap_mode);
         btnWrapMode.setOnClickListener(v -> cycleWrapMode());
     }

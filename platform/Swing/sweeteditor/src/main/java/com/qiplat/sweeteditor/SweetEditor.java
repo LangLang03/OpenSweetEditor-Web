@@ -347,14 +347,14 @@ public class SweetEditor extends JPanel {
      *
      * @param provider Icon provider, pass null to remove
      */
-    public void setEditorIconProvider(EditorRenderer.EditorIconProvider provider) {
+    public void setEditorIconProvider(EditorIconProvider provider) {
         renderer.setEditorIconProvider(provider);
     }
 
     /**
      * Get the current editor icon provider.
      */
-    public EditorRenderer.EditorIconProvider getEditorIconProvider() {
+    public EditorIconProvider getEditorIconProvider() {
         return renderer.getEditorIconProvider();
     }
 

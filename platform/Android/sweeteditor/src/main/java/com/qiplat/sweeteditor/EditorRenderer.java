@@ -1,4 +1,4 @@
-package com.qiplat.sweeteditor.renderer;
+package com.qiplat.sweeteditor;
 
 import android.graphics.Canvas;
 import android.graphics.DashPathEffect;
@@ -12,7 +12,6 @@ import androidx.annotation.Nullable;
 
 import java.util.List;
 
-import com.qiplat.sweeteditor.EditorTheme;
 import com.qiplat.sweeteditor.core.HandleConfig;
 import com.qiplat.sweeteditor.core.ScrollbarConfig;
 import com.qiplat.sweeteditor.core.TextMeasurer;
@@ -26,16 +25,7 @@ import com.qiplat.sweeteditor.perf.PerfStepRecorder;
  * Owns all Paint objects, draw methods, perf overlay, icon provider, handle/scrollbar config,
  * and TextMeasurer. SweetEditor delegates all rendering to this class.
  */
-public class EditorRenderer {
-
-    /**
-     * Icon provider interface for gutter icons and InlayHint ICON types.
-     */
-    public interface EditorIconProvider {
-        @Nullable
-        Drawable getIconDrawable(int iconId);
-    }
-
+final class EditorRenderer {
     private EditorTheme mTheme;
     private final float mDensity;
 

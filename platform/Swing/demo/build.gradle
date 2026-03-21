@@ -16,6 +16,7 @@ repositories {
 
 dependencies {
     implementation(project(':sweeteditor'))
+    implementation 'com.qiplat:sweetline-ffm:0.1.4'
     testImplementation platform('org.junit:junit-bom:5.10.0')
     testImplementation 'org.junit.jupiter:junit-jupiter'
 }

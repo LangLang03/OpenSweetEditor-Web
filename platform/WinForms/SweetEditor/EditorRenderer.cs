@@ -15,14 +15,6 @@ namespace SweetEditor {
 	/// </summary>
 	public class EditorRenderer : IDisposable {
 
-		/// <summary>
-		/// Editor icon provider interface.
-		/// Host code implements this to provide icon images for gutter icons and InlayHint ICON rendering.
-		/// </summary>
-		public interface EditorIconProvider {
-			Image? GetIconImage(int iconId);
-		}
-
 		private const float BaseTextFontSize = 11f;
 		private const float BaseInlayHintFontSize = 9.5f;
 		private const string BaseTextFontFamily = "Consolas";

@@ -55,8 +55,8 @@ import java.util.concurrent.Executors;
  */
 public class DemoDecorationProvider implements DecorationProvider {
 
-    private static final String CPP_SYNTAX_ASSET = "syntaxes/cpp.json";
-    private static final String CPP_SYNTAX_NAME = "cpp";
+    private static final String SYNTAX_ASSET_DIR = "syntaxes";
+    private static final String DEFAULT_ANALYSIS_FILE_NAME = "sample.cpp";
     private static final int STYLE_KEYWORD = 1;
     private static final int STYLE_TYPE = 2;
     private static final int STYLE_STRING = 3;
@@ -69,16 +69,16 @@ public class DemoDecorationProvider implements DecorationProvider {
 
     public static final int ICON_CLASS = 1;
 
-    private final Context appContext;
     private final SweetEditor editor;
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
     private static HighlightEngine highlightEngine;
     private DocumentAnalyzer documentAnalyzer;
     private DocumentHighlight cacheHighlight;
+    @NonNull
+    private String analyzedFileName = DEFAULT_ANALYSIS_FILE_NAME;
 
-    public DemoDecorationProvider(@NonNull Context context, @NonNull SweetEditor editor) {
-        this.appContext = context.getApplicationContext();
+    public DemoDecorationProvider(@NonNull SweetEditor editor) {
         this.editor = editor;
     }
 
@@ -142,6 +142,9 @@ public class DemoDecorationProvider implements DecorationProvider {
 
     @NonNull
     private DecorationResult buildSweetLineDecorationResult(DecorationContext context) {
+        if (highlightEngine == null) {
+            return new DecorationResult.Builder().build();
+        }
         SparseArray<List<StyleSpan>> syntaxSpans = new SparseArray<>();
         SparseArray<List<InlayHint>> colorInlayHints = new SparseArray<>();
         SparseArray<List<GutterIcon>> gutterIcons = new SparseArray<>();
@@ -151,11 +154,25 @@ public class DemoDecorationProvider implements DecorationProvider {
         Set<String> seenColorHints = new HashSet<>();
 
         Document editorDocument = editor.getDocument();
-        String text = editorDocument != null ? editorDocument.getText() : "";
+        if (editorDocument == null) {
+            return new DecorationResult.Builder()
+                    .syntaxSpans(syntaxSpans, DecorationResult.ApplyMode.MERGE)
+                    .inlayHints(colorInlayHints, DecorationResult.ApplyMode.REPLACE_RANGE)
+                    .indentGuides(indentGuides, DecorationResult.ApplyMode.REPLACE_ALL)
+                    .foldRegions(foldRegions, DecorationResult.ApplyMode.REPLACE_ALL)
+                    .separatorGuides(separatorGuides, DecorationResult.ApplyMode.REPLACE_ALL)
+                    .gutterIcons(gutterIcons, DecorationResult.ApplyMode.REPLACE_ALL)
+                    .build();
+        }
+        String text = editorDocument.getText();
+        String currentFileName = resolveCurrentFileName(context);
 
-        if (cacheHighlight == null || documentAnalyzer == null) {
-            documentAnalyzer = highlightEngine.loadDocument(new com.qiplat.sweetline.Document("http://sample.cpp", text));
+        boolean fileChanged = !currentFileName.equals(analyzedFileName);
+        if (cacheHighlight == null || documentAnalyzer == null || fileChanged) {
+            documentAnalyzer = highlightEngine.loadDocument(
+                    new com.qiplat.sweetline.Document(buildAnalysisUri(currentFileName), text));
             cacheHighlight = documentAnalyzer.analyze();
+            analyzedFileName = currentFileName;
         } else if (!context.textChanges.isEmpty()) {
             for (EditorCore.TextChange change : context.textChanges) {
                 cacheHighlight = documentAnalyzer.analyzeIncremental(
@@ -163,6 +180,16 @@ public class DemoDecorationProvider implements DecorationProvider {
                         change.newText
                 );
             }
+        }
+        if (cacheHighlight == null || cacheHighlight.lines == null || cacheHighlight.lines.isEmpty()) {
+            return new DecorationResult.Builder()
+                    .syntaxSpans(syntaxSpans, DecorationResult.ApplyMode.MERGE)
+                    .inlayHints(colorInlayHints, DecorationResult.ApplyMode.REPLACE_RANGE)
+                    .indentGuides(indentGuides, DecorationResult.ApplyMode.REPLACE_ALL)
+                    .foldRegions(foldRegions, DecorationResult.ApplyMode.REPLACE_ALL)
+                    .separatorGuides(separatorGuides, DecorationResult.ApplyMode.REPLACE_ALL)
+                    .gutterIcons(gutterIcons, DecorationResult.ApplyMode.REPLACE_ALL)
+                    .build();
         }
         int renderStartLine = Math.max(0, context.visibleStartLine);
         int maxLine = Math.min(context.visibleEndLine, cacheHighlight.lines.size() - 1);
@@ -209,6 +236,22 @@ public class DemoDecorationProvider implements DecorationProvider {
                 .separatorGuides(separatorGuides, DecorationResult.ApplyMode.REPLACE_ALL)
                 .gutterIcons(gutterIcons, DecorationResult.ApplyMode.REPLACE_ALL)
                 .build();
+    }
+
+    @NonNull
+    private static String buildAnalysisUri(@NonNull String fileName) {
+        return "file:///" + fileName;
+    }
+
+    @NonNull
+    private static String resolveCurrentFileName(@NonNull DecorationContext context) {
+        if (context.editorMetadata instanceof DemoFileMetadata) {
+            String fileName = ((DemoFileMetadata) context.editorMetadata).fileName;
+            if (fileName != null && !fileName.isEmpty()) {
+                return fileName;
+            }
+        }
+        return DEFAULT_ANALYSIS_FILE_NAME;
     }
 
     private void appendStyleSpan(@NonNull SparseArray<List<StyleSpan>> syntaxSpans,
@@ -406,15 +449,48 @@ public class DemoDecorationProvider implements DecorationProvider {
         HighlightEngine engine = new HighlightEngine(config);
         registerDemoStyleMap(engine);
 
-        String syntaxJson = loadAssetText(context, CPP_SYNTAX_ASSET);
-        try {
-            engine.compileSyntaxFromJson(syntaxJson);
-        } catch (SyntaxCompileError e) {
-            throw new RuntimeException(e);
+        List<String> syntaxAssets = collectSyntaxAssetFiles(context, SYNTAX_ASSET_DIR);
+        if (syntaxAssets.isEmpty()) {
+            throw new IOException("No syntax files found under assets/" + SYNTAX_ASSET_DIR);
+        }
+        for (String assetPath : syntaxAssets) {
+            String syntaxJson = loadAssetText(context, assetPath);
+            try {
+                engine.compileSyntaxFromJson(syntaxJson);
+            } catch (SyntaxCompileError e) {
+                throw new RuntimeException("Failed to compile syntax asset: " + assetPath, e);
+            }
         }
 
         highlightEngine = engine;
         return true;
+    }
+
+    @NonNull
+    private static List<String> collectSyntaxAssetFiles(@NonNull Context context, @NonNull String assetDir) throws IOException {
+        List<String> files = new ArrayList<>();
+        collectSyntaxAssetFilesRecursive(context, assetDir, files);
+        files.sort(String::compareToIgnoreCase);
+        return files;
+    }
+
+    private static void collectSyntaxAssetFilesRecursive(@NonNull Context context,
+                                                         @NonNull String assetPath,
+                                                         @NonNull List<String> outFiles) throws IOException {
+        String[] entries = context.getAssets().list(assetPath);
+        if (entries == null || entries.length == 0) {
+            if (assetPath.endsWith(".json")) {
+                outFiles.add(assetPath);
+            }
+            return;
+        }
+        for (String entry : entries) {
+            if (entry == null || entry.isEmpty()) {
+                continue;
+            }
+            String childPath = assetPath + "/" + entry;
+            collectSyntaxAssetFilesRecursive(context, childPath, outFiles);
+        }
     }
 
     private static void registerDemoStyleMap(@NonNull HighlightEngine engine) {

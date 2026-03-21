@@ -52,6 +52,14 @@ namespace SweetEditor {
 	}
 
 	/// <summary>
+	/// Editor icon provider interface.
+	/// Host code implements this to provide icon images for gutter icons and InlayHint ICON rendering.
+	/// </summary>
+	public interface EditorIconProvider {
+		Image? GetIconImage(int iconId);
+	}
+
+	/// <summary>
 	/// Editor theme configuration containing all configurable color properties.
 	/// All colors are in ARGB format.
 	/// Apply a theme via <see cref="EditorControl.ApplyTheme(EditorTheme)"/>.
@@ -670,7 +678,7 @@ namespace SweetEditor {
 		#region Public API - Gutter Icons
 
 		/// <summary>Sets editor icon provider.</summary>
-		public void SetEditorIconProvider(EditorRenderer.EditorIconProvider? provider) {
+		public void SetEditorIconProvider(EditorIconProvider? provider) {
 			renderer.SetEditorIconProvider(provider);
 			Flush();
 		}

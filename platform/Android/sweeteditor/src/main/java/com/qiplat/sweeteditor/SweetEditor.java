@@ -29,7 +29,6 @@ import com.qiplat.sweeteditor.core.EditorOptions;
 import com.qiplat.sweeteditor.core.HandleConfig;
 import com.qiplat.sweeteditor.core.EditorCore;
 import com.qiplat.sweeteditor.core.ScrollbarConfig;
-import com.qiplat.sweeteditor.renderer.EditorRenderer;
 import com.qiplat.sweeteditor.core.adornment.DiagnosticItem;
 import com.qiplat.sweeteditor.core.adornment.FoldRegion;
 
@@ -43,13 +42,10 @@ import com.qiplat.sweeteditor.core.adornment.PhantomText;
 import com.qiplat.sweeteditor.core.adornment.StyleSpan;
 
 import com.qiplat.sweeteditor.core.TextMeasurer;
-import com.qiplat.sweeteditor.core.foundation.AutoIndentMode;
-import com.qiplat.sweeteditor.core.foundation.FoldArrowMode;
 import com.qiplat.sweeteditor.core.foundation.ScrollBehavior;
 import com.qiplat.sweeteditor.core.adornment.SpanLayer;
 import com.qiplat.sweeteditor.core.foundation.TextPosition;
 import com.qiplat.sweeteditor.core.foundation.TextRange;
-import com.qiplat.sweeteditor.core.foundation.WrapMode;
 import com.qiplat.sweeteditor.core.snippet.LinkedEditingModel;
 import com.qiplat.sweeteditor.perf.MeasurePerfStats;
 import com.qiplat.sweeteditor.perf.PerfOverlay;
@@ -874,7 +870,7 @@ public class SweetEditor extends View {
 
     /**
      * Set gutter icons for a specified line (replaces entire line).
-     * <p>Icon Drawables are provided by {@link EditorRenderer.EditorIconProvider}.
+     * <p>Icon Drawables are provided by {@link EditorIconProvider}.
      *
      * @param line  Line number (0-based)
      * @param icons Icon list
@@ -1193,7 +1189,7 @@ public class SweetEditor extends View {
      *
      * @param provider Icon provider, pass null to remove
      */
-    public void setEditorIconProvider(@Nullable EditorRenderer.EditorIconProvider provider) {
+    public void setEditorIconProvider(@Nullable EditorIconProvider provider) {
         mRenderer.setEditorIconProvider(provider);
     }
 

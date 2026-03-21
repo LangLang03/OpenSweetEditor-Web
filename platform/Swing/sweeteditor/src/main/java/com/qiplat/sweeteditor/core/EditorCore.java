@@ -36,22 +36,22 @@ public class EditorCore implements AutoCloseable {
 
         MemorySegment measurer = arena.allocate(EditorNative.MEASURER_LAYOUT);
 
-        MemorySegment measureTextStub = EditorNative.createUpcallStub(arena, callback,
+        MemorySegment measureTextStub = EditorNative.createUpcallStub(arena, callback, TextMeasureCallback.class,
                 "measureTextWidth",
                 MethodType.methodType(float.class, MemorySegment.class, int.class),
                 EditorNative.MEASURE_TEXT_WIDTH_DESC);
 
-        MemorySegment measureInlayStub = EditorNative.createUpcallStub(arena, callback,
+        MemorySegment measureInlayStub = EditorNative.createUpcallStub(arena, callback, TextMeasureCallback.class,
                 "measureInlayHintWidth",
                 MethodType.methodType(float.class, MemorySegment.class),
                 EditorNative.MEASURE_INLAY_HINT_WIDTH_DESC);
 
-        MemorySegment measureIconStub = EditorNative.createUpcallStub(arena, callback,
+        MemorySegment measureIconStub = EditorNative.createUpcallStub(arena, callback, TextMeasureCallback.class,
                 "measureIconWidth",
                 MethodType.methodType(float.class, int.class),
                 EditorNative.MEASURE_ICON_WIDTH_DESC);
 
-        MemorySegment fontMetricsStub = EditorNative.createUpcallStub(arena, callback,
+        MemorySegment fontMetricsStub = EditorNative.createUpcallStub(arena, callback, TextMeasureCallback.class,
                 "getFontMetrics",
                 MethodType.methodType(void.class, MemorySegment.class, long.class),
                 EditorNative.GET_FONT_METRICS_DESC);

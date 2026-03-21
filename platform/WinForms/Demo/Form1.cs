@@ -1,90 +1,50 @@
 using System.Diagnostics;
-using System.Collections.Generic;
-using System.IO;
-using System.Threading.Tasks;
+using System.Text;
 using SweetEditor;
+using SweetLine;
+using EditorTextPosition = SweetEditor.TextPosition;
+using EditorTextRange = SweetEditor.TextRange;
+using SweetLineTextPosition = SweetLine.TextPosition;
+using SweetLineTextRange = SweetLine.TextRange;
 
-	namespace Demo {
-		public partial class Form1 : Form {
-		private const string SECTION_BASIC = "//==== Basic Utilities ====";
-		private const string SECTION_LEXICAL = "//---- Lexical Analysis ----";
-		private const string SECTION_MAIN = "//==== Main Program ====";
-
-		private const string SAMPLE_CODE =
+namespace Demo {
+	public partial class Form1 : Form {
+		private const int STYLE_COLOR = 9;
+		private const string DEFAULT_FILE_NAME = "example.cpp";
+		private const string FALLBACK_SAMPLE_CODE =
 			"// SweetEditor Demo\n" +
-			"#include <iostream>\n" +
-			"#include <string>\n" +
-			"#include <vector>\n" +
-			SECTION_BASIC + "\n" +
-			"namespace editor {\n" +
-			"class Logger {\n" +
-			"public:\n" +
-			"    enum Level { DEBUG, INFO, WARN, ERROR };\n" +
-			"    void log(Level level, const std::string& msg) {\n" +
-			"        const char* tags[] = {\"D\", \"I\", \"W\", \"E\"};\n" +
-			"        std::cout << \"[\" << tags[level] << \"] \" << msg << std::endl;\n" +
-			"    }\n" +
-			"};\n" +
-			SECTION_LEXICAL + "\n" +
-			"struct Token {\n" +
-			"    int type;\n" +
-			"    size_t start;\n" +
-			"    size_t length;\n" +
-			"};\n" +
-			"std::vector<Token> tokenize(const std::string& line) {\n" +
-			"    std::vector<Token> result;\n" +
-			"    for (size_t i = 0; i < line.size(); ++i) {\n" +
-			"        switch (line[i]) {\n" +
-			"            case '#':\n" +
-			"                result.push_back({1, i, 1});\n" +
-			"                break;\n" +
-			"            case '\"':\n" +
-			"                result.push_back({2, i, 1});\n" +
-			"                break;\n" +
-			"            case '/':\n" +
-			"                result.push_back({3, i, 1});\n" +
-			"                break;\n" +
-			"            default:\n" +
-			"                result.push_back({0, i, 1});\n" +
-			"                break;\n" +
-			"        }\n" +
-			"    }\n" +
-			"    return result;\n" +
-			"}\n" +
-			"} // namespace editor\n" +
-			SECTION_MAIN + "\n" +
 			"int main() {\n" +
-			"    editor::Logger logger;\n" +
-			"    logger.log(editor::Logger::INFO, \"SweetEditor started\");\n" +
-			"    auto tokens = editor::tokenize(\"int x = 42;\");\n" +
-			"    std::cout << \"Tokens: \" << tokens.size() << std::endl;\n" +
 			"    return 0;\n" +
 			"}\n";
 
-		private Label statusLabel;
+		private Label statusLabel = null!;
+		private ComboBox fileComboBox = null!;
 		private bool isDarkTheme = true;
 		private WrapMode wrapModePreset = WrapMode.NONE;
+		private bool suppressFileSelection;
+		private readonly List<string> demoFiles = new();
+
 		private DemoDecorationProvider? demoProvider;
 		private DemoCompletionProvider? demoCompletionProvider;
 
 		public Form1() {
 			InitializeComponent();
 			SetupToolbar();
+			RegisterColorStyleForCurrentTheme();
 
-			// Auto-load the document and decorations on startup.
-			Document doc = new Document(LoadSampleCode());
-			editorControl1.LoadDocument(doc);
-			ApplyAllDecorations();
+			try {
+				DemoDecorationProvider.EnsureSweetLineReady(ResolveSyntaxFiles());
+			} catch (Exception ex) {
+				throw new InvalidOperationException("Failed to initialize SweetLine syntaxes", ex);
+			}
 
-			// Register DecorationProvider (receiver callback mode).
 			demoProvider = new DemoDecorationProvider();
 			editorControl1.AddDecorationProvider(demoProvider);
 
-			// Register CompletionProvider (completion callback mode).
 			demoCompletionProvider = new DemoCompletionProvider();
 			editorControl1.AddCompletionProvider(demoCompletionProvider);
 
-			//editorControl1.SetPerfOverlayEnabled(true);
+			SetupFileSpinner();
 		}
 
 		private void SetupToolbar() {
@@ -96,21 +56,43 @@ using SweetEditor;
 				Padding = new Padding(4, 4, 4, 0)
 			};
 
-			toolbar.Controls.Add(MakeButton("Undo", (_, _) => { if (editorControl1.CanUndo()) { editorControl1.Undo(); UpdateStatus("Undo"); } }));
-			toolbar.Controls.Add(MakeButton("Redo", (_, _) => { if (editorControl1.CanRedo()) { editorControl1.Redo(); UpdateStatus("Redo"); } }));
-			toolbar.Controls.Add(MakeButton("Select All", (_, _) => { editorControl1.SelectAll(); UpdateStatus("Select All"); }));
-			toolbar.Controls.Add(MakeButton("Get Selection", (_, _) => {
-				string sel = editorControl1.GetSelectedText();
-				UpdateStatus(string.IsNullOrEmpty(sel) ? "No selection" : $"Selection: {sel[..Math.Min(30, sel.Length)]}");
+			fileComboBox = new ComboBox {
+				DropDownStyle = ComboBoxStyle.DropDownList,
+				Width = 150,
+				Margin = new Padding(2, 0, 2, 0)
+			};
+			fileComboBox.SelectedIndexChanged += (_, _) => {
+				if (suppressFileSelection) {
+					return;
+				}
+				int index = fileComboBox.SelectedIndex;
+				if (index < 0 || index >= demoFiles.Count) {
+					return;
+				}
+				LoadDemoFile(demoFiles[index]);
+			};
+
+			toolbar.Controls.Add(fileComboBox);
+			toolbar.Controls.Add(MakeButton("Undo", (_, _) => {
+				if (editorControl1.CanUndo()) {
+					editorControl1.Undo();
+					UpdateStatus("Undo");
+				} else {
+					UpdateStatus("Nothing to undo");
+				}
 			}));
-			toolbar.Controls.Add(MakeButton("Load Decorations", (_, _) => ApplyAllDecorations()));
-			toolbar.Controls.Add(MakeButton("Clear Decorations", (_, _) => {
-				editorControl1.ClearAllDecorations(); editorControl1.ClearGuides(); editorControl1.ClearDiagnostics();
-				UpdateStatus("Decorations cleared");
+			toolbar.Controls.Add(MakeButton("Redo", (_, _) => {
+				if (editorControl1.CanRedo()) {
+					editorControl1.Redo();
+					UpdateStatus("Redo");
+				} else {
+					UpdateStatus("Nothing to redo");
+				}
 			}));
 			toolbar.Controls.Add(MakeButton("Toggle Theme", (_, _) => {
 				isDarkTheme = !isDarkTheme;
 				editorControl1.ApplyTheme(isDarkTheme ? EditorTheme.Dark() : EditorTheme.Light());
+				RegisterColorStyleForCurrentTheme();
 				UpdateStatus(isDarkTheme ? "Switched to dark theme" : "Switched to light theme");
 			}));
 			toolbar.Controls.Add(MakeButton("WrapMode", (_, _) => CycleWrapMode()));
@@ -145,44 +127,49 @@ using SweetEditor;
 			return btn;
 		}
 
-		private static string LoadSampleCode() {
-			string? samplePath = ResolveDemoFile("files/sample.cpp");
-			if (!string.IsNullOrEmpty(samplePath)) {
-				try {
-					return File.ReadAllText(samplePath);
-				} catch {
-					// Fallback to built-in sample text.
-				}
+		private void SetupFileSpinner() {
+			demoFiles.Clear();
+			demoFiles.AddRange(ListDemoFiles());
+
+			suppressFileSelection = true;
+			fileComboBox.Items.Clear();
+			foreach (string file in demoFiles) {
+				fileComboBox.Items.Add(Path.GetFileName(file));
 			}
-			return SAMPLE_CODE;
+			suppressFileSelection = false;
+
+			if (demoFiles.Count == 0) {
+				LoadDemoText(DEFAULT_FILE_NAME, FALLBACK_SAMPLE_CODE);
+				return;
+			}
+
+			fileComboBox.SelectedIndex = 0;
 		}
 
-		private static string? ResolveDemoFile(string relativePath) {
-			var candidates = new List<DirectoryInfo>();
+		private void LoadDemoFile(string filePath) {
 			try {
-				candidates.Add(new DirectoryInfo(AppContext.BaseDirectory));
+				string text = File.ReadAllText(filePath);
+				LoadDemoText(Path.GetFileName(filePath), text);
 			} catch {
-				// ignore
+				LoadDemoText(Path.GetFileName(filePath), FALLBACK_SAMPLE_CODE);
 			}
-			try {
-				candidates.Add(new DirectoryInfo(Directory.GetCurrentDirectory()));
-			} catch {
-				// ignore
-			}
+		}
 
-			foreach (var start in candidates) {
-				for (DirectoryInfo? dir = start; dir != null; dir = dir.Parent) {
-					string p1 = Path.Combine(dir.FullName, "_res", relativePath);
-					if (File.Exists(p1)) {
-						return p1;
-					}
-					string p2 = Path.Combine(dir.FullName, "platform", "_res", relativePath);
-					if (File.Exists(p2)) {
-						return p2;
-					}
-				}
+		private void LoadDemoText(string fileName, string text) {
+			string normalizedText = NormalizeNewlines(text);
+			demoProvider?.SetDocumentSource(fileName, normalizedText);
+			editorControl1.LoadDocument(new SweetEditor.Document(normalizedText));
+			editorControl1.SetMetadata(new DemoFileMetadata(fileName));
+			editorControl1.RequestDecorationRefresh();
+			if (IsHandleCreated) {
+				BeginInvoke((Action)(() => editorControl1.RequestDecorationRefresh()));
 			}
-			return null;
+			UpdateStatus($"Loaded: {fileName}");
+		}
+
+		private void RegisterColorStyleForCurrentTheme() {
+			int color = isDarkTheme ? unchecked((int)0xFFB5CEA8) : unchecked((int)0xFF098658);
+			editorControl1.RegisterStyle(STYLE_COLOR, color, 0);
 		}
 
 		private void UpdateStatus(string message) {
@@ -190,139 +177,80 @@ using SweetEditor;
 		}
 
 		private void CycleWrapMode() {
-			wrapModePreset = (WrapMode)(((int)wrapModePreset + 1) % 3);
+			var wrapModes = Enum.GetValues<WrapMode>();
+			wrapModePreset = wrapModes[((int)wrapModePreset + 1) % wrapModes.Length];
 			editorControl1.Settings.SetWrapMode(wrapModePreset);
 			UpdateStatus($"WrapMode: {wrapModePreset}");
 		}
 
-		private void ApplyAllDecorations() {
-			editorControl1.ClearAllDecorations();
-			editorControl1.ClearGuides();
-			editorControl1.ClearDiagnostics();
-			ApplySyntaxHighlight();
-			ApplyInlayHints();
-			ApplyGuides();
-			ApplyFoldRegions();
-			ApplyDiagnostics();
-			UpdateStatus("Applied all decorations");
+		private static string NormalizeNewlines(string text) {
+			return text.Replace("\r\n", "\n").Replace('\r', '\n');
 		}
 
-		private void ApplySyntaxHighlight() {
-			int SK = 1, ST = 2, SS = 3, SC = 4, SP = 5, SF = 6, SN = 7, SL = 8;
-
-			editorControl1.SetLineSpans(0, new List<StyleSpan> { new(0, 19, SC) });
-			editorControl1.SetLineSpans(1, new List<StyleSpan> { new(0, 8, SP), new(9, 10, SS) });
-			editorControl1.SetLineSpans(2, new List<StyleSpan> { new(0, 8, SP), new(9, 8, SS) });
-			editorControl1.SetLineSpans(3, new List<StyleSpan> { new(0, 8, SP), new(9, 8, SS) });
-			editorControl1.SetLineSpans(4, new List<StyleSpan> { new(0, SECTION_BASIC.Length, SC) });
-			editorControl1.SetLineSpans(5, new List<StyleSpan> { new(0, 9, SK) });
-			editorControl1.SetLineSpans(6, new List<StyleSpan> { new(0, 5, SK), new(6, 6, SL) });
-			editorControl1.SetLineSpans(7, new List<StyleSpan> { new(0, 6, SK) });
-			editorControl1.SetLineSpans(8, new List<StyleSpan> { new(4, 4, SK), new(9, 5, SL) });
-			editorControl1.SetLineSpans(9, new List<StyleSpan> { new(4, 4, SK), new(9, 3, SF), new(13, 5, SL), new(26, 5, SK) });
-			editorControl1.SetLineSpans(10, new List<StyleSpan> { new(8, 5, SK), new(14, 4, ST), new(30, 3, SS), new(35, 3, SS), new(40, 3, SS), new(45, 3, SS) });
-			editorControl1.SetLineSpans(11, new List<StyleSpan> { new(21, 3, SS), new(43, 4, SS) });
-			editorControl1.SetLineSpans(14, new List<StyleSpan> { new(0, SECTION_LEXICAL.Length, SC) });
-			editorControl1.SetLineSpans(15, new List<StyleSpan> { new(0, 6, SK), new(7, 5, SL) });
-			editorControl1.SetLineSpans(16, new List<StyleSpan> { new(4, 3, ST) });
-			editorControl1.SetLineSpans(17, new List<StyleSpan> { new(4, 6, ST) });
-			editorControl1.SetLineSpans(18, new List<StyleSpan> { new(4, 6, ST) });
-			editorControl1.SetLineSpans(20, new List<StyleSpan> { new(12, 5, SL), new(19, 8, SF), new(28, 5, SK) });
-			editorControl1.SetLineSpans(22, new List<StyleSpan> { new(4, 3, SK), new(9, 6, ST), new(20, 1, SN) });
-			editorControl1.SetLineSpans(23, new List<StyleSpan> { new(8, 6, SK) });
-			editorControl1.SetLineSpans(24, new List<StyleSpan> { new(12, 4, SK), new(17, 3, SS) });
-			editorControl1.SetLineSpans(27, new List<StyleSpan> { new(12, 4, SK), new(17, 3, SS) });
-			editorControl1.SetLineSpans(30, new List<StyleSpan> { new(12, 4, SK), new(17, 3, SS) });
-			editorControl1.SetLineSpans(33, new List<StyleSpan> { new(12, 7, SK) });
-			editorControl1.SetLineSpans(25, new List<StyleSpan> { new(34, 1, SN), new(40, 1, SN) });
-			editorControl1.SetLineSpans(28, new List<StyleSpan> { new(34, 1, SN), new(40, 1, SN) });
-			editorControl1.SetLineSpans(31, new List<StyleSpan> { new(34, 1, SN), new(40, 1, SN) });
-			editorControl1.SetLineSpans(34, new List<StyleSpan> { new(34, 1, SN), new(40, 1, SN) });
-			foreach (int i in new[] { 26, 29, 32, 35 }) {
-				editorControl1.SetLineSpans(i, new List<StyleSpan> { new(16, 5, SK) });
+		private static List<string> ListDemoFiles() {
+			string? resRoot = ResolveDemoResRoot();
+			if (string.IsNullOrEmpty(resRoot)) {
+				return new List<string>();
 			}
-			editorControl1.SetLineSpans(38, new List<StyleSpan> { new(4, 6, SK) });
-			editorControl1.SetLineSpans(40, new List<StyleSpan> { new(2, 19, SC) });
-			editorControl1.SetLineSpans(41, new List<StyleSpan> { new(0, SECTION_MAIN.Length, SC) });
-			editorControl1.SetLineSpans(42, new List<StyleSpan> { new(0, 3, ST), new(4, 4, SF) });
-			editorControl1.SetLineSpans(43, new List<StyleSpan> { new(12, 6, SL) });
-			editorControl1.SetLineSpans(44, new List<StyleSpan> { new(11, 3, SF), new(23, 6, SL), new(37, 21, SS) });
-			editorControl1.SetLineSpans(45, new List<StyleSpan> { new(4, 4, SK), new(26, 8, SF), new(35, 13, SS) });
-			editorControl1.SetLineSpans(46, new List<StyleSpan> { new(17, 10, SS) });
-			editorControl1.SetLineSpans(47, new List<StyleSpan> { new(4, 6, SK), new(11, 1, SN) });
+			string filesDir = Path.Combine(resRoot, "files");
+			if (!Directory.Exists(filesDir)) {
+				return new List<string>();
+			}
+			return Directory
+				.EnumerateFiles(filesDir, "*", SearchOption.TopDirectoryOnly)
+				.OrderBy(path => Path.GetFileName(path), StringComparer.OrdinalIgnoreCase)
+				.ToList();
 		}
 
-		private void ApplyInlayHints() {
-			editorControl1.SetLineInlayHints(44, new List<InlayHint> {
-				InlayHint.TextHint(15, "level: "),
-				InlayHint.TextHint(37, "msg: ")
-			});
-			editorControl1.SetLineInlayHints(45, new List<InlayHint> {
-				InlayHint.TextHint(35, "line: ")
-			});
-			editorControl1.SetLineInlayHints(10, new List<InlayHint> {
-				InlayHint.ColorHint(30, unchecked((int)0xFF4CAF50)),
-				InlayHint.ColorHint(35, unchecked((int)0xFF2196F3)),
-				InlayHint.ColorHint(40, unchecked((int)0xFFFF9800)),
-				InlayHint.ColorHint(45, unchecked((int)0xFFF44336))
-			});
-
-			editorControl1.SetLinePhantomTexts(13, new List<PhantomText> { new(2, " // end class Logger") });
-			editorControl1.SetLinePhantomTexts(39, new List<PhantomText> { new(1, " // end tokenize") });
-			editorControl1.SetLinePhantomTexts(48, new List<PhantomText> { new(1, " // end main") });
-			editorControl1.SetLinePhantomTexts(12, new List<PhantomText> { new(5, "\n    void warn(const std::string& m) { log(WARN, m); }") });
+		private static List<string> ResolveSyntaxFiles() {
+			string? resRoot = ResolveDemoResRoot();
+			if (string.IsNullOrEmpty(resRoot)) {
+				return new List<string>();
+			}
+			string syntaxDir = Path.Combine(resRoot, "syntaxes");
+			if (!Directory.Exists(syntaxDir)) {
+				return new List<string>();
+			}
+			return Directory
+				.EnumerateFiles(syntaxDir, "*.json", SearchOption.AllDirectories)
+				.OrderBy(path => Path.GetFileName(path), StringComparer.OrdinalIgnoreCase)
+				.ToList();
 		}
 
-		private void ApplyGuides() {
-			editorControl1.ClearGuides();
-			editorControl1.SetIndentGuides(new List<IndentGuide> {
-				new(6, 0, 13, 0),
-				new(9, 4, 12, 4),
-				new(20, 0, 39, 0),
-				new(22, 4, 37, 4),
-				new(23, 8, 36, 8),
-				new(42, 0, 48, 0)
-			});
+		private static string? ResolveDemoResRoot() {
+			string? envPath = Environment.GetEnvironmentVariable("SWEETEDITOR_DEMO_RES_DIR");
+			if (!string.IsNullOrWhiteSpace(envPath) && Directory.Exists(envPath)) {
+				return Path.GetFullPath(envPath);
+			}
 
-			editorControl1.SetBracketGuides(new List<BracketGuide> {
-				new(
-					new TextPosition { Line = 23, Column = 8 },
-					new TextPosition { Line = 36, Column = 8 },
-					new[] {
-						new TextPosition { Line = 24, Column = 12 },
-						new TextPosition { Line = 27, Column = 12 },
-						new TextPosition { Line = 30, Column = 12 },
-						new TextPosition { Line = 33, Column = 12 }
-					})
-			});
+			var starts = new List<string>();
+			try {
+				starts.Add(AppContext.BaseDirectory);
+			} catch {
+				// ignore
+			}
+			try {
+				starts.Add(Directory.GetCurrentDirectory());
+			} catch {
+				// ignore
+			}
 
-			editorControl1.SetFlowGuides(new List<FlowGuide> {
-				new(22, 4, 37, 4)
-			});
+			foreach (string start in starts) {
+				DirectoryInfo? dir = new DirectoryInfo(start);
+				while (dir != null) {
+					string candidate1 = Path.Combine(dir.FullName, "_res");
+					if (Directory.Exists(candidate1)) {
+						return candidate1;
+					}
+					string candidate2 = Path.Combine(dir.FullName, "platform", "_res");
+					if (Directory.Exists(candidate2)) {
+						return candidate2;
+					}
+					dir = dir.Parent;
+				}
+			}
 
-			editorControl1.SetSeparatorGuides(new List<SeparatorGuide> {
-				new(4, (int)SeparatorStyle.DOUBLE, 4, SECTION_BASIC.Length),
-				new(14, (int)SeparatorStyle.SINGLE, 4, SECTION_LEXICAL.Length),
-				new(41, (int)SeparatorStyle.DOUBLE, 4, SECTION_MAIN.Length)
-			});
-		}
-
-		private void ApplyFoldRegions() {
-			editorControl1.SetFoldRegions(new List<FoldRegion> {
-				new(6, 13, false), new(9, 12, false), new(15, 19, true),
-				new(20, 39, false), new(22, 37, false), new(23, 36, true),
-				new(42, 48, false), new(5, 40, false)
-			});
-		}
-
-		private void ApplyDiagnostics() {
-			editorControl1.ClearDiagnostics();
-			editorControl1.SetLineDiagnostics(9, new List<DiagnosticItem> { new(13, 5, 0, 0) });
-			editorControl1.SetLineDiagnostics(16, new List<DiagnosticItem> { new(8, 4, 1, 0) });
-			editorControl1.SetLineDiagnostics(22, new List<DiagnosticItem> { new(4, 3, 3, 0) });
-			editorControl1.SetLineDiagnostics(44, new List<DiagnosticItem> { new(38, 20, 2, 0) });
-			editorControl1.SetLineDiagnostics(45, new List<DiagnosticItem> { new(4, 4, 1, unchecked((int)0xFFFF8C00)) });
-			editorControl1.SetLineDiagnostics(46, new List<DiagnosticItem> { new(17, 10, 2, 0), new(31, 6, 0, 0) });
+			return null;
 		}
 
 		private sealed class DemoCompletionProvider : ICompletionProvider {
@@ -331,8 +259,6 @@ using SweetEditor;
 			public bool IsTriggerCharacter(string ch) => TriggerChars.Contains(ch);
 
 			public void ProvideCompletions(CompletionContext context, ICompletionReceiver receiver) {
-				Debug.WriteLine($"[DemoCompletionProvider] provideCompletions: kind={context.TriggerKind} trigger='{context.TriggerCharacter}' cursor={context.CursorPosition.Line}:{context.CursorPosition.Column}");
-
 				if (context.TriggerKind == CompletionTriggerKind.Character && context.TriggerCharacter == ".") {
 					var items = new List<CompletionItem> {
 						new() { Label = "length", Detail = "size_t", Kind = CompletionItem.KIND_PROPERTY, InsertText = "length()", SortKey = "a_length" },
@@ -342,7 +268,6 @@ using SweetEditor;
 						new() { Label = "size", Detail = "size_t", Kind = CompletionItem.KIND_FUNCTION, InsertText = "size()", SortKey = "e_size" }
 					};
 					receiver.Accept(new CompletionResult(items));
-					Debug.WriteLine($"[DemoCompletionProvider] Sync push: {items.Count} member candidates");
 					return;
 				}
 
@@ -350,7 +275,6 @@ using SweetEditor;
 					await Task.Delay(200);
 
 					if (receiver.IsCancelled) {
-						Debug.WriteLine("[DemoCompletionProvider] Async completion cancelled");
 						return;
 					}
 
@@ -360,72 +284,516 @@ using SweetEditor;
 						new() { Label = "std::cout", Detail = "ostream", Kind = CompletionItem.KIND_VARIABLE, InsertText = "std::cout", SortKey = "c_cout" },
 						new() { Label = "if", Detail = "snippet", Kind = CompletionItem.KIND_SNIPPET, InsertText = "if (${1:condition}) {\n\t$0\n}", InsertTextFormat = CompletionItem.INSERT_TEXT_FORMAT_SNIPPET, SortKey = "d_if" },
 						new() { Label = "for", Detail = "snippet", Kind = CompletionItem.KIND_SNIPPET, InsertText = "for (int ${1:i} = 0; ${1:i} < ${2:n}; ++${1:i}) {\n\t$0\n}", InsertTextFormat = CompletionItem.INSERT_TEXT_FORMAT_SNIPPET, SortKey = "e_for" },
-						new() { Label = "class", Detail = "snippet — class definition", Kind = CompletionItem.KIND_SNIPPET, InsertText = "class ${1:ClassName} {\npublic:\n\t${1:ClassName}() {$2}\n\t~${1:ClassName}() {$3}\n$0\n};", InsertTextFormat = CompletionItem.INSERT_TEXT_FORMAT_SNIPPET, SortKey = "f_class" },
+						new() { Label = "class", Detail = "snippet - class definition", Kind = CompletionItem.KIND_SNIPPET, InsertText = "class ${1:ClassName} {\npublic:\n\t${1:ClassName}() {$2}\n\t~${1:ClassName}() {$3}\n$0\n};", InsertTextFormat = CompletionItem.INSERT_TEXT_FORMAT_SNIPPET, SortKey = "f_class" },
 						new() { Label = "return", Detail = "keyword", Kind = CompletionItem.KIND_KEYWORD, InsertText = "return ", SortKey = "g_return" }
 					};
 					receiver.Accept(new CompletionResult(items));
-					Debug.WriteLine($"[DemoCompletionProvider] Async push: {items.Count} keyword/identifier candidates (delay 200ms)");
 				});
 			}
 		}
 
 		private sealed class DemoDecorationProvider : IDecorationProvider {
+			private const string DefaultAnalysisFileName = "example.cpp";
+			private const int StyleKeyword = 1;
+			private const int StyleComment = 4;
+			private const int StyleColor = 9;
+			private const int IconClass = 1;
+
+			private static HighlightEngine? highlightEngine;
+
+			private readonly object stateLock = new();
+			private DocumentAnalyzer? documentAnalyzer;
+			private DocumentHighlight? cacheHighlight;
+			private string sourceFileName = DefaultAnalysisFileName;
+			private string sourceText = string.Empty;
+			private string analyzedFileName = DefaultAnalysisFileName;
+
 			public DecorationType Capabilities =>
-				DecorationType.InlayHint | DecorationType.PhantomText | DecorationType.Diagnostic;
+				DecorationType.SyntaxHighlight |
+				DecorationType.IndentGuide |
+				DecorationType.FoldRegion |
+				DecorationType.SeparatorGuide |
+				DecorationType.GutterIcon |
+				DecorationType.InlayHint |
+				DecorationType.PhantomText |
+				DecorationType.Diagnostic;
+
+			public static bool EnsureSweetLineReady(IReadOnlyList<string> syntaxFiles) {
+				if (highlightEngine != null) {
+					return true;
+				}
+				if (syntaxFiles == null || syntaxFiles.Count == 0) {
+					throw new InvalidOperationException("No syntax files configured");
+				}
+
+				var engine = new HighlightEngine(new HighlightConfig(false, false));
+				RegisterStyleMap(engine);
+
+				foreach (string syntaxFile in syntaxFiles) {
+					string syntaxJson = File.ReadAllText(syntaxFile);
+					try {
+						engine.CompileSyntaxFromJson(syntaxJson);
+					} catch (SyntaxCompileError ex) {
+						throw new InvalidOperationException($"Failed to compile syntax file: {syntaxFile}", ex);
+					}
+				}
+
+				highlightEngine = engine;
+				return true;
+			}
+
+			public void SetDocumentSource(string fileName, string text) {
+				lock (stateLock) {
+					sourceFileName = string.IsNullOrWhiteSpace(fileName) ? DefaultAnalysisFileName : fileName;
+					sourceText = text ?? string.Empty;
+					documentAnalyzer = null;
+					cacheHighlight = null;
+					analyzedFileName = sourceFileName;
+				}
+			}
 
 			public void ProvideDecorations(DecorationContext context, IDecorationReceiver receiver) {
-				Debug.WriteLine($"[DemoProvider] provideDecorations: visible={context.VisibleStartLine}-{context.VisibleEndLine}");
-
-				var hints = new Dictionary<int, List<DecorationResult.InlayHintItem>> {
-					[44] = [
-						DecorationResult.InlayHintItem.TextHint(15, "level: "),
-						DecorationResult.InlayHintItem.TextHint(37, "msg: ")
-					],
-					[45] = [DecorationResult.InlayHintItem.TextHint(35, "line: ")],
-					[10] = [
-						DecorationResult.InlayHintItem.ColorHint(30, unchecked((int)0xFF4CAF50)),
-						DecorationResult.InlayHintItem.ColorHint(35, unchecked((int)0xFF2196F3)),
-						DecorationResult.InlayHintItem.ColorHint(40, unchecked((int)0xFFFF9800)),
-						DecorationResult.InlayHintItem.ColorHint(45, unchecked((int)0xFFF44336))
-					]
-				};
-
 				var phantoms = new Dictionary<int, List<DecorationResult.PhantomTextItem>> {
-					[13] = [new(2, " // end class Logger")],
-					[39] = [new(1, " // end tokenize")],
-					[48] = [new(1, " // end main")]
+					[15] = [new DecorationResult.PhantomTextItem(5, "\n    void warn(const std::string& m) {\n        log(WARN, m);\n    }")]
 				};
 
+				DecorationResult sweetLineResult = BuildSweetLineDecorationResult(context);
 				receiver.Accept(new DecorationResult {
-					InlayHints = hints,
-					PhantomTexts = phantoms
+					InlayHints = sweetLineResult.InlayHints,
+					InlayHintsMode = DecorationApplyMode.REPLACE_RANGE,
+					PhantomTexts = phantoms,
+					PhantomTextsMode = DecorationApplyMode.REPLACE_ALL,
+					SyntaxSpans = sweetLineResult.SyntaxSpans,
+					SyntaxSpansMode = DecorationApplyMode.MERGE,
+					IndentGuides = sweetLineResult.IndentGuides,
+					IndentGuidesMode = DecorationApplyMode.REPLACE_ALL,
+					FoldRegions = sweetLineResult.FoldRegions,
+					FoldRegionsMode = DecorationApplyMode.REPLACE_ALL,
+					SeparatorGuides = sweetLineResult.SeparatorGuides,
+					SeparatorGuidesMode = DecorationApplyMode.REPLACE_ALL,
+					GutterIcons = sweetLineResult.GutterIcons,
+					GutterIconsMode = DecorationApplyMode.REPLACE_ALL
 				});
-
-				Debug.WriteLine("[DemoProvider] Sync push complete: InlayHint + PhantomText");
 
 				Task.Run(async () => {
 					await Task.Delay(500);
-
 					if (receiver.IsCancelled) {
-						Debug.WriteLine("[DemoProvider] Async diagnostic cancelled");
 						return;
 					}
 
 					var diags = new Dictionary<int, List<DecorationResult.DiagnosticItem>> {
-						[9] = [new(13, 5, 0, 0)],
-						[16] = [new(8, 4, 1, 0)],
-						[22] = [new(4, 3, 3, 0)],
-						[44] = [new(38, 20, 2, 0)],
-						[45] = [new(4, 4, 1, unchecked((int)0xFFFF8C00))],
-						[46] = [new(17, 10, 2, 0), new(31, 6, 0, 0)]
+						[9] = [new DecorationResult.DiagnosticItem(13, 5, 0, 0)],
+						[16] = [new DecorationResult.DiagnosticItem(8, 4, 1, 0)],
+						[22] = [new DecorationResult.DiagnosticItem(4, 3, 3, 0)],
+						[44] = [new DecorationResult.DiagnosticItem(38, 20, 2, 0)],
+						[45] = [new DecorationResult.DiagnosticItem(4, 4, 1, unchecked((int)0xFFFF8C00))],
+						[46] = [
+							new DecorationResult.DiagnosticItem(17, 10, 2, 0),
+							new DecorationResult.DiagnosticItem(31, 6, 0, 0)
+						]
 					};
 
 					receiver.Accept(new DecorationResult {
-						Diagnostics = diags
+						Diagnostics = diags,
+						DiagnosticsMode = DecorationApplyMode.REPLACE_ALL
 					});
-
-					Debug.WriteLine("[DemoProvider] Async push complete: Diagnostic (delay 500ms)");
 				});
+			}
+
+			private DecorationResult BuildSweetLineDecorationResult(DecorationContext context) {
+				var syntaxSpans = new Dictionary<int, List<DecorationResult.SpanItem>>();
+				var inlayHints = new Dictionary<int, List<DecorationResult.InlayHintItem>>();
+				var gutterIcons = new Dictionary<int, List<int>>();
+				var indentGuides = new List<DecorationResult.IndentGuideItem>();
+				var foldRegions = new List<DecorationResult.FoldRegionItem>();
+				var separatorGuides = new List<DecorationResult.SeparatorGuideItem>();
+				var seenColorHints = new HashSet<string>();
+
+				DocumentAnalyzer? analyzerSnapshot;
+				DocumentHighlight? highlightSnapshot;
+				string textSnapshot;
+
+				lock (stateLock) {
+					if (highlightEngine == null) {
+						return new DecorationResult();
+					}
+
+					string currentFileName = ResolveCurrentFileName(context);
+					if (!string.Equals(currentFileName, sourceFileName, StringComparison.Ordinal)) {
+						sourceFileName = currentFileName;
+					}
+
+					if (cacheHighlight == null || documentAnalyzer == null || !string.Equals(currentFileName, analyzedFileName, StringComparison.Ordinal)) {
+						using var sweetDoc = new SweetLine.Document(BuildAnalysisUri(currentFileName), sourceText);
+						documentAnalyzer = highlightEngine.LoadDocument(sweetDoc);
+						cacheHighlight = documentAnalyzer?.Analyze();
+						analyzedFileName = currentFileName;
+					} else if (context.TextChanges.Count > 0 && documentAnalyzer != null) {
+						foreach (TextChange change in context.TextChanges) {
+							if (change.Range == null) {
+								continue;
+							}
+							string newText = change.NewText ?? string.Empty;
+							cacheHighlight = documentAnalyzer.AnalyzeIncremental(ConvertAsSLTextRange(change.Range.Value), newText);
+							sourceText = ApplyTextChange(sourceText, change.Range.Value, newText);
+						}
+					}
+
+					analyzerSnapshot = documentAnalyzer;
+					highlightSnapshot = cacheHighlight;
+					textSnapshot = sourceText;
+				}
+
+				if (highlightSnapshot?.Lines == null || highlightSnapshot.Lines.Count == 0) {
+					return new DecorationResult {
+						SyntaxSpans = syntaxSpans,
+						SyntaxSpansMode = DecorationApplyMode.MERGE,
+						InlayHints = inlayHints,
+						InlayHintsMode = DecorationApplyMode.REPLACE_RANGE,
+						IndentGuides = indentGuides,
+						IndentGuidesMode = DecorationApplyMode.REPLACE_ALL,
+						FoldRegions = foldRegions,
+						FoldRegionsMode = DecorationApplyMode.REPLACE_ALL,
+						SeparatorGuides = separatorGuides,
+						SeparatorGuidesMode = DecorationApplyMode.REPLACE_ALL,
+						GutterIcons = gutterIcons,
+						GutterIconsMode = DecorationApplyMode.REPLACE_ALL
+					};
+				}
+
+				List<string> textLines = SplitLines(textSnapshot);
+				int renderStartLine = Math.Max(0, context.VisibleStartLine);
+				int maxLine = Math.Min(context.VisibleEndLine, highlightSnapshot.Lines.Count - 1);
+				for (int i = renderStartLine; i <= maxLine; i++) {
+					LineHighlight lineHighlight = highlightSnapshot.Lines[i];
+					if (lineHighlight?.Spans == null) {
+						continue;
+					}
+					foreach (TokenSpan token in lineHighlight.Spans) {
+						AppendStyleSpan(syntaxSpans, token);
+						AppendColorInlayHint(inlayHints, seenColorHints, textLines, token);
+						AppendTextInlayHint(inlayHints, textLines, token);
+						AppendSeparator(separatorGuides, textLines, token);
+						AppendGutterIcons(gutterIcons, textLines, token);
+					}
+				}
+
+				if (analyzerSnapshot != null && (context.TotalLineCount < 0 || context.TotalLineCount < 2048)) {
+					IndentGuideResult guideResult = analyzerSnapshot.AnalyzeIndentGuides();
+					if (guideResult?.GuideLines != null) {
+						var seenFolds = new HashSet<string>();
+						foreach (IndentGuideLine guide in guideResult.GuideLines) {
+							if (guide == null || guide.EndLine < guide.StartLine) {
+								continue;
+							}
+
+							int column = Math.Max(guide.Column, 0);
+							indentGuides.Add(new DecorationResult.IndentGuideItem(
+								new EditorTextPosition { Line = guide.StartLine, Column = column },
+								new EditorTextPosition { Line = guide.EndLine, Column = column }));
+
+							if (guide.EndLine <= guide.StartLine) {
+								continue;
+							}
+
+							string key = $"{guide.StartLine}:{guide.EndLine}";
+							if (seenFolds.Add(key)) {
+								foldRegions.Add(new DecorationResult.FoldRegionItem(guide.StartLine, guide.EndLine, false));
+							}
+						}
+					}
+				}
+
+				return new DecorationResult {
+					SyntaxSpans = syntaxSpans,
+					SyntaxSpansMode = DecorationApplyMode.MERGE,
+					InlayHints = inlayHints,
+					InlayHintsMode = DecorationApplyMode.REPLACE_RANGE,
+					IndentGuides = indentGuides,
+					IndentGuidesMode = DecorationApplyMode.REPLACE_ALL,
+					FoldRegions = foldRegions,
+					FoldRegionsMode = DecorationApplyMode.REPLACE_ALL,
+					SeparatorGuides = separatorGuides,
+					SeparatorGuidesMode = DecorationApplyMode.REPLACE_ALL,
+					GutterIcons = gutterIcons,
+					GutterIconsMode = DecorationApplyMode.REPLACE_ALL
+				};
+			}
+
+			private static void RegisterStyleMap(HighlightEngine engine) {
+				engine.RegisterStyleName("keyword", 1);
+				engine.RegisterStyleName("type", 2);
+				engine.RegisterStyleName("string", 3);
+				engine.RegisterStyleName("comment", 4);
+				engine.RegisterStyleName("preprocessor", 5);
+				engine.RegisterStyleName("macro", 5);
+				engine.RegisterStyleName("method", 6);
+				engine.RegisterStyleName("function", 6);
+				engine.RegisterStyleName("number", 7);
+				engine.RegisterStyleName("class", 8);
+				engine.RegisterStyleName("color", 9);
+				engine.RegisterStyleName("builtin", 2);
+				engine.RegisterStyleName("annotation", 1);
+			}
+
+			private static string ResolveCurrentFileName(DecorationContext context) {
+				if (context.EditorMetadata is DemoFileMetadata fileMetadata &&
+					!string.IsNullOrWhiteSpace(fileMetadata.FileName)) {
+					return fileMetadata.FileName;
+				}
+				return DefaultAnalysisFileName;
+			}
+
+			private static string BuildAnalysisUri(string fileName) {
+				return $"file:///{fileName}";
+			}
+
+			private static void AppendStyleSpan(Dictionary<int, List<DecorationResult.SpanItem>> syntaxSpans, TokenSpan token) {
+				if (token.StyleId <= 0) {
+					return;
+				}
+				TokenRangeInfo? range = ExtractSingleLineTokenRange(token);
+				if (range == null) {
+					return;
+				}
+				GetOrCreate(syntaxSpans, range.Line)
+					.Add(new DecorationResult.SpanItem(range.StartColumn, range.Length, token.StyleId));
+			}
+
+			private static void AppendColorInlayHint(Dictionary<int, List<DecorationResult.InlayHintItem>> inlayHints,
+													 HashSet<string> seenHints,
+													 List<string> textLines,
+													 TokenSpan token) {
+				if (token.StyleId != StyleColor) {
+					return;
+				}
+				TokenRangeInfo? range = ExtractSingleLineTokenRange(token);
+				if (range == null) {
+					return;
+				}
+				string literal = GetTokenLiteral(textLines, range);
+				int? color = ParseColorLiteral(literal);
+				if (color == null) {
+					return;
+				}
+				string key = $"{range.Line}:{range.StartColumn}:{literal}";
+				if (!seenHints.Add(key)) {
+					return;
+				}
+				GetOrCreate(inlayHints, range.Line)
+					.Add(DecorationResult.InlayHintItem.ColorHint(range.StartColumn, color.Value));
+			}
+
+			private static void AppendTextInlayHint(Dictionary<int, List<DecorationResult.InlayHintItem>> inlayHints,
+													List<string> textLines,
+													TokenSpan token) {
+				if (token.StyleId != StyleKeyword) {
+					return;
+				}
+				TokenRangeInfo? range = ExtractSingleLineTokenRange(token);
+				if (range == null) {
+					return;
+				}
+				string literal = GetTokenLiteral(textLines, range);
+				List<DecorationResult.InlayHintItem> lineHints = GetOrCreate(inlayHints, range.Line);
+				if (literal == "const") {
+					lineHints.Add(DecorationResult.InlayHintItem.TextHint(range.EndColumn + 1, "immutable"));
+				} else if (literal == "return") {
+					lineHints.Add(DecorationResult.InlayHintItem.TextHint(range.EndColumn + 1, "value: "));
+				} else if (literal == "case") {
+					lineHints.Add(DecorationResult.InlayHintItem.TextHint(range.EndColumn + 1, "condition: "));
+				}
+			}
+
+			private static void AppendSeparator(List<DecorationResult.SeparatorGuideItem> separatorGuides,
+												List<string> textLines,
+												TokenSpan token) {
+				if (token.StyleId != StyleComment) {
+					return;
+				}
+				TokenRangeInfo? range = ExtractSingleLineTokenRange(token);
+				if (range == null) {
+					return;
+				}
+				string? lineText = GetLineText(textLines, range.Line);
+				if (lineText == null || range.EndColumn > lineText.Length) {
+					return;
+				}
+				int count = -1;
+				bool isDouble = false;
+				for (int i = 0; i < lineText.Length; i++) {
+					char ch = lineText[i];
+					if (count < 0) {
+						if (ch == '/') {
+							continue;
+						}
+						if (ch == '=') {
+							count = 1;
+							isDouble = true;
+						} else if (ch == '-') {
+							count = 1;
+							isDouble = false;
+						}
+					} else if (isDouble && ch == '=') {
+						count++;
+					} else if (!isDouble && ch == '-') {
+						count++;
+					} else {
+						break;
+					}
+				}
+				if (count > 0) {
+					separatorGuides.Add(new DecorationResult.SeparatorGuideItem(
+						range.Line,
+						isDouble ? 1 : 0,
+						count,
+						lineText.Length));
+				}
+			}
+
+			private static void AppendGutterIcons(Dictionary<int, List<int>> gutterIcons,
+												  List<string> textLines,
+												  TokenSpan token) {
+				if (token.StyleId != StyleKeyword) {
+					return;
+				}
+				TokenRangeInfo? range = ExtractSingleLineTokenRange(token);
+				if (range == null) {
+					return;
+				}
+				string literal = GetTokenLiteral(textLines, range);
+				if (literal == "class" || literal == "struct") {
+					GetOrCreate(gutterIcons, range.Line).Add(IconClass);
+				}
+			}
+
+			private static int? ParseColorLiteral(string literal) {
+				if (!literal.StartsWith("0X", StringComparison.Ordinal)) {
+					return null;
+				}
+				try {
+					return unchecked((int)Convert.ToUInt32(literal[2..], 16));
+				} catch {
+					return null;
+				}
+			}
+
+			private static string GetTokenLiteral(List<string> textLines, TokenRangeInfo range) {
+				string? lineText = GetLineText(textLines, range.Line);
+				if (lineText == null || range.EndColumn > lineText.Length) {
+					return string.Empty;
+				}
+				return lineText.Substring(range.StartColumn, range.Length);
+			}
+
+			private static string? GetLineText(List<string> textLines, int line) {
+				if (line < 0 || line >= textLines.Count) {
+					return null;
+				}
+				return textLines[line];
+			}
+
+			private static List<string> SplitLines(string text) {
+				var lines = new List<string>();
+				int start = 0;
+				for (int i = 0; i < text.Length; i++) {
+					if (text[i] == '\n') {
+						string line = text.Substring(start, i - start);
+						if (line.EndsWith("\r", StringComparison.Ordinal)) {
+							line = line[..^1];
+						}
+						lines.Add(line);
+						start = i + 1;
+					}
+				}
+				string tail = text[start..];
+				if (tail.EndsWith("\r", StringComparison.Ordinal)) {
+					tail = tail[..^1];
+				}
+				lines.Add(tail);
+				return lines;
+			}
+
+			private static TokenRangeInfo? ExtractSingleLineTokenRange(TokenSpan token) {
+				int startLine = token.Range.Start.Line;
+				int endLine = token.Range.End.Line;
+				int startColumn = token.Range.Start.Column;
+				int endColumn = token.Range.End.Column;
+				if (startLine < 0 || startLine != endLine || startColumn < 0 || endColumn <= startColumn) {
+					return null;
+				}
+				return new TokenRangeInfo(startLine, startColumn, endColumn);
+			}
+
+			private static string ApplyTextChange(string originalText, EditorTextRange range, string newText) {
+				int startOffset = LineColumnToOffset(originalText, range.Start.Line, range.Start.Column);
+				int endOffset = LineColumnToOffset(originalText, range.End.Line, range.End.Column);
+				if (startOffset > endOffset) {
+					(startOffset, endOffset) = (endOffset, startOffset);
+				}
+				var builder = new StringBuilder(Math.Max(0, originalText.Length - (endOffset - startOffset)) + newText.Length);
+				builder.Append(originalText, 0, startOffset);
+				builder.Append(newText);
+				builder.Append(originalText, endOffset, originalText.Length - endOffset);
+				return builder.ToString();
+			}
+
+			private static int LineColumnToOffset(string text, int targetLine, int targetColumn) {
+				int line = 0;
+				int index = 0;
+
+				while (index < text.Length && line < Math.Max(0, targetLine)) {
+					char ch = text[index++];
+					if (ch == '\n') {
+						line++;
+					}
+				}
+
+				int column = 0;
+				while (index < text.Length && column < Math.Max(0, targetColumn)) {
+					char ch = text[index];
+					if (ch == '\n') {
+						break;
+					}
+					index++;
+					column++;
+				}
+				return index;
+			}
+
+			private static SweetLineTextRange ConvertAsSLTextRange(EditorTextRange range) {
+				return new SweetLineTextRange(
+					new SweetLineTextPosition(range.Start.Line, range.Start.Column, 0),
+					new SweetLineTextPosition(range.End.Line, range.End.Column, 0));
+			}
+
+			private static List<T> GetOrCreate<T>(Dictionary<int, List<T>> map, int line) {
+				if (!map.TryGetValue(line, out List<T>? list)) {
+					list = new List<T>();
+					map[line] = list;
+				}
+				return list;
+			}
+
+			private sealed class TokenRangeInfo {
+				public int Line { get; }
+				public int StartColumn { get; }
+				public int EndColumn { get; }
+				public int Length => EndColumn - StartColumn;
+
+				public TokenRangeInfo(int line, int startColumn, int endColumn) {
+					Line = line;
+					StartColumn = startColumn;
+					EndColumn = endColumn;
+				}
+			}
+		}
+
+		private sealed class DemoFileMetadata : IEditorMetadata {
+			public string FileName { get; }
+
+			public DemoFileMetadata(string fileName) {
+				FileName = fileName;
 			}
 		}
 	}
