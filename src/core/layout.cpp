@@ -116,6 +116,11 @@ namespace NS_SWEETEDITOR {
     // Center offset for line spacing (when line height > font height)
     const float line_height = getLineHeight();
     const float top_padding = (line_height - m_layout_metrics_.font_height) * 0.5f;
+    const float split_x = m_layout_metrics_.gutterWidth();
+    const bool show_fold_arrows = m_layout_metrics_.shouldShowFoldArrows();
+    const float fold_arrow_x = show_fold_arrows
+      ? split_x - m_layout_metrics_.line_number_margin - m_layout_metrics_.foldArrowAreaWidth() * 0.5f
+      : 0.0f;
     for (size_t i = visible_line_info.first_line; i <= visible_line_info.last_line; ++i) {
       LogicalLine& logical_line = logical_lines[i];
       // Crop recomposed VisualLine by horizontal viewport, then map to screen coords
@@ -139,27 +144,23 @@ namespace NS_SWEETEDITOR {
             run.x += text_area_x;
           }
         }
-        // For first line (not continuation, not phantom), fill gutter icons and fold state
+        // For first line (not continuation, not phantom), fill fold state and gutter icon render items
         if (visual_line.wrap_index == 0 && !visual_line.is_phantom_line) {
-          const auto& gutter_icons = m_decoration_manager_->getLineGutterIcons(i);
-          if (!gutter_icons.empty()) {
-            visual_line.gutter_icon_ids.reserve(gutter_icons.size());
-            for (const auto& icon : gutter_icons) {
-              visual_line.gutter_icon_ids.push_back(icon.icon_id);
-            }
-          }
+          buildGutterIconRenderItems(i, screen_y, model.gutter_icons);
           // Set fold state (used by platform to draw fold/unfold arrow)
           int fs = m_decoration_manager_->getFoldStateForLine(i);
           visual_line.fold_state = static_cast<FoldState>(fs);
+          FoldMarkerRenderItem fold_marker;
+          if (buildFoldMarkerRenderItem(i, screen_y, fold_marker)) {
+            model.fold_markers.push_back(std::move(fold_marker));
+          }
         }
         model.lines.push_back(std::move(visual_line));
       }
     }
-    model.split_x = m_layout_metrics_.gutterWidth();
+    model.split_x = split_x;
     model.max_gutter_icons = m_layout_metrics_.max_gutter_icons;
-    if (m_layout_metrics_.shouldShowFoldArrows()) {
-      model.fold_arrow_x = model.split_x - m_layout_metrics_.line_number_margin - m_layout_metrics_.foldArrowAreaWidth() * 0.5f;
-    }
+    model.fold_arrow_x = fold_arrow_x;
     model.scroll_x = scroll_x;
     model.scroll_y = scroll_y;
     model.viewport_width = m_viewport_.width;
@@ -296,22 +297,21 @@ namespace NS_SWEETEDITOR {
 
     // Detect click in gutter area (line number area)
     if (screen_point.x < split_x) {
-      // Check fold arrow area first (on the right side of icon area)
-      if (m_layout_metrics_.shouldShowFoldArrows()) {
-        float arrow_area_left = split_x - m_layout_metrics_.line_number_margin - m_layout_metrics_.foldArrowAreaWidth();
-        if (screen_point.x >= arrow_area_left) {
-          int fold_state = m_decoration_manager_->getFoldStateForLine(hit_line);
-          if (fold_state != 0) {
-            return {HitTargetType::FOLD_GUTTER, hit_line, 0, 0};
-          }
+      // Check fold marker area first (explicit marker geometry)
+      FoldMarkerRenderItem fold_marker;
+      if (buildFoldMarkerRenderItem(hit_line, ll.start_y - scroll_y, fold_marker)) {
+        if (screen_point.x >= fold_marker.origin.x && screen_point.x < fold_marker.origin.x + fold_marker.width &&
+            screen_point.y >= fold_marker.origin.y && screen_point.y < fold_marker.origin.y + fold_marker.height) {
+          return {HitTargetType::FOLD_GUTTER, hit_line, 0, 0};
         }
       }
-      // Check whether this line has gutter icons
-      if (!ll.visual_lines.empty()) {
-        const VisualLine& vl = ll.visual_lines[0];
-        if (!vl.gutter_icon_ids.empty()) {
-          // Hit gutter icon - return first icon (same as rendering: overlay shows first)
-          return {HitTargetType::GUTTER_ICON, hit_line, 0, vl.gutter_icon_ids[0]};
+      // Check gutter icon bounds on this line
+      Vector<GutterIconRenderItem> gutter_icons;
+      buildGutterIconRenderItems(hit_line, ll.start_y - scroll_y, gutter_icons);
+      for (const auto& icon : gutter_icons) {
+        if (screen_point.x >= icon.origin.x && screen_point.x < icon.origin.x + icon.width &&
+            screen_point.y >= icon.origin.y && screen_point.y < icon.origin.y + icon.height) {
+          return {HitTargetType::GUTTER_ICON, hit_line, 0, icon.icon_id};
         }
       }
       // If fold arrows are hidden, still check fold state
@@ -1521,6 +1521,65 @@ namespace NS_SWEETEDITOR {
            ch == CHAR16('?') || ch == CHAR16(')') ||
            ch == CHAR16(']') || ch == CHAR16('}') ||
            ch == CHAR16('>');
+  }
+
+  void TextLayout::buildGutterIconRenderItems(size_t logical_line, float line_top_screen,
+                                              Vector<GutterIconRenderItem>& out_items) const {
+    const auto& gutter_icons = m_decoration_manager_->getLineGutterIcons(logical_line);
+    if (gutter_icons.empty()) return;
+
+    const float line_height = getLineHeight();
+    const float icon_size = m_layout_metrics_.font_height;
+    if (icon_size <= 0) return;
+    const float icon_top = line_top_screen + std::max(0.0f, (line_height - icon_size) * 0.5f);
+
+    if (m_layout_metrics_.max_gutter_icons == 0) {
+      GutterIconRenderItem item;
+      item.logical_line = logical_line;
+      item.icon_id = gutter_icons[0].icon_id;
+      item.origin = {m_layout_metrics_.line_number_margin, icon_top};
+      item.width = icon_size;
+      item.height = icon_size;
+      out_items.push_back(std::move(item));
+      return;
+    }
+
+    const size_t max_icons = std::min(static_cast<size_t>(m_layout_metrics_.max_gutter_icons), gutter_icons.size());
+    const float split_x = m_layout_metrics_.gutterWidth();
+    const bool show_fold_arrows = m_layout_metrics_.shouldShowFoldArrows();
+    const float fold_lane_left = split_x - m_layout_metrics_.line_number_margin - m_layout_metrics_.foldArrowAreaWidth();
+    float icon_right = show_fold_arrows ? fold_lane_left : (split_x - 2.0f);
+    for (size_t idx = 0; idx < max_icons; ++idx) {
+      const size_t icon_index = max_icons - 1 - idx;
+      GutterIconRenderItem item;
+      item.logical_line = logical_line;
+      item.icon_id = gutter_icons[icon_index].icon_id;
+      item.origin = {icon_right - icon_size, icon_top};
+      item.width = icon_size;
+      item.height = icon_size;
+      out_items.push_back(std::move(item));
+      icon_right -= icon_size;
+    }
+  }
+
+  bool TextLayout::buildFoldMarkerRenderItem(size_t logical_line, float line_top_screen,
+                                             FoldMarkerRenderItem& out_item) const {
+    if (!m_layout_metrics_.shouldShowFoldArrows()) return false;
+    int fs = m_decoration_manager_->getFoldStateForLine(logical_line);
+    if (fs == 0) return false;
+    const float fold_width = m_layout_metrics_.foldArrowAreaWidth();
+    if (fold_width <= 0) return false;
+    const float split_x = m_layout_metrics_.gutterWidth();
+    const float fold_left = split_x - m_layout_metrics_.line_number_margin - fold_width;
+    const float marker_height = m_layout_metrics_.font_height;
+    const float line_height = getLineHeight();
+    const float marker_top = line_top_screen + std::max(0.0f, (line_height - marker_height) * 0.5f);
+    out_item.logical_line = logical_line;
+    out_item.fold_state = static_cast<FoldState>(fs);
+    out_item.origin = {fold_left, marker_top};
+    out_item.width = fold_width;
+    out_item.height = marker_height;
+    return true;
   }
 
   size_t TextLayout::findHitLine(float abs_y) {

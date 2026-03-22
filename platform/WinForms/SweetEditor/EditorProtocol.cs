@@ -550,17 +550,8 @@ namespace SweetEditor {
 				!TryReadInt32(data, ref offset, out int wrapIndex) ||
 				!TryReadPointF(data, ref offset, out PointF lineNumberPosition) ||
 				!TryReadInt32(data, ref offset, out int isPhantomLine) ||
-				!TryReadInt32(data, ref offset, out int foldStateValue) ||
-				!TryReadInt32(data, ref offset, out int gutterIconCount) ||
-				gutterIconCount < 0) {
+				!TryReadInt32(data, ref offset, out int foldStateValue)) {
 				return false;
-			}
-			List<int> gutterIconIds = new(gutterIconCount);
-			for (int i = 0; i < gutterIconCount; i++) {
-				if (!TryReadInt32(data, ref offset, out int iconId)) {
-					return false;
-				}
-				gutterIconIds.Add(iconId);
 			}
 			if (!TryReadInt32(data, ref offset, out int runCount) || runCount < 0) {
 				return false;
@@ -578,8 +569,45 @@ namespace SweetEditor {
 				LineNumberPosition = lineNumberPosition,
 				Runs = runs,
 				IsPhantomLine = isPhantomLine != 0,
-				GutterIconIds = gutterIconIds,
 				FoldState = ToFoldState(foldStateValue),
+			};
+			return true;
+		}
+
+		internal static bool TryReadGutterIconRenderItem(ReadOnlySpan<byte> data, ref int offset, out GutterIconRenderItem item) {
+			item = default;
+			if (!TryReadInt32(data, ref offset, out int logicalLine) ||
+				!TryReadInt32(data, ref offset, out int iconId) ||
+				!TryReadPointF(data, ref offset, out PointF origin) ||
+				!TryReadFloat(data, ref offset, out float width) ||
+				!TryReadFloat(data, ref offset, out float height)) {
+				return false;
+			}
+			item = new GutterIconRenderItem {
+				LogicalLine = logicalLine,
+				IconId = iconId,
+				Origin = origin,
+				Width = width,
+				Height = height,
+			};
+			return true;
+		}
+
+		internal static bool TryReadFoldMarkerRenderItem(ReadOnlySpan<byte> data, ref int offset, out FoldMarkerRenderItem item) {
+			item = default;
+			if (!TryReadInt32(data, ref offset, out int logicalLine) ||
+				!TryReadInt32(data, ref offset, out int foldStateValue) ||
+				!TryReadPointF(data, ref offset, out PointF origin) ||
+				!TryReadFloat(data, ref offset, out float width) ||
+				!TryReadFloat(data, ref offset, out float height)) {
+				return false;
+			}
+			item = new FoldMarkerRenderItem {
+				LogicalLine = logicalLine,
+				FoldState = ToFoldState(foldStateValue),
+				Origin = origin,
+				Width = width,
+				Height = height,
 			};
 			return true;
 		}
@@ -746,6 +774,8 @@ namespace SweetEditor {
 			return new EditorRenderModel {
 				SplitLineVisible = true,
 				VisualLines = new List<VisualLine>(),
+				GutterIcons = new List<GutterIconRenderItem>(),
+				FoldMarkers = new List<FoldMarkerRenderItem>(),
 				SelectionRects = new List<SelectionRect>(),
 				GuideSegments = new List<GuideSegment>(),
 				DiagnosticDecorations = new List<DiagnosticDecoration>(),
@@ -793,6 +823,30 @@ namespace SweetEditor {
 				lines.Add(line);
 			}
 			model.VisualLines = lines;
+
+			if (!TryReadInt32(data, ref offset, out int gutterIconCount) || gutterIconCount < 0) {
+				return model;
+			}
+			List<GutterIconRenderItem> gutterIcons = new(gutterIconCount);
+			for (int i = 0; i < gutterIconCount; i++) {
+				if (!TryReadGutterIconRenderItem(data, ref offset, out GutterIconRenderItem item)) {
+					return model;
+				}
+				gutterIcons.Add(item);
+			}
+			model.GutterIcons = gutterIcons;
+
+			if (!TryReadInt32(data, ref offset, out int foldMarkerCount) || foldMarkerCount < 0) {
+				return model;
+			}
+			List<FoldMarkerRenderItem> foldMarkers = new(foldMarkerCount);
+			for (int i = 0; i < foldMarkerCount; i++) {
+				if (!TryReadFoldMarkerRenderItem(data, ref offset, out FoldMarkerRenderItem item)) {
+					return model;
+				}
+				foldMarkers.Add(item);
+			}
+			model.FoldMarkers = foldMarkers;
 
 			if (!TryReadCursor(data, ref offset, out Cursor cursor) ||
 				!TryReadInt32(data, ref offset, out int selectionRectCount) ||

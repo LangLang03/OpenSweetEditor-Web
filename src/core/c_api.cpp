@@ -158,14 +158,26 @@ static void appendVisualLine(std::vector<uint8_t>& buffer, const VisualLine& lin
   appendPoint(buffer, line.line_number_position);
   appendBool(buffer, line.is_phantom_line);
   appendI32(buffer, static_cast<int32_t>(line.fold_state));
-  appendI32(buffer, static_cast<int32_t>(line.gutter_icon_ids.size()));
-  for (int32_t icon_id : line.gutter_icon_ids) {
-    appendI32(buffer, icon_id);
-  }
   appendI32(buffer, static_cast<int32_t>(line.runs.size()));
   for (const auto& run : line.runs) {
     appendVisualRun(buffer, run);
   }
+}
+
+static void appendGutterIconRenderItem(std::vector<uint8_t>& buffer, const GutterIconRenderItem& item) {
+  appendI32(buffer, static_cast<int32_t>(item.logical_line));
+  appendI32(buffer, item.icon_id);
+  appendPoint(buffer, item.origin);
+  appendF32(buffer, item.width);
+  appendF32(buffer, item.height);
+}
+
+static void appendFoldMarkerRenderItem(std::vector<uint8_t>& buffer, const FoldMarkerRenderItem& item) {
+  appendI32(buffer, static_cast<int32_t>(item.logical_line));
+  appendI32(buffer, static_cast<int32_t>(item.fold_state));
+  appendPoint(buffer, item.origin);
+  appendF32(buffer, item.width);
+  appendF32(buffer, item.height);
 }
 
 static void appendCursor(std::vector<uint8_t>& buffer, const Cursor& cursor) {
@@ -252,6 +264,16 @@ static const uint8_t* editorRenderModelToBinary(const EditorRenderModel& model, 
   appendI32(buffer, static_cast<int32_t>(model.lines.size()));
   for (const auto& line : model.lines) {
     appendVisualLine(buffer, line);
+  }
+
+  appendI32(buffer, static_cast<int32_t>(model.gutter_icons.size()));
+  for (const auto& icon : model.gutter_icons) {
+    appendGutterIconRenderItem(buffer, icon);
+  }
+
+  appendI32(buffer, static_cast<int32_t>(model.fold_markers.size()));
+  for (const auto& marker : model.fold_markers) {
+    appendFoldMarkerRenderItem(buffer, marker);
   }
 
   appendCursor(buffer, model.cursor);

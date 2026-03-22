@@ -145,8 +145,6 @@ EDITOR_API void editor_set_show_split_line(intptr_t editor_handle, int show);
 ///            - PointF line_number_position
 ///            - i32 is_phantom_line
 ///            - i32 fold_state
-///            - i32 gutter_icon_count
-///            - i32[gutter_icon_count] gutter_icon_ids
 ///            - i32 run_count
 ///            - VisualRun[run_count] runs
 ///            VisualRun layout:
@@ -164,7 +162,23 @@ EDITOR_API void editor_set_show_split_line(intptr_t editor_handle, int show);
 ///            - f32 width
 ///            - f32 padding
 ///            - f32 margin
-///         10. Cursor cursor
+///         10. i32 gutter_icon_render_count
+///         11. GutterIconRenderItem[gutter_icon_render_count] gutter_icons
+///             GutterIconRenderItem layout:
+///             - i32 logical_line
+///             - i32 icon_id
+///             - PointF origin
+///             - f32 width
+///             - f32 height
+///         12. i32 fold_marker_render_count
+///         13. FoldMarkerRenderItem[fold_marker_render_count] fold_markers
+///             FoldMarkerRenderItem layout:
+///             - i32 logical_line
+///             - i32 fold_state
+///             - PointF origin
+///             - f32 width
+///             - f32 height
+///         14. Cursor cursor
 ///            - TextPosition text_position
 ///              - i32 line
 ///              - i32 column
@@ -172,25 +186,25 @@ EDITOR_API void editor_set_show_split_line(intptr_t editor_handle, int show);
 ///            - f32 height
 ///            - i32 visible
 ///            - i32 show_dragger
-///         11. i32 selection_rect_count
-///         12. SelectionRect[selection_rect_count] selection_rects
+///         15. i32 selection_rect_count
+///         16. SelectionRect[selection_rect_count] selection_rects
 ///             SelectionRect layout:
 ///             - PointF origin
 ///             - f32 width
 ///             - f32 height
-///         13. SelectionHandle selection_start_handle
-///         14. SelectionHandle selection_end_handle
+///         17. SelectionHandle selection_start_handle
+///         18. SelectionHandle selection_end_handle
 ///             SelectionHandle layout:
 ///             - PointF position
 ///             - f32 height
 ///             - i32 visible
-///         15. CompositionDecoration composition_decoration
+///         19. CompositionDecoration composition_decoration
 ///             - i32 active
 ///             - PointF origin
 ///             - f32 width
 ///             - f32 height
-///         16. i32 guide_segment_count
-///         17. GuideSegment[guide_segment_count] guide_segments
+///         20. i32 guide_segment_count
+///         21. GuideSegment[guide_segment_count] guide_segments
 ///             GuideSegment layout:
 ///             - i32 direction
 ///             - i32 type
@@ -198,31 +212,31 @@ EDITOR_API void editor_set_show_split_line(intptr_t editor_handle, int show);
 ///             - PointF start
 ///             - PointF end
 ///             - i32 arrow_end
-///         18. i32 diagnostic_count
-///         19. DiagnosticDecoration[diagnostic_count] diagnostic_decorations
+///         22. i32 diagnostic_count
+///         23. DiagnosticDecoration[diagnostic_count] diagnostic_decorations
 ///             DiagnosticDecoration layout:
 ///             - PointF origin
 ///             - f32 width
 ///             - f32 height
 ///             - i32 severity
 ///             - i32 color
-///         20. i32 max_gutter_icons
-///         21. f32 fold_arrow_x
-///         22. i32 linked_editing_rect_count
-///         23. LinkedEditingRect[linked_editing_rect_count] linked_editing_rects
+///         24. i32 max_gutter_icons
+///         25. f32 fold_arrow_x
+///         26. i32 linked_editing_rect_count
+///         27. LinkedEditingRect[linked_editing_rect_count] linked_editing_rects
 ///             LinkedEditingRect layout:
 ///             - PointF origin
 ///             - f32 width
 ///             - f32 height
 ///             - i32 is_active
-///         24. i32 bracket_highlight_rect_count
-///         25. BracketHighlightRect[bracket_highlight_rect_count] bracket_highlight_rects
+///         28. i32 bracket_highlight_rect_count
+///         29. BracketHighlightRect[bracket_highlight_rect_count] bracket_highlight_rects
 ///             BracketHighlightRect layout:
 ///             - PointF origin
 ///             - f32 width
 ///             - f32 height
-///         26. (optional append-only tail) ScrollbarModel vertical_scrollbar
-///         27. (optional append-only tail) ScrollbarModel horizontal_scrollbar
+///         30. (optional append-only tail) ScrollbarModel vertical_scrollbar
+///         31. (optional append-only tail) ScrollbarModel horizontal_scrollbar
 ///             ScrollbarModel layout:
 ///             - i32 visible
 ///             - f32 alpha (0~1)

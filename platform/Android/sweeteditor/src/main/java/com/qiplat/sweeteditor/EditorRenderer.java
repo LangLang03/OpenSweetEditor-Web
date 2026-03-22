@@ -485,82 +485,88 @@ final class EditorRenderer {
 
     private void drawLineNumbers(Canvas canvas, EditorRenderModel model) {
         if (model.lines == null) return;
+        List<GutterIconRenderItem> gutterIcons = model.gutterIcons;
+        List<FoldMarkerRenderItem> foldMarkers = model.foldMarkers;
+        int iconCount = gutterIcons != null ? gutterIcons.size() : 0;
+        int markerCount = foldMarkers != null ? foldMarkers.size() : 0;
+        int iconCursor = 0;
+        int markerCursor = 0;
         boolean overlayMode = (model.maxGutterIcons == 0);
         Path arrowPath = new Path();
         for (VisualLine line : model.lines) {
             if (line.wrapIndex == 0 && !line.isPhantomLine && line.lineNumberPosition != null) {
-                boolean hasIcons = mEditorIconProvider != null
-                        && line.gutterIconIds != null && !line.gutterIconIds.isEmpty();
+                final int logicalLine = line.logicalLine;
+
+                while (iconCursor < iconCount && gutterIcons.get(iconCursor).logicalLine < logicalLine) {
+                    iconCursor++;
+                }
+                int iconStart = iconCursor;
+                while (iconCursor < iconCount && gutterIcons.get(iconCursor).logicalLine == logicalLine) {
+                    iconCursor++;
+                }
+                int iconEnd = iconCursor;
+                boolean hasIcons = mEditorIconProvider != null && iconEnd > iconStart;
 
                 if (overlayMode && hasIcons) {
-                    Paint.FontMetrics fm = mLineNumberPaint.getFontMetrics();
-                    float baseline = line.lineNumberPosition.y;
-                    float iconTop = baseline + fm.ascent;
-                    float iconSize = fm.descent - fm.ascent;
-                    float iconLeft = line.lineNumberPosition.x;
-                    int iconId = line.gutterIconIds.get(0);
-                    Drawable drawable = mEditorIconProvider.getIconDrawable(iconId);
-                    if (drawable != null) {
-                        drawable.setBounds((int) iconLeft, (int) iconTop,
-                                (int) (iconLeft + iconSize), (int) (iconTop + iconSize));
-                        drawable.draw(canvas);
-                    }
+                    drawGutterIconItem(canvas, gutterIcons.get(iconStart));
                 } else {
                     String lineNumStr = String.valueOf(line.logicalLine + 1);
                     canvas.drawText(lineNumStr,
                             line.lineNumberPosition.x, line.lineNumberPosition.y,
                             mLineNumberPaint);
 
-                    if (hasIcons) {
-                        float lineHeight = model.cursor != null ? model.cursor.height : mLineNumberPaint.getTextSize();
-                        float iconSize = lineHeight;
-                        Paint.FontMetrics fm = mLineNumberPaint.getFontMetrics();
-                        float baseline = line.lineNumberPosition.y;
-                        float iconTop = baseline + fm.ascent;
-                        float iconRight = model.foldArrowX > 0
-                                ? model.foldArrowX - lineHeight * 0.5f
-                                : model.splitX - 2f;
-                        int maxIcons = Math.min(line.gutterIconIds.size(), model.maxGutterIcons);
-                        for (int i = maxIcons - 1; i >= 0; i--) {
-                            int iconId = line.gutterIconIds.get(i);
-                            Drawable drawable = mEditorIconProvider.getIconDrawable(iconId);
-                            if (drawable != null) {
-                                int left = (int) (iconRight - iconSize);
-                                int top = (int) iconTop;
-                                int right = (int) iconRight;
-                                int bottom = (int) (iconTop + iconSize);
-                                drawable.setBounds(left, top, right, bottom);
-                                drawable.draw(canvas);
-                                iconRight -= iconSize;
-                            }
+                    if (hasIcons && !overlayMode) {
+                        for (int i = iconStart; i < iconEnd; i++) {
+                            drawGutterIconItem(canvas, gutterIcons.get(i));
                         }
                     }
                 }
 
-                if (line.foldState != null && line.foldState != FoldState.NONE) {
-                    Paint.FontMetrics fm = mLineNumberPaint.getFontMetrics();
-                    float baseline = line.lineNumberPosition.y;
-                    float lineTop = baseline + fm.ascent;
-                    float lineHeight = fm.descent - fm.ascent;
-                    float halfSize = lineHeight * 0.2f;
-                    float centerX = model.foldArrowX > 0 ? model.foldArrowX : model.splitX - lineHeight * 0.5f;
-                    float centerY = lineTop + lineHeight * 0.5f;
-                    mFoldArrowPaint.setStrokeWidth(lineHeight * 0.1f);
-
-                    arrowPath.reset();
-                    if (line.foldState == FoldState.COLLAPSED) {
-                        arrowPath.moveTo(centerX - halfSize * 0.5f, centerY - halfSize);
-                        arrowPath.lineTo(centerX + halfSize * 0.5f, centerY);
-                        arrowPath.lineTo(centerX - halfSize * 0.5f, centerY + halfSize);
-                    } else {
-                        arrowPath.moveTo(centerX - halfSize, centerY - halfSize * 0.5f);
-                        arrowPath.lineTo(centerX, centerY + halfSize * 0.5f);
-                        arrowPath.lineTo(centerX + halfSize, centerY - halfSize * 0.5f);
-                    }
-                    canvas.drawPath(arrowPath, mFoldArrowPaint);
+                while (markerCursor < markerCount && foldMarkers.get(markerCursor).logicalLine < logicalLine) {
+                    markerCursor++;
                 }
+                FoldMarkerRenderItem foldMarker = null;
+                while (markerCursor < markerCount && foldMarkers.get(markerCursor).logicalLine == logicalLine) {
+                    if (foldMarker == null) foldMarker = foldMarkers.get(markerCursor);
+                    markerCursor++;
+                }
+                if (foldMarker != null) drawFoldMarkerItem(canvas, foldMarker, arrowPath);
             }
         }
+    }
+
+    private void drawGutterIconItem(@NonNull Canvas canvas, @NonNull GutterIconRenderItem item) {
+        if (mEditorIconProvider == null || item.origin == null || item.width <= 0f || item.height <= 0f) return;
+        Drawable drawable = mEditorIconProvider.getIconDrawable(item.iconId);
+        if (drawable == null) return;
+        int left = Math.round(item.origin.x);
+        int top = Math.round(item.origin.y);
+        int right = Math.round(item.origin.x + item.width);
+        int bottom = Math.round(item.origin.y + item.height);
+        drawable.setBounds(left, top, right, bottom);
+        drawable.draw(canvas);
+    }
+
+    private void drawFoldMarkerItem(@NonNull Canvas canvas, @NonNull FoldMarkerRenderItem item, @NonNull Path arrowPath) {
+        if (item.origin == null || item.width <= 0f || item.height <= 0f) return;
+        if (item.foldState == null || item.foldState == FoldState.NONE) return;
+
+        float centerX = item.origin.x + item.width * 0.5f;
+        float centerY = item.origin.y + item.height * 0.5f;
+        float halfSize = Math.min(item.width, item.height) * 0.28f;
+        mFoldArrowPaint.setStrokeWidth(Math.max(1f, item.height * 0.1f));
+
+        arrowPath.reset();
+        if (item.foldState == FoldState.COLLAPSED) {
+            arrowPath.moveTo(centerX - halfSize * 0.5f, centerY - halfSize);
+            arrowPath.lineTo(centerX + halfSize * 0.5f, centerY);
+            arrowPath.lineTo(centerX - halfSize * 0.5f, centerY + halfSize);
+        } else {
+            arrowPath.moveTo(centerX - halfSize, centerY - halfSize * 0.5f);
+            arrowPath.lineTo(centerX, centerY + halfSize * 0.5f);
+            arrowPath.lineTo(centerX + halfSize, centerY - halfSize * 0.5f);
+        }
+        canvas.drawPath(arrowPath, mFoldArrowPaint);
     }
 
     /**

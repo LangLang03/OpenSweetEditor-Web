@@ -28,6 +28,8 @@ final class ProtocolDecoder {
         model.viewportHeight = data.getFloat();
         model.currentLine = readPoint(data);
         model.lines = readVisualLines(data);
+        model.gutterIcons = readGutterIconRenderItems(data);
+        model.foldMarkers = readFoldMarkerRenderItems(data);
         model.cursor = readCursor(data);
         model.selectionRects = readSelectionRects(data);
         model.selectionStartHandle = readSelectionHandle(data);
@@ -231,11 +233,6 @@ final class ProtocolDecoder {
         line.lineNumberPosition = readPoint(data);
         line.isPhantomLine = data.getInt() != 0;
         line.foldState = readFoldState(data);
-        int gutterIconCount = data.getInt();
-        line.gutterIconIds = new ArrayList<>(Math.max(gutterIconCount, 0));
-        for (int i = 0; i < gutterIconCount; i++) {
-            line.gutterIconIds.add(data.getInt());
-        }
         line.runs = readVisualRuns(data);
         return line;
     }
@@ -247,6 +244,44 @@ final class ProtocolDecoder {
             lines.add(readVisualLine(data));
         }
         return lines;
+    }
+
+    private static GutterIconRenderItem readGutterIconRenderItem(ByteBuffer data) {
+        GutterIconRenderItem item = new GutterIconRenderItem();
+        item.logicalLine = data.getInt();
+        item.iconId = data.getInt();
+        item.origin = readPoint(data);
+        item.width = data.getFloat();
+        item.height = data.getFloat();
+        return item;
+    }
+
+    private static ArrayList<GutterIconRenderItem> readGutterIconRenderItems(ByteBuffer data) {
+        int count = data.getInt();
+        ArrayList<GutterIconRenderItem> items = new ArrayList<>(Math.max(count, 0));
+        for (int i = 0; i < count; i++) {
+            items.add(readGutterIconRenderItem(data));
+        }
+        return items;
+    }
+
+    private static FoldMarkerRenderItem readFoldMarkerRenderItem(ByteBuffer data) {
+        FoldMarkerRenderItem item = new FoldMarkerRenderItem();
+        item.logicalLine = data.getInt();
+        item.foldState = readFoldState(data);
+        item.origin = readPoint(data);
+        item.width = data.getFloat();
+        item.height = data.getFloat();
+        return item;
+    }
+
+    private static ArrayList<FoldMarkerRenderItem> readFoldMarkerRenderItems(ByteBuffer data) {
+        int count = data.getInt();
+        ArrayList<FoldMarkerRenderItem> items = new ArrayList<>(Math.max(count, 0));
+        for (int i = 0; i < count; i++) {
+            items.add(readFoldMarkerRenderItem(data));
+        }
+        return items;
     }
 
     private static Cursor readCursor(ByteBuffer data) {

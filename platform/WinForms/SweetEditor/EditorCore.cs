@@ -662,12 +662,51 @@ namespace SweetEditor {
 		/// <summary>Whether this is a ghost-text continuation row (2nd, 3rd, ... rows of multi-line phantom text).</summary>
 		[JsonPropertyName("is_phantom_line")]
 		public bool IsPhantomLine { get; set; }
-		/// <summary>Gutter icon ID list.</summary>
-		[JsonPropertyName("gutter_icon_ids")]
-		public List<int> GutterIconIds { get; set; }
 		/// <summary>Fold state</summary>
 		[JsonPropertyName("fold_state")]
 		public FoldState FoldState { get; set; }
+	}
+
+	/// <summary>
+	/// Gutter icon render item with fully resolved geometry.
+	/// </summary>
+	public struct GutterIconRenderItem {
+		/// <summary>Logical line index.</summary>
+		[JsonPropertyName("logical_line")]
+		public int LogicalLine { get; set; }
+		/// <summary>Icon resource ID.</summary>
+		[JsonPropertyName("icon_id")]
+		public int IconId { get; set; }
+		/// <summary>Icon top-left corner.</summary>
+		[JsonPropertyName("origin")]
+		public PointF Origin { get; set; }
+		/// <summary>Icon width.</summary>
+		[JsonPropertyName("width")]
+		public float Width { get; set; }
+		/// <summary>Icon height.</summary>
+		[JsonPropertyName("height")]
+		public float Height { get; set; }
+	}
+
+	/// <summary>
+	/// Fold marker render item with fully resolved geometry.
+	/// </summary>
+	public struct FoldMarkerRenderItem {
+		/// <summary>Logical line index.</summary>
+		[JsonPropertyName("logical_line")]
+		public int LogicalLine { get; set; }
+		/// <summary>Fold state on this line.</summary>
+		[JsonPropertyName("fold_state")]
+		public FoldState FoldState { get; set; }
+		/// <summary>Marker top-left corner.</summary>
+		[JsonPropertyName("origin")]
+		public PointF Origin { get; set; }
+		/// <summary>Marker width.</summary>
+		[JsonPropertyName("width")]
+		public float Width { get; set; }
+		/// <summary>Marker height.</summary>
+		[JsonPropertyName("height")]
+		public float Height { get; set; }
 	}
 
 	/// <summary>
@@ -1029,12 +1068,18 @@ namespace SweetEditor {
 		/// <summary>Current-line background position</summary>
 		[JsonPropertyName("current_line")]
 		public PointF CurrentLine { get; set; }
-		/// <summary>Visually rendered text rows (visible area only).</summary>
-		[JsonPropertyName("lines")]
-		public List<VisualLine> VisualLines { get; set; }
-		/// <summary>Caret</summary>
-		[JsonPropertyName("cursor")]
-		public Cursor Cursor { get; set; }
+			/// <summary>Visually rendered text rows (visible area only).</summary>
+			[JsonPropertyName("lines")]
+			public List<VisualLine> VisualLines { get; set; }
+			/// <summary>Gutter icon render list (fully resolved geometry, visible area only).</summary>
+			[JsonPropertyName("gutter_icons")]
+			public List<GutterIconRenderItem> GutterIcons { get; set; }
+			/// <summary>Fold marker render list (fully resolved geometry, visible area only).</summary>
+			[JsonPropertyName("fold_markers")]
+			public List<FoldMarkerRenderItem> FoldMarkers { get; set; }
+			/// <summary>Caret</summary>
+			[JsonPropertyName("cursor")]
+			public Cursor Cursor { get; set; }
 		/// <summary>Selection highlight rectangles</summary>
 		[JsonPropertyName("selection_rects")]
 		public List<SelectionRect> SelectionRects { get; set; }

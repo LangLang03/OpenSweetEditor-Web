@@ -11,6 +11,7 @@ import java.awt.font.LineMetrics;
 import java.awt.geom.*;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
+import java.util.List;
 
 /**
  * Platform-independent rendering engine for the Swing editor.
@@ -295,47 +296,106 @@ final class EditorRenderer implements EditorCore.TextMeasureCallback {
 
     private void drawLineNumbers(Graphics2D g, EditorRenderModel model) {
         if (model.lines == null) return;
+        List<GutterIconRenderItem> gutterIcons = model.gutterIcons;
+        List<FoldMarkerRenderItem> foldMarkers = model.foldMarkers;
+        int iconCount = gutterIcons != null ? gutterIcons.size() : 0;
+        int markerCount = foldMarkers != null ? foldMarkers.size() : 0;
+        int iconCursor = 0;
+        int markerCursor = 0;
         currentDrawingLineNumber = -1;
         for (VisualLine line : model.lines) {
-            drawLineNumber(g, line, model);
+            if (line.wrapIndex != 0 || line.isPhantomLine) continue;
+            int logicalLine = line.logicalLine;
+
+            while (iconCursor < iconCount && gutterIcons.get(iconCursor).logicalLine < logicalLine) {
+                iconCursor++;
+            }
+            int iconStart = iconCursor;
+            while (iconCursor < iconCount && gutterIcons.get(iconCursor).logicalLine == logicalLine) {
+                iconCursor++;
+            }
+            int iconEnd = iconCursor;
+
+            while (markerCursor < markerCount && foldMarkers.get(markerCursor).logicalLine < logicalLine) {
+                markerCursor++;
+            }
+            FoldMarkerRenderItem foldMarker = null;
+            while (markerCursor < markerCount && foldMarkers.get(markerCursor).logicalLine == logicalLine) {
+                if (foldMarker == null) foldMarker = foldMarkers.get(markerCursor);
+                markerCursor++;
+            }
+
+            drawLineNumber(g, line, model, gutterIcons, iconStart, iconEnd, foldMarker);
         }
     }
 
-    private void drawLineNumber(Graphics2D g, VisualLine vl, EditorRenderModel model) {
-        if (vl.wrapIndex != 0 || vl.isPhantomLine) return;
+    private void drawLineNumber(Graphics2D g, VisualLine vl, EditorRenderModel model,
+                                List<GutterIconRenderItem> gutterIcons,
+                                int iconStart,
+                                int iconEnd,
+                                FoldMarkerRenderItem foldMarker) {
         PointF pos = vl.lineNumberPosition;
-        float ascent = getFontAscent(g, regularFont);
-        float topY = pos.y - ascent;
-        float lineHeight = getFontHeight(g, regularFont);
         int newLineNumber = vl.logicalLine + 1;
+        boolean overlayMode = model.maxGutterIcons == 0;
+        boolean hasIcons = editorIconProvider != null && iconEnd > iconStart;
 
-        if (newLineNumber != currentDrawingLineNumber) {
+        if (overlayMode && hasIcons) {
+            drawGutterIcon(g, gutterIcons.get(iconStart));
+            currentDrawingLineNumber = newLineNumber;
+        } else if (newLineNumber != currentDrawingLineNumber) {
             g.setColor(theme.lineNumberColor);
             g.setFont(regularFont);
             g.drawString(String.valueOf(newLineNumber), pos.x, pos.y);
             currentDrawingLineNumber = newLineNumber;
         }
 
-        if (vl.foldState != null && vl.foldState != FoldState.NONE) {
-            float halfSize = lineHeight * 0.2f;
-            float centerX = model.foldArrowX > 0 ? model.foldArrowX : model.splitX - lineHeight * 0.5f;
-            float centerY = topY + lineHeight * 0.5f;
-
-            g.setColor(theme.lineNumberColor);
-            g.setStroke(new BasicStroke(Math.max(1f, lineHeight * 0.1f), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-
-            GeneralPath path = new GeneralPath();
-            if (vl.foldState == FoldState.COLLAPSED) {
-                path.moveTo(centerX - halfSize * 0.5f, centerY - halfSize);
-                path.lineTo(centerX + halfSize * 0.5f, centerY);
-                path.lineTo(centerX - halfSize * 0.5f, centerY + halfSize);
-            } else {
-                path.moveTo(centerX - halfSize, centerY - halfSize * 0.5f);
-                path.lineTo(centerX, centerY + halfSize * 0.5f);
-                path.lineTo(centerX + halfSize, centerY - halfSize * 0.5f);
+        if (!overlayMode && hasIcons) {
+            for (int i = iconStart; i < iconEnd; i++) {
+                drawGutterIcon(g, gutterIcons.get(i));
             }
-            g.draw(path);
         }
+
+        drawFoldMarker(g, foldMarker);
+    }
+
+    private void drawFoldMarker(Graphics2D g, FoldMarkerRenderItem item) {
+        if (item == null || item.origin == null || item.width <= 0 || item.height <= 0) return;
+        if (item.foldState == null || item.foldState == FoldState.NONE) return;
+
+        float centerX = item.origin.x + item.width * 0.5f;
+        float centerY = item.origin.y + item.height * 0.5f;
+        float halfSize = Math.min(item.width, item.height) * 0.28f;
+
+        g.setColor(theme.lineNumberColor);
+        g.setStroke(new BasicStroke(Math.max(1f, item.height * 0.1f), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+
+        GeneralPath path = new GeneralPath();
+        if (item.foldState == FoldState.COLLAPSED) {
+            path.moveTo(centerX - halfSize * 0.5f, centerY - halfSize);
+            path.lineTo(centerX + halfSize * 0.5f, centerY);
+            path.lineTo(centerX - halfSize * 0.5f, centerY + halfSize);
+        } else {
+            path.moveTo(centerX - halfSize, centerY - halfSize * 0.5f);
+            path.lineTo(centerX, centerY + halfSize * 0.5f);
+            path.lineTo(centerX + halfSize, centerY - halfSize * 0.5f);
+        }
+        g.draw(path);
+    }
+
+    private boolean drawGutterIcon(Graphics2D g, GutterIconRenderItem item) {
+        if (editorIconProvider == null || item == null || item.origin == null || item.width <= 0 || item.height <= 0) {
+            return false;
+        }
+        Image image = editorIconProvider.getIconImage(item.iconId);
+        if (image == null) return false;
+        g.drawImage(
+                image,
+                (int) item.origin.x,
+                (int) item.origin.y,
+                (int) Math.ceil(item.width),
+                (int) Math.ceil(item.height),
+                null);
+        return true;
     }
 
     private void drawScrollbars(Graphics2D g, EditorRenderModel model) {

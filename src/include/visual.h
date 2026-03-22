@@ -90,8 +90,6 @@ namespace NS_SWEETEDITOR {
     Vector<VisualRun> runs;
     /// Whether this is a ghost-text continuation line (2nd/3rd... line of cross-line phantom text)
     bool is_phantom_line {false};
-    /// Gutter icon ID list (supports multiple icons)
-    Vector<int32_t> gutter_icon_ids;
     /// Fold state (NONE=not fold line, EXPANDED=expandable, COLLAPSED=folded)
     FoldState fold_state {FoldState::NONE};
 
@@ -201,6 +199,34 @@ namespace NS_SWEETEDITOR {
     float height {0};
   };
 
+  /// Gutter icon render item (fully resolved geometry for one icon)
+  struct GutterIconRenderItem {
+    /// Logical line index this icon belongs to
+    size_t logical_line {0};
+    /// Icon resource ID
+    int32_t icon_id {0};
+    /// Top-left corner of icon bounds
+    PointF origin;
+    /// Icon width
+    float width {0};
+    /// Icon height
+    float height {0};
+  };
+
+  /// Fold marker render item (one gutter fold toggle marker)
+  struct FoldMarkerRenderItem {
+    /// Logical line index this marker belongs to
+    size_t logical_line {0};
+    /// Fold state on this line (EXPANDED / COLLAPSED)
+    FoldState fold_state {FoldState::NONE};
+    /// Top-left corner of marker bounds
+    PointF origin;
+    /// Marker width
+    float width {0};
+    /// Marker height
+    float height {0};
+  };
+
   /// Linked-editing highlight rectangle (visual marker for Tab Stop placeholder)
   struct LinkedEditingRect {
     /// Top-left corner of rectangle
@@ -275,6 +301,10 @@ namespace NS_SWEETEDITOR {
     Vector<LinkedEditingRect> linked_editing_rects;
     /// Bracket-pair highlight rectangle list (bracket near cursor + matching bracket, usually 0 or 2)
     Vector<BracketHighlightRect> bracket_highlight_rects;
+    /// Gutter icon render list (fully resolved, visible region only)
+    Vector<GutterIconRenderItem> gutter_icons;
+    /// Fold marker render list (fully resolved, visible region only)
+    Vector<FoldMarkerRenderItem> fold_markers;
     /// Vertical scrollbar render model
     ScrollbarModel vertical_scrollbar;
     /// Horizontal scrollbar render model
@@ -397,7 +427,7 @@ namespace NS_SWEETEDITOR {
     {FoldState::EXPANDED, "EXPANDED"},
     {FoldState::COLLAPSED, "COLLAPSED"},
   })
-  NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(VisualLine, logical_line, wrap_index, line_number_position, runs, is_phantom_line, gutter_icon_ids, fold_state)
+  NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(VisualLine, logical_line, wrap_index, line_number_position, runs, is_phantom_line, fold_state)
   NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Cursor, text_position, position, height, visible, show_dragger)
   NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SelectionRect, origin, width, height)
   NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SelectionHandle, position, height, visible)
@@ -421,9 +451,11 @@ namespace NS_SWEETEDITOR {
   NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GuideSegment, direction, type, style, start, end, arrow_end)
   NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(LinkedEditingRect, origin, width, height, is_active)
   NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(BracketHighlightRect, origin, width, height)
+  NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GutterIconRenderItem, logical_line, icon_id, origin, width, height)
+  NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(FoldMarkerRenderItem, logical_line, fold_state, origin, width, height)
   NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ScrollbarRect, origin, width, height)
   NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ScrollbarModel, visible, alpha, track, thumb)
-  NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EditorRenderModel, split_x, split_line_visible, scroll_x, scroll_y, viewport_width, viewport_height, current_line, lines, cursor, selection_rects, selection_start_handle, selection_end_handle, composition_decoration, guide_segments, diagnostic_decorations, max_gutter_icons, fold_arrow_x, linked_editing_rects, bracket_highlight_rects, vertical_scrollbar, horizontal_scrollbar)
+  NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EditorRenderModel, split_x, split_line_visible, scroll_x, scroll_y, viewport_width, viewport_height, current_line, lines, cursor, selection_rects, selection_start_handle, selection_end_handle, composition_decoration, guide_segments, diagnostic_decorations, max_gutter_icons, fold_arrow_x, linked_editing_rects, bracket_highlight_rects, gutter_icons, fold_markers, vertical_scrollbar, horizontal_scrollbar)
   NLOHMANN_JSON_SERIALIZE_ENUM(FoldArrowMode, {
     {FoldArrowMode::AUTO, "AUTO"},
     {FoldArrowMode::ALWAYS, "ALWAYS"},

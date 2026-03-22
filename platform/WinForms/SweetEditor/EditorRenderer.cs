@@ -271,9 +271,40 @@ namespace SweetEditor {
 		private void DrawLineNumbers(Graphics g, EditorRenderModel model) {
 			List<VisualLine> lines = model.VisualLines;
 			if (lines == null) return;
+			List<GutterIconRenderItem>? gutterIcons = model.GutterIcons;
+			List<FoldMarkerRenderItem>? foldMarkers = model.FoldMarkers;
+			int iconCount = gutterIcons?.Count ?? 0;
+			int markerCount = foldMarkers?.Count ?? 0;
+			int iconCursor = 0;
+			int markerCursor = 0;
 			currentDrawingLineNumber = -1;
 			foreach (var line in lines) {
-				DrawLineNumber(g, line, model);
+				if (line.WrapIndex != 0 || line.IsPhantomLine) continue;
+				int logicalLine = line.LogicalLine;
+
+				while (iconCursor < iconCount && gutterIcons![iconCursor].LogicalLine < logicalLine) {
+					iconCursor++;
+				}
+				int iconStart = iconCursor;
+				while (iconCursor < iconCount && gutterIcons![iconCursor].LogicalLine == logicalLine) {
+					iconCursor++;
+				}
+				int iconEnd = iconCursor;
+
+				while (markerCursor < markerCount && foldMarkers![markerCursor].LogicalLine < logicalLine) {
+					markerCursor++;
+				}
+				bool hasMarker = false;
+				FoldMarkerRenderItem foldMarker = default;
+				while (markerCursor < markerCount && foldMarkers![markerCursor].LogicalLine == logicalLine) {
+					if (!hasMarker) {
+						foldMarker = foldMarkers[markerCursor];
+						hasMarker = true;
+					}
+					markerCursor++;
+				}
+
+				DrawLineNumber(g, line, model, gutterIcons, iconStart, iconEnd, hasMarker, foldMarker);
 			}
 		}
 
@@ -319,17 +350,17 @@ namespace SweetEditor {
 			}
 		}
 
-		private void DrawLineNumber(Graphics g, VisualLine visualLine, EditorRenderModel model) {
-			if (visualLine.WrapIndex != 0 || visualLine.IsPhantomLine) return;
+		private void DrawLineNumber(Graphics g, VisualLine visualLine, EditorRenderModel model,
+			List<GutterIconRenderItem>? gutterIcons,
+			int iconStart, int iconEnd,
+			bool hasFoldMarker, FoldMarkerRenderItem foldMarker) {
 			PointF position = visualLine.LineNumberPosition;
 			float topY = position.Y - GetFontAscent(g, regularFont);
-			float lineHeight = regularFont.GetHeight(g);
-			List<int>? gutterIconIds = visualLine.GutterIconIds;
-			bool hasIcons = editorIconProvider != null && gutterIconIds is { Count: > 0 };
+			bool overlayMode = model.MaxGutterIcons == 0;
+			bool hasIcons = editorIconProvider != null && iconEnd > iconStart;
 			int newLineNumber = visualLine.LogicalLine + 1;
-			if (model.MaxGutterIcons == 0 && hasIcons) {
-				List<int> iconIds = gutterIconIds!;
-				DrawOverlayGutterIcon(g, iconIds[0], position.X, topY, lineHeight);
+			if (overlayMode && hasIcons) {
+				DrawOverlayGutterIcon(g, gutterIcons![iconStart]);
 				currentDrawingLineNumber = newLineNumber;
 			} else if (newLineNumber != currentDrawingLineNumber) {
 				var rect = new Rectangle((int)position.X, (int)topY, 120, (int)Math.Ceiling(regularFont.GetHeight(g)));
@@ -337,46 +368,14 @@ namespace SweetEditor {
 				currentDrawingLineNumber = newLineNumber;
 			}
 
-			if (hasIcons && model.MaxGutterIcons != 0) {
-				List<int> iconIds = gutterIconIds!;
-				float iconRight = model.FoldArrowX > 0 ? model.FoldArrowX - lineHeight * 0.5f : model.SplitX - 2f;
-				int maxIcons = model.MaxGutterIcons > 0
-					? Math.Min(iconIds.Count, model.MaxGutterIcons)
-					: iconIds.Count;
-				for (int i = maxIcons - 1; i >= 0; i--) {
-					int iconId = iconIds[i];
-					if (DrawGutterIcon(g, iconId, iconRight - lineHeight, topY, lineHeight, lineHeight)) {
-						iconRight -= lineHeight;
-					}
+			if (!overlayMode && hasIcons) {
+				for (int i = iconStart; i < iconEnd; i++) {
+					DrawGutterIcon(g, gutterIcons![i]);
 				}
 			}
 
-			if (visualLine.FoldState != FoldState.NONE) {
-				float halfSize = lineHeight * 0.2f;
-				float centerX = model.FoldArrowX > 0 ? model.FoldArrowX : model.SplitX - lineHeight * 0.5f;
-				float centerY = topY + lineHeight * 0.5f;
-
-				using var path = new GraphicsPath();
-				using var pen = new Pen(currentTheme.LineNumberColor, Math.Max(1f, lineHeight * 0.1f)) {
-					StartCap = LineCap.Round,
-					EndCap = LineCap.Round,
-					LineJoin = LineJoin.Round
-				};
-
-				if (visualLine.FoldState == FoldState.COLLAPSED) {
-					path.AddLines([
-						new System.Drawing.PointF(centerX - halfSize * 0.5f, centerY - halfSize),
-						new System.Drawing.PointF(centerX + halfSize * 0.5f, centerY),
-						new System.Drawing.PointF(centerX - halfSize * 0.5f, centerY + halfSize)
-					]);
-				} else {
-					path.AddLines([
-						new System.Drawing.PointF(centerX - halfSize, centerY - halfSize * 0.5f),
-						new System.Drawing.PointF(centerX, centerY + halfSize * 0.5f),
-						new System.Drawing.PointF(centerX + halfSize, centerY - halfSize * 0.5f)
-					]);
-				}
-				g.DrawPath(pen, path);
+			if (hasFoldMarker) {
+				DrawFoldMarker(g, foldMarker);
 			}
 		}
 
@@ -385,18 +384,51 @@ namespace SweetEditor {
 			g.DrawLine(pen, x, 0, x, clientHeight);
 		}
 
-		private void DrawOverlayGutterIcon(Graphics g, int iconId, float x, float y, float size) {
-			DrawGutterIcon(g, iconId, x, y, size, size);
+		private void DrawOverlayGutterIcon(Graphics g, GutterIconRenderItem item) {
+			DrawGutterIcon(g, item);
 		}
 
-		private bool DrawGutterIcon(Graphics g, int iconId, float x, float y, float width, float height) {
+		private bool DrawGutterIcon(Graphics g, GutterIconRenderItem item) {
+			if (item.Width <= 0 || item.Height <= 0) return false;
+			int iconId = item.IconId;
 			Image? image = editorIconProvider?.GetIconImage(iconId);
 			if (image == null) return false;
 			InterpolationMode oldInterpolation = g.InterpolationMode;
 			g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-			g.DrawImage(image, x, y, width, height);
+			g.DrawImage(image, item.Origin.X, item.Origin.Y, item.Width, item.Height);
 			g.InterpolationMode = oldInterpolation;
 			return true;
+		}
+
+		private void DrawFoldMarker(Graphics g, FoldMarkerRenderItem marker) {
+			if (marker.Width <= 0 || marker.Height <= 0) return;
+			if (marker.FoldState == FoldState.NONE) return;
+
+			float centerX = marker.Origin.X + marker.Width * 0.5f;
+			float centerY = marker.Origin.Y + marker.Height * 0.5f;
+			float halfSize = Math.Min(marker.Width, marker.Height) * 0.28f;
+
+			using var path = new GraphicsPath();
+			using var pen = new Pen(currentTheme.LineNumberColor, Math.Max(1f, marker.Height * 0.1f)) {
+				StartCap = LineCap.Round,
+				EndCap = LineCap.Round,
+				LineJoin = LineJoin.Round
+			};
+
+			if (marker.FoldState == FoldState.COLLAPSED) {
+				path.AddLines([
+					new System.Drawing.PointF(centerX - halfSize * 0.5f, centerY - halfSize),
+					new System.Drawing.PointF(centerX + halfSize * 0.5f, centerY),
+					new System.Drawing.PointF(centerX - halfSize * 0.5f, centerY + halfSize)
+				]);
+			} else {
+				path.AddLines([
+					new System.Drawing.PointF(centerX - halfSize, centerY - halfSize * 0.5f),
+					new System.Drawing.PointF(centerX, centerY + halfSize * 0.5f),
+					new System.Drawing.PointF(centerX + halfSize, centerY - halfSize * 0.5f)
+				]);
+			}
+			g.DrawPath(pen, path);
 		}
 
 		private void DrawVisualRun(Graphics g, VisualRun visualRun) {
@@ -456,12 +488,18 @@ namespace SweetEditor {
 					using (var bgBrush = new SolidBrush(currentTheme.InlayHintBgColor)) {
 						DrawRoundedRect(g, bgBrush, bgLeft, bgTop, bgWidth, bgHeight, radius);
 					}
-					if (visualRun.IconId > 0 && editorIconProvider != null) {
-						float iconSize = Math.Min(bgWidth, bgHeight);
-						float iconLeft = bgLeft + (bgWidth - iconSize) * 0.5f;
-						float iconTop2 = bgTop + (bgHeight - iconSize) * 0.5f;
-						DrawGutterIcon(g, visualRun.IconId, iconLeft, iconTop2, iconSize, iconSize);
-					} else if (hasText) {
+						if (visualRun.IconId > 0 && editorIconProvider != null) {
+							float iconSize = Math.Min(bgWidth, bgHeight);
+							float iconLeft = bgLeft + (bgWidth - iconSize) * 0.5f;
+							float iconTop2 = bgTop + (bgHeight - iconSize) * 0.5f;
+							DrawGutterIcon(g, new GutterIconRenderItem {
+								LogicalLine = -1,
+								IconId = visualRun.IconId,
+								Origin = new PointF(iconLeft, iconTop2),
+								Width = iconSize,
+								Height = iconSize,
+							});
+						} else if (hasText) {
 						float textX = visualRun.X + mgn + visualRun.Padding;
 						int inlayW = Math.Max(1, (int)Math.Ceiling(visualRun.Width - mgn * 2 - visualRun.Padding * 2));
 						inlayW = Math.Max(inlayW, measuredSize.Width);

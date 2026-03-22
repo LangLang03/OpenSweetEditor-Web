@@ -40,6 +40,14 @@ public class EditorRenderModel {
     @SerializedName("lines")
     public List<VisualLine> lines;
 
+    /** Gutter icon render list (fully resolved geometry, visible region only). */
+    @SerializedName("gutter_icons")
+    public List<GutterIconRenderItem> gutterIcons;
+
+    /** Fold marker render list (fully resolved geometry, visible region only). */
+    @SerializedName("fold_markers")
+    public List<FoldMarkerRenderItem> foldMarkers;
+
     /** Cursor. */
     @SerializedName("cursor")
     public Cursor cursor;
