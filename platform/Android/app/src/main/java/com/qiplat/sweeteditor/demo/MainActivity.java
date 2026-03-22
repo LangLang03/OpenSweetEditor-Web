@@ -102,6 +102,8 @@ public class MainActivity extends AppCompatActivity {
         mEditor.subscribe(InlayHintClickEvent.class, e -> {
             if (e.isColor) {
                 Toast.makeText(this, "Click color: " + String.format("0X%X", e.colorValue), Toast.LENGTH_SHORT).show();
+            } else if (!e.isIcon) {
+                Toast.makeText(this, "Click inlay hint: (" + e.line + "," + e.column + ")", Toast.LENGTH_SHORT).show();
             }
         });
         mEditor.subscribe(GutterIconClickEvent.class, e ->

@@ -39,11 +39,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -70,6 +69,10 @@ public class DemoDecorationProvider implements DecorationProvider {
     private static final int STYLE_VARIABLE = EditorTheme.STYLE_VARIABLE;
     private static final int STYLE_ANNOTATION = EditorTheme.STYLE_ANNOTATION;
     private static final int STYLE_COLOR = EditorTheme.STYLE_PREPROCESSOR + 1;
+    private static final int MAX_DYNAMIC_DIAGNOSTICS = 8;
+    private static final String PHANTOM_MEMBER_STUB =
+            "\n    void debugTrace(const std::string& tag) {\n        log(DEBUG, tag);\n    }";
+    private static final String PHANTOM_INLINE_HINT = " /* demo phantom */";
 
     public static final int ICON_TYPE = 1;
     public static final int ICON_AT = 2;
@@ -102,21 +105,10 @@ public class DemoDecorationProvider implements DecorationProvider {
 
     @Override
     public void provideDecorations(@NonNull DecorationContext context, @NonNull DecorationReceiver receiver) {
-        SparseArray<List<PhantomText>> phantoms = new SparseArray<>();
-        phantoms.put(15, Collections.singletonList(
-                new PhantomText(5, "\n    void warn(const std::string& m) {\n        log(WARN, m);\n    }")));
+        SparseArray<List<DiagnosticItem>> diagnostics = new SparseArray<>();
 
-        DecorationResult sweetLineResult = buildSweetLineDecorationResult(context);
-        SparseArray<List<InlayHint>> mergedHints = sweetLineResult.getInlayHints();
-        receiver.accept(new DecorationResult.Builder()
-                .inlayHints(mergedHints, DecorationResult.ApplyMode.REPLACE_RANGE)
-                .phantomTexts(phantoms, DecorationResult.ApplyMode.REPLACE_ALL)
-                .syntaxSpans(sweetLineResult.getSyntaxSpans(), DecorationResult.ApplyMode.MERGE)
-                .indentGuides(sweetLineResult.getIndentGuides(), DecorationResult.ApplyMode.REPLACE_ALL)
-                .foldRegions(sweetLineResult.getFoldRegions(), DecorationResult.ApplyMode.REPLACE_ALL)
-                .separatorGuides(sweetLineResult.getSeparatorGuides(), DecorationResult.ApplyMode.REPLACE_ALL)
-                .gutterIcons(sweetLineResult.getGutterIcons(), DecorationResult.ApplyMode.REPLACE_ALL)
-                .build());
+        DecorationResult sweetLineResult = buildSweetLineDecorationResult(context, diagnostics);
+        receiver.accept(sweetLineResult);
 
         executor.submit(() -> {
             try {
@@ -128,27 +120,20 @@ public class DemoDecorationProvider implements DecorationProvider {
                 return;
             }
 
-            SparseArray<List<DiagnosticItem>> diags = new SparseArray<>();
-            diags.put(9, Collections.singletonList(new DiagnosticItem(13, 5, 0, 0)));
-            diags.put(16, Collections.singletonList(new DiagnosticItem(8, 4, 1, 0)));
-            diags.put(22, Collections.singletonList(new DiagnosticItem(4, 3, 3, 0)));
-            diags.put(44, Collections.singletonList(new DiagnosticItem(38, 20, 2, 0)));
-            diags.put(45, Collections.singletonList(new DiagnosticItem(4, 4, 1, (int) 0xFFFF8C00)));
-            diags.put(46, Arrays.asList(
-                    new DiagnosticItem(17, 10, 2, 0),
-                    new DiagnosticItem(31, 6, 0, 0)
-            ));
-
             receiver.accept(new DecorationResult.Builder()
-                    .diagnostics(diags, DecorationResult.ApplyMode.REPLACE_ALL)
+                    .diagnostics(diagnostics, DecorationResult.ApplyMode.REPLACE_ALL)
                     .build());
         });
     }
 
     @NonNull
-    private DecorationResult buildSweetLineDecorationResult(DecorationContext context) {
+    private DecorationResult buildSweetLineDecorationResult(@NonNull DecorationContext context,
+                                                            @NonNull SparseArray<List<DiagnosticItem>> dynamicDiagnostics) {
+        SparseArray<List<PhantomText>> dynamicPhantoms = new SparseArray<>();
         if (highlightEngine == null) {
-            return new DecorationResult.Builder().build();
+            return new DecorationResult.Builder()
+                    .phantomTexts(dynamicPhantoms, DecorationResult.ApplyMode.REPLACE_ALL)
+                    .build();
         }
         SparseArray<List<StyleSpan>> syntaxSpans = new SparseArray<>();
         SparseArray<List<InlayHint>> colorInlayHints = new SparseArray<>();
@@ -157,10 +142,15 @@ public class DemoDecorationProvider implements DecorationProvider {
         List<FoldRegion> foldRegions = new ArrayList<>();
         List<SeparatorGuide> separatorGuides = new ArrayList<>();
         Set<String> seenColorHints = new HashSet<>();
+        Set<Integer> phantomLines = new HashSet<>();
+        Set<String> seenDiagnostics = new HashSet<>();
+        int[] diagnosticCount = new int[]{0};
+        TokenRangeInfo firstKeywordRange = null;
 
         Document editorDocument = editor.getDocument();
         if (editorDocument == null) {
             return new DecorationResult.Builder()
+                    .phantomTexts(dynamicPhantoms, DecorationResult.ApplyMode.REPLACE_ALL)
                     .syntaxSpans(syntaxSpans, DecorationResult.ApplyMode.MERGE)
                     .inlayHints(colorInlayHints, DecorationResult.ApplyMode.REPLACE_RANGE)
                     .indentGuides(indentGuides, DecorationResult.ApplyMode.REPLACE_ALL)
@@ -188,6 +178,7 @@ public class DemoDecorationProvider implements DecorationProvider {
         }
         if (cacheHighlight == null || cacheHighlight.lines == null || cacheHighlight.lines.isEmpty()) {
             return new DecorationResult.Builder()
+                    .phantomTexts(dynamicPhantoms, DecorationResult.ApplyMode.REPLACE_ALL)
                     .syntaxSpans(syntaxSpans, DecorationResult.ApplyMode.MERGE)
                     .inlayHints(colorInlayHints, DecorationResult.ApplyMode.REPLACE_RANGE)
                     .indentGuides(indentGuides, DecorationResult.ApplyMode.REPLACE_ALL)
@@ -206,8 +197,19 @@ public class DemoDecorationProvider implements DecorationProvider {
                 appendTextInlayHint(colorInlayHints, editorDocument, token);
                 appendSeparator(separatorGuides, editorDocument, token);
                 appendGutterIcons(gutterIcons, editorDocument, token);
+                firstKeywordRange = appendDynamicDemoDecorations(
+                        dynamicPhantoms,
+                        phantomLines,
+                        dynamicDiagnostics,
+                        seenDiagnostics,
+                        diagnosticCount,
+                        firstKeywordRange,
+                        editorDocument,
+                        token
+                );
             }
         }
+        appendDiagnosticFallbackIfNeeded(dynamicDiagnostics, seenDiagnostics, diagnosticCount, firstKeywordRange);
 
         // Only analyze indent guides under 2048 lines
         if (context.totalLineCount < 2048) {
@@ -234,6 +236,7 @@ public class DemoDecorationProvider implements DecorationProvider {
         }
 
         return new DecorationResult.Builder()
+                .phantomTexts(dynamicPhantoms, DecorationResult.ApplyMode.REPLACE_ALL)
                 .syntaxSpans(syntaxSpans, DecorationResult.ApplyMode.MERGE)
                 .inlayHints(colorInlayHints, DecorationResult.ApplyMode.REPLACE_RANGE)
                 .indentGuides(indentGuides, DecorationResult.ApplyMode.REPLACE_ALL)
@@ -241,6 +244,122 @@ public class DemoDecorationProvider implements DecorationProvider {
                 .separatorGuides(separatorGuides, DecorationResult.ApplyMode.REPLACE_ALL)
                 .gutterIcons(gutterIcons, DecorationResult.ApplyMode.REPLACE_ALL)
                 .build();
+    }
+
+    private TokenRangeInfo appendDynamicDemoDecorations(@NonNull SparseArray<List<PhantomText>> phantoms,
+                                                        @NonNull Set<Integer> phantomLines,
+                                                        @NonNull SparseArray<List<DiagnosticItem>> diagnostics,
+                                                        @NonNull Set<String> seenDiagnostics,
+                                                        @NonNull int[] diagnosticCount,
+                                                        TokenRangeInfo firstKeywordRange,
+                                                        @NonNull Document editorDocument,
+                                                        TokenSpan token) {
+        TokenRangeInfo range = extractSingleLineTokenRange(token);
+        if (range == null) {
+            return firstKeywordRange;
+        }
+        String literal = getTokenLiteral(editorDocument, range);
+        if (literal.isEmpty()) {
+            return firstKeywordRange;
+        }
+
+        if (token.styleId == STYLE_KEYWORD) {
+            if (firstKeywordRange == null) {
+                firstKeywordRange = range;
+            }
+            if (phantomLines.isEmpty() && ("class".equals(literal) || "struct".equals(literal))) {
+                appendPhantom(phantoms, range.line, range.endColumn, PHANTOM_MEMBER_STUB);
+                phantomLines.add(range.line);
+            } else if (phantomLines.isEmpty() && "return".equals(literal)) {
+                appendPhantom(phantoms, range.line, range.endColumn, PHANTOM_INLINE_HINT);
+                phantomLines.add(range.line);
+            }
+            return firstKeywordRange;
+        }
+
+        if (token.styleId == STYLE_COMMENT) {
+            String upper = literal.toUpperCase(Locale.ROOT);
+            int fixmeIndex = upper.indexOf("FIXME");
+            if (fixmeIndex >= 0) {
+                appendDiagnostic(diagnostics, seenDiagnostics, diagnosticCount,
+                        range.line, range.startColumn + fixmeIndex, 5, 0, 0);
+            }
+            int todoIndex = upper.indexOf("TODO");
+            if (todoIndex >= 0) {
+                appendDiagnostic(diagnostics, seenDiagnostics, diagnosticCount,
+                        range.line, range.startColumn + todoIndex, 4, 1, 0);
+            }
+            return firstKeywordRange;
+        }
+
+        if (token.styleId == STYLE_COLOR) {
+            Integer color = parseColorLiteral(literal);
+            if (color != null) {
+                appendDiagnostic(diagnostics, seenDiagnostics, diagnosticCount,
+                        range.line, range.startColumn, range.length(), 2, color);
+            }
+            return firstKeywordRange;
+        }
+
+        if (token.styleId == STYLE_ANNOTATION) {
+            appendDiagnostic(diagnostics, seenDiagnostics, diagnosticCount,
+                    range.line, range.startColumn, range.length(), 3, 0);
+        }
+        return firstKeywordRange;
+    }
+
+    private static void appendPhantom(@NonNull SparseArray<List<PhantomText>> phantoms,
+                                      int line,
+                                      int column,
+                                      @NonNull String text) {
+        List<PhantomText> lineItems = phantoms.get(line);
+        if (lineItems == null) {
+            lineItems = new ArrayList<>();
+            phantoms.put(line, lineItems);
+        }
+        lineItems.add(new PhantomText(column, text));
+    }
+
+    private static void appendDiagnostic(@NonNull SparseArray<List<DiagnosticItem>> diagnostics,
+                                         @NonNull Set<String> seenDiagnostics,
+                                         @NonNull int[] diagnosticCount,
+                                         int line,
+                                         int column,
+                                         int length,
+                                         int severity,
+                                         int color) {
+        if (diagnosticCount[0] >= MAX_DYNAMIC_DIAGNOSTICS) {
+            return;
+        }
+        if (line < 0 || column < 0 || length <= 0) {
+            return;
+        }
+        String key = line + ":" + column + ":" + length + ":" + severity + ":" + color;
+        if (!seenDiagnostics.add(key)) {
+            return;
+        }
+        List<DiagnosticItem> lineItems = diagnostics.get(line);
+        if (lineItems == null) {
+            lineItems = new ArrayList<>();
+            diagnostics.put(line, lineItems);
+        }
+        lineItems.add(new DiagnosticItem(column, length, severity, color));
+        diagnosticCount[0]++;
+    }
+
+    private static void appendDiagnosticFallbackIfNeeded(@NonNull SparseArray<List<DiagnosticItem>> diagnostics,
+                                                         @NonNull Set<String> seenDiagnostics,
+                                                         @NonNull int[] diagnosticCount,
+                                                         TokenRangeInfo firstKeywordRange) {
+        if (diagnosticCount[0] > 0 || firstKeywordRange == null) {
+            return;
+        }
+        appendDiagnostic(diagnostics, seenDiagnostics, diagnosticCount,
+                firstKeywordRange.line,
+                firstKeywordRange.startColumn,
+                firstKeywordRange.length(),
+                3,
+                0);
     }
 
     @NonNull
