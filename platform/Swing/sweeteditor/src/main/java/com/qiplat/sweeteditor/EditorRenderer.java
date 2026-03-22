@@ -19,6 +19,8 @@ import java.lang.foreign.ValueLayout;
  */
 final class EditorRenderer implements EditorCore.TextMeasureCallback {
 
+    private static final FontRenderContext FALLBACK_FRC = new FontRenderContext(null, true, true);
+
     private EditorTheme theme;
 
     private Font regularFont;
@@ -34,6 +36,11 @@ final class EditorRenderer implements EditorCore.TextMeasureCallback {
 
     private EditorIconProvider editorIconProvider;
     private int currentDrawingLineNumber = -1;
+    /**
+     * Last draw-time FontRenderContext captured from Graphics2D.
+     * Measurement callbacks prefer this so layout measurement stays in sync with actual rendering.
+     */
+    private volatile FontRenderContext lastRenderFontRenderContext = FALLBACK_FRC;
 
     public EditorRenderer(EditorTheme theme) {
         this.theme = theme;
@@ -115,13 +122,18 @@ final class EditorRenderer implements EditorCore.TextMeasureCallback {
     }
 
     private FontRenderContext getFontRenderContext() {
-        return new FontRenderContext(null, true, true);
+        return lastRenderFontRenderContext;
     }
 
     public void render(Graphics2D g2, EditorRenderModel model,
                        int viewWidth, int viewHeight, boolean cursorVisible) {
         g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB);
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        // Keep draw-time glyph positioning consistent with measureTextWidth() FRC (fractional metrics on),
+        // otherwise segmented runs can accumulate rounding error and appear overlapped.
+        g2.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
+        // Capture real draw-time FRC so native text measurement callbacks use the same metrics source.
+        lastRenderFontRenderContext = g2.getFontRenderContext();
 
         g2.setColor(theme.backgroundColor);
         g2.fillRect(0, 0, viewWidth, viewHeight);
