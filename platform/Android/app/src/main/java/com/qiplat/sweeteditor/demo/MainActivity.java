@@ -34,7 +34,7 @@ import java.util.Collections;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
-    private static final int STYLE_COLOR = 9;
+    private static final int STYLE_COLOR = EditorTheme.STYLE_PREPROCESSOR + 1;
     private static final String DEMO_FILES_ASSET_DIR = "files";
     private static final String FALLBACK_FILE_NAME = "sample.cpp";
 

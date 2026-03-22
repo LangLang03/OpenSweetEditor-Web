@@ -9,7 +9,7 @@ using SweetLineTextRange = SweetLine.TextRange;
 
 namespace Demo {
 	public partial class Form1 : Form {
-		private const int STYLE_COLOR = 9;
+		private const int STYLE_COLOR = (int)EditorTheme.STYLE_PREPROCESSOR + 1;
 		private const string DEFAULT_FILE_NAME = "example.cpp";
 		private const string FALLBACK_SAMPLE_CODE =
 			"// SweetEditor Demo\n" +
@@ -294,9 +294,9 @@ namespace Demo {
 
 		private sealed class DemoDecorationProvider : IDecorationProvider {
 			private const string DefaultAnalysisFileName = "example.cpp";
-			private const int StyleKeyword = 1;
-			private const int StyleComment = 4;
-			private const int StyleColor = 9;
+			private const int StyleKeyword = (int)EditorTheme.STYLE_KEYWORD;
+			private const int StyleComment = (int)EditorTheme.STYLE_COMMENT;
+			private const int StyleColor = STYLE_COLOR;
 			private const int IconClass = 1;
 
 			private static HighlightEngine? highlightEngine;
@@ -521,19 +521,22 @@ namespace Demo {
 			}
 
 			private static void RegisterStyleMap(HighlightEngine engine) {
-				engine.RegisterStyleName("keyword", 1);
-				engine.RegisterStyleName("type", 2);
-				engine.RegisterStyleName("string", 3);
-				engine.RegisterStyleName("comment", 4);
-				engine.RegisterStyleName("preprocessor", 5);
-				engine.RegisterStyleName("macro", 5);
-				engine.RegisterStyleName("method", 6);
-				engine.RegisterStyleName("function", 6);
-				engine.RegisterStyleName("number", 7);
-				engine.RegisterStyleName("class", 8);
-				engine.RegisterStyleName("color", 9);
-				engine.RegisterStyleName("builtin", 2);
-				engine.RegisterStyleName("annotation", 1);
+				engine.RegisterStyleName("keyword", (int)EditorTheme.STYLE_KEYWORD);
+				engine.RegisterStyleName("type", (int)EditorTheme.STYLE_TYPE);
+				engine.RegisterStyleName("string", (int)EditorTheme.STYLE_STRING);
+				engine.RegisterStyleName("comment", (int)EditorTheme.STYLE_COMMENT);
+				engine.RegisterStyleName("preprocessor", (int)EditorTheme.STYLE_PREPROCESSOR);
+				engine.RegisterStyleName("macro", (int)EditorTheme.STYLE_PREPROCESSOR);
+				engine.RegisterStyleName("method", (int)EditorTheme.STYLE_FUNCTION);
+				engine.RegisterStyleName("function", (int)EditorTheme.STYLE_FUNCTION);
+				engine.RegisterStyleName("variable", (int)EditorTheme.STYLE_VARIABLE);
+				engine.RegisterStyleName("identifier", (int)EditorTheme.STYLE_VARIABLE);
+				engine.RegisterStyleName("field", (int)EditorTheme.STYLE_VARIABLE);
+				engine.RegisterStyleName("number", (int)EditorTheme.STYLE_NUMBER);
+				engine.RegisterStyleName("class", (int)EditorTheme.STYLE_CLASS);
+				engine.RegisterStyleName("color", StyleColor);
+				engine.RegisterStyleName("builtin", (int)EditorTheme.STYLE_BUILTIN);
+				engine.RegisterStyleName("annotation", (int)EditorTheme.STYLE_ANNOTATION);
 			}
 
 			private static string ResolveCurrentFileName(DecorationContext context) {

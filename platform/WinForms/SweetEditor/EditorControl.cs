@@ -85,6 +85,25 @@ namespace SweetEditor {
 	/// Apply a theme via <see cref="EditorControl.ApplyTheme(EditorTheme)"/>.
 	/// </summary>
 	public class EditorTheme {
+		public const uint STYLE_KEYWORD = 1;
+		public const uint STYLE_STRING = 2;
+		public const uint STYLE_COMMENT = 3;
+		public const uint STYLE_NUMBER = 4;
+		public const uint STYLE_BUILTIN = 5;
+		public const uint STYLE_TYPE = 6;
+		public const uint STYLE_CLASS = 7;
+		public const uint STYLE_FUNCTION = 8;
+		public const uint STYLE_VARIABLE = 9;
+		public const uint STYLE_ANNOTATION = 10;
+		public const uint STYLE_PREPROCESSOR = 11;
+		/// <summary>
+		/// Base style ID reserved for application-defined/custom text styles.
+		/// Built-in styles in this library currently use low IDs (1..11); to avoid conflicts
+		/// with current/future built-in IDs and keep style IDs consistent across platform bindings,
+		/// allocate custom style IDs starting from <see cref="STYLE_USER_BASE"/> and above.
+		/// </summary>
+		public const uint STYLE_USER_BASE = 100;
+
 		/// <summary>Editor background color (ARGB).</summary>
 		public Color BackgroundColor { get; set; }
 		/// <summary>Default text color (ARGB), used when not overridden by syntax highlighting.</summary>
@@ -167,86 +186,92 @@ namespace SweetEditor {
 		}
 
 		/// <summary>
-		/// Creates dark theme preset (VSCode Dark+ style).
+		/// Creates refined dark theme preset.
 		/// </summary>
 		public static EditorTheme Dark() => new EditorTheme {
-			BackgroundColor = Color.FromArgb(unchecked((int)0xFF1E1E1E)),
-			TextColor = Color.FromArgb(unchecked((int)0xFFD4D4D4)),
-			CursorColor = Color.FromArgb(unchecked((int)0xFFAEAFAD)),
-			SelectionColor = Color.FromArgb(unchecked((int)0x99264F78)),
-			LineNumberColor = Color.FromArgb(unchecked((int)0xFF858585)),
-			CurrentLineColor = Color.FromArgb(unchecked((int)0x15FFFFFF)),
-			GuideColor = Color.FromArgb(unchecked((int)0x33FFFFFF)),
-			SeparatorColor = Color.FromArgb(unchecked((int)0xFF6A9955)),
-			SplitLineColor = Color.FromArgb(unchecked((int)0x33FFFFFF)),
-			ScrollbarTrackColor = Color.FromArgb(unchecked((int)0x48FFFFFF)),
-			ScrollbarThumbColor = Color.FromArgb(unchecked((int)0xAA858585)),
-			CompositionColor = Color.FromArgb(unchecked((int)0xFFFFCC00)),
-			InlayHintBgColor = Color.FromArgb(unchecked((int)0x20FFFFFF)),
-			InlayHintTextColor = Color.FromArgb(unchecked((int)0xFFA0A0A0)),
-			InlayHintIconColor = Color.FromArgb(unchecked((int)0xFFA0A0A0)),
-			PhantomTextColor = Color.FromArgb(unchecked((int)0xFF6A6A6A)),
-			FoldPlaceholderBgColor = Color.FromArgb(100, 80, 80, 80),
-			FoldPlaceholderTextColor = Color.FromArgb(160, 200, 200, 200),
-			DiagnosticErrorColor = Color.FromArgb(unchecked((int)0xFFF44747)),
-			DiagnosticWarningColor = Color.FromArgb(unchecked((int)0xFFCCA700)),
-			DiagnosticInfoColor = Color.FromArgb(unchecked((int)0xFF3794FF)),
-			DiagnosticHintColor = Color.FromArgb(unchecked((int)0xFFEEEEEE)),
-			LinkedEditingActiveColor = Color.FromArgb(unchecked((int)0x40007ACC)),
-			LinkedEditingInactiveColor = Color.FromArgb(unchecked((int)0x20007ACC)),
-			BracketHighlightBorderColor = Color.FromArgb(unchecked((int)0xFF888888)),
-			BracketHighlightBgColor = Color.FromArgb(unchecked((int)0x20FFFFFF)),
+			BackgroundColor = Color.FromArgb(unchecked((int)0xFF1B1E24)),
+			TextColor = Color.FromArgb(unchecked((int)0xFFD7DEE9)),
+			CursorColor = Color.FromArgb(unchecked((int)0xFF8FB8FF)),
+			SelectionColor = Color.FromArgb(unchecked((int)0x553B4F72)),
+			LineNumberColor = Color.FromArgb(unchecked((int)0xFF5E6778)),
+			CurrentLineColor = Color.FromArgb(unchecked((int)0x163A4A66)),
+			GuideColor = Color.FromArgb(unchecked((int)0x2E56617A)),
+			SeparatorColor = Color.FromArgb(unchecked((int)0xFF4A8F7A)),
+			SplitLineColor = Color.FromArgb(unchecked((int)0x3356617A)),
+			ScrollbarTrackColor = Color.FromArgb(unchecked((int)0x2AFFFFFF)),
+			ScrollbarThumbColor = Color.FromArgb(unchecked((int)0x9A7282A0)),
+			CompositionColor = Color.FromArgb(unchecked((int)0xFF7AA2F7)),
+			InlayHintBgColor = Color.FromArgb(unchecked((int)0x223A4A66)),
+			InlayHintTextColor = Color.FromArgb(unchecked((int)0xC0AFC2E0)),
+			InlayHintIconColor = Color.FromArgb(unchecked((int)0xCC9CB0CD)),
+			PhantomTextColor = Color.FromArgb(unchecked((int)0x8AA3B5D1)),
+			FoldPlaceholderBgColor = Color.FromArgb(unchecked((int)0x28405066)),
+			FoldPlaceholderTextColor = Color.FromArgb(unchecked((int)0xC0AFC2E0)),
+			DiagnosticErrorColor = Color.FromArgb(unchecked((int)0xFFF7768E)),
+			DiagnosticWarningColor = Color.FromArgb(unchecked((int)0xFFE0AF68)),
+			DiagnosticInfoColor = Color.FromArgb(unchecked((int)0xFF7DCFFF)),
+			DiagnosticHintColor = Color.FromArgb(unchecked((int)0xFF8FA3BF)),
+			LinkedEditingActiveColor = Color.FromArgb(unchecked((int)0xCC7AA2F7)),
+			LinkedEditingInactiveColor = Color.FromArgb(unchecked((int)0x667AA2F7)),
+			BracketHighlightBorderColor = Color.FromArgb(unchecked((int)0xCC9ECE6A)),
+			BracketHighlightBgColor = Color.FromArgb(unchecked((int)0x2A9ECE6A)),
 			TextStyles = new() {
-				[1] = new TextStyle(unchecked((int)0xFFC678DD), 1),
-				[2] = new TextStyle(unchecked((int)0xFF56B6C2), 0),
-				[3] = new TextStyle(unchecked((int)0xFFCE9178), 0),
-				[4] = new TextStyle(unchecked((int)0xFF6A9955), 2),
-				[5] = new TextStyle(unchecked((int)0xFFD19A66), 0),
-				[6] = new TextStyle(unchecked((int)0xFF61AFEF), 0),
-				[7] = new TextStyle(unchecked((int)0xFFB5CEA8), 0),
-				[8] = new TextStyle(unchecked((int)0xFFE5C07B), 1),
+				[STYLE_KEYWORD] = new TextStyle(unchecked((int)0xFF7AA2F7), 1),
+				[STYLE_STRING] = new TextStyle(unchecked((int)0xFF9ECE6A), 0),
+				[STYLE_COMMENT] = new TextStyle(unchecked((int)0xFF7A8294), 2),
+				[STYLE_NUMBER] = new TextStyle(unchecked((int)0xFFFF9E64), 0),
+				[STYLE_BUILTIN] = new TextStyle(unchecked((int)0xFF7DCFFF), 0),
+				[STYLE_TYPE] = new TextStyle(unchecked((int)0xFFBB9AF7), 0),
+				[STYLE_CLASS] = new TextStyle(unchecked((int)0xFFE0AF68), 1),
+				[STYLE_FUNCTION] = new TextStyle(unchecked((int)0xFF73DACA), 0),
+				[STYLE_VARIABLE] = new TextStyle(unchecked((int)0xFFD7DEE9), 0),
+				[STYLE_ANNOTATION] = new TextStyle(unchecked((int)0xFF2AC3DE), 0),
+				[STYLE_PREPROCESSOR] = new TextStyle(unchecked((int)0xFFF7768E), 0),
 			},
 		};
 
 		/// <summary>
-		/// Creates light theme preset (VSCode Light+ style).
+		/// Creates refined light theme preset.
 		/// </summary>
 		public static EditorTheme Light() => new EditorTheme {
-			BackgroundColor = Color.FromArgb(unchecked((int)0xFFFFFFFF)),
-			TextColor = Color.FromArgb(unchecked((int)0xFF000000)),
-			CursorColor = Color.FromArgb(unchecked((int)0xFF000000)),
-			SelectionColor = Color.FromArgb(unchecked((int)0x99ADD6FF)),
-			LineNumberColor = Color.FromArgb(unchecked((int)0xFF237893)),
-			CurrentLineColor = Color.FromArgb(unchecked((int)0x15000000)),
-			GuideColor = Color.FromArgb(unchecked((int)0x33000000)),
-			SeparatorColor = Color.FromArgb(unchecked((int)0xFF008000)),
-			SplitLineColor = Color.FromArgb(unchecked((int)0x33000000)),
-			ScrollbarTrackColor = Color.FromArgb(unchecked((int)0x48000000)),
-			ScrollbarThumbColor = Color.FromArgb(unchecked((int)0xAA237893)),
-			CompositionColor = Color.FromArgb(unchecked((int)0xFF0066FF)),
-			InlayHintBgColor = Color.FromArgb(unchecked((int)0x20000000)),
-			InlayHintTextColor = Color.FromArgb(unchecked((int)0xFF808080)),
-			InlayHintIconColor = Color.FromArgb(unchecked((int)0xFF808080)),
-			PhantomTextColor = Color.FromArgb(unchecked((int)0xFFA0A0A0)),
-			FoldPlaceholderBgColor = Color.FromArgb(100, 200, 200, 200),
-			FoldPlaceholderTextColor = Color.FromArgb(160, 80, 80, 80),
-			DiagnosticErrorColor = Color.FromArgb(unchecked((int)0xFFE51400)),
-			DiagnosticWarningColor = Color.FromArgb(unchecked((int)0xFFBF8803)),
-			DiagnosticInfoColor = Color.FromArgb(unchecked((int)0xFF1A85FF)),
-			DiagnosticHintColor = Color.FromArgb(unchecked((int)0xFF6E6E6E)),
-			LinkedEditingActiveColor = Color.FromArgb(unchecked((int)0x40007ACC)),
-			LinkedEditingInactiveColor = Color.FromArgb(unchecked((int)0x20007ACC)),
-			BracketHighlightBorderColor = Color.FromArgb(unchecked((int)0xFF888888)),
-			BracketHighlightBgColor = Color.FromArgb(unchecked((int)0x20000000)),
+			BackgroundColor = Color.FromArgb(unchecked((int)0xFFFAFBFD)),
+			TextColor = Color.FromArgb(unchecked((int)0xFF1F2937)),
+			CursorColor = Color.FromArgb(unchecked((int)0xFF2563EB)),
+			SelectionColor = Color.FromArgb(unchecked((int)0x4D60A5FA)),
+			LineNumberColor = Color.FromArgb(unchecked((int)0xFF8A94A6)),
+			CurrentLineColor = Color.FromArgb(unchecked((int)0x120D3B66)),
+			GuideColor = Color.FromArgb(unchecked((int)0x2229426B)),
+			SeparatorColor = Color.FromArgb(unchecked((int)0xFF2F855A)),
+			SplitLineColor = Color.FromArgb(unchecked((int)0x1F29426B)),
+			ScrollbarTrackColor = Color.FromArgb(unchecked((int)0x1F2A3B55)),
+			ScrollbarThumbColor = Color.FromArgb(unchecked((int)0x80446C9C)),
+			CompositionColor = Color.FromArgb(unchecked((int)0xFF2563EB)),
+			InlayHintBgColor = Color.FromArgb(unchecked((int)0x143B82F6)),
+			InlayHintTextColor = Color.FromArgb(unchecked((int)0xB0344A73)),
+			InlayHintIconColor = Color.FromArgb(unchecked((int)0xB04B607E)),
+			PhantomTextColor = Color.FromArgb(unchecked((int)0x8A4B607E)),
+			FoldPlaceholderBgColor = Color.FromArgb(unchecked((int)0x1A7A8CA8)),
+			FoldPlaceholderTextColor = Color.FromArgb(unchecked((int)0xC0354A6B)),
+			DiagnosticErrorColor = Color.FromArgb(unchecked((int)0xFFDC2626)),
+			DiagnosticWarningColor = Color.FromArgb(unchecked((int)0xFFD97706)),
+			DiagnosticInfoColor = Color.FromArgb(unchecked((int)0xFF0EA5E9)),
+			DiagnosticHintColor = Color.FromArgb(unchecked((int)0xFF64748B)),
+			LinkedEditingActiveColor = Color.FromArgb(unchecked((int)0xCC2563EB)),
+			LinkedEditingInactiveColor = Color.FromArgb(unchecked((int)0x662563EB)),
+			BracketHighlightBorderColor = Color.FromArgb(unchecked((int)0xCC0F766E)),
+			BracketHighlightBgColor = Color.FromArgb(unchecked((int)0x260F766E)),
 			TextStyles = new() {
-				[1] = new TextStyle(unchecked((int)0xFF0000FF), 0),
-				[2] = new TextStyle(unchecked((int)0xFF267F99), 0),
-				[3] = new TextStyle(unchecked((int)0xFFA31515), 0),
-				[4] = new TextStyle(unchecked((int)0xFF008000), 2),
-				[5] = new TextStyle(unchecked((int)0xFF795E26), 0),
-				[6] = new TextStyle(unchecked((int)0xFF795E26), 0),
-				[7] = new TextStyle(unchecked((int)0xFF098658), 0),
-				[8] = new TextStyle(unchecked((int)0xFF267F99), 1),
+				[STYLE_KEYWORD] = new TextStyle(unchecked((int)0xFF3559D6), 1),
+				[STYLE_STRING] = new TextStyle(unchecked((int)0xFF0F7B6C), 0),
+				[STYLE_COMMENT] = new TextStyle(unchecked((int)0xFF7B8798), 2),
+				[STYLE_NUMBER] = new TextStyle(unchecked((int)0xFFB45309), 0),
+				[STYLE_BUILTIN] = new TextStyle(unchecked((int)0xFF006E7F), 0),
+				[STYLE_TYPE] = new TextStyle(unchecked((int)0xFF6D28D9), 0),
+				[STYLE_CLASS] = new TextStyle(unchecked((int)0xFF9A3412), 1),
+				[STYLE_FUNCTION] = new TextStyle(unchecked((int)0xFF0E7490), 0),
+				[STYLE_VARIABLE] = new TextStyle(unchecked((int)0xFF1F2937), 0),
+				[STYLE_ANNOTATION] = new TextStyle(unchecked((int)0xFF0F766E), 0),
+				[STYLE_PREPROCESSOR] = new TextStyle(unchecked((int)0xFFBE123C), 0),
 			},
 		};
 	}

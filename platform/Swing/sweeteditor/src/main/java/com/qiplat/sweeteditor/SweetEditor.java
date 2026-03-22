@@ -94,7 +94,7 @@ public class SweetEditor extends JPanel {
             editorCore.registerTextStyle(entry.getKey(), v.color, v.backgroundColor, v.fontStyle);
         }
 
-        setBackground(EditorRenderer.argbToColor(currentTheme.backgroundColor));
+        setBackground(currentTheme.backgroundColor);
         setFont(renderer.getRegularFont());
         setupEventListeners();
         setupCursorBlink();
@@ -122,7 +122,7 @@ public class SweetEditor extends JPanel {
     public void applyTheme(EditorTheme theme) {
         this.currentTheme = theme;
         renderer.applyTheme(theme);
-        setBackground(EditorRenderer.argbToColor(theme.backgroundColor));
+        setBackground(theme.backgroundColor);
         for (var entry : theme.textStyles.entrySet()) {
             TextStyle v = entry.getValue();
             editorCore.registerTextStyle(entry.getKey(), v.color, v.backgroundColor, v.fontStyle);

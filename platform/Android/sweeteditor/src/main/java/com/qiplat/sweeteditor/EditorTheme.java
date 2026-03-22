@@ -11,6 +11,25 @@ import java.util.Map;
  * Apply theme via {@link SweetEditor#applyTheme(EditorTheme)}.
  */
 public class EditorTheme {
+    public static final int STYLE_KEYWORD = 1;
+    public static final int STYLE_STRING = 2;
+    public static final int STYLE_COMMENT = 3;
+    public static final int STYLE_NUMBER = 4;
+    public static final int STYLE_BUILTIN = 5;
+    public static final int STYLE_TYPE = 6;
+    public static final int STYLE_CLASS = 7;
+    public static final int STYLE_FUNCTION = 8;
+    public static final int STYLE_VARIABLE = 9;
+    public static final int STYLE_ANNOTATION = 10;
+    public static final int STYLE_PREPROCESSOR = 11;
+    /**
+     * Base style ID reserved for application-defined/custom text styles.
+     * <p>
+     * Built-in styles in this library currently occupy low IDs (1..11). To avoid collisions with
+     * current/future built-in style IDs and keep style IDs portable across all platform bindings,
+     * allocate custom style IDs starting from {@code STYLE_USER_BASE} and above.
+     */
+    public static final int STYLE_USER_BASE = 100;
 
     /** Editor background color (ARGB). */
     public int backgroundColor;
@@ -97,92 +116,98 @@ public class EditorTheme {
     }
 
     /**
-     * Create dark theme (VSCode Dark+ style, consistent with original default values).
+     * Create refined dark theme preset.
      *
      * @return Dark theme instance
      */
     public static EditorTheme dark() {
         EditorTheme t = new EditorTheme();
-        t.backgroundColor          = 0xFF1E1E1E;
-        t.textColor                = 0xFFD4D4D4;
-        t.cursorColor              = 0xFFAEAFAD;
-        t.selectionColor           = 0x99264F78;
-        t.lineNumberColor          = 0xFF858585;
-        t.currentLineColor         = 0x15FFFFFF;
-        t.guideColor               = 0x33FFFFFF;
-        t.separatorLineColor       = 0xFF6A9955;
-        t.splitLineColor           = 0x33FFFFFF;
-        t.scrollbarTrackColor      = 0x48FFFFFF;
-        t.scrollbarThumbColor      = 0xAA858585;
-        t.compositionUnderlineColor = 0xFFFFCC00;
-        t.inlayHintBgColor         = 0x20FFFFFF;
-        t.inlayHintTextColor       = 0x80D4D4D4;
-        t.foldPlaceholderBgColor   = 0x64FFFFFF;
-        t.foldPlaceholderTextColor = 0xA0D4D4D4;
-        t.phantomTextColor         = 0x80D4D4D4;
-        t.inlayHintIconColor       = 0xB2D4D4D4;
-        t.diagnosticErrorColor     = 0xFFFF0000;
-        t.diagnosticWarningColor   = 0xFFFFCC00;
-        t.diagnosticInfoColor      = 0xFF61B5ED;
-        t.diagnosticHintColor      = 0xB3999999;
-        t.linkedEditingActiveColor  = 0xCC569CD6;  // Blue border
-        t.linkedEditingInactiveColor = 0x66569CD6; // Semi-transparent blue border
-        t.bracketHighlightBorderColor = 0xCCFFD700; // Golden border
-        t.bracketHighlightBgColor     = 0x30FFD700; // Semi-transparent golden background
-        // VSCode Dark+ syntax highlighting presets
-        t.defineTextStyle(1, new TextStyle(0xFFC678DD, 1));  // keyword      - purple, bold
-        t.defineTextStyle(2, new TextStyle(0xFF56B6C2, 0));  // type         - cyan
-        t.defineTextStyle(3, new TextStyle(0xFFCE9178, 0));  // string       - orange
-        t.defineTextStyle(4, new TextStyle(0xFF6A9955, 2));  // comment      - green, italic
-        t.defineTextStyle(5, new TextStyle(0xFFD19A66, 0));  // preprocessor - orange-yellow
-        t.defineTextStyle(6, new TextStyle(0xFF61AFEF, 0));  // function     - blue
-        t.defineTextStyle(7, new TextStyle(0xFFB5CEA8, 0));  // number       - light green
-        t.defineTextStyle(8, new TextStyle(0xFFE5C07B, 1));  // class        - yellow, bold
+        t.backgroundColor           = 0xFF1B1E24;
+        t.textColor                 = 0xFFD7DEE9;
+        t.cursorColor               = 0xFF8FB8FF;
+        t.selectionColor            = 0x553B4F72;
+        t.lineNumberColor           = 0xFF5E6778;
+        t.currentLineColor          = 0x163A4A66;
+        t.guideColor                = 0x2E56617A;
+        t.separatorLineColor        = 0xFF4A8F7A;
+        t.splitLineColor            = 0x3356617A;
+        t.scrollbarTrackColor       = 0x2AFFFFFF;
+        t.scrollbarThumbColor       = 0x9A7282A0;
+        t.compositionUnderlineColor = 0xFF7AA2F7;
+        t.inlayHintBgColor          = 0x223A4A66;
+        t.inlayHintTextColor        = 0xC0AFC2E0;
+        t.foldPlaceholderBgColor    = 0x28405066;
+        t.foldPlaceholderTextColor  = 0xC0AFC2E0;
+        t.phantomTextColor          = 0x8AA3B5D1;
+        t.inlayHintIconColor        = 0xCC9CB0CD;
+        t.diagnosticErrorColor      = 0xFFF7768E;
+        t.diagnosticWarningColor    = 0xFFE0AF68;
+        t.diagnosticInfoColor       = 0xFF7DCFFF;
+        t.diagnosticHintColor       = 0xFF8FA3BF;
+        t.linkedEditingActiveColor   = 0xCC7AA2F7;
+        t.linkedEditingInactiveColor = 0x667AA2F7;
+        t.bracketHighlightBorderColor = 0xCC9ECE6A;
+        t.bracketHighlightBgColor     = 0x2A9ECE6A;
+
+        t.defineTextStyle(STYLE_KEYWORD, new TextStyle(0xFF7AA2F7, TextStyle.BOLD));
+        t.defineTextStyle(STYLE_STRING, new TextStyle(0xFF9ECE6A, TextStyle.NORMAL));
+        t.defineTextStyle(STYLE_COMMENT, new TextStyle(0xFF7A8294, TextStyle.ITALIC));
+        t.defineTextStyle(STYLE_NUMBER, new TextStyle(0xFFFF9E64, TextStyle.NORMAL));
+        t.defineTextStyle(STYLE_BUILTIN, new TextStyle(0xFF7DCFFF, TextStyle.NORMAL));
+        t.defineTextStyle(STYLE_TYPE, new TextStyle(0xFFBB9AF7, TextStyle.NORMAL));
+        t.defineTextStyle(STYLE_CLASS, new TextStyle(0xFFE0AF68, TextStyle.BOLD));
+        t.defineTextStyle(STYLE_FUNCTION, new TextStyle(0xFF73DACA, TextStyle.NORMAL));
+        t.defineTextStyle(STYLE_VARIABLE, new TextStyle(0xFFD7DEE9, TextStyle.NORMAL));
+        t.defineTextStyle(STYLE_ANNOTATION, new TextStyle(0xFF2AC3DE, TextStyle.NORMAL));
+        t.defineTextStyle(STYLE_PREPROCESSOR, new TextStyle(0xFFF7768E, TextStyle.NORMAL));
         return t;
     }
 
     /**
-     * Create light theme (VSCode Light+ style).
+     * Create refined light theme preset.
      *
      * @return Light theme instance
      */
     public static EditorTheme light() {
         EditorTheme t = new EditorTheme();
-        t.backgroundColor          = 0xFFFFFFFF;
-        t.textColor                = 0xFF000000;
-        t.cursorColor              = 0xFF000000;
-        t.selectionColor           = 0x99ADD6FF;
-        t.lineNumberColor          = 0xFF237893;
-        t.currentLineColor         = 0x15000000;
-        t.guideColor               = 0x33000000;
-        t.separatorLineColor       = 0xFF008000;
-        t.splitLineColor           = 0x33000000;
-        t.scrollbarTrackColor      = 0x48000000;
-        t.scrollbarThumbColor      = 0xAA237893;
-        t.compositionUnderlineColor = 0xFF0066FF;
-        t.inlayHintBgColor         = 0x20000000;
-        t.inlayHintTextColor       = 0x80000000;
-        t.foldPlaceholderBgColor   = 0x64000000;
-        t.foldPlaceholderTextColor = 0xA0000000;
-        t.phantomTextColor         = 0x80000000;
-        t.inlayHintIconColor       = 0xB2000000;
-        t.diagnosticErrorColor     = 0xFFFF0000;
-        t.diagnosticWarningColor   = 0xFFFFCC00;
-        t.diagnosticInfoColor      = 0xFF61B5ED;
-        t.diagnosticHintColor      = 0xB3999999;
-        t.linkedEditingActiveColor  = 0xCC0066FF;  // Blue border
-        t.linkedEditingInactiveColor = 0x660066FF; // Semi-transparent blue border
-        t.bracketHighlightBorderColor = 0xCCB8860B; // Dark golden border
-        t.bracketHighlightBgColor     = 0x30B8860B; // Semi-transparent dark golden background
-        // VSCode Light+ syntax highlighting presets
-        t.defineTextStyle(1, new TextStyle(0xFF0000FF, 0));  // keyword      - blue
-        t.defineTextStyle(2, new TextStyle(0xFF267F99, 0));  // type         - dark cyan
-        t.defineTextStyle(3, new TextStyle(0xFFA31515, 0));  // string       - red
-        t.defineTextStyle(4, new TextStyle(0xFF008000, 2));  // comment      - green, italic
-        t.defineTextStyle(5, new TextStyle(0xFF795E26, 0));  // preprocessor - brown
-        t.defineTextStyle(6, new TextStyle(0xFF795E26, 0));  // function     - brown
-        t.defineTextStyle(7, new TextStyle(0xFF098658, 0));  // number       - dark green
-        t.defineTextStyle(8, new TextStyle(0xFF267F99, 1));  // class        - dark cyan, bold
+        t.backgroundColor           = 0xFFFAFBFD;
+        t.textColor                 = 0xFF1F2937;
+        t.cursorColor               = 0xFF2563EB;
+        t.selectionColor            = 0x4D60A5FA;
+        t.lineNumberColor           = 0xFF8A94A6;
+        t.currentLineColor          = 0x120D3B66;
+        t.guideColor                = 0x2229426B;
+        t.separatorLineColor        = 0xFF2F855A;
+        t.splitLineColor            = 0x1F29426B;
+        t.scrollbarTrackColor       = 0x1F2A3B55;
+        t.scrollbarThumbColor       = 0x80446C9C;
+        t.compositionUnderlineColor = 0xFF2563EB;
+        t.inlayHintBgColor          = 0x143B82F6;
+        t.inlayHintTextColor        = 0xB0344A73;
+        t.foldPlaceholderBgColor    = 0x1A7A8CA8;
+        t.foldPlaceholderTextColor  = 0xC0354A6B;
+        t.phantomTextColor          = 0x8A4B607E;
+        t.inlayHintIconColor        = 0xB04B607E;
+        t.diagnosticErrorColor      = 0xFFDC2626;
+        t.diagnosticWarningColor    = 0xFFD97706;
+        t.diagnosticInfoColor       = 0xFF0EA5E9;
+        t.diagnosticHintColor       = 0xFF64748B;
+        t.linkedEditingActiveColor   = 0xCC2563EB;
+        t.linkedEditingInactiveColor = 0x662563EB;
+        t.bracketHighlightBorderColor = 0xCC0F766E;
+        t.bracketHighlightBgColor     = 0x260F766E;
+
+        t.defineTextStyle(STYLE_KEYWORD, new TextStyle(0xFF3559D6, TextStyle.BOLD));
+        t.defineTextStyle(STYLE_STRING, new TextStyle(0xFF0F7B6C, TextStyle.NORMAL));
+        t.defineTextStyle(STYLE_COMMENT, new TextStyle(0xFF7B8798, TextStyle.ITALIC));
+        t.defineTextStyle(STYLE_NUMBER, new TextStyle(0xFFB45309, TextStyle.NORMAL));
+        t.defineTextStyle(STYLE_BUILTIN, new TextStyle(0xFF006E7F, TextStyle.NORMAL));
+        t.defineTextStyle(STYLE_TYPE, new TextStyle(0xFF6D28D9, TextStyle.NORMAL));
+        t.defineTextStyle(STYLE_CLASS, new TextStyle(0xFF9A3412, TextStyle.BOLD));
+        t.defineTextStyle(STYLE_FUNCTION, new TextStyle(0xFF0E7490, TextStyle.NORMAL));
+        t.defineTextStyle(STYLE_VARIABLE, new TextStyle(0xFF1F2937, TextStyle.NORMAL));
+        t.defineTextStyle(STYLE_ANNOTATION, new TextStyle(0xFF0F766E, TextStyle.NORMAL));
+        t.defineTextStyle(STYLE_PREPROCESSOR, new TextStyle(0xFFBE123C, TextStyle.NORMAL));
         return t;
     }
 }

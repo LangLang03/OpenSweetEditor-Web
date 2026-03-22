@@ -5,6 +5,7 @@ import android.util.SparseArray;
 
 import androidx.annotation.NonNull;
 
+import com.qiplat.sweeteditor.EditorTheme;
 import com.qiplat.sweeteditor.SweetEditor;
 import com.qiplat.sweeteditor.core.Document;
 import com.qiplat.sweeteditor.core.EditorCore;
@@ -57,15 +58,18 @@ public class DemoDecorationProvider implements DecorationProvider {
 
     private static final String SYNTAX_ASSET_DIR = "syntaxes";
     private static final String DEFAULT_ANALYSIS_FILE_NAME = "sample.cpp";
-    private static final int STYLE_KEYWORD = 1;
-    private static final int STYLE_TYPE = 2;
-    private static final int STYLE_STRING = 3;
-    private static final int STYLE_COMMENT = 4;
-    private static final int STYLE_PREPROCESSOR = 5;
-    private static final int STYLE_FUNCTION = 6;
-    private static final int STYLE_NUMBER = 7;
-    private static final int STYLE_CLASS = 8;
-    private static final int STYLE_COLOR = 9;
+    private static final int STYLE_KEYWORD = EditorTheme.STYLE_KEYWORD;
+    private static final int STYLE_STRING = EditorTheme.STYLE_STRING;
+    private static final int STYLE_COMMENT = EditorTheme.STYLE_COMMENT;
+    private static final int STYLE_NUMBER = EditorTheme.STYLE_NUMBER;
+    private static final int STYLE_TYPE = EditorTheme.STYLE_TYPE;
+    private static final int STYLE_FUNCTION = EditorTheme.STYLE_FUNCTION;
+    private static final int STYLE_PREPROCESSOR = EditorTheme.STYLE_PREPROCESSOR;
+    private static final int STYLE_CLASS = EditorTheme.STYLE_CLASS;
+    private static final int STYLE_BUILTIN = EditorTheme.STYLE_BUILTIN;
+    private static final int STYLE_VARIABLE = EditorTheme.STYLE_VARIABLE;
+    private static final int STYLE_ANNOTATION = EditorTheme.STYLE_ANNOTATION;
+    private static final int STYLE_COLOR = EditorTheme.STYLE_PREPROCESSOR + 1;
 
     public static final int ICON_CLASS = 1;
 
@@ -502,11 +506,14 @@ public class DemoDecorationProvider implements DecorationProvider {
         engine.registerStyleName("macro", STYLE_PREPROCESSOR);
         engine.registerStyleName("method", STYLE_FUNCTION);
         engine.registerStyleName("function", STYLE_FUNCTION);
+        engine.registerStyleName("variable", STYLE_VARIABLE);
+        engine.registerStyleName("identifier", STYLE_VARIABLE);
+        engine.registerStyleName("field", STYLE_VARIABLE);
         engine.registerStyleName("number", STYLE_NUMBER);
         engine.registerStyleName("class", STYLE_CLASS);
         engine.registerStyleName("color", STYLE_COLOR);
-        engine.registerStyleName("builtin", STYLE_TYPE);
-        engine.registerStyleName("annotation", STYLE_KEYWORD);
+        engine.registerStyleName("builtin", STYLE_BUILTIN);
+        engine.registerStyleName("annotation", STYLE_ANNOTATION);
     }
 
     @NonNull

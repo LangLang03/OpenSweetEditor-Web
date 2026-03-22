@@ -123,7 +123,7 @@ final class EditorRenderer implements EditorCore.TextMeasureCallback {
         g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB);
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-        g2.setColor(argbToColor(theme.backgroundColor));
+        g2.setColor(theme.backgroundColor);
         g2.fillRect(0, 0, viewWidth, viewHeight);
 
         if (model == null) return;
@@ -175,13 +175,13 @@ final class EditorRenderer implements EditorCore.TextMeasureCallback {
     private void drawCurrentLineHighlight(Graphics2D g, EditorRenderModel model, float width) {
         if (model.lines == null || model.lines.isEmpty()) return;
         float lineH = model.cursor != null && model.cursor.height > 0 ? model.cursor.height : getFontHeight(g, regularFont);
-        g.setColor(argbToColor(theme.currentLineColor));
+        g.setColor(theme.currentLineColor);
         g.fillRect(0, (int) model.currentLine.y, (int) width, (int) lineH);
     }
 
     private void drawSelectionRects(Graphics2D g, EditorRenderModel model) {
         if (model.selectionRects == null || model.selectionRects.isEmpty()) return;
-        g.setColor(argbToColor(theme.selectionColor));
+        g.setColor(theme.selectionColor);
         for (SelectionRect r : model.selectionRects) {
             g.fillRect((int) r.origin.x, (int) r.origin.y, (int) r.width, (int) r.height);
         }
@@ -208,7 +208,7 @@ final class EditorRenderer implements EditorCore.TextMeasureCallback {
 
         Color color = (run.style != null && run.style.color != 0)
                 ? argbToColor(run.style.color)
-                : argbToColor(theme.textColor);
+                : theme.textColor;
 
         float ascent = getFontAscent(g, font);
         float topY = run.y - ascent;
@@ -219,11 +219,11 @@ final class EditorRenderer implements EditorCore.TextMeasureCallback {
             float bgLeft = run.x + mgn;
             float bgWidth = run.width - mgn * 2;
             float radius = fontHeight * 0.2f;
-            g.setColor(argbToColor(theme.foldPlaceholderBgColor));
+            g.setColor(theme.foldPlaceholderBgColor);
             g.fill(new RoundRectangle2D.Float(bgLeft, topY, bgWidth, fontHeight, radius * 2, radius * 2));
             if (hasText) {
                 float textX = run.x + mgn + run.padding;
-                g.setColor(argbToColor(theme.foldPlaceholderTextColor));
+                g.setColor(theme.foldPlaceholderTextColor);
                 g.setFont(font);
                 g.drawString(text, textX, run.y);
             }
@@ -238,7 +238,7 @@ final class EditorRenderer implements EditorCore.TextMeasureCallback {
                 g.fillRect((int) (run.x + mgn), (int) topY, (int) blockSize, (int) blockSize);
             } else {
                 float radius = fontHeight * 0.2f;
-                g.setColor(argbToColor(theme.inlayHintBgColor));
+                g.setColor(theme.inlayHintBgColor);
                 g.fill(new RoundRectangle2D.Float(bgLeft, topY, bgWidth, fontHeight, radius * 2, radius * 2));
                 if (hasText) {
                     float textX = run.x + mgn + run.padding;
@@ -254,7 +254,7 @@ final class EditorRenderer implements EditorCore.TextMeasureCallback {
             }
             if (hasText) {
                 Color drawColor = (run.type == VisualRunType.PHANTOM_TEXT)
-                        ? argbToColor(theme.phantomTextColor)
+                        ? theme.phantomTextColor
                         : color;
                 g.setColor(drawColor);
                 g.setFont(font);
@@ -272,10 +272,10 @@ final class EditorRenderer implements EditorCore.TextMeasureCallback {
 
     private void drawGutterOverlay(Graphics2D g, EditorRenderModel model, int viewWidth, int viewHeight) {
         if (model.splitX <= 0) return;
-        g.setColor(argbToColor(theme.backgroundColor));
+        g.setColor(theme.backgroundColor);
         g.fillRect(0, 0, (int) model.splitX, viewHeight);
         drawCurrentLineHighlight(g, model, model.splitX);
-        g.setColor(argbToColor(theme.splitLineColor));
+        g.setColor(theme.splitLineColor);
         g.drawLine((int) model.splitX, 0, (int) model.splitX, viewHeight);
     }
 
@@ -296,7 +296,7 @@ final class EditorRenderer implements EditorCore.TextMeasureCallback {
         int newLineNumber = vl.logicalLine + 1;
 
         if (newLineNumber != currentDrawingLineNumber) {
-            g.setColor(argbToColor(theme.lineNumberColor));
+            g.setColor(theme.lineNumberColor);
             g.setFont(regularFont);
             g.drawString(String.valueOf(newLineNumber), pos.x, pos.y);
             currentDrawingLineNumber = newLineNumber;
@@ -307,7 +307,7 @@ final class EditorRenderer implements EditorCore.TextMeasureCallback {
             float centerX = model.foldArrowX > 0 ? model.foldArrowX : model.splitX - lineHeight * 0.5f;
             float centerY = topY + lineHeight * 0.5f;
 
-            g.setColor(argbToColor(theme.lineNumberColor));
+            g.setColor(theme.lineNumberColor);
             g.setStroke(new BasicStroke(Math.max(1f, lineHeight * 0.1f), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
 
             GeneralPath path = new GeneralPath();
@@ -342,8 +342,8 @@ final class EditorRenderer implements EditorCore.TextMeasureCallback {
                 && horizontal.track.height > 0;
         if (!hasVertical && !hasHorizontal) return;
 
-        Color trackColor = argbToColor(theme.scrollbarTrackColor);
-        Color thumbColor = argbToColor(theme.scrollbarThumbColor);
+        Color trackColor = theme.scrollbarTrackColor;
+        Color thumbColor = theme.scrollbarThumbColor;
 
         float verticalTrackX = 0f;
         float verticalTrackWidth = 0f;
@@ -388,14 +388,14 @@ final class EditorRenderer implements EditorCore.TextMeasureCallback {
 
     private void drawCursor(Graphics2D g, EditorRenderModel model, boolean cursorVisible) {
         if (model.cursor == null || !model.cursor.visible || !cursorVisible) return;
-        g.setColor(argbToColor(theme.cursorColor));
+        g.setColor(theme.cursorColor);
         g.fillRect((int) model.cursor.position.x, (int) model.cursor.position.y,
                 2, (int) model.cursor.height);
     }
 
     private void drawCompositionDecoration(Graphics2D g, CompositionDecoration comp) {
         float y = comp.origin.y + comp.height;
-        g.setColor(argbToColor(theme.compositionUnderlineColor));
+        g.setColor(theme.compositionUnderlineColor);
         g.setStroke(new BasicStroke(2f));
         g.drawLine((int) comp.origin.x, (int) y, (int) (comp.origin.x + comp.width), (int) y);
     }
@@ -404,10 +404,10 @@ final class EditorRenderer implements EditorCore.TextMeasureCallback {
         if (model.diagnosticDecorations == null || model.diagnosticDecorations.isEmpty()) return;
         for (DiagnosticDecoration diag : model.diagnosticDecorations) {
             Color c = diag.color != 0 ? argbToColor(diag.color) : switch (diag.severity) {
-                case 0 -> argbToColor(theme.diagnosticErrorColor);
-                case 1 -> argbToColor(theme.diagnosticWarningColor);
-                case 2 -> argbToColor(theme.diagnosticInfoColor);
-                default -> argbToColor(theme.diagnosticHintColor);
+                case 0 -> theme.diagnosticErrorColor;
+                case 1 -> theme.diagnosticWarningColor;
+                case 2 -> theme.diagnosticInfoColor;
+                default -> theme.diagnosticHintColor;
             };
 
             float startX = diag.origin.x;
@@ -448,10 +448,10 @@ final class EditorRenderer implements EditorCore.TextMeasureCallback {
             if (rect.isActive) {
                 g.setColor(withAlpha(theme.linkedEditingActiveColor, 32));
                 g.fillRect((int) rect.origin.x, (int) rect.origin.y, (int) rect.width, (int) rect.height);
-                g.setColor(argbToColor(theme.linkedEditingActiveColor));
+                g.setColor(theme.linkedEditingActiveColor);
                 g.setStroke(new BasicStroke(2f));
             } else {
-                g.setColor(argbToColor(theme.linkedEditingInactiveColor));
+                g.setColor(theme.linkedEditingInactiveColor);
                 g.setStroke(new BasicStroke(1f));
             }
             g.drawRect((int) rect.origin.x, (int) rect.origin.y, (int) rect.width, (int) rect.height);
@@ -462,9 +462,9 @@ final class EditorRenderer implements EditorCore.TextMeasureCallback {
         if (model.bracketHighlightRects == null || model.bracketHighlightRects.isEmpty()) return;
         for (BracketHighlightRect rect : model.bracketHighlightRects) {
             if (rect.origin == null) continue;
-            g.setColor(argbToColor(theme.bracketHighlightBgColor));
+            g.setColor(theme.bracketHighlightBgColor);
             g.fillRect((int) rect.origin.x, (int) rect.origin.y, (int) rect.width, (int) rect.height);
-            g.setColor(argbToColor(theme.bracketHighlightBorderColor));
+            g.setColor(theme.bracketHighlightBorderColor);
             g.setStroke(new BasicStroke(1.5f));
             g.drawRect((int) rect.origin.x, (int) rect.origin.y, (int) rect.width, (int) rect.height);
         }
@@ -473,7 +473,7 @@ final class EditorRenderer implements EditorCore.TextMeasureCallback {
     private void drawGuideSegments(Graphics2D g, EditorRenderModel model) {
         if (model.guideSegments == null || model.guideSegments.isEmpty()) return;
         for (GuideSegment seg : model.guideSegments) {
-            Color c = argbToColor((seg.type == GuideType.SEPARATOR) ? theme.separatorLineColor : theme.guideColor);
+            Color c = (seg.type == GuideType.SEPARATOR) ? theme.separatorLineColor : theme.guideColor;
             g.setColor(c);
             float lineWidth = (seg.type == GuideType.INDENT) ? 1f : 1.2f;
             g.setStroke(new BasicStroke(lineWidth));
@@ -545,8 +545,8 @@ final class EditorRenderer implements EditorCore.TextMeasureCallback {
         return new Color(r, g2, b, a);
     }
 
-    private static Color withAlpha(int argb, int alpha) {
+    private static Color withAlpha(Color color, int alpha) {
         int a = Math.max(0, Math.min(255, alpha));
-        return new Color((argb >> 16) & 0xFF, (argb >> 8) & 0xFF, argb & 0xFF, a);
+        return new Color(color.getRed(), color.getGreen(), color.getBlue(), a);
     }
 }

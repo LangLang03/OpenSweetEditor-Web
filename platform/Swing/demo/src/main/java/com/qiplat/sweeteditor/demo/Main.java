@@ -28,7 +28,7 @@ import java.util.Comparator;
 import java.util.List;
 
 public class Main extends JFrame {
-    private static final int STYLE_COLOR = 9;
+    private static final int STYLE_COLOR = EditorTheme.STYLE_PREPROCESSOR + 1;
     private static final String FALLBACK_FILE_NAME = "example.cpp";
     private static final String FALLBACK_SAMPLE_CODE =
             "// SweetEditor Demo\n" +

@@ -1,79 +1,100 @@
 package com.qiplat.sweeteditor;
 
 import com.qiplat.sweeteditor.core.adornment.TextStyle;
+import java.awt.Color;
 import java.util.HashMap;
 import java.util.Map;
 
 /**
  * Editor theme configuration containing all configurable color properties.
  * <p>
- * All colors are in ARGB format (e.g., 0xFF1E1E1E).
+ * All color fields use {@link Color}. Built-in presets are initialized from ARGB constants
+ * (e.g., {@code 0xFF1E1E1E}).
  * Apply theme via {@link SweetEditor#applyTheme(EditorTheme)}.
  */
 public class EditorTheme {
+    public static final int STYLE_KEYWORD = 1;
+    public static final int STYLE_STRING = 2;
+    public static final int STYLE_COMMENT = 3;
+    public static final int STYLE_NUMBER = 4;
+    public static final int STYLE_BUILTIN = 5;
+    public static final int STYLE_TYPE = 6;
+    public static final int STYLE_CLASS = 7;
+    public static final int STYLE_FUNCTION = 8;
+    public static final int STYLE_VARIABLE = 9;
+    public static final int STYLE_ANNOTATION = 10;
+    public static final int STYLE_PREPROCESSOR = 11;
+    /**
+     * Base style ID reserved for application-defined/custom text styles.
+     * <p>
+     * Built-in styles in this library currently occupy low IDs (1..11). To avoid collisions with
+     * current/future built-in style IDs and keep style IDs portable across all platform bindings,
+     * allocate custom style IDs starting from {@code STYLE_USER_BASE} and above.
+     */
+    public static final int STYLE_USER_BASE = 100;
 
-    /** Editor background color (ARGB). */
-    public int backgroundColor;
-    /** Default text color (ARGB), used when not overridden by syntax highlighting. */
-    public int textColor;
-    /** Cursor color (ARGB). */
-    public int cursorColor;
-    /** Selection highlight fill color (ARGB, recommended to include transparency). */
-    public int selectionColor;
-    /** Line number text color (ARGB). */
-    public int lineNumberColor;
-    /** Current line highlight background color (ARGB, recommended to include transparency). */
-    public int currentLineColor;
+    /** Editor background color. */
+    public Color backgroundColor;
+    /** Default text color, used when not overridden by syntax highlighting. */
+    public Color textColor;
+    /** Cursor color. */
+    public Color cursorColor;
+    /** Selection highlight fill color, recommended to include alpha. */
+    public Color selectionColor;
+    /** Line number text color. */
+    public Color lineNumberColor;
+    /** Current line highlight background color, recommended to include alpha. */
+    public Color currentLineColor;
 
-    /** Code structure line color (indent/bracket/flow guide, ARGB). */
-    public int guideColor;
-    /** Separator line color (SeparatorGuide, ARGB). */
-    public int separatorLineColor;
+    /** Code structure line color (indent/bracket/flow guide). */
+    public Color guideColor;
+    /** Separator line color (SeparatorGuide). */
+    public Color separatorLineColor;
 
-    /** Line number area split line color (ARGB). */
-    public int splitLineColor;
-    /** Scrollbar track color (ARGB). */
-    public int scrollbarTrackColor = 0x48FFFFFF;
-    /** Scrollbar thumb color (ARGB). */
-    public int scrollbarThumbColor = 0xAA858585;
+    /** Line number area split line color. */
+    public Color splitLineColor;
+    /** Scrollbar track color. */
+    public Color scrollbarTrackColor = argb(0x48FFFFFF);
+    /** Scrollbar thumb color. */
+    public Color scrollbarThumbColor = argb(0xAA858585);
 
-    /** IME composition underline color (ARGB). */
-    public int compositionUnderlineColor;
+    /** IME composition underline color. */
+    public Color compositionUnderlineColor;
 
-    /** InlayHint rounded background color (ARGB). */
-    public int inlayHintBgColor;
-    /** InlayHint text color (ARGB, typically with transparency to distinguish from main text). */
-    public int inlayHintTextColor;
+    /** InlayHint rounded background color. */
+    public Color inlayHintBgColor;
+    /** InlayHint text color, typically with alpha to distinguish from main text. */
+    public Color inlayHintTextColor;
 
-    /** Fold placeholder background color (ARGB, typically with transparency). */
-    public int foldPlaceholderBgColor;
-    /** Fold placeholder text color (ARGB, typically with transparency to distinguish from main text). */
-    public int foldPlaceholderTextColor;
+    /** Fold placeholder background color, typically with alpha. */
+    public Color foldPlaceholderBgColor;
+    /** Fold placeholder text color, typically with alpha to distinguish from main text. */
+    public Color foldPlaceholderTextColor;
 
-    /** PhantomText color (ARGB, typically with transparency to distinguish from main text). */
-    public int phantomTextColor;
+    /** PhantomText color, typically with alpha to distinguish from main text. */
+    public Color phantomTextColor;
 
-    /** InlayHint icon tint color (ARGB, typically with transparency). */
-    public int inlayHintIconColor;
+    /** InlayHint icon tint color, typically with alpha. */
+    public Color inlayHintIconColor;
 
-    /** Diagnostic decoration ERROR level default color (ARGB). */
-    public int diagnosticErrorColor;
-    /** Diagnostic decoration WARNING level default color (ARGB). */
-    public int diagnosticWarningColor;
-    /** Diagnostic decoration INFO level default color (ARGB). */
-    public int diagnosticInfoColor;
-    /** Diagnostic decoration HINT level default color (ARGB). */
-    public int diagnosticHintColor;
+    /** Diagnostic decoration ERROR level default color. */
+    public Color diagnosticErrorColor;
+    /** Diagnostic decoration WARNING level default color. */
+    public Color diagnosticWarningColor;
+    /** Diagnostic decoration INFO level default color. */
+    public Color diagnosticInfoColor;
+    /** Diagnostic decoration HINT level default color. */
+    public Color diagnosticHintColor;
 
-    /** Linked editing active tab stop border color (ARGB). */
-    public int linkedEditingActiveColor;
-    /** Linked editing inactive tab stop border color (ARGB). */
-    public int linkedEditingInactiveColor;
+    /** Linked editing active tab stop border color. */
+    public Color linkedEditingActiveColor;
+    /** Linked editing inactive tab stop border color. */
+    public Color linkedEditingInactiveColor;
 
-    /** Bracket match highlight border color (ARGB, golden tone). */
-    public int bracketHighlightBorderColor;
-    /** Bracket match highlight background color (ARGB, semi-transparent). */
-    public int bracketHighlightBgColor;
+    /** Bracket match highlight border color (golden tone). */
+    public Color bracketHighlightBorderColor;
+    /** Bracket match highlight background color, typically with alpha. */
+    public Color bracketHighlightBgColor;
 
     /**
      * Theme text style mapping (extensible).
@@ -97,89 +118,99 @@ public class EditorTheme {
     }
 
     /**
-     * Create dark theme (VSCode Dark+ style).
+     * Create refined dark theme preset.
      */
     public static EditorTheme dark() {
         EditorTheme t = new EditorTheme();
-        t.backgroundColor          = 0xFF1E1E1E;
-        t.textColor                = 0xFFD4D4D4;
-        t.cursorColor              = 0xFFAEAFAD;
-        t.selectionColor           = 0x99264F78;
-        t.lineNumberColor          = 0xFF858585;
-        t.currentLineColor         = 0x15FFFFFF;
-        t.guideColor               = 0x33FFFFFF;
-        t.separatorLineColor       = 0xFF6A9955;
-        t.splitLineColor           = 0x33FFFFFF;
-        t.scrollbarTrackColor      = 0x48FFFFFF;
-        t.scrollbarThumbColor      = 0xAA858585;
-        t.compositionUnderlineColor = 0xFFFFCC00;
-        t.inlayHintBgColor         = 0x20FFFFFF;
-        t.inlayHintTextColor       = 0x80D4D4D4;
-        t.foldPlaceholderBgColor   = 0x64FFFFFF;
-        t.foldPlaceholderTextColor = 0xA0D4D4D4;
-        t.phantomTextColor         = 0x80D4D4D4;
-        t.inlayHintIconColor       = 0xB2D4D4D4;
-        t.diagnosticErrorColor     = 0xFFFF0000;
-        t.diagnosticWarningColor   = 0xFFFFCC00;
-        t.diagnosticInfoColor      = 0xFF61B5ED;
-        t.diagnosticHintColor      = 0xB3999999;
-        t.linkedEditingActiveColor  = 0xCC569CD6;
-        t.linkedEditingInactiveColor = 0x66569CD6;
-        t.bracketHighlightBorderColor = 0xCCFFD700;
-        t.bracketHighlightBgColor     = 0x30FFD700;
-        // VSCode Dark+ syntax highlighting presets
-        t.defineTextStyle(1, new TextStyle(0xFFC678DD, 1));  // keyword      - purple, bold
-        t.defineTextStyle(2, new TextStyle(0xFF56B6C2, 0));  // type         - cyan
-        t.defineTextStyle(3, new TextStyle(0xFFCE9178, 0));  // string       - orange
-        t.defineTextStyle(4, new TextStyle(0xFF6A9955, 2));  // comment      - green, italic
-        t.defineTextStyle(5, new TextStyle(0xFFD19A66, 0));  // preprocessor - orange-yellow
-        t.defineTextStyle(6, new TextStyle(0xFF61AFEF, 0));  // function     - blue
-        t.defineTextStyle(7, new TextStyle(0xFFB5CEA8, 0));  // number       - light green
-        t.defineTextStyle(8, new TextStyle(0xFFE5C07B, 1));  // class        - yellow, bold
+        t.backgroundColor           = argb(0xFF1B1E24);
+        t.textColor                 = argb(0xFFD7DEE9);
+        t.cursorColor               = argb(0xFF8FB8FF);
+        t.selectionColor            = argb(0x553B4F72);
+        t.lineNumberColor           = argb(0xFF5E6778);
+        t.currentLineColor          = argb(0x163A4A66);
+        t.guideColor                = argb(0x2E56617A);
+        t.separatorLineColor        = argb(0xFF4A8F7A);
+        t.splitLineColor            = argb(0x3356617A);
+        t.scrollbarTrackColor       = argb(0x2AFFFFFF);
+        t.scrollbarThumbColor       = argb(0x9A7282A0);
+        t.compositionUnderlineColor = argb(0xFF7AA2F7);
+        t.inlayHintBgColor          = argb(0x223A4A66);
+        t.inlayHintTextColor        = argb(0xC0AFC2E0);
+        t.foldPlaceholderBgColor    = argb(0x28405066);
+        t.foldPlaceholderTextColor  = argb(0xC0AFC2E0);
+        t.phantomTextColor          = argb(0x8AA3B5D1);
+        t.inlayHintIconColor        = argb(0xCC9CB0CD);
+        t.diagnosticErrorColor      = argb(0xFFF7768E);
+        t.diagnosticWarningColor    = argb(0xFFE0AF68);
+        t.diagnosticInfoColor       = argb(0xFF7DCFFF);
+        t.diagnosticHintColor       = argb(0xFF8FA3BF);
+        t.linkedEditingActiveColor   = argb(0xCC7AA2F7);
+        t.linkedEditingInactiveColor = argb(0x667AA2F7);
+        t.bracketHighlightBorderColor = argb(0xCC9ECE6A);
+        t.bracketHighlightBgColor     = argb(0x2A9ECE6A);
+
+        t.defineTextStyle(STYLE_KEYWORD, new TextStyle(0xFF7AA2F7, TextStyle.BOLD));
+        t.defineTextStyle(STYLE_STRING, new TextStyle(0xFF9ECE6A, TextStyle.NORMAL));
+        t.defineTextStyle(STYLE_COMMENT, new TextStyle(0xFF7A8294, TextStyle.ITALIC));
+        t.defineTextStyle(STYLE_NUMBER, new TextStyle(0xFFFF9E64, TextStyle.NORMAL));
+        t.defineTextStyle(STYLE_BUILTIN, new TextStyle(0xFF7DCFFF, TextStyle.NORMAL));
+        t.defineTextStyle(STYLE_TYPE, new TextStyle(0xFFBB9AF7, TextStyle.NORMAL));
+        t.defineTextStyle(STYLE_CLASS, new TextStyle(0xFFE0AF68, TextStyle.BOLD));
+        t.defineTextStyle(STYLE_FUNCTION, new TextStyle(0xFF73DACA, TextStyle.NORMAL));
+        t.defineTextStyle(STYLE_VARIABLE, new TextStyle(0xFFD7DEE9, TextStyle.NORMAL));
+        t.defineTextStyle(STYLE_ANNOTATION, new TextStyle(0xFF2AC3DE, TextStyle.NORMAL));
+        t.defineTextStyle(STYLE_PREPROCESSOR, new TextStyle(0xFFF7768E, TextStyle.NORMAL));
         return t;
     }
 
     /**
-     * Create light theme (VSCode Light+ style).
+     * Create refined light theme preset.
      */
     public static EditorTheme light() {
         EditorTheme t = new EditorTheme();
-        t.backgroundColor          = 0xFFFFFFFF;
-        t.textColor                = 0xFF000000;
-        t.cursorColor              = 0xFF000000;
-        t.selectionColor           = 0x99ADD6FF;
-        t.lineNumberColor          = 0xFF237893;
-        t.currentLineColor         = 0x15000000;
-        t.guideColor               = 0x33000000;
-        t.separatorLineColor       = 0xFF008000;
-        t.splitLineColor           = 0x33000000;
-        t.scrollbarTrackColor      = 0x48000000;
-        t.scrollbarThumbColor      = 0xAA237893;
-        t.compositionUnderlineColor = 0xFF0066FF;
-        t.inlayHintBgColor         = 0x20000000;
-        t.inlayHintTextColor       = 0x80000000;
-        t.foldPlaceholderBgColor   = 0x64000000;
-        t.foldPlaceholderTextColor = 0xA0000000;
-        t.phantomTextColor         = 0x80000000;
-        t.inlayHintIconColor       = 0xB2000000;
-        t.diagnosticErrorColor     = 0xFFFF0000;
-        t.diagnosticWarningColor   = 0xFFFFCC00;
-        t.diagnosticInfoColor      = 0xFF61B5ED;
-        t.diagnosticHintColor      = 0xB3999999;
-        t.linkedEditingActiveColor  = 0xCC0066FF;
-        t.linkedEditingInactiveColor = 0x660066FF;
-        t.bracketHighlightBorderColor = 0xCCB8860B;
-        t.bracketHighlightBgColor     = 0x30B8860B;
-        // VSCode Light+ syntax highlighting presets
-        t.defineTextStyle(1, new TextStyle(0xFF0000FF, 0));  // keyword      - blue
-        t.defineTextStyle(2, new TextStyle(0xFF267F99, 0));  // type         - dark cyan
-        t.defineTextStyle(3, new TextStyle(0xFFA31515, 0));  // string       - red
-        t.defineTextStyle(4, new TextStyle(0xFF008000, 2));  // comment      - green, italic
-        t.defineTextStyle(5, new TextStyle(0xFF795E26, 0));  // preprocessor - brown
-        t.defineTextStyle(6, new TextStyle(0xFF795E26, 0));  // function     - brown
-        t.defineTextStyle(7, new TextStyle(0xFF098658, 0));  // number       - dark green
-        t.defineTextStyle(8, new TextStyle(0xFF267F99, 1));  // class        - dark cyan, bold
+        t.backgroundColor           = argb(0xFFFAFBFD);
+        t.textColor                 = argb(0xFF1F2937);
+        t.cursorColor               = argb(0xFF2563EB);
+        t.selectionColor            = argb(0x4D60A5FA);
+        t.lineNumberColor           = argb(0xFF8A94A6);
+        t.currentLineColor          = argb(0x120D3B66);
+        t.guideColor                = argb(0x2229426B);
+        t.separatorLineColor        = argb(0xFF2F855A);
+        t.splitLineColor            = argb(0x1F29426B);
+        t.scrollbarTrackColor       = argb(0x1F2A3B55);
+        t.scrollbarThumbColor       = argb(0x80446C9C);
+        t.compositionUnderlineColor = argb(0xFF2563EB);
+        t.inlayHintBgColor          = argb(0x143B82F6);
+        t.inlayHintTextColor        = argb(0xB0344A73);
+        t.foldPlaceholderBgColor    = argb(0x1A7A8CA8);
+        t.foldPlaceholderTextColor  = argb(0xC0354A6B);
+        t.phantomTextColor          = argb(0x8A4B607E);
+        t.inlayHintIconColor        = argb(0xB04B607E);
+        t.diagnosticErrorColor      = argb(0xFFDC2626);
+        t.diagnosticWarningColor    = argb(0xFFD97706);
+        t.diagnosticInfoColor       = argb(0xFF0EA5E9);
+        t.diagnosticHintColor       = argb(0xFF64748B);
+        t.linkedEditingActiveColor   = argb(0xCC2563EB);
+        t.linkedEditingInactiveColor = argb(0x662563EB);
+        t.bracketHighlightBorderColor = argb(0xCC0F766E);
+        t.bracketHighlightBgColor     = argb(0x260F766E);
+
+        t.defineTextStyle(STYLE_KEYWORD, new TextStyle(0xFF3559D6, TextStyle.BOLD));
+        t.defineTextStyle(STYLE_STRING, new TextStyle(0xFF0F7B6C, TextStyle.NORMAL));
+        t.defineTextStyle(STYLE_COMMENT, new TextStyle(0xFF7B8798, TextStyle.ITALIC));
+        t.defineTextStyle(STYLE_NUMBER, new TextStyle(0xFFB45309, TextStyle.NORMAL));
+        t.defineTextStyle(STYLE_BUILTIN, new TextStyle(0xFF006E7F, TextStyle.NORMAL));
+        t.defineTextStyle(STYLE_TYPE, new TextStyle(0xFF6D28D9, TextStyle.NORMAL));
+        t.defineTextStyle(STYLE_CLASS, new TextStyle(0xFF9A3412, TextStyle.BOLD));
+        t.defineTextStyle(STYLE_FUNCTION, new TextStyle(0xFF0E7490, TextStyle.NORMAL));
+        t.defineTextStyle(STYLE_VARIABLE, new TextStyle(0xFF1F2937, TextStyle.NORMAL));
+        t.defineTextStyle(STYLE_ANNOTATION, new TextStyle(0xFF0F766E, TextStyle.NORMAL));
+        t.defineTextStyle(STYLE_PREPROCESSOR, new TextStyle(0xFFBE123C, TextStyle.NORMAL));
         return t;
+    }
+
+    private static Color argb(int argb) {
+        return new Color(argb, true);
     }
 }
 
