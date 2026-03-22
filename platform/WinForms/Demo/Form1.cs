@@ -530,7 +530,6 @@ namespace Demo {
 				engine.RegisterStyleName("method", (int)EditorTheme.STYLE_FUNCTION);
 				engine.RegisterStyleName("function", (int)EditorTheme.STYLE_FUNCTION);
 				engine.RegisterStyleName("variable", (int)EditorTheme.STYLE_VARIABLE);
-				engine.RegisterStyleName("identifier", (int)EditorTheme.STYLE_VARIABLE);
 				engine.RegisterStyleName("field", (int)EditorTheme.STYLE_VARIABLE);
 				engine.RegisterStyleName("number", (int)EditorTheme.STYLE_NUMBER);
 				engine.RegisterStyleName("class", (int)EditorTheme.STYLE_CLASS);

@@ -20,12 +20,13 @@ public class EditorTheme {
     public static final int STYLE_CLASS = 7;
     public static final int STYLE_FUNCTION = 8;
     public static final int STYLE_VARIABLE = 9;
-    public static final int STYLE_ANNOTATION = 10;
-    public static final int STYLE_PREPROCESSOR = 11;
+    public static final int STYLE_PUNCTUATION = 10;
+    public static final int STYLE_ANNOTATION = 11;
+    public static final int STYLE_PREPROCESSOR = 12;
     /**
      * Base style ID reserved for application-defined/custom text styles.
      * <p>
-     * Built-in styles in this library currently occupy low IDs (1..11). To avoid collisions with
+     * Built-in styles in this library currently occupy low IDs (1..12). To avoid collisions with
      * current/future built-in style IDs and keep style IDs portable across all platform bindings,
      * allocate custom style IDs starting from {@code STYLE_USER_BASE} and above.
      */
@@ -158,6 +159,7 @@ public class EditorTheme {
         t.defineTextStyle(STYLE_CLASS, new TextStyle(0xFFE0AF68, TextStyle.BOLD));
         t.defineTextStyle(STYLE_FUNCTION, new TextStyle(0xFF73DACA, TextStyle.NORMAL));
         t.defineTextStyle(STYLE_VARIABLE, new TextStyle(0xFFD7DEE9, TextStyle.NORMAL));
+        t.defineTextStyle(STYLE_PUNCTUATION, new TextStyle(0xFFB0BED3, TextStyle.NORMAL));
         t.defineTextStyle(STYLE_ANNOTATION, new TextStyle(0xFF2AC3DE, TextStyle.NORMAL));
         t.defineTextStyle(STYLE_PREPROCESSOR, new TextStyle(0xFFF7768E, TextStyle.NORMAL));
         return t;
@@ -206,6 +208,7 @@ public class EditorTheme {
         t.defineTextStyle(STYLE_CLASS, new TextStyle(0xFF9A3412, TextStyle.BOLD));
         t.defineTextStyle(STYLE_FUNCTION, new TextStyle(0xFF0E7490, TextStyle.NORMAL));
         t.defineTextStyle(STYLE_VARIABLE, new TextStyle(0xFF1F2937, TextStyle.NORMAL));
+        t.defineTextStyle(STYLE_PUNCTUATION, new TextStyle(0xFF6E82A0, TextStyle.NORMAL));
         t.defineTextStyle(STYLE_ANNOTATION, new TextStyle(0xFF0F766E, TextStyle.NORMAL));
         t.defineTextStyle(STYLE_PREPROCESSOR, new TextStyle(0xFFBE123C, TextStyle.NORMAL));
         return t;

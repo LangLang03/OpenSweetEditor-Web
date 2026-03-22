@@ -94,11 +94,12 @@ namespace SweetEditor {
 		public const uint STYLE_CLASS = 7;
 		public const uint STYLE_FUNCTION = 8;
 		public const uint STYLE_VARIABLE = 9;
-		public const uint STYLE_ANNOTATION = 10;
-		public const uint STYLE_PREPROCESSOR = 11;
+		public const uint STYLE_PUNCTUATION = 10;
+		public const uint STYLE_ANNOTATION = 11;
+		public const uint STYLE_PREPROCESSOR = 12;
 		/// <summary>
 		/// Base style ID reserved for application-defined/custom text styles.
-		/// Built-in styles in this library currently use low IDs (1..11); to avoid conflicts
+		/// Built-in styles in this library currently use low IDs (1..12); to avoid conflicts
 		/// with current/future built-in IDs and keep style IDs consistent across platform bindings,
 		/// allocate custom style IDs starting from <see cref="STYLE_USER_BASE"/> and above.
 		/// </summary>
@@ -225,6 +226,7 @@ namespace SweetEditor {
 				[STYLE_CLASS] = new TextStyle(unchecked((int)0xFFE0AF68), 1),
 				[STYLE_FUNCTION] = new TextStyle(unchecked((int)0xFF73DACA), 0),
 				[STYLE_VARIABLE] = new TextStyle(unchecked((int)0xFFD7DEE9), 0),
+				[STYLE_PUNCTUATION] = new TextStyle(unchecked((int)0xFFB0BED3), 0),
 				[STYLE_ANNOTATION] = new TextStyle(unchecked((int)0xFF2AC3DE), 0),
 				[STYLE_PREPROCESSOR] = new TextStyle(unchecked((int)0xFFF7768E), 0),
 			},
@@ -270,6 +272,7 @@ namespace SweetEditor {
 				[STYLE_CLASS] = new TextStyle(unchecked((int)0xFF9A3412), 1),
 				[STYLE_FUNCTION] = new TextStyle(unchecked((int)0xFF0E7490), 0),
 				[STYLE_VARIABLE] = new TextStyle(unchecked((int)0xFF1F2937), 0),
+				[STYLE_PUNCTUATION] = new TextStyle(unchecked((int)0xFF6E82A0), 0),
 				[STYLE_ANNOTATION] = new TextStyle(unchecked((int)0xFF0F766E), 0),
 				[STYLE_PREPROCESSOR] = new TextStyle(unchecked((int)0xFFBE123C), 0),
 			},

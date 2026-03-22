@@ -507,7 +507,6 @@ public class DemoDecorationProvider implements DecorationProvider {
         engine.registerStyleName("method", STYLE_FUNCTION);
         engine.registerStyleName("function", STYLE_FUNCTION);
         engine.registerStyleName("variable", STYLE_VARIABLE);
-        engine.registerStyleName("identifier", STYLE_VARIABLE);
         engine.registerStyleName("field", STYLE_VARIABLE);
         engine.registerStyleName("number", STYLE_NUMBER);
         engine.registerStyleName("class", STYLE_CLASS);
