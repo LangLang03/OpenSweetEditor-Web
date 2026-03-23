@@ -83,3 +83,39 @@ SweetEditorSwiftUIViewiOS(
     }
 )
 ```
+
+## Runtime settings
+
+Use `settings` as the preferred entry point for runtime editor configuration. This matches the Android-side design where runtime behavior is centralized in `EditorSettings`, while theme and language configuration stay on their own APIs.
+
+### macOS AppKit
+
+```swift
+let editor = SweetEditorViewMacOS(frame: .zero)
+editor.settings.setScale(1.1)
+editor.settings.setWrapMode(.wordBreak)
+editor.settings.setLineSpacing(add: 1.0, mult: 1.2)
+editor.settings.setReadOnly(false)
+editor.settings.setMaxGutterIcons(2)
+
+editor.applyTheme(.dark())
+editor.setLanguageConfiguration(swiftConfig)
+```
+
+### iOS UIKit
+
+```swift
+let editor = SweetEditorViewiOS(frame: .zero)
+editor.settings.setScale(1.1)
+editor.settings.setWrapMode(.wordBreak)
+editor.settings.setLineSpacing(add: 1.0, mult: 1.2)
+editor.settings.setReadOnly(false)
+editor.settings.setMaxGutterIcons(2)
+
+editor.applyTheme(.dark())
+editor.setLanguageConfiguration(swiftConfig)
+```
+
+### Compatibility note
+
+Legacy setters such as `setScale(_:)`, `setWrapMode(_:)`, and `setReadOnly(_:)` remain available for compatibility, but they now forward into `settings`. Prefer `settings` for new integration code.

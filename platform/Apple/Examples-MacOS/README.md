@@ -31,3 +31,18 @@ swift run SweetEditorMacDemoSwiftUI
 1. Open `platform/Apple/Examples-MacOS/Package.swift` in Xcode.
 2. Select either the `SweetEditorMacDemo` (AppKit) or `SweetEditorMacDemoSwiftUI` (SwiftUI) scheme.
 3. Run (`⌘R`).
+
+## Recommended runtime configuration style
+
+Prefer the centralized `settings` API for runtime behavior changes:
+
+```swift
+let editor = SweetEditorViewMacOS(frame: .zero)
+editor.settings.setScale(1.1)
+editor.settings.setWrapMode(.wordBreak)
+editor.settings.setLineSpacing(add: 1.0, mult: 1.2)
+editor.settings.setReadOnly(false)
+editor.settings.setMaxGutterIcons(2)
+```
+
+Use `applyTheme(_:)` for theme changes and `setLanguageConfiguration(_:)` for language metadata. Legacy setters remain available, but new demo code should prefer `settings`.
