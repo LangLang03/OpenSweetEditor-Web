@@ -9,6 +9,19 @@
 
 ---
 
+## AI/Vibe Coding Declaration (required)
+
+- [ ] No AI-generated code
+- [ ] AI-assisted reference only
+- [ ] Partial AI-generated code
+- [ ] Vibe coding (fully AI-generated)
+
+**AI tool used (if applicable):**
+
+> Fill in here (e.g., GitHub Copilot, ChatGPT, Claude, etc.)
+
+---
+
 ## Change Type (select one)
 
 - [ ] `feat` New feature

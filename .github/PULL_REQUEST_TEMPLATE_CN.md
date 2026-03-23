@@ -9,6 +9,19 @@
 
 ---
 
+## AI/Vibe Coding 声明 (必选)
+
+- [ ] 无 AI 生成代码
+- [ ] AI 辅助参考
+- [ ] 部分 AI 生成代码
+- [ ] Vibe coding (完全由 AI 完成)
+
+**使用的 AI 工具 (如有):**
+
+> 在此填写 (如: GitHub Copilot, ChatGPT, Claude 等)
+
+---
+
 ## 变更分类 (必选其一)
 
 - [ ] `feat` 新功能
