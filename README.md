@@ -39,13 +39,19 @@ It is well suited for long-term evolving editor infrastructure in IDEs, AI progr
 | Platform SDK | Status | Rendering Technology | UI Framework |
 | --- | --- | --- | --- |
 | Android (official, [repo](./platform/Android)) | ✅ Implemented | Canvas + Paint | Android View |
-| Android Compose | ❌ Pending | - | Compose |
 | iOS (official, [repo](./platform/Apple)) | ✅ Implemented | CoreText + CoreGraphics | UIKit (wrapped) / SwiftUI (being refined) |
 | macOS (official, [repo](./platform/Apple)) | ✅ Implemented | CoreText + CoreGraphics | AppKit (wrapped) / SwiftUI (being refined) |
 | Windows (official, [repo](./platform/WinForms)) | ✅ Implemented | GDI+ | WinForms |
 | Swing (official, [repo](./platform/Swing)) | ✅ Implemented | Java2D | Swing |
 | Web (official, [repo](./platform/Emscripten)) | 🚧 In Progress | - | - |
 | OHOS (official, [repo](./platform/OHOS)) | 🚧 In Progress | - | - |
+| Flutter | 🚧 In Progress | - | Flutter |
+| Android Compose | ❌ Pending | - | Compose |
+| Qt | ❌ Pending | - | Qt |
+| Compose Multiplatform | ❌ Pending | - | Compose |
+| C# Avalonia UI | ❌ Pending | - | - |
+| C# WinUI | ❌ Pending | - | - |
+
 
 ## Overall Architecture
 

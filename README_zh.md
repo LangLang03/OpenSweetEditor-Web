@@ -39,13 +39,18 @@ SweetEditor 是一套跨平台代码编辑器内核，面向需要在 Android、
 | 平台SDK | 状态 | 渲染技术 | UI框架 |
 |---|---|---|---|
 | Android（官方，[仓库](./platform/Android)） | ✅ 已实现 | Canvas + Paint | Android View |
-| Android Compose | ❌ 待实现 | - | Compose |
 | iOS（官方，[仓库](./platform/Apple)） | ✅ 已实现 | CoreText + CoreGraphics | UIKit（已封装） / SwiftUI（正在完善） |
 | macOS（官方，[仓库](./platform/Apple)） | ✅ 已实现 | CoreText + CoreGraphics | AppKit（已封装） / SwiftUI（正在完善） |
 | Windows（官方，[仓库](./platform/WinForms)） | ✅ 已实现 | GDI+ | WinForms |
 | Swing（官方，[仓库](./platform/Swing)） | ✅ 已实现 | Java2D | Swing |
 | Web（官方，[仓库](./platform/Emscripten)） | 🚧 进行中 | - | - |
 | OHOS（官方，[仓库](./platform/OHOS)） | 🚧 进行中 | - | - |
+| Flutter | 🚧 进行中 | - | Flutter |
+| Android Compose | ❌ 待实现 | - | Compose |
+| Qt | ❌ 待实现 | - | Qt |
+| Compose Multiplatform | ❌ 待实现 | - | Compose |
+| C# Avalonia UI | ❌ 待实现 | - | - |
+| C# WinUI | ❌ 待实现 | - | - |
 
 ## 整体架构
 
