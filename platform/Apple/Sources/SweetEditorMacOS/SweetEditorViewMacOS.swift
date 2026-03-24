@@ -642,7 +642,7 @@ public class SweetEditorViewMacOS: NSView, NSTextInputClient, CompletionEditorAc
     func applyTheme(_ theme: EditorTheme) {
         let bgColor = EditorRenderer.applyTheme(theme, core: editorCore)
         layer?.backgroundColor = bgColor
-        rehighlightAndRedraw()
+        rebuildAndRedraw()
     }
 
     public func applyTheme(isDark: Bool) {
