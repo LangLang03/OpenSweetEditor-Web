@@ -508,11 +508,11 @@ public class SweetEditorViewMacOS: NSView, NSTextInputClient, CompletionEditorAc
 
     // MARK: - EditorMetadata
 
-    func setMetadata<T: EditorMetadata>(_ metadata: T?) {
+    public func setMetadata<T: EditorMetadata>(_ metadata: T?) {
         self.metadata = metadata
     }
 
-    func getMetadata<T: EditorMetadata>() -> T? {
+    public func getMetadata<T: EditorMetadata>() -> T? {
         return metadata as? T
     }
 

@@ -80,10 +80,15 @@ private final class DemoRootView: NSView {
     private let toolbarScrollView = NSScrollView(frame: .zero)
     private let toolbarStack = NSStackView(frame: .zero)
     private let statusLabel = NSTextField(labelWithString: "Ready")
+    private let fileLabel = NSTextField(labelWithString: "File")
+    private let filePicker = NSPopUpButton(frame: .zero, pullsDown: false)
 
     private var wrapModePreset = 0
     private var isDarkTheme = true
     private var decorationFeatureByIdentifier: [NSUserInterfaceItemIdentifier: DemoDecorationFeature] = [:]
+    private var fileSelectionController = DemoFileSelectionController(
+        sampleFiles: DemoSampleSupport.availableSampleFiles()
+    )
 
     private let decorationFeatureItems: [(title: String, feature: DemoDecorationFeature)] = [
         ("Inlay", .inlayHints),
@@ -127,6 +132,8 @@ private final class DemoRootView: NSView {
         toolbarScrollView.translatesAutoresizingMaskIntoConstraints = false
         toolbarStack.translatesAutoresizingMaskIntoConstraints = false
         statusLabel.translatesAutoresizingMaskIntoConstraints = false
+        fileLabel.translatesAutoresizingMaskIntoConstraints = false
+        filePicker.translatesAutoresizingMaskIntoConstraints = false
         editorView.translatesAutoresizingMaskIntoConstraints = false
 
         titleLabel.textColor = .secondaryLabelColor
@@ -168,6 +175,14 @@ private final class DemoRootView: NSView {
         statusLabel.font = .systemFont(ofSize: 12)
         statusLabel.textColor = .secondaryLabelColor
         statusLabel.lineBreakMode = .byTruncatingTail
+
+        fileLabel.font = .systemFont(ofSize: 12)
+        fileLabel.textColor = .secondaryLabelColor
+
+        filePicker.font = .systemFont(ofSize: 12)
+        filePicker.target = self
+        filePicker.action = #selector(fileSelectionChanged(_:))
+        filePicker.widthAnchor.constraint(greaterThanOrEqualToConstant: 180).isActive = true
 
         addSubview(headerView)
         addSubview(divider)
@@ -222,10 +237,18 @@ private final class DemoRootView: NSView {
         editorView.applyTheme(isDark: true)
         editorView.addCompletionProvider(demoCompletionProvider)
         editorView.addDecorationProvider(demoDecorationProvider)
-        let sampleText = DemoSampleSupport.loadSampleText()
-        editorView.loadDocument(text: sampleText)
+        configureFilePicker()
+        loadSelectedFileIntoEditor(showStatus: false)
         applyAllDecorations(showStatus: false)
-        updateStatus("Ready")
+        updateStatus(fileSelectionController?.statusText ?? "Ready")
+    }
+
+    @objc
+    private func fileSelectionChanged(_ sender: NSPopUpButton) {
+        guard let title = sender.selectedItem?.title else { return }
+        _ = fileSelectionController?.selectFile(named: title)
+        loadSelectedFileIntoEditor(showStatus: true)
+        applyAllDecorations(showStatus: false)
     }
 
     @objc
@@ -267,6 +290,9 @@ private final class DemoRootView: NSView {
             toolbarStack.addArrangedSubview(makeToolbarButton(title: title, handler: handler))
         }
 
+        toolbarStack.addArrangedSubview(makeToolbarSeparator())
+        toolbarStack.addArrangedSubview(fileLabel)
+        toolbarStack.addArrangedSubview(filePicker)
         toolbarStack.addArrangedSubview(makeToolbarSeparator())
 
         for item in decorationFeatureItems {
@@ -384,6 +410,25 @@ private final class DemoRootView: NSView {
 
     private func updateThemeLabel(isDark: Bool) {
         themeLabel.stringValue = isDark ? "Dark Theme" : "Light Theme"
+    }
+
+    private func configureFilePicker() {
+        filePicker.removeAllItems()
+        let titles = fileSelectionController?.fileTitles ?? []
+        filePicker.addItems(withTitles: titles)
+        if let selectedTitle = fileSelectionController?.selectedFile.fileName {
+            filePicker.selectItem(withTitle: selectedTitle)
+        }
+        filePicker.isEnabled = !titles.isEmpty
+    }
+
+    private func loadSelectedFileIntoEditor(showStatus: Bool) {
+        guard let selectedFile = fileSelectionController?.selectedFile else { return }
+        editorView.setMetadata(fileSelectionController?.currentMetadata)
+        editorView.loadDocument(text: selectedFile.text)
+        if showStatus {
+            updateStatus(fileSelectionController?.statusText ?? "Ready")
+        }
     }
 
     private final class ToolbarButton: NSButton {

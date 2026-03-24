@@ -15,4 +15,4 @@ import Foundation
 /// editorCore.metadata = FileMetadata(filePath: "/a/b.cpp")
 /// let file = editorCore.metadata as? FileMetadata
 /// ```
-protocol EditorMetadata: AnyObject {}
+public protocol EditorMetadata: AnyObject {}

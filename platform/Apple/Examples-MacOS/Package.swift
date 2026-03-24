@@ -39,6 +39,7 @@ let package = Package(
             name: "SweetEditorMacDemoTests",
             dependencies: [
                 "SweetEditorMacDemo",
+                "SweetEditorDemoSupport",
             ]
         ),
     ],
