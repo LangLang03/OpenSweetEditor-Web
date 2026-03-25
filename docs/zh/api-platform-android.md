@@ -121,6 +121,24 @@ public void flush()
 
 `flush()` 用于提交待处理更新（装饰 / 布局 / 滚动 / 选区）并触发重绘。装饰批量更新时，建议在最后手动调用一次 `flush()`。
 
+### 补全触发规则
+
+- 手动触发：`triggerCompletion()` 走 `CompletionContext.TriggerKind.INVOKED`。
+- 快捷键触发：`Ctrl + Space` 最终会调用 `triggerCompletion()`，同样走 `INVOKED`。
+- 自动触发入口在文本变更分发（`dispatchTextChanged`）中，且**联动编辑模式**下会跳过自动补全触发。
+- 当主变更是单字符输入时：
+  - 若字符命中任一 Provider 的 trigger character，触发 `CHARACTER`，并携带 `triggerCharacter`。
+  - 若补全面板当前已显示，触发 `RETRIGGER`。
+  - 若字符是字母/数字/`_`，触发 `INVOKED`。
+- 当主变更不是单字符输入时：
+  - 若补全面板当前已显示，触发 `RETRIGGER`。
+- Completion Manager 内置防抖：
+  - `INVOKED`：0ms（立即触发）
+  - `CHARACTER` / `RETRIGGER`：50ms
+- 面板交互补充：
+  - 键盘：`Up/Down` 切换、`Enter` 确认、`Escape` 关闭。
+  - 手势：`TAP` 或 `SCROLL` 会关闭当前补全面板。
+
 ### 性能调试
 
 ```java
@@ -128,7 +146,26 @@ public void setPerfOverlayEnabled(boolean enabled)
 public boolean isPerfOverlayEnabled()
 ```
 
-启用后会在控件右上角显示 FPS、build/draw/total 耗时、测量统计、最近输入事件耗时等实时信息。默认关闭，仅建议用于调试。
+`setPerfOverlayEnabled(true)` 后，会在编辑区**左上角**显示实时性能面板（默认关闭，仅建议调试使用）。
+
+面板内容（当前实现）：
+
+- `FPS`
+- `Frame: total/build/draw`
+  - 当 `total > 16.6ms` 时标记 `SLOW`
+- `Step: ...`
+  - 渲染分阶段耗时（如 `clear/current/selection/lines/guides/comp/diag/linked/bracket/cursor/handles/gutter/scrollbars`）
+  - 单步骤耗时 `>= 2ms` 会追加 `!`
+- `measure{...}`
+  - 文本测量统计（text/inlay/icon 调用次数、总耗时、最大耗时及部分上下文）
+- `Input[tag]: ...`
+  - 最近一次输入路径耗时（如 `touch`、`key`、`ime-update`、`ime-commit`）
+  - 输入耗时 `> 3ms` 标记 `SLOW`
+
+与日志相关的阈值（当前实现）：
+
+- 输入慢路径：`>= 3ms` 会输出 `[PERF][SLOW]` 输入日志
+- build 慢路径：`>= 8ms` 或测量统计达到阈值，会周期输出 `[PERF][Build]` 日志（默认每 60 帧检查一次）
 
 ### 样式 / 装饰 / 折叠 / 联动编辑
 
@@ -213,3 +250,4 @@ public int getCharIndexFromPosition(TextPosition position)
 - `SeparatorStyle`
 
 字体位标志常量：`com.qiplat.sweeteditor.core.FontStyle`。
+
