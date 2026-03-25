@@ -11,6 +11,7 @@ import android.os.Looper;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.SparseArray;
+import android.view.Choreographer;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
@@ -164,6 +165,23 @@ public class SweetEditor extends View {
         }
     };
 
+    // Fling timer: ticks via Choreographer for VSync-aligned inertial scrolling
+    private boolean mFlingActive = false;
+    private final Choreographer.FrameCallback mFlingFrameCallback = new Choreographer.FrameCallback() {
+        @Override
+        public void doFrame(long frameTimeNanos) {
+            if (!mFlingActive) return;
+            EditorCore.GestureResult result = mEditorCore.tickFling();
+            fireGestureEvents(result, null);
+            flush();
+            if (result.needsFling) {
+                Choreographer.getInstance().postFrameCallback(this);
+            } else {
+                mFlingActive = false;
+            }
+        }
+    };
+
     public SweetEditor(Context context) {
         super(context);
         initView(context);
@@ -210,6 +228,14 @@ public class SweetEditor extends View {
         } else if (!result.needsEdgeScroll && mEdgeScrollActive) {
             mEdgeScrollActive = false;
             mHandler.removeCallbacks(mEdgeScrollTick);
+        }
+        // Start/stop fling timer based on C++ core needs_fling flag
+        if (result.needsFling && !mFlingActive) {
+            mFlingActive = true;
+            Choreographer.getInstance().postFrameCallback(mFlingFrameCallback);
+        } else if (!result.needsFling && mFlingActive) {
+            mFlingActive = false;
+            Choreographer.getInstance().removeFrameCallback(mFlingFrameCallback);
         }
         if (ENABLE_PERF_LOG) {
             float ms = (System.nanoTime() - t0) / 1_000_000f;
@@ -304,6 +330,8 @@ public class SweetEditor extends View {
         super.onDetachedFromWindow();
         mHandler.removeCallbacks(mCursorBlink);
         mHandler.removeCallbacks(mTransientScrollbarRefresh);
+        android.view.Choreographer.getInstance().removeFrameCallback(mFlingFrameCallback);
+        mFlingActive = false;
     }
 
     @Override
@@ -314,6 +342,8 @@ public class SweetEditor extends View {
         } else {
             mHandler.removeCallbacks(mCursorBlink);
             mHandler.removeCallbacks(mTransientScrollbarRefresh);
+            android.view.Choreographer.getInstance().removeFrameCallback(mFlingFrameCallback);
+            mFlingActive = false;
         }
     }
 

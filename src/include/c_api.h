@@ -72,6 +72,9 @@ EDITOR_API const U16Char* get_document_line_text(intptr_t document_handle, size_
 ///        f32 touch_slop         — Move threshold for a tap (default 10)
 ///        i64 double_tap_timeout — Time window for double tap (default 300ms)
 ///        i64 long_press_ms      — Long press threshold (default 500ms)
+///        f32 fling_friction     — Fling friction coefficient (default 3.5)
+///        f32 fling_min_velocity — Minimum fling velocity in px/s (default 50)
+///        f32 fling_max_velocity — Maximum fling velocity in px/s (default 8000)
 ///        u64 max_undo_stack_size — Max undo stack depth, 0=unlimited (default 512)
 /// @param options_size Byte length of options_data
 /// @return EditorCore handle
@@ -301,6 +304,8 @@ EDITOR_API const uint8_t* get_layout_metrics(intptr_t editor_handle, size_t* out
 ///    i32 hit_target_color_value
 ///    i32 needs_edge_scroll (1 = platform should start/continue 16ms timer calling
 ///        editor_tick_edge_scroll; 0 = platform should stop the timer)
+///    i32 needs_fling (1 = platform should start/continue per-frame callback calling
+///        editor_tick_fling; 0 = platform should stop the callback)
 ///
 /// Handle gesture event
 /// @param type Event type
@@ -327,6 +332,14 @@ EDITOR_API const uint8_t* handle_editor_gesture_event_ex(intptr_t editor_handle,
 /// When needs_edge_scroll becomes false in the returned payload, stop the timer.
 /// @return GestureResult binary payload
 EDITOR_API const uint8_t* editor_tick_edge_scroll(intptr_t editor_handle, size_t* out_size);
+
+/// Tick fling (inertial scroll) animation.
+/// Call each frame while the previous GestureResult.needs_fling was true.
+/// The core tracks real elapsed time internally; any frame interval is fine.
+/// Returns the same GestureResult binary layout as handle_editor_gesture_event.
+/// When needs_fling becomes false in the returned payload, stop the timer.
+/// @return GestureResult binary payload
+EDITOR_API const uint8_t* editor_tick_fling(intptr_t editor_handle, size_t* out_size);
 
 /// KeyEventResult binary return layout (payload uses native byte order; all supported platforms are currently LE):
 /// 1. i32 handled

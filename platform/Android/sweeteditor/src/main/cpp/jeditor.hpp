@@ -182,13 +182,16 @@ public:
   static jlong makeEditorCore(JNIEnv* env, jclass clazz, jobject measurer, jobject options_buffer, jint options_size) {
     // Zero-copy decode: get direct ByteBuffer address
     EditorOptions editor_options;
-    if (options_buffer != nullptr && options_size >= 28) {
+    if (options_buffer != nullptr && options_size >= 40) {
       auto* data_ptr = reinterpret_cast<const uint8_t*>(env->GetDirectBufferAddress(options_buffer));
       if (data_ptr != nullptr) {
         size_t offset = 0;
         std::memcpy(&editor_options.touch_slop, data_ptr + offset, sizeof(float)); offset += sizeof(float);
         std::memcpy(&editor_options.double_tap_timeout, data_ptr + offset, sizeof(int64_t)); offset += sizeof(int64_t);
         std::memcpy(&editor_options.long_press_ms, data_ptr + offset, sizeof(int64_t)); offset += sizeof(int64_t);
+        std::memcpy(&editor_options.fling_friction, data_ptr + offset, sizeof(float)); offset += sizeof(float);
+        std::memcpy(&editor_options.fling_min_velocity, data_ptr + offset, sizeof(float)); offset += sizeof(float);
+        std::memcpy(&editor_options.fling_max_velocity, data_ptr + offset, sizeof(float)); offset += sizeof(float);
         uint64_t max_undo = 0;
         std::memcpy(&max_undo, data_ptr + offset, sizeof(uint64_t));
         editor_options.max_undo_stack_size = static_cast<size_t>(max_undo);
@@ -236,6 +239,13 @@ public:
     if (handle == 0) return nullptr;
     size_t out_size = 0;
     const uint8_t* payload = editor_tick_edge_scroll(static_cast<intptr_t>(handle), &out_size);
+    return wrapBinaryPayload(env, payload, out_size);
+  }
+
+  static jobject tickFling(JNIEnv* env, jclass clazz, jlong handle) {
+    if (handle == 0) return nullptr;
+    size_t out_size = 0;
+    const uint8_t* payload = editor_tick_fling(static_cast<intptr_t>(handle), &out_size);
     return wrapBinaryPayload(env, payload, out_size);
   }
 
@@ -825,6 +835,7 @@ public:
       {"nativeLoadDocument", "(JJ)V", (void*) loadDocument},
       {"nativeHandleGestureEvent", "(JII[F)Ljava/nio/ByteBuffer;", (void*) handleGestureEvent},
       {"nativeTickEdgeScroll", "(J)Ljava/nio/ByteBuffer;", (void*) tickEdgeScroll},
+      {"nativeTickFling", "(J)Ljava/nio/ByteBuffer;", (void*) tickFling},
       {"nativeOnFontMetricsChanged", "(J)V", (void*) onFontMetricsChanged},
       {"nativeBuildRenderModel", "(J)Ljava/nio/ByteBuffer;", (void*) buildRenderModel},
       {"nativeHandleKeyEvent", "(JILjava/lang/String;I)Ljava/nio/ByteBuffer;", (void*) handleKeyEvent},

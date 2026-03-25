@@ -38,11 +38,11 @@ namespace NS_SWEETEDITOR {
 
 #pragma region [Class: EditorOptions]
   TouchConfig EditorOptions::simpleAsTouchConfig() const {
-    return TouchConfig {touch_slop, double_tap_timeout, long_press_ms};
+    return TouchConfig {touch_slop, double_tap_timeout, long_press_ms, fling_friction, fling_min_velocity, fling_max_velocity};
   }
 
   U8String EditorOptions::dump() const {
-    return "EditorOptions {touch_slop = " + std::to_string(touch_slop) + ", double_tap_timeout = " + std::to_string(double_tap_timeout) + ", long_press_ms = " + std::to_string(long_press_ms) + ", max_undo_stack_size = " + std::to_string(max_undo_stack_size) + "}";
+    return "EditorOptions {touch_slop = " + std::to_string(touch_slop) + ", double_tap_timeout = " + std::to_string(double_tap_timeout) + ", long_press_ms = " + std::to_string(long_press_ms) + ", fling_friction = " + std::to_string(fling_friction) + ", fling_min_velocity = " + std::to_string(fling_min_velocity) + ", fling_max_velocity = " + std::to_string(fling_max_velocity) + ", max_undo_stack_size = " + std::to_string(max_undo_stack_size) + "}";
   }
 
   U8String EditorSettings::dump() const {
@@ -70,6 +70,8 @@ namespace NS_SWEETEDITOR {
     m_gesture_handler_ = makeUPtr<GestureHandler>(options.simpleAsTouchConfig());
     m_text_layout_ = makeUPtr<TextLayout>(measurer, m_decorations_);
     m_undo_manager_ = makeUPtr<UndoManager>(options.max_undo_stack_size);
+    TouchConfig tc = options.simpleAsTouchConfig();
+m_fling_ = makeUPtr<FlingAnimator>(tc);
     LOGD("EditorCore::EditorCore(), options = %s", options.dump().c_str());
   }
 
@@ -607,8 +609,10 @@ namespace NS_SWEETEDITOR {
       return gesture_result;
     }
 
-    // On TOUCH_DOWN / MOUSE_DOWN, check whether the cursor handle was pressed
+    // On TOUCH_DOWN / MOUSE_DOWN: cancel active fling and check handle hit
     if (event.type == EventType::TOUCH_DOWN || event.type == EventType::MOUSE_DOWN) {
+      m_fling_->stop();
+      m_fling_->resetSamples();
       if (!event.points.empty()) {
         m_dragging_handle_ = hitTestHandle(event.points[0]);
       }
@@ -653,6 +657,10 @@ namespace NS_SWEETEDITOR {
     if (event.type == EventType::TOUCH_UP || event.type == EventType::MOUSE_UP
         || event.type == EventType::TOUCH_CANCEL) {
       m_edge_scroll_.active = false;
+      // Attempt to start fling on touch-up if we were scrolling
+      if (event.type == EventType::TOUCH_UP && result.type == GestureType::UNDEFINED && !m_edge_scroll_.active) {
+        m_fling_->start();
+      }
     }
 
     // If TOUCH_DOWN just hit a cursor handle, skip follow-up actions such as TAP
@@ -716,6 +724,9 @@ namespace NS_SWEETEDITOR {
       m_view_state_.scroll_x += result.scroll_x;
       m_view_state_.scroll_y += result.scroll_y;
       markScrollbarInteraction();
+      if (event.type == EventType::TOUCH_MOVE && !event.points.empty()) {
+        m_fling_->recordSample(event.points[0], TimeUtil::milliTime());
+      }
       break;
     case GestureType::FAST_SCROLL: {
       constexpr float kFastScrollMultiplier = 3.0f;
@@ -747,9 +758,44 @@ namespace NS_SWEETEDITOR {
     if (result.type == GestureType::DRAG_SELECT) {
       result.needs_edge_scroll = m_edge_scroll_.active;
     }
+    result.needs_fling = m_fling_->isActive();
 
     LOGD("EditorCore::handleGestureEvent, m_view_state_ = %s", m_view_state_.dump().c_str());
     return result;
+  }
+
+  GestureResult EditorCore::tickFling() {
+    GestureResult result;
+    result.type = GestureType::SCROLL;
+
+    if (!m_fling_->isActive()) {
+      fillGestureResult(result);
+      result.needs_fling = false;
+      return result;
+    }
+
+    float dx = 0, dy = 0;
+    bool still_active = m_fling_->advance(dx, dy);
+
+    // Fling velocity is in screen space (finger direction), scroll is inverted
+    m_view_state_.scroll_x -= dx;
+    m_view_state_.scroll_y -= dy;
+    normalizeScrollState();
+    markScrollbarInteraction();
+
+    if (!still_active) {
+      m_view_state_.scroll_x = std::round(m_view_state_.scroll_x);
+      m_view_state_.scroll_y = std::round(m_view_state_.scroll_y);
+      normalizeScrollState();
+    }
+
+    fillGestureResult(result);
+    result.needs_fling = still_active;
+    return result;
+  }
+
+  void EditorCore::stopFling() {
+    m_fling_->stop();
   }
 
   KeyEventResult EditorCore::handleKeyEvent(const KeyEvent& event) {

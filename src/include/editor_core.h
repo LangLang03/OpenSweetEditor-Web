@@ -28,6 +28,12 @@ namespace NS_SWEETEDITOR {
     int64_t double_tap_timeout {300};
     /// Long press time threshold
     int64_t long_press_ms {500};
+    /// Fling friction coefficient (higher = faster deceleration)
+    float fling_friction {3.5f};
+    /// Minimum fling velocity threshold in pixels/second
+    float fling_min_velocity {50.0f};
+    /// Maximum fling velocity cap in pixels/second
+    float fling_max_velocity {8000.0f};
     /// Max undo stack size (0 = unlimited)
     size_t max_undo_stack_size {512};
 
@@ -260,6 +266,15 @@ namespace NS_SWEETEDITOR {
     /// @return Updated gesture result (platform should redraw; check needs_edge_scroll to decide
     ///         whether to continue the timer)
     GestureResult tickEdgeScroll();
+
+    /// Called by platform each frame while needs_fling is true.
+    /// Advances fling animation using real elapsed time and applies scroll delta.
+    /// @return Updated gesture result (platform should redraw; check needs_fling to decide
+    ///         whether to continue the timer)
+    GestureResult tickFling();
+
+    /// Immediately stop any active fling animation
+    void stopFling();
 
     /// Handle keyboard event (optional default key mapping; platform can bypass and call atomic edit APIs directly)
     /// @param event Keyboard event data
@@ -641,6 +656,7 @@ namespace NS_SWEETEDITOR {
     UPtr<GestureHandler> m_gesture_handler_;
     UPtr<TextLayout> m_text_layout_;
     UPtr<UndoManager> m_undo_manager_;
+    UPtr<FlingAnimator> m_fling_;
     // Cache of render height for each logical line
     HashMap<size_t, float> m_line_heights_;
 

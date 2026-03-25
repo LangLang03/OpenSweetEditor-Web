@@ -246,6 +246,22 @@ public class EditorCore {
         }
     }
 
+    /**
+     * Tick fling (inertial scroll) animation.
+     * Call at ~16ms intervals while the previous GestureResult.needsFling was true.
+     */
+    public GestureResult tickFling() {
+        if (mNativeHandle == 0) {
+            return new GestureResult();
+        }
+        ByteBuffer data = nativeTickFling(mNativeHandle);
+        try {
+            return ProtocolDecoder.decodeGestureResult(data);
+        } finally {
+            nativeFreeBinaryData(data);
+        }
+    }
+
     public KeyEventResult handleKeyEvent(int keyCode, String text, int modifiers) {
         if (mNativeHandle == 0) {
             return new KeyEventResult();
@@ -1543,6 +1559,10 @@ public class EditorCore {
          * Whether the platform should start/continue a ~16ms timer calling tickEdgeScroll().
          */
         public final boolean needsEdgeScroll;
+        /**
+         * Whether the platform should start/continue a ~16ms timer calling tickFling().
+         */
+        public final boolean needsFling;
 
         public GestureResult() {
             this.type = GestureType.UNDEFINED;
@@ -1555,12 +1575,13 @@ public class EditorCore {
             this.viewScale = 1;
             this.hitTarget = HitTarget.NONE;
             this.needsEdgeScroll = false;
+            this.needsFling = false;
         }
 
         public GestureResult(GestureType type, PointF tapPoint,
                              TextPosition cursorPosition, boolean hasSelection, TextRange selection,
                              float viewScrollX, float viewScrollY, float viewScale,
-                             HitTarget hitTarget, boolean needsEdgeScroll) {
+                             HitTarget hitTarget, boolean needsEdgeScroll, boolean needsFling) {
             this.type = type;
             this.tapPoint = tapPoint;
             this.cursorPosition = cursorPosition;
@@ -1571,6 +1592,7 @@ public class EditorCore {
             this.viewScale = viewScale;
             this.hitTarget = hitTarget;
             this.needsEdgeScroll = needsEdgeScroll;
+            this.needsFling = needsFling;
         }
 
         @NonNull
@@ -1658,6 +1680,9 @@ public class EditorCore {
 
     @FastNative
     private static native ByteBuffer nativeTickEdgeScroll(long handle);
+
+    @FastNative
+    private static native ByteBuffer nativeTickFling(long handle);
 
     @FastNative
     private static native ByteBuffer nativeHandleKeyEvent(long handle, int keyCode, String text, int modifiers);

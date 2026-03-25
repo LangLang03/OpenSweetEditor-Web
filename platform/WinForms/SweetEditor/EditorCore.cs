@@ -255,7 +255,7 @@ namespace SweetEditor {
 	/// <summary>
 	/// Construction-time immutable options for EditorCore.
 	/// Fields mirror the C++ EditorOptions struct.
-	/// Binary layout (LE): f32 touch_slop, i64 double_tap_timeout, i64 long_press_ms, u64 max_undo_stack_size
+	/// Binary layout (LE): f32 touch_slop, i64 double_tap_timeout, i64 long_press_ms, f32 fling_friction, f32 fling_min_velocity, f32 fling_max_velocity, u64 max_undo_stack_size
 	/// </summary>
 	public class EditorOptions {
 		/// <summary>Threshold to determine if a gesture is a move (default 10)</summary>
@@ -264,6 +264,12 @@ namespace SweetEditor {
 		public long DoubleTapTimeout { get; set; } = 300;
 		/// <summary>Long press time threshold in ms (default 500)</summary>
 		public long LongPressMs { get; set; } = 500;
+		/// <summary>Fling friction coefficient, higher = faster deceleration (default 3.5)</summary>
+		public float FlingFriction { get; set; } = 3.5f;
+		/// <summary>Minimum fling velocity threshold in px/s (default 50)</summary>
+		public float FlingMinVelocity { get; set; } = 50f;
+		/// <summary>Maximum fling velocity cap in px/s (default 8000)</summary>
+		public float FlingMaxVelocity { get; set; } = 8000f;
 		/// <summary>Max undo stack size, 0 = unlimited (default 512)</summary>
 		public ulong MaxUndoStackSize { get; set; } = 512;
 	}
