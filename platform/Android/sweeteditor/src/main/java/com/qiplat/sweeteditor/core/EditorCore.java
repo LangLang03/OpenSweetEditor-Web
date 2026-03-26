@@ -1604,6 +1604,10 @@ public class EditorCore {
          * frame callback calling tickAnimations() instead of separate tick calls.
          */
         public final boolean needsAnimation;
+        /**
+         * Whether this gesture event is part of a selection handle drag.
+         */
+        public final boolean isHandleDrag;
 
         public GestureResult() {
             this.type = GestureType.UNDEFINED;
@@ -1618,13 +1622,14 @@ public class EditorCore {
             this.needsEdgeScroll = false;
             this.needsFling = false;
             this.needsAnimation = false;
+            this.isHandleDrag = false;
         }
 
         public GestureResult(GestureType type, PointF tapPoint,
                              TextPosition cursorPosition, boolean hasSelection, TextRange selection,
                              float viewScrollX, float viewScrollY, float viewScale,
                              HitTarget hitTarget, boolean needsEdgeScroll, boolean needsFling,
-                             boolean needsAnimation) {
+                             boolean needsAnimation, boolean isHandleDrag) {
             this.type = type;
             this.tapPoint = tapPoint;
             this.cursorPosition = cursorPosition;
@@ -1637,6 +1642,7 @@ public class EditorCore {
             this.needsEdgeScroll = needsEdgeScroll;
             this.needsFling = needsFling;
             this.needsAnimation = needsAnimation;
+            this.isHandleDrag = isHandleDrag;
         }
 
         @NonNull

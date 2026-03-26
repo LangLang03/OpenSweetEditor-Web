@@ -397,6 +397,7 @@ static const uint8_t* gestureResultToBinary(const GestureResult& result, size_t*
   appendI32(buffer, result.needs_edge_scroll ? 1 : 0);
   appendI32(buffer, result.needs_fling ? 1 : 0);
   appendI32(buffer, result.needs_animation ? 1 : 0);
+  appendI32(buffer, result.is_handle_drag ? 1 : 0);
   return allocBinaryPayload(buffer.data(), buffer.size(), out_size);
 }
 

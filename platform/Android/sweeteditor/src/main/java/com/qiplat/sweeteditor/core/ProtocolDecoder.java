@@ -139,8 +139,13 @@ final class ProtocolDecoder {
             needsAnimation = data.getInt() != 0;
         }
 
+        boolean isHandleDrag = false;
+        if (data.remaining() >= 4) {
+            isHandleDrag = data.getInt() != 0;
+        }
+
         return new EditorCore.GestureResult(gestureType, tapPoint,
-                cursorPosition, hasSelection, selection, viewScrollX, viewScrollY, viewScale, hitTarget, needsEdgeScroll, needsFling, needsAnimation);
+                cursorPosition, hasSelection, selection, viewScrollX, viewScrollY, viewScale, hitTarget, needsEdgeScroll, needsFling, needsAnimation, isHandleDrag);
     }
 
     static ScrollMetrics decodeScrollMetrics(@Nullable ByteBuffer data) {

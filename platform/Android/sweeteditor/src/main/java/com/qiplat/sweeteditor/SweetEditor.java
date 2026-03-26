@@ -28,7 +28,6 @@ import java.util.Map;
 
 import com.qiplat.sweeteditor.core.Document;
 import com.qiplat.sweeteditor.core.EditorOptions;
-import com.qiplat.sweeteditor.core.HandleConfig;
 import com.qiplat.sweeteditor.core.EditorCore;
 import com.qiplat.sweeteditor.core.ScrollbarConfig;
 import com.qiplat.sweeteditor.core.adornment.DiagnosticItem;
@@ -78,6 +77,8 @@ import com.qiplat.sweeteditor.event.FoldToggleEvent;
 import com.qiplat.sweeteditor.event.GutterIconClickEvent;
 import com.qiplat.sweeteditor.event.InlayHintClickEvent;
 import com.qiplat.sweeteditor.event.LongPressEvent;
+import com.qiplat.sweeteditor.selection.SelectionMenuController;
+import com.qiplat.sweeteditor.selection.SelectionMenuItemProvider;
 import com.qiplat.sweeteditor.event.ScaleChangedEvent;
 import com.qiplat.sweeteditor.event.ScrollChangedEvent;
 import com.qiplat.sweeteditor.event.SelectionChangedEvent;
@@ -117,6 +118,7 @@ public class SweetEditor extends View {
     private CompletionPopupController mCompletionPopupController;
     private InlineSuggestionController mInlineSuggestionController;
     private NewLineActionProviderManager mNewLineActionProviderManager;
+    private SelectionMenuController mSelectionMenuController;
     @Nullable
     private LanguageConfiguration mLanguageConfiguration;
     @Nullable
@@ -155,7 +157,7 @@ public class SweetEditor extends View {
         public void doFrame(long frameTimeNanos) {
             if (!mAnimationActive) return;
             EditorCore.GestureResult result = mEditorCore.tickAnimations();
-            fireGestureEvents(result, null);
+            fireGestureEvents(result, null, -1);
             flush();
             if (result.needsAnimation) {
                 Choreographer.getInstance().postFrameCallback(this);
@@ -194,7 +196,7 @@ public class SweetEditor extends View {
         EditorCore.GestureResult result = mEditorCore.handleGestureEvent(event);
         Log.d(TAG, "result: " + result);
         PointF screenPoint = new PointF(event.getX(), event.getY());
-        fireGestureEvents(result, screenPoint);
+        fireGestureEvents(result, screenPoint, event.getActionMasked());
         if (result.type == EditorCore.GestureType.TAP) {
             requestFocus();
             if (result.hitTarget == null || result.hitTarget.type == EditorCore.HitTargetType.NONE) {
@@ -276,6 +278,12 @@ public class SweetEditor extends View {
                     model.cursor.position.x, model.cursor.position.y, model.cursor.height);
         }
 
+        if (mSelectionMenuController != null
+                && model.selectionStartHandle != null
+                && model.selectionEndHandle != null) {
+            mSelectionMenuController.updateSelectionHandles(model.selectionStartHandle, model.selectionEndHandle);
+        }
+
         if (needsTransientRefresh) {
             scheduleTransientScrollbarRefresh(TRANSIENT_SCROLLBAR_REFRESH_MIN_MS);
         } else {
@@ -308,6 +316,9 @@ public class SweetEditor extends View {
         mHandler.removeCallbacks(mTransientScrollbarRefresh);
         Choreographer.getInstance().removeFrameCallback(mAnimationFrameCallback);
         mAnimationActive = false;
+        if (mSelectionMenuController != null) {
+            mSelectionMenuController.dismiss();
+        }
     }
 
     @Override
@@ -398,6 +409,10 @@ public class SweetEditor extends View {
 
         if (mCompletionPopupController != null) {
             mCompletionPopupController.applyTheme(theme);
+        }
+
+        if (mSelectionMenuController != null) {
+            mSelectionMenuController.applyTheme(theme);
         }
 
         flush();
@@ -595,6 +610,9 @@ public class SweetEditor extends View {
      */
     public void selectAll() {
         mEditorCore.selectAll();
+        if (mSelectionMenuController != null) {
+            mSelectionMenuController.onSelectAll();
+        }
         flush();
     }
 
@@ -637,6 +655,30 @@ public class SweetEditor extends View {
     @Nullable
     public TextRange getSelection() {
         return mEditorCore.getSelection();
+    }
+
+    /**
+     * Check whether the editor currently has an active selection.
+     *
+     * @return true if text is selected
+     */
+    public boolean hasSelection() {
+        return mEditorCore.getSelection() != null;
+    }
+
+    /**
+     * Set a custom provider for selection menu items.
+     * <p>
+     * The provider is called each time the menu is about to show,
+     * allowing dynamic items based on editor state.
+     * Pass {@code null} to restore the default menu (Cut/Copy/Paste/Select All).
+     *
+     * @param provider custom menu item provider, or null for default
+     */
+    public void setSelectionMenuItemProvider(@Nullable SelectionMenuItemProvider provider) {
+        if (mSelectionMenuController != null) {
+            mSelectionMenuController.setItemProvider(provider);
+        }
     }
 
     /**
@@ -1442,6 +1484,10 @@ public class SweetEditor extends View {
             if (mDecorationProviderManager != null) {
                 mDecorationProviderManager.onTextChanged(editResult.changes);
             }
+            // Hide selection menu on text change
+            if (mSelectionMenuController != null) {
+                mSelectionMenuController.onTextChanged();
+            }
             // Suppress completion trigger during linked editing to avoid conflict with Enter/Tab keys
             if (!mEditorCore.isInLinkedEditing()) {
                 // Completion trigger: based on first change (primary change)
@@ -1506,7 +1552,7 @@ public class SweetEditor extends View {
      * @param result      Gesture processing result
      * @param screenPoint Screen coordinates of touch point
      */
-    private void fireGestureEvents(EditorCore.GestureResult result, PointF screenPoint) {
+    private void fireGestureEvents(EditorCore.GestureResult result, PointF screenPoint, int actionMasked) {
         switch (result.type) {
             case LONG_PRESS:
                 mEventBus.publish(new LongPressEvent(result.cursorPosition, screenPoint));
@@ -1581,10 +1627,18 @@ public class SweetEditor extends View {
                 mEventBus.publish(new ContextMenuEvent(result.cursorPosition, screenPoint));
                 break;
         }
+
+        // Drive selection menu state machine
+        if (mSelectionMenuController != null) {
+            mSelectionMenuController.onGestureResult(result, actionMasked);
+        }
     }
 
     private void dispatchKeyEventResult(@NonNull EditorCore.KeyEventResult result) {
         if (result.contentChanged) {
+            if (mSelectionMenuController != null) {
+                mSelectionMenuController.onTextChanged();
+            }
             if (result.editResult != null && result.editResult.changed && !result.editResult.changes.isEmpty()) {
                 for (EditorCore.TextChange change : result.editResult.changes) {
                     mEventBus.publish(new TextChangedEvent(TextChangeAction.KEY, change.range, change.newText));
@@ -1744,6 +1798,8 @@ public class SweetEditor extends View {
         mCompletionPopupController.setConfirmListener(this::applyCompletionItem);
 
         mInlineSuggestionController = new InlineSuggestionController(context, this);
+
+        mSelectionMenuController = new SelectionMenuController(this, mEventBus, mTheme);
 
         for (Map.Entry<Integer, TextStyle> entry : mTheme.textStyles.entrySet()) {
             TextStyle style = entry.getValue();
