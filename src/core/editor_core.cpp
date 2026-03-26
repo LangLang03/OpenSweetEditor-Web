@@ -126,9 +126,14 @@ m_fling_ = makeUPtr<FlingAnimator>(tc);
   }
 #pragma region [Appearance-Font]
   void EditorCore::setViewport(const Viewport& viewport) {
+    PERF_TIMER("setViewport");
+    bool width_changed = (m_viewport_.width != viewport.width);
+    LOGW("setViewport: old=%s new=%s widthChanged=%d", m_viewport_.dump().c_str(), viewport.dump().c_str(), width_changed);
     m_viewport_ = viewport;
     m_text_layout_->setViewport(viewport);
-    markAllLinesDirty();
+    if (width_changed) {
+      markAllLinesDirty();
+    }
     normalizeScrollState();
     LOGD("EditorCore::setViewport, viewport = %s", m_viewport_.dump().c_str());
   }
@@ -3248,6 +3253,7 @@ m_fling_ = makeUPtr<FlingAnimator>(tc);
   }
 
   void EditorCore::normalizeScrollState() {
+    PERF_TIMER("normalizeScrollState");
     if (m_text_layout_ == nullptr) return;
     m_text_layout_->clampScroll(m_view_state_.scroll_x, m_view_state_.scroll_y);
     m_text_layout_->setViewState(m_view_state_);

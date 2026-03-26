@@ -24,9 +24,11 @@ namespace NS_SWEETEDITOR {
   }
 
   void TextLayout::setViewport(const Viewport& viewport) {
-    if (m_viewport_.width != viewport.width || m_viewport_.height != viewport.height) {
+    if (m_viewport_.width != viewport.width) {
       m_content_metrics_dirty_ = true;
       m_prefix_dirty_from_ = 0;
+    } else if (m_viewport_.height != viewport.height) {
+      m_content_metrics_dirty_ = true;
     }
     m_viewport_ = viewport;
   }
@@ -741,10 +743,13 @@ namespace NS_SWEETEDITOR {
   }
 
   TextLayout::ContentMetrics TextLayout::estimateContentMetrics_() {
+    PERF_TIMER("estimateContentMetrics_");
     // Cache is clean, return the exact cached value directly
     if (!m_content_metrics_dirty_) {
       return m_content_metrics_cache_;
     }
+    size_t line_count = m_document_ ? m_document_->getLogicalLines().size() : 0;
+    LOGW("estimateContentMetrics_: dirty=1 lines=%zu prefixDirtyFrom=%zu", line_count, m_prefix_dirty_from_);
     ContentMetrics metrics;
     if (m_document_ == nullptr) return metrics;
     Vector<LogicalLine>& lines = m_document_->getLogicalLines();
@@ -752,15 +757,20 @@ namespace NS_SWEETEDITOR {
 
     // content_height: O(1) lookup via prefix index (unlaid-out lines use estimated height)
     const size_t last_idx = lines.size() - 1;
+    PERF_BEGIN(prefix);
     ensurePrefixIndexUpTo(last_idx);
+    PERF_END(prefix, "estimateContentMetrics_::ensurePrefixIndexUpTo");
     float last_h = (lines[last_idx].height >= 0) ? lines[last_idx].height : getLineHeight();
     metrics.content_height = m_line_prefix_y_[last_idx] + last_h;
 
     // max_line_width: scan already-laid-out lines (non-empty visual_lines) for max width,
     // O(number of laid-out lines). No new layoutLine calls; also takes max with cached value as fallback
+    PERF_BEGIN(width_scan);
     float max_width = m_content_metrics_cache_.max_line_width;
+    size_t scanned = 0;
     for (size_t i = 0; i < lines.size(); ++i) {
       if (lines[i].visual_lines.empty()) continue;
+      ++scanned;
       for (const VisualLine& vl : lines[i].visual_lines) {
         float line_width = 0;
         for (const VisualRun& run : vl.runs) {
@@ -769,6 +779,8 @@ namespace NS_SWEETEDITOR {
         max_width = std::max(max_width, line_width);
       }
     }
+    PERF_END(width_scan, "estimateContentMetrics_::widthScan");
+    LOGW("estimateContentMetrics_: scanned %zu/%zu lines for max_width", scanned, lines.size());
     metrics.max_line_width = max_width;
     return metrics;
   }
@@ -959,6 +971,7 @@ namespace NS_SWEETEDITOR {
   }
 
   VisibleLineInfo TextLayout::resolveVisibleLines() {
+    PERF_TIMER("resolveVisibleLines");
     Vector<LogicalLine>& logical_lines = m_document_->getLogicalLines();
     if (logical_lines.empty()) {
       return {};
