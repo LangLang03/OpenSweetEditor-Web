@@ -264,12 +264,12 @@ namespace SweetEditor {
 		public long DoubleTapTimeout { get; set; } = 300;
 		/// <summary>Long press time threshold in ms (default 500)</summary>
 		public long LongPressMs { get; set; } = 500;
-		/// <summary>Fling friction coefficient, higher = faster deceleration (default 3.5)</summary>
-		public float FlingFriction { get; set; } = 3.5f;
-		/// <summary>Minimum fling velocity threshold in px/s (default 50)</summary>
-		public float FlingMinVelocity { get; set; } = 50f;
-		/// <summary>Maximum fling velocity cap in px/s (default 8000)</summary>
-		public float FlingMaxVelocity { get; set; } = 8000f;
+		/// <summary>Fling friction coefficient, higher = faster deceleration (default 2.0)</summary>
+		public float FlingFriction { get; set; } = 2.0f;
+		/// <summary>Minimum fling velocity threshold in px/s (default 30)</summary>
+		public float FlingMinVelocity { get; set; } = 30f;
+		/// <summary>Maximum fling velocity cap in px/s (default 12000)</summary>
+		public float FlingMaxVelocity { get; set; } = 12000f;
 		/// <summary>Max undo stack size, 0 = unlimited (default 512)</summary>
 		public ulong MaxUndoStackSize { get; set; } = 512;
 	}
@@ -1150,6 +1150,12 @@ namespace SweetEditor {
 		/// <summary>Horizontal scrollbar render model.</summary>
 		[JsonPropertyName("horizontal_scrollbar")]
 		public ScrollbarModel HorizontalScrollbar { get; set; }
+		/// <summary>Whether gutter stays fixed during horizontal scroll.</summary>
+		[JsonPropertyName("gutter_sticky")]
+		public bool GutterSticky { get; set; }
+		/// <summary>Whether gutter area is visible.</summary>
+		[JsonPropertyName("gutter_visible")]
+		public bool GutterVisible { get; set; }
 	}
 
 	/// <summary>
@@ -1343,6 +1349,12 @@ namespace SweetEditor {
 
 		[DllImport(LibraryName, EntryPoint = "editor_set_show_split_line", CallingConvention = CallingConvention.Cdecl)]
 		internal static extern void SetShowSplitLine(IntPtr handle, int show);
+
+		[DllImport(LibraryName, EntryPoint = "editor_set_gutter_sticky", CallingConvention = CallingConvention.Cdecl)]
+		internal static extern void SetGutterSticky(IntPtr handle, int sticky);
+
+		[DllImport(LibraryName, EntryPoint = "editor_set_gutter_visible", CallingConvention = CallingConvention.Cdecl)]
+		internal static extern void SetGutterVisible(IntPtr handle, int visible);
 
 		[DllImport(LibraryName, EntryPoint = "editor_set_current_line_render_mode", CallingConvention = CallingConvention.Cdecl)]
 		internal static extern void SetCurrentLineRenderMode(IntPtr handle, int mode);
@@ -1802,6 +1814,18 @@ namespace SweetEditor {
 		/// <param name="show">true=show, false=hide.</param>
 		public void SetShowSplitLine(bool show) {
 			NativeMethods.SetShowSplitLine(nativeHandle, show ? 1 : 0);
+		}
+
+		/// <summary>Sets whether gutter stays fixed during horizontal scroll.</summary>
+		/// <param name="sticky">true=gutter fixed (desktop style), false=gutter scrolls with content (mobile style).</param>
+		public void SetGutterSticky(bool sticky) {
+			NativeMethods.SetGutterSticky(nativeHandle, sticky ? 1 : 0);
+		}
+
+		/// <summary>Sets whether gutter area is visible.</summary>
+		/// <param name="visible">true=show gutter, false=hide entire gutter.</param>
+		public void SetGutterVisible(bool visible) {
+			NativeMethods.SetGutterVisible(nativeHandle, visible ? 1 : 0);
 		}
 
 		/// <summary>Sets current line render mode.</summary>

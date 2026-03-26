@@ -6,6 +6,7 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.PointF;
 import android.graphics.Typeface;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.AttributeSet;
@@ -1744,9 +1745,15 @@ public class SweetEditor extends View {
         mSettings = new EditorSettings(this);
         mSettings.setContentStartPadding(DEFAULT_CONTENT_START_PADDING_DP * density);
         mSettings.setTypeface(Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL));
+        mSettings.setGutterSticky(false);
         setFocusable(true);
         setFocusableInTouchMode(true);
-        loadDocument(new Document(""));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            setImportantForAutofill(IMPORTANT_FOR_AUTOFILL_NO);
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            setImportantForContentCapture(IMPORTANT_FOR_CONTENT_CAPTURE_NO);
+        }
     }
 
     private void scheduleTransientScrollbarRefresh(int requestedDelayMs) {
