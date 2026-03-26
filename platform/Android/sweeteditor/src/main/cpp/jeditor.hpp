@@ -470,6 +470,14 @@ public:
                                static_cast<int32_t>(fontStyle));
   }
 
+  static void registerBatchTextStyles(JNIEnv* env, jclass clazz, jlong handle, jobject data, jint size) {
+    if (handle == 0 || data == nullptr || size <= 0) return;
+    void* ptr = env->GetDirectBufferAddress(data);
+    jlong capacity = env->GetDirectBufferCapacity(data);
+    if (ptr == nullptr || capacity < 0 || static_cast<jlong>(size) > capacity) return;
+    editor_register_batch_text_styles(static_cast<intptr_t>(handle), reinterpret_cast<const uint8_t*>(ptr), static_cast<size_t>(size));
+  }
+
   static void setLineSpans(JNIEnv* env, jclass clazz, jlong handle, jobject data, jint size) {
     if (handle == 0 || data == nullptr || size <= 0) return;
     void* ptr = env->GetDirectBufferAddress(data);
@@ -874,6 +882,7 @@ public:
       {"nativeGetPositionRect", "(JII)[F", (void*) getPositionRect},
       {"nativeGetCursorRect", "(J)[F", (void*) getCursorRect},
       {"nativeRegisterTextStyle", "(JIIII)V", (void*) registerTextStyle},
+      {"nativeRegisterBatchTextStyles", "(JLjava/nio/ByteBuffer;I)V", (void*) registerBatchTextStyles},
       {"nativeSetLineSpans", "(JLjava/nio/ByteBuffer;I)V", (void*) setLineSpans},
       {"nativeSetLineInlayHints", "(JLjava/nio/ByteBuffer;I)V", (void*) setLineInlayHints},
       {"nativeSetLinePhantomTexts", "(JLjava/nio/ByteBuffer;I)V", (void*) setLinePhantomTexts},
@@ -946,4 +955,3 @@ public:
 };
 
 #endif //SWEETEDITOR_JEDITOR_HPP
-

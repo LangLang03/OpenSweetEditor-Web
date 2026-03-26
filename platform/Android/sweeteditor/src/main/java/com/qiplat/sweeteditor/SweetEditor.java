@@ -23,8 +23,6 @@ import android.view.inputmethod.InputMethodManager;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import java.util.Map;
-
 import com.qiplat.sweeteditor.core.Document;
 import com.qiplat.sweeteditor.core.EditorOptions;
 import com.qiplat.sweeteditor.core.HandleConfig;
@@ -386,10 +384,7 @@ public class SweetEditor extends View {
         mTheme = theme;
         mRenderer.applyTheme(theme);
 
-        for (Map.Entry<Integer, TextStyle> entry : theme.textStyles.entrySet()) {
-            TextStyle style = entry.getValue();
-            mEditorCore.registerTextStyle(entry.getKey(), style.color, style.backgroundColor, style.fontStyle);
-        }
+        mEditorCore.registerBatchTextStyles(theme.textStyles);
 
         if (mInlineSuggestionController != null) {
             mInlineSuggestionController.applyTheme(theme);
@@ -1744,10 +1739,7 @@ public class SweetEditor extends View {
 
         mInlineSuggestionController = new InlineSuggestionController(context, this);
 
-        for (Map.Entry<Integer, TextStyle> entry : mTheme.textStyles.entrySet()) {
-            TextStyle style = entry.getValue();
-            mEditorCore.registerTextStyle(entry.getKey(), style.color, style.backgroundColor, style.fontStyle);
-        }
+        mEditorCore.registerBatchTextStyles(mTheme.textStyles);
 
         mSettings = new EditorSettings(this);
         mSettings.setContentStartPadding(DEFAULT_CONTENT_START_PADDING_DP * density);
@@ -1814,4 +1806,3 @@ public class SweetEditor extends View {
         }
     }
 }
-

@@ -27,6 +27,7 @@ import com.qiplat.sweeteditor.core.adornment.TextStyle;
 
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.Map;
 
 import dalvik.annotation.optimization.CriticalNative;
 import dalvik.annotation.optimization.FastNative;
@@ -818,6 +819,27 @@ public class EditorCore {
      */
     public void registerTextStyle(int styleId, int color, int fontStyle) {
         registerTextStyle(styleId, color, 0, fontStyle);
+    }
+
+    /**
+     * Registers multiple highlight styles in one JNI call.
+     *
+     * @param stylesById style ID -> style mapping
+     */
+    public void registerBatchTextStyles(@Nullable Map<Integer, TextStyle> stylesById) {
+        if (mNativeHandle == 0 || stylesById == null || stylesById.isEmpty()) return;
+        ByteBuffer payload = ProtocolEncoder.packBatchTextStyles(stylesById);
+        registerBatchTextStyles(payload);
+    }
+
+    /**
+     * Registers multiple highlight styles in one JNI call (already encoded by caller).
+     *
+     * @param payload Packed ByteBuffer
+     */
+    public void registerBatchTextStyles(@Nullable ByteBuffer payload) {
+        if (mNativeHandle == 0 || payload == null) return;
+        nativeRegisterBatchTextStyles(mNativeHandle, payload, payload.remaining());
     }
 
     /**
@@ -1847,6 +1869,9 @@ public class EditorCore {
     private static native void nativeRegisterTextStyle(long handle, int styleId, int color, int backgroundColor, int fontStyle);
 
     @FastNative
+    private static native void nativeRegisterBatchTextStyles(long handle, ByteBuffer data, int size);
+
+    @FastNative
     private static native void nativeSetLineSpans(long handle, ByteBuffer data, int size);
 
     @FastNative
@@ -1970,4 +1995,3 @@ public class EditorCore {
         System.loadLibrary("sweeteditor");
     }
 }
-
