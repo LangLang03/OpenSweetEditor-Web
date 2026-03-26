@@ -2226,6 +2226,16 @@ namespace NS_SWEETEDITOR {
 #pragma region [Decorations]
   void EditorCore::registerTextStyle(uint32_t style_id, TextStyle&& style) {
     m_decorations_->getTextStyleRegistry()->registerTextStyle(style_id, std::move(style));
+    markAllLinesDirty();
+  }
+
+  void EditorCore::registerBatchTextStyles(Vector<std::pair<uint32_t, TextStyle>>&& entries) {
+    if (entries.empty()) return;
+    auto registry = m_decorations_->getTextStyleRegistry();
+    for (auto& [style_id, style] : entries) {
+      registry->registerTextStyle(style_id, std::move(style));
+    }
+    markAllLinesDirty();
   }
 
   void EditorCore::setLineSpans(size_t line, SpanLayer layer, Vector<StyleSpan>&& spans) {
@@ -3198,4 +3208,3 @@ namespace NS_SWEETEDITOR {
   }
 #pragma endregion
 }
-

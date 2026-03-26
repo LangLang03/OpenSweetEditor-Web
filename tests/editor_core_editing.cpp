@@ -90,3 +90,37 @@ TEST_CASE("EditorCore rebuilds text run styles after style re-registration") {
   REQUIRE(updated_model.lines[0].runs.size() == 1);
   CHECK(updated_model.lines[0].runs[0].style.color == updated_color);
 }
+
+TEST_CASE("EditorCore rebuilds text run styles after batch style re-registration") {
+  EditorOptions options;
+  EditorCore editor(makePtr<FixedWidthTextMeasurer>(), options);
+
+  Ptr<Document> document = makePtr<LineArrayDocument>("hello");
+  editor.loadDocument(document);
+  editor.setViewport({800, 600});
+
+  constexpr uint32_t style_id = 1;
+  constexpr int32_t original_color = static_cast<int32_t>(0xFF112233u);
+  constexpr int32_t updated_color = static_cast<int32_t>(0xFF445566u);
+
+  editor.registerTextStyle(style_id, TextStyle{original_color, 0, FONT_STYLE_NORMAL});
+  editor.setLineSpans(0, SpanLayer::SYNTAX, Vector<StyleSpan>{{0, 5, style_id}});
+
+  EditorRenderModel initial_model;
+  editor.buildRenderModel(initial_model);
+
+  REQUIRE(initial_model.lines.size() == 1);
+  REQUIRE(initial_model.lines[0].runs.size() == 1);
+  CHECK(initial_model.lines[0].runs[0].style.color == original_color);
+
+  Vector<std::pair<uint32_t, TextStyle>> styles;
+  styles.emplace_back(style_id, TextStyle{updated_color, 0, FONT_STYLE_NORMAL});
+  editor.registerBatchTextStyles(std::move(styles));
+
+  EditorRenderModel updated_model;
+  editor.buildRenderModel(updated_model);
+
+  REQUIRE(updated_model.lines.size() == 1);
+  REQUIRE(updated_model.lines[0].runs.size() == 1);
+  CHECK(updated_model.lines[0].runs[0].style.color == updated_color);
+}

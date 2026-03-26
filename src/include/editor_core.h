@@ -508,6 +508,10 @@ namespace NS_SWEETEDITOR {
     /// @param style Text style definition
     void registerTextStyle(uint32_t style_id, TextStyle&& style);
 
+    /// Batch register highlight styles (loop register in registry + mark dirty once)
+    /// @param entries Array of style_id->text style pairs (passed with move semantics)
+    void registerBatchTextStyles(Vector<std::pair<uint32_t, TextStyle>>&& entries);
+
     /// Set highlight spans for given line and layer
     /// @param line Line number
     /// @param layer Highlight layer (SYNTAX / SEMANTIC)
@@ -812,4 +816,3 @@ namespace NS_SWEETEDITOR {
 }
 
 #endif //SWEETEDITOR_EDITOR_CORE_H
-

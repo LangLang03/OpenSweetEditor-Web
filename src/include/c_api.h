@@ -693,6 +693,13 @@ EDITOR_API void editor_set_line_spans(intptr_t editor_handle, const uint8_t* dat
 /// @param size payload byte length
 EDITOR_API void editor_set_batch_line_spans(intptr_t editor_handle, const uint8_t* data, size_t size);
 
+/// Batch register highlight text styles (compact binary)
+/// @param data payload(LE):
+///             u32 entry_count,
+///             [u32 style_id, i32 color, i32 background_color, i32 font_style] x entry_count
+/// @param size payload byte length
+EDITOR_API void editor_register_batch_text_styles(intptr_t editor_handle, const uint8_t* data, size_t size);
+
 /// Clear all style ranges for specified line and layer
 /// @param line Line number(0-based)
 /// @param layer Highlight layer (0=SYNTAX, 1=SEMANTIC)
