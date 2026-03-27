@@ -22,6 +22,8 @@ DerivedData/
 
 binaries/SweetNativeCore.xcframework/
 
+/.derived/
+
 # PM
 Pods/
 .build/
