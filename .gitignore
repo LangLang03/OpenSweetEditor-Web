@@ -16,11 +16,13 @@ tests/output
 tests/build
 CMakeSettings.json
 *.csproj.user
-.tmp/
+**/.tmp/
 
-# Claude Code / CodeX
-.claude
-.codex
+# AI Coding (DO NOT submit)
+**/.claude
+**/.codex
+**/.codex-home
+
 # Trae
 .trae/
 # Local build folders
