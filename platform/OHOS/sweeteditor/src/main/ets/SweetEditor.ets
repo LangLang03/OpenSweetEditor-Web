@@ -2190,6 +2190,10 @@ export struct SweetEditor {
         break;
       case GestureType.TAP:
         this.eventBus.publish(new CursorChangedEvent(result.cursorPosition));
+        if (this.completionPopupController && this.completionPopupController.isShowing() &&
+          this.completionProviderManager) {
+          this.completionProviderManager.dismiss();
+        }
         if (result.hitTarget && result.hitTarget.type !== HitTargetType.NONE) {
           this.fireHitTargetEvent(result, screenPoint);
         }
@@ -2199,6 +2203,10 @@ export struct SweetEditor {
         this.eventBus.publish(new ScrollChangedEvent(result.viewScrollX, result.viewScrollY));
         if (this.decorationProviderManager) {
           this.decorationProviderManager.onScrollChanged();
+        }
+        if (this.completionPopupController && this.completionPopupController.isShowing() &&
+          this.completionProviderManager) {
+          this.completionProviderManager.dismiss();
         }
         break;
       case GestureType.SCALE:
@@ -2287,9 +2295,11 @@ export struct SweetEditor {
       return;
     }
 
+    const popupShowing = this.completionPopupController !== null && this.completionPopupController.isShowing();
+
     if (textChanges.length === 0) {
-      if (this.completionPopupController && this.completionPopupController.isShowing()) {
-        this.completionProviderManager.triggerCompletion(CompletionTriggerKind.RETRIGGER, null);
+      if (popupShowing) {
+        this.completionProviderManager.dismiss();
       }
       return;
     }
@@ -2299,16 +2309,16 @@ export struct SweetEditor {
     if (newText && newText.length === 1) {
       if (this.completionProviderManager.isTriggerCharacter(newText)) {
         this.completionProviderManager.triggerCompletion(CompletionTriggerKind.CHARACTER, newText);
-      } else if (this.completionPopupController && this.completionPopupController.isShowing()) {
-        this.completionProviderManager.triggerCompletion(CompletionTriggerKind.RETRIGGER, null);
+      } else if (popupShowing) {
+        this.completionProviderManager.dismiss();
       } else if (this.isCompletionInvokeCharacter(newText)) {
         this.completionProviderManager.triggerCompletion(CompletionTriggerKind.INVOKED, null);
       }
       return;
     }
 
-    if (this.completionPopupController && this.completionPopupController.isShowing()) {
-      this.completionProviderManager.triggerCompletion(CompletionTriggerKind.RETRIGGER, null);
+    if (popupShowing) {
+      this.completionProviderManager.dismiss();
     }
   }
 
