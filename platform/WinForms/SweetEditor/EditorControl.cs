@@ -883,7 +883,7 @@ namespace SweetEditor {
 			return (cachedVisibleStartLine, cachedVisibleEndLine);
 		}
 
-		public int GetTotalLineCount() => -1;
+		public int GetTotalLineCount() => editorCore.GetDocument()?.GetLineCount() ?? -1;
 
 		#endregion
 

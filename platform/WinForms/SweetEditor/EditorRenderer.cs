@@ -223,6 +223,10 @@ namespace SweetEditor {
 			return b;
 		}
 
+		private SolidBrush GetOrCreateBrush(Color color) {
+			return GetOrCreateBrush(color.ToArgb());
+		}
+
 		#region TextMeasurer Callbacks
 
 		private float OnMeasureText(string text, int fontStyle) {
@@ -329,7 +333,7 @@ namespace SweetEditor {
 
 		private void DrawGutterOverlay(Graphics g, EditorRenderModel model, int clientHeight) {
 			if (model.SplitX <= 0) return;
-			using var brush = new SolidBrush(currentTheme.BackgroundColor);
+			SolidBrush brush = GetOrCreateBrush(currentTheme.BackgroundColor);
 			g.FillRectangle(brush, 0, 0, model.SplitX, clientHeight);
 			DrawCurrentLineDecoration(g, model, 0f, model.SplitX);
 			if (model.SplitLineVisible) {
@@ -397,13 +401,12 @@ namespace SweetEditor {
 			bool hasHorizontal = horizontal.Visible && horizontal.Track.Width > 0 && horizontal.Track.Height > 0;
 			if (!hasVertical && !hasHorizontal) return;
 
-			using var trackBrush = new SolidBrush(currentTheme.ScrollbarTrackColor);
+			SolidBrush trackBrush = GetOrCreateBrush(currentTheme.ScrollbarTrackColor);
 			RectangleF verticalTrackRect = RectangleF.Empty;
 			RectangleF horizontalTrackRect = RectangleF.Empty;
 
 			if (hasVertical) {
-				var vThumbColor = vertical.ThumbActive ? currentTheme.ScrollbarThumbActiveColor : currentTheme.ScrollbarThumbColor;
-				using var vThumbBrush = new SolidBrush(vThumbColor);
+				SolidBrush vThumbBrush = GetOrCreateBrush(vertical.ThumbActive ? currentTheme.ScrollbarThumbActiveColor : currentTheme.ScrollbarThumbColor);
 				verticalTrackRect = new RectangleF(
 					vertical.Track.Origin.X, vertical.Track.Origin.Y,
 					vertical.Track.Width, vertical.Track.Height);
@@ -415,8 +418,7 @@ namespace SweetEditor {
 			}
 
 			if (hasHorizontal) {
-				var hThumbColor = horizontal.ThumbActive ? currentTheme.ScrollbarThumbActiveColor : currentTheme.ScrollbarThumbColor;
-				using var hThumbBrush = new SolidBrush(hThumbColor);
+				SolidBrush hThumbBrush = GetOrCreateBrush(horizontal.ThumbActive ? currentTheme.ScrollbarThumbActiveColor : currentTheme.ScrollbarThumbColor);
 				horizontalTrackRect = new RectangleF(
 					horizontal.Track.Origin.X, horizontal.Track.Origin.Y,
 					horizontal.Track.Width, horizontal.Track.Height);
@@ -551,9 +553,7 @@ namespace SweetEditor {
 				float bgWidth = visualRun.Width - mgn * 2;
 				float bgHeight = fontHeight;
 				float radius = fontHeight * 0.2f;
-				using (var bgBrush = new SolidBrush(currentTheme.FoldPlaceholderBgColor)) {
-					DrawRoundedRect(g, bgBrush, bgLeft, bgTop, bgWidth, bgHeight, radius);
-				}
+				DrawRoundedRect(g, GetOrCreateBrush(currentTheme.FoldPlaceholderBgColor), bgLeft, bgTop, bgWidth, bgHeight, radius);
 				float textX = visualRun.X + mgn + visualRun.Padding;
 				int foldW = Math.Max(1, (int)Math.Ceiling(visualRun.Width - mgn * 2 - visualRun.Padding * 2));
 				var foldRect = new Rectangle((int)textX, (int)topY, foldW, lineHeight);
@@ -571,14 +571,10 @@ namespace SweetEditor {
 					float blockSize = fontHeight;
 					float colorLeft = visualRun.X + mgn;
 					float colorTop = topY;
-					using (var colorBrush = new SolidBrush(Color.FromArgb(visualRun.ColorValue))) {
-						g.FillRectangle(colorBrush, colorLeft, colorTop, blockSize, blockSize);
-					}
+					g.FillRectangle(GetOrCreateBrush(visualRun.ColorValue), colorLeft, colorTop, blockSize, blockSize);
 				} else {
 					float radius = fontHeight * 0.2f;
-					using (var bgBrush = new SolidBrush(currentTheme.InlayHintBgColor)) {
-						DrawRoundedRect(g, bgBrush, bgLeft, bgTop, bgWidth, bgHeight, radius);
-					}
+					DrawRoundedRect(g, GetOrCreateBrush(currentTheme.InlayHintBgColor), bgLeft, bgTop, bgWidth, bgHeight, radius);
 					if (visualRun.IconId > 0 && editorIconProvider != null) {
 						float iconSize = Math.Min(bgWidth, bgHeight);
 						float iconLeft = bgLeft + (bgWidth - iconSize) * 0.5f;
@@ -599,8 +595,7 @@ namespace SweetEditor {
 				}
 			} else {
 				if (visualRun.Style.BackgroundColor != 0) {
-					using var bgBrush = new SolidBrush(Color.FromArgb(visualRun.Style.BackgroundColor));
-					g.FillRectangle(bgBrush, visualRun.X, topY, drawWidth, lineHeight);
+					g.FillRectangle(GetOrCreateBrush(visualRun.Style.BackgroundColor), visualRun.X, topY, drawWidth, lineHeight);
 				}
 				var rect = new Rectangle((int)visualRun.X, (int)topY, drawWidth, lineHeight);
 				Color drawColor = visualRun.Type == VisualRunType.PHANTOM_TEXT
@@ -641,7 +636,7 @@ namespace SweetEditor {
 				g.DrawRectangle(pen, left, model.CurrentLine.Y, width, lineH);
 				return;
 			}
-			using var brush = new SolidBrush(currentTheme.CurrentLineColor);
+			SolidBrush brush = GetOrCreateBrush(currentTheme.CurrentLineColor);
 			g.FillRectangle(brush, left, model.CurrentLine.Y, width, lineH);
 		}
 
@@ -665,7 +660,7 @@ namespace SweetEditor {
 
 		private void DrawSelectionRects(Graphics g, EditorRenderModel model) {
 			if (model.SelectionRects == null || model.SelectionRects.Count == 0) return;
-			using var brush = new SolidBrush(currentTheme.SelectionColor);
+			SolidBrush brush = GetOrCreateBrush(currentTheme.SelectionColor);
 			foreach (var rect in model.SelectionRects) {
 				g.FillRectangle(brush, rect.Origin.X, rect.Origin.Y, rect.Width, rect.Height);
 			}
@@ -673,7 +668,7 @@ namespace SweetEditor {
 
 		private void DrawCursor(Graphics g, EditorRenderModel model) {
 			if (!model.Cursor.Visible) return;
-			using var brush = new SolidBrush(currentTheme.CursorColor);
+			SolidBrush brush = GetOrCreateBrush(currentTheme.CursorColor);
 			g.FillRectangle(brush, model.Cursor.Position.X, model.Cursor.Position.Y, 2f, model.Cursor.Height);
 		}
 

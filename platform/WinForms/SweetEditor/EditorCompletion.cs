@@ -113,6 +113,7 @@ namespace SweetEditor {
 
 		private readonly List<ICompletionProvider> providers = new();
 		private readonly Dictionary<ICompletionProvider, ManagedReceiver> activeReceivers = new();
+		private readonly Dictionary<ICompletionProvider, SemaphoreSlim> providerGates = new();
 		private readonly EditorControl editor;
 		private readonly System.Windows.Forms.Timer debounceTimer;
 
@@ -128,7 +129,10 @@ namespace SweetEditor {
 		}
 
 		public void AddProvider(ICompletionProvider provider) {
-			if (!providers.Contains(provider)) providers.Add(provider);
+			if (!providers.Contains(provider)) {
+				providers.Add(provider);
+				providerGates[provider] = new SemaphoreSlim(1, 1);
+			}
 		}
 
 		public void RemoveProvider(ICompletionProvider provider) {
@@ -137,6 +141,7 @@ namespace SweetEditor {
 				receiver.Cancel();
 				activeReceivers.Remove(provider);
 			}
+			providerGates.Remove(provider);
 		}
 
 		public void TriggerCompletion(CompletionTriggerKind kind, string? triggerChar) {
@@ -184,7 +189,22 @@ namespace SweetEditor {
 			foreach (var provider in providers) {
 				var receiver = new ManagedReceiver(this, provider, currentGen);
 				activeReceivers[provider] = receiver;
-				try { provider.ProvideCompletions(context, receiver); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"CompletionProvider error: {ex.Message}"); }
+				SemaphoreSlim gate = providerGates.TryGetValue(provider, out var existingGate)
+					? existingGate
+					: (providerGates[provider] = new SemaphoreSlim(1, 1));
+				_ = Task.Run(async () => {
+					try {
+						await gate.WaitAsync().ConfigureAwait(false);
+						try {
+							if (receiver.IsCancelled) return;
+							provider.ProvideCompletions(context, receiver);
+						} finally {
+							gate.Release();
+						}
+					} catch (Exception ex) {
+						System.Diagnostics.Debug.WriteLine($"CompletionProvider error: {ex.Message}");
+					}
+				});
 			}
 		}
 

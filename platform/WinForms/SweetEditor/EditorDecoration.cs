@@ -264,10 +264,20 @@ namespace SweetEditor {
 				state.ActiveReceiver?.Cancel();
 				var receiver = new ManagedReceiver(this, provider, currentGeneration);
 				state.ActiveReceiver = receiver;
-				try {
-					provider.ProvideDecorations(context, receiver);
-				} catch {
-				}
+				_ = Task.Run(async () => {
+					try {
+						await state.Gate.WaitAsync().ConfigureAwait(false);
+						try {
+							if (receiver.IsCancelled) {
+								return;
+							}
+							provider.ProvideDecorations(context, receiver);
+						} finally {
+							state.Gate.Release();
+						}
+					} catch {
+					}
+				});
 			}
 		}
 
@@ -698,6 +708,7 @@ namespace SweetEditor {
 		private sealed class ProviderState {
 			public DecorationResult? Snapshot;
 			public ManagedReceiver? ActiveReceiver;
+			public SemaphoreSlim Gate { get; } = new(1, 1);
 		}
 
 		private sealed class ManagedReceiver : IDecorationReceiver {

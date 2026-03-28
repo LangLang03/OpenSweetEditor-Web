@@ -26,6 +26,14 @@ namespace SweetEditor {
 		}
 
 		/// <summary>
+		/// Gets the number of logical lines in the document.
+		/// </summary>
+		public int GetLineCount() {
+			if (nativeHandle == IntPtr.Zero) return 0;
+			return checked((int)NativeMethods.GetDocumentLineCount(nativeHandle));
+		}
+
+		/// <summary>
 		/// Gets the text content of the specified line.
 		/// </summary>
 		/// <param name="line">Line number (0-based)</param>
@@ -1313,6 +1321,9 @@ namespace SweetEditor {
 
 		[DllImport(LibraryName, EntryPoint = "get_document_line_text", CallingConvention = CallingConvention.Cdecl)]
 		internal static extern IntPtr GetDocumentLineText(IntPtr documentHandle, UIntPtr line);
+
+		[DllImport(LibraryName, EntryPoint = "get_document_line_count", CallingConvention = CallingConvention.Cdecl)]
+		internal static extern UIntPtr GetDocumentLineCount(IntPtr documentHandle);
 
 		[DllImport(LibraryName, EntryPoint = "init_unhandled_exception_handler", CallingConvention = CallingConvention.Cdecl)]
 		internal static extern void InitUnhandledExceptionHandler();

@@ -412,23 +412,20 @@ namespace SweetEditor {
 	}
 
 	internal static class ProtocolDecoder {
-		internal static byte[]? ReadBinaryPayload(IntPtr payloadPtr, UIntPtr payloadSize) {
+		internal static int GetPayloadLength(IntPtr payloadPtr, UIntPtr payloadSize) {
 			if (payloadPtr == IntPtr.Zero) {
-				return null;
+				return 0;
 			}
 			long size64 = checked((long)payloadSize.ToUInt64());
 			if (size64 <= 0) {
 				NativeMethods.FreeBinaryData(payloadPtr);
-				return null;
+				return 0;
 			}
 			if (size64 > int.MaxValue) {
 				NativeMethods.FreeBinaryData(payloadPtr);
 				throw new InvalidOperationException($"Binary payload too large: {size64}");
 			}
-			byte[] data = new byte[(int)size64];
-			Marshal.Copy(payloadPtr, data, 0, (int)size64);
-			NativeMethods.FreeBinaryData(payloadPtr);
-			return data;
+			return (int)size64;
 		}
 
 		internal static bool TryReadInt32(ReadOnlySpan<byte> data, ref int offset, out int value) {
@@ -813,219 +810,185 @@ namespace SweetEditor {
 			};
 		}
 
-		internal static EditorRenderModel ParseRenderModel(IntPtr payloadPtr, UIntPtr payloadSize) {
-			byte[]? payload = ReadBinaryPayload(payloadPtr, payloadSize);
+		internal static unsafe EditorRenderModel ParseRenderModel(IntPtr payloadPtr, UIntPtr payloadSize) {
 			EditorRenderModel model = CreateEmptyRenderModel();
-			if (payload == null) {
+			int payloadLength = GetPayloadLength(payloadPtr, payloadSize);
+			if (payloadLength == 0) {
 				return model;
 			}
-
-			ReadOnlySpan<byte> data = payload;
-			int offset = 0;
-			if (!TryReadFloat(data, ref offset, out float splitX) ||
-				!TryReadInt32(data, ref offset, out int splitLineVisibleRaw) ||
-				!TryReadFloat(data, ref offset, out float scrollX) ||
-				!TryReadFloat(data, ref offset, out float scrollY) ||
-				!TryReadFloat(data, ref offset, out float viewportWidth) ||
-				!TryReadFloat(data, ref offset, out float viewportHeight) ||
-				!TryReadPointF(data, ref offset, out PointF currentLine) ||
-				!TryReadInt32(data, ref offset, out int currentLineRenderModeValue) ||
-				!TryReadInt32(data, ref offset, out int lineCount) ||
-				lineCount < 0) {
-				return model;
-			}
-
-			model.SplitX = splitX;
-			model.SplitLineVisible = splitLineVisibleRaw != 0;
-			model.ScrollX = scrollX;
-			model.ScrollY = scrollY;
-			model.ViewportWidth = viewportWidth;
-			model.ViewportHeight = viewportHeight;
-			model.CurrentLine = currentLine;
-			model.CurrentLineRenderMode = Enum.IsDefined(typeof(CurrentLineRenderMode), currentLineRenderModeValue)
-				? (CurrentLineRenderMode)currentLineRenderModeValue
-				: CurrentLineRenderMode.BACKGROUND;
-
-			List<VisualLine> lines = new(lineCount);
-			for (int i = 0; i < lineCount; i++) {
-				if (!TryReadVisualLine(data, ref offset, out VisualLine line)) {
+			try {
+				ReadOnlySpan<byte> data = new(payloadPtr.ToPointer(), payloadLength);
+				int offset = 0;
+				if (!TryReadFloat(data, ref offset, out float splitX) ||
+					!TryReadInt32(data, ref offset, out int splitLineVisibleRaw) ||
+					!TryReadFloat(data, ref offset, out float scrollX) ||
+					!TryReadFloat(data, ref offset, out float scrollY) ||
+					!TryReadFloat(data, ref offset, out float viewportWidth) ||
+					!TryReadFloat(data, ref offset, out float viewportHeight) ||
+					!TryReadPointF(data, ref offset, out PointF currentLine) ||
+					!TryReadInt32(data, ref offset, out int currentLineRenderModeValue) ||
+					!TryReadInt32(data, ref offset, out int lineCount) ||
+					lineCount < 0) {
 					return model;
 				}
-				lines.Add(line);
-			}
-			model.VisualLines = lines;
 
-			if (!TryReadInt32(data, ref offset, out int gutterIconCount) || gutterIconCount < 0) {
-				return model;
-			}
-			List<GutterIconRenderItem> gutterIcons = new(gutterIconCount);
-			for (int i = 0; i < gutterIconCount; i++) {
-				if (!TryReadGutterIconRenderItem(data, ref offset, out GutterIconRenderItem item)) {
+				model.SplitX = splitX;
+				model.SplitLineVisible = splitLineVisibleRaw != 0;
+				model.ScrollX = scrollX;
+				model.ScrollY = scrollY;
+				model.ViewportWidth = viewportWidth;
+				model.ViewportHeight = viewportHeight;
+				model.CurrentLine = currentLine;
+				model.CurrentLineRenderMode = Enum.IsDefined(typeof(CurrentLineRenderMode), currentLineRenderModeValue)
+					? (CurrentLineRenderMode)currentLineRenderModeValue
+					: CurrentLineRenderMode.BACKGROUND;
+
+				List<VisualLine> lines = new(lineCount);
+				for (int i = 0; i < lineCount; i++) {
+					if (!TryReadVisualLine(data, ref offset, out VisualLine line)) {
+						return model;
+					}
+					lines.Add(line);
+				}
+				model.VisualLines = lines;
+
+				if (!TryReadInt32(data, ref offset, out int gutterIconCount) || gutterIconCount < 0) {
 					return model;
 				}
-				gutterIcons.Add(item);
-			}
-			model.GutterIcons = gutterIcons;
+				List<GutterIconRenderItem> gutterIcons = new(gutterIconCount);
+				for (int i = 0; i < gutterIconCount; i++) {
+					if (!TryReadGutterIconRenderItem(data, ref offset, out GutterIconRenderItem item)) {
+						return model;
+					}
+					gutterIcons.Add(item);
+				}
+				model.GutterIcons = gutterIcons;
 
-			if (!TryReadInt32(data, ref offset, out int foldMarkerCount) || foldMarkerCount < 0) {
-				return model;
-			}
-			List<FoldMarkerRenderItem> foldMarkers = new(foldMarkerCount);
-			for (int i = 0; i < foldMarkerCount; i++) {
-				if (!TryReadFoldMarkerRenderItem(data, ref offset, out FoldMarkerRenderItem item)) {
+				if (!TryReadInt32(data, ref offset, out int foldMarkerCount) || foldMarkerCount < 0) {
 					return model;
 				}
-				foldMarkers.Add(item);
-			}
-			model.FoldMarkers = foldMarkers;
+				List<FoldMarkerRenderItem> foldMarkers = new(foldMarkerCount);
+				for (int i = 0; i < foldMarkerCount; i++) {
+					if (!TryReadFoldMarkerRenderItem(data, ref offset, out FoldMarkerRenderItem item)) {
+						return model;
+					}
+					foldMarkers.Add(item);
+				}
+				model.FoldMarkers = foldMarkers;
 
-			if (!TryReadCursor(data, ref offset, out Cursor cursor) ||
-				!TryReadInt32(data, ref offset, out int selectionRectCount) ||
-				selectionRectCount < 0) {
-				return model;
-			}
-			model.Cursor = cursor;
-
-			List<SelectionRect> selectionRects = new(selectionRectCount);
-			for (int i = 0; i < selectionRectCount; i++) {
-				if (!TryReadSelectionRect(data, ref offset, out SelectionRect rect)) {
+				if (!TryReadCursor(data, ref offset, out Cursor cursor) ||
+					!TryReadInt32(data, ref offset, out int selectionRectCount) ||
+					selectionRectCount < 0) {
 					return model;
 				}
-				selectionRects.Add(rect);
-			}
-			model.SelectionRects = selectionRects;
+				model.Cursor = cursor;
 
-			if (!TryReadSelectionHandle(data, ref offset, out SelectionHandle startHandle) ||
-				!TryReadSelectionHandle(data, ref offset, out SelectionHandle endHandle) ||
-				!TryReadCompositionDecoration(data, ref offset, out CompositionDecoration compositionDecoration) ||
-				!TryReadInt32(data, ref offset, out int guideCount) ||
-				guideCount < 0) {
-				return model;
-			}
-			model.SelectionStartHandle = startHandle;
-			model.SelectionEndHandle = endHandle;
-			model.CompositionDecoration = compositionDecoration;
+				List<SelectionRect> selectionRects = new(selectionRectCount);
+				for (int i = 0; i < selectionRectCount; i++) {
+					if (!TryReadSelectionRect(data, ref offset, out SelectionRect rect)) {
+						return model;
+					}
+					selectionRects.Add(rect);
+				}
+				model.SelectionRects = selectionRects;
 
-			List<GuideSegment> guideSegments = new(guideCount);
-			for (int i = 0; i < guideCount; i++) {
-				if (!TryReadGuideSegment(data, ref offset, out GuideSegment segment)) {
+				if (!TryReadSelectionHandle(data, ref offset, out SelectionHandle startHandle) ||
+					!TryReadSelectionHandle(data, ref offset, out SelectionHandle endHandle) ||
+					!TryReadCompositionDecoration(data, ref offset, out CompositionDecoration compositionDecoration) ||
+					!TryReadInt32(data, ref offset, out int guideCount) ||
+					guideCount < 0) {
 					return model;
 				}
-				guideSegments.Add(segment);
-			}
-			model.GuideSegments = guideSegments;
+				model.SelectionStartHandle = startHandle;
+				model.SelectionEndHandle = endHandle;
+				model.CompositionDecoration = compositionDecoration;
 
-			if (!TryReadInt32(data, ref offset, out int diagnosticCount) || diagnosticCount < 0) {
-				return model;
-			}
-			List<DiagnosticDecoration> diagnosticDecorations = new(diagnosticCount);
-			for (int i = 0; i < diagnosticCount; i++) {
-				if (!TryReadDiagnosticDecoration(data, ref offset, out DiagnosticDecoration decoration)) {
+				List<GuideSegment> guideSegments = new(guideCount);
+				for (int i = 0; i < guideCount; i++) {
+					if (!TryReadGuideSegment(data, ref offset, out GuideSegment segment)) {
+						return model;
+					}
+					guideSegments.Add(segment);
+				}
+				model.GuideSegments = guideSegments;
+
+				if (!TryReadInt32(data, ref offset, out int diagnosticCount) || diagnosticCount < 0) {
 					return model;
 				}
-				diagnosticDecorations.Add(decoration);
-			}
-			model.DiagnosticDecorations = diagnosticDecorations;
+				List<DiagnosticDecoration> diagnosticDecorations = new(diagnosticCount);
+				for (int i = 0; i < diagnosticCount; i++) {
+					if (!TryReadDiagnosticDecoration(data, ref offset, out DiagnosticDecoration decoration)) {
+						return model;
+					}
+					diagnosticDecorations.Add(decoration);
+				}
+				model.DiagnosticDecorations = diagnosticDecorations;
 
-			if (!TryReadInt32(data, ref offset, out int maxGutterIcons) ||
-				!TryReadInt32(data, ref offset, out int linkedRectCount) ||
-				linkedRectCount < 0) {
-				return model;
-			}
-			model.MaxGutterIcons = maxGutterIcons;
-
-			List<LinkedEditingRect> linkedEditingRects = new(linkedRectCount);
-			for (int i = 0; i < linkedRectCount; i++) {
-				if (!TryReadLinkedEditingRect(data, ref offset, out LinkedEditingRect rect)) {
+				if (!TryReadInt32(data, ref offset, out int maxGutterIcons) ||
+					!TryReadInt32(data, ref offset, out int linkedRectCount) ||
+					linkedRectCount < 0) {
 					return model;
 				}
-				linkedEditingRects.Add(rect);
-			}
-			model.LinkedEditingRects = linkedEditingRects;
+				model.MaxGutterIcons = maxGutterIcons;
 
-			if (!TryReadInt32(data, ref offset, out int bracketRectCount) || bracketRectCount < 0) {
-				return model;
-			}
-			List<BracketHighlightRect> bracketHighlightRects = new(bracketRectCount);
-			for (int i = 0; i < bracketRectCount; i++) {
-				if (!TryReadBracketHighlightRect(data, ref offset, out BracketHighlightRect rect)) {
+				List<LinkedEditingRect> linkedEditingRects = new(linkedRectCount);
+				for (int i = 0; i < linkedRectCount; i++) {
+					if (!TryReadLinkedEditingRect(data, ref offset, out LinkedEditingRect rect)) {
+						return model;
+					}
+					linkedEditingRects.Add(rect);
+				}
+				model.LinkedEditingRects = linkedEditingRects;
+
+				if (!TryReadInt32(data, ref offset, out int bracketRectCount) || bracketRectCount < 0) {
 					return model;
 				}
-				bracketHighlightRects.Add(rect);
-			}
-			model.BracketHighlightRects = bracketHighlightRects;
-
-			// Optional append-only tail: vertical/horizontal scrollbar models.
-			if (offset < data.Length) {
-				int savedOffset = offset;
-				if (TryReadScrollbarModel(data, ref offset, out ScrollbarModel verticalScrollbar) &&
-					TryReadScrollbarModel(data, ref offset, out ScrollbarModel horizontalScrollbar)) {
-					model.VerticalScrollbar = verticalScrollbar;
-					model.HorizontalScrollbar = horizontalScrollbar;
-				} else {
-					offset = savedOffset;
+				List<BracketHighlightRect> bracketHighlightRects = new(bracketRectCount);
+				for (int i = 0; i < bracketRectCount; i++) {
+					if (!TryReadBracketHighlightRect(data, ref offset, out BracketHighlightRect rect)) {
+						return model;
+					}
+					bracketHighlightRects.Add(rect);
 				}
+				model.BracketHighlightRects = bracketHighlightRects;
+
+				if (offset < data.Length) {
+					int savedOffset = offset;
+					if (TryReadScrollbarModel(data, ref offset, out ScrollbarModel verticalScrollbar) &&
+						TryReadScrollbarModel(data, ref offset, out ScrollbarModel horizontalScrollbar)) {
+						model.VerticalScrollbar = verticalScrollbar;
+						model.HorizontalScrollbar = horizontalScrollbar;
+					} else {
+						offset = savedOffset;
+					}
+				}
+				if (TryReadInt32(data, ref offset, out int gutterStickyRaw)) {
+					model.GutterSticky = gutterStickyRaw != 0;
+				}
+				if (TryReadInt32(data, ref offset, out int gutterVisibleRaw)) {
+					model.GutterVisible = gutterVisibleRaw != 0;
+				}
+				return model;
+			} finally {
+				NativeMethods.FreeBinaryData(payloadPtr);
 			}
-			if (TryReadInt32(data, ref offset, out int gutterStickyRaw)) {
-				model.GutterSticky = gutterStickyRaw != 0;
-			}
-			if (TryReadInt32(data, ref offset, out int gutterVisibleRaw)) {
-				model.GutterVisible = gutterVisibleRaw != 0;
-			}
-			return model;
 		}
 
-		internal static TextEditResult ParseTextEditResult(IntPtr payloadPtr, UIntPtr payloadSize) {
-			byte[]? payload = ReadBinaryPayload(payloadPtr, payloadSize);
-			if (payload == null) {
+		internal static unsafe TextEditResult ParseTextEditResult(IntPtr payloadPtr, UIntPtr payloadSize) {
+			int payloadLength = GetPayloadLength(payloadPtr, payloadSize);
+			if (payloadLength == 0) {
 				return TextEditResult.Empty;
 			}
-
-			ReadOnlySpan<byte> data = payload;
-			int offset = 0;
-			if (!TryReadInt32(data, ref offset, out int changedInt) || changedInt == 0) {
-				return TextEditResult.Empty;
-			}
-			if (!TryReadInt32(data, ref offset, out int count) || count <= 0) {
-				return TextEditResult.Empty;
-			}
-
-			List<TextChange> changes = new(count);
-			for (int i = 0; i < count; i++) {
-				if (!TryReadTextChange(data, ref offset, out TextChange change)) {
-					break;
+			try {
+				ReadOnlySpan<byte> data = new(payloadPtr.ToPointer(), payloadLength);
+				int offset = 0;
+				if (!TryReadInt32(data, ref offset, out int changedInt) || changedInt == 0) {
+					return TextEditResult.Empty;
 				}
-				changes.Add(change);
-			}
-			if (changes.Count == 0) {
-				return TextEditResult.Empty;
-			}
-			return new TextEditResult { Changes = changes };
-		}
+				if (!TryReadInt32(data, ref offset, out int count) || count <= 0) {
+					return TextEditResult.Empty;
+				}
 
-		internal static KeyEventResult ParseKeyEventResult(IntPtr payloadPtr, UIntPtr payloadSize) {
-			byte[]? payload = ReadBinaryPayload(payloadPtr, payloadSize);
-			KeyEventResult result = new();
-			if (payload == null) {
-				return result;
-			}
-
-			ReadOnlySpan<byte> data = payload;
-			int offset = 0;
-			if (!TryReadInt32(data, ref offset, out int handled) ||
-				!TryReadInt32(data, ref offset, out int contentChanged) ||
-				!TryReadInt32(data, ref offset, out int cursorChanged) ||
-				!TryReadInt32(data, ref offset, out int selectionChanged) ||
-				!TryReadInt32(data, ref offset, out int hasEdit)) {
-				return result;
-			}
-
-			result.Handled = handled != 0;
-			result.ContentChanged = contentChanged != 0;
-			result.CursorChanged = cursorChanged != 0;
-			result.SelectionChanged = selectionChanged != 0;
-
-			if (hasEdit != 0 && TryReadInt32(data, ref offset, out int count) && count > 0) {
 				List<TextChange> changes = new(count);
 				for (int i = 0; i < count; i++) {
 					if (!TryReadTextChange(data, ref offset, out TextChange change)) {
@@ -1033,127 +996,175 @@ namespace SweetEditor {
 					}
 					changes.Add(change);
 				}
-				if (changes.Count > 0) {
-					result.EditResult = new TextEditResult { Changes = changes };
+				if (changes.Count == 0) {
+					return TextEditResult.Empty;
 				}
+				return new TextEditResult { Changes = changes };
+			} finally {
+				NativeMethods.FreeBinaryData(payloadPtr);
 			}
-			return result;
 		}
 
-		internal static GestureResult ParseGestureResult(IntPtr payloadPtr, UIntPtr payloadSize) {
-			byte[]? payload = ReadBinaryPayload(payloadPtr, payloadSize);
-			GestureResult result = new();
-			if (payload == null) {
+		internal static unsafe KeyEventResult ParseKeyEventResult(IntPtr payloadPtr, UIntPtr payloadSize) {
+			KeyEventResult result = new();
+			int payloadLength = GetPayloadLength(payloadPtr, payloadSize);
+			if (payloadLength == 0) {
 				return result;
 			}
+			try {
+				ReadOnlySpan<byte> data = new(payloadPtr.ToPointer(), payloadLength);
+				int offset = 0;
+				if (!TryReadInt32(data, ref offset, out int handled) ||
+					!TryReadInt32(data, ref offset, out int contentChanged) ||
+					!TryReadInt32(data, ref offset, out int cursorChanged) ||
+					!TryReadInt32(data, ref offset, out int selectionChanged) ||
+					!TryReadInt32(data, ref offset, out int hasEdit)) {
+					return result;
+				}
 
-			ReadOnlySpan<byte> data = payload;
-			int offset = 0;
-			if (!TryReadInt32(data, ref offset, out int gestureTypeValue)) {
-				return result;
-			}
-			result.Type = ToGestureType(gestureTypeValue);
-			result.TapPoint = new PointF(0, 0);
-			switch (result.Type) {
-				case GestureType.TAP:
-				case GestureType.DOUBLE_TAP:
-				case GestureType.LONG_PRESS:
-				case GestureType.DRAG_SELECT:
-				case GestureType.CONTEXT_MENU:
-					if (TryReadFloat(data, ref offset, out float tx) && TryReadFloat(data, ref offset, out float ty)) {
-						result.TapPoint = new PointF(tx, ty);
+				result.Handled = handled != 0;
+				result.ContentChanged = contentChanged != 0;
+				result.CursorChanged = cursorChanged != 0;
+				result.SelectionChanged = selectionChanged != 0;
+
+				if (hasEdit != 0 && TryReadInt32(data, ref offset, out int count) && count > 0) {
+					List<TextChange> changes = new(count);
+					for (int i = 0; i < count; i++) {
+						if (!TryReadTextChange(data, ref offset, out TextChange change)) {
+							break;
+						}
+						changes.Add(change);
 					}
-					break;
-			}
-
-			if (!TryReadInt32(data, ref offset, out int cursorLine) ||
-				!TryReadInt32(data, ref offset, out int cursorColumn) ||
-				!TryReadInt32(data, ref offset, out int hasSelectionInt) ||
-				!TryReadInt32(data, ref offset, out int selStartLine) ||
-				!TryReadInt32(data, ref offset, out int selStartColumn) ||
-				!TryReadInt32(data, ref offset, out int selEndLine) ||
-				!TryReadInt32(data, ref offset, out int selEndColumn) ||
-				!TryReadFloat(data, ref offset, out float viewScrollX) ||
-				!TryReadFloat(data, ref offset, out float viewScrollY) ||
-				!TryReadFloat(data, ref offset, out float viewScale)) {
+					if (changes.Count > 0) {
+						result.EditResult = new TextEditResult { Changes = changes };
+					}
+				}
 				return result;
+			} finally {
+				NativeMethods.FreeBinaryData(payloadPtr);
 			}
-
-			result.CursorPosition = new TextPosition { Line = cursorLine, Column = cursorColumn };
-			result.HasSelection = hasSelectionInt != 0;
-			result.Selection = new TextRange {
-				Start = new TextPosition { Line = selStartLine, Column = selStartColumn },
-				End = new TextPosition { Line = selEndLine, Column = selEndColumn }
-			};
-			result.ViewScrollX = viewScrollX;
-			result.ViewScrollY = viewScrollY;
-			result.ViewScale = viewScale;
-			result.HitTarget = new HitTarget { Type = HitTargetType.NONE };
-
-			if (TryReadInt32(data, ref offset, out int hitType) &&
-				TryReadInt32(data, ref offset, out int hitLine) &&
-				TryReadInt32(data, ref offset, out int hitColumn) &&
-				TryReadInt32(data, ref offset, out int hitIconId) &&
-				TryReadInt32(data, ref offset, out int hitColor)) {
-				result.HitTarget = new HitTarget {
-					Type = ToHitTargetType(hitType),
-					Line = hitLine,
-					Column = hitColumn,
-					IconId = hitIconId,
-					ColorValue = hitColor
-				};
-			}
-			if (TryReadInt32(data, ref offset, out int needsEdgeScrollInt)) {
-				result.NeedsEdgeScroll = needsEdgeScrollInt != 0;
-			}
-			if (TryReadInt32(data, ref offset, out int needsFlingInt)) {
-				result.NeedsFling = needsFlingInt != 0;
-			}
-			if (TryReadInt32(data, ref offset, out int needsAnimationInt)) {
-				result.NeedsAnimation = needsAnimationInt != 0;
-			}
-			return result;
 		}
 
-		internal static ScrollMetrics ParseScrollMetrics(IntPtr payloadPtr, UIntPtr payloadSize) {
-			byte[]? payload = ReadBinaryPayload(payloadPtr, payloadSize);
+		internal static unsafe GestureResult ParseGestureResult(IntPtr payloadPtr, UIntPtr payloadSize) {
+			GestureResult result = new();
+			int payloadLength = GetPayloadLength(payloadPtr, payloadSize);
+			if (payloadLength == 0) {
+				return result;
+			}
+			try {
+				ReadOnlySpan<byte> data = new(payloadPtr.ToPointer(), payloadLength);
+				int offset = 0;
+				if (!TryReadInt32(data, ref offset, out int gestureTypeValue)) {
+					return result;
+				}
+				result.Type = ToGestureType(gestureTypeValue);
+				result.TapPoint = new PointF(0, 0);
+				switch (result.Type) {
+					case GestureType.TAP:
+					case GestureType.DOUBLE_TAP:
+					case GestureType.LONG_PRESS:
+					case GestureType.DRAG_SELECT:
+					case GestureType.CONTEXT_MENU:
+						if (TryReadFloat(data, ref offset, out float tx) && TryReadFloat(data, ref offset, out float ty)) {
+							result.TapPoint = new PointF(tx, ty);
+						}
+						break;
+				}
+
+				if (!TryReadInt32(data, ref offset, out int cursorLine) ||
+					!TryReadInt32(data, ref offset, out int cursorColumn) ||
+					!TryReadInt32(data, ref offset, out int hasSelectionInt) ||
+					!TryReadInt32(data, ref offset, out int selStartLine) ||
+					!TryReadInt32(data, ref offset, out int selStartColumn) ||
+					!TryReadInt32(data, ref offset, out int selEndLine) ||
+					!TryReadInt32(data, ref offset, out int selEndColumn) ||
+					!TryReadFloat(data, ref offset, out float viewScrollX) ||
+					!TryReadFloat(data, ref offset, out float viewScrollY) ||
+					!TryReadFloat(data, ref offset, out float viewScale)) {
+					return result;
+				}
+
+				result.CursorPosition = new TextPosition { Line = cursorLine, Column = cursorColumn };
+				result.HasSelection = hasSelectionInt != 0;
+				result.Selection = new TextRange {
+					Start = new TextPosition { Line = selStartLine, Column = selStartColumn },
+					End = new TextPosition { Line = selEndLine, Column = selEndColumn }
+				};
+				result.ViewScrollX = viewScrollX;
+				result.ViewScrollY = viewScrollY;
+				result.ViewScale = viewScale;
+				result.HitTarget = new HitTarget { Type = HitTargetType.NONE };
+
+				if (TryReadInt32(data, ref offset, out int hitType) &&
+					TryReadInt32(data, ref offset, out int hitLine) &&
+					TryReadInt32(data, ref offset, out int hitColumn) &&
+					TryReadInt32(data, ref offset, out int hitIconId) &&
+					TryReadInt32(data, ref offset, out int hitColor)) {
+					result.HitTarget = new HitTarget {
+						Type = ToHitTargetType(hitType),
+						Line = hitLine,
+						Column = hitColumn,
+						IconId = hitIconId,
+						ColorValue = hitColor
+					};
+				}
+				if (TryReadInt32(data, ref offset, out int needsEdgeScrollInt)) {
+					result.NeedsEdgeScroll = needsEdgeScrollInt != 0;
+				}
+				if (TryReadInt32(data, ref offset, out int needsFlingInt)) {
+					result.NeedsFling = needsFlingInt != 0;
+				}
+				if (TryReadInt32(data, ref offset, out int needsAnimationInt)) {
+					result.NeedsAnimation = needsAnimationInt != 0;
+				}
+				return result;
+			} finally {
+				NativeMethods.FreeBinaryData(payloadPtr);
+			}
+		}
+
+		internal static unsafe ScrollMetrics ParseScrollMetrics(IntPtr payloadPtr, UIntPtr payloadSize) {
 			ScrollMetrics result = new() { Scale = 1.0f };
-			if (payload == null) {
+			int payloadLength = GetPayloadLength(payloadPtr, payloadSize);
+			if (payloadLength == 0) {
 				return result;
 			}
+			try {
+				ReadOnlySpan<byte> data = new(payloadPtr.ToPointer(), payloadLength);
+				int offset = 0;
+				if (!TryReadFloat(data, ref offset, out float scale) ||
+					!TryReadFloat(data, ref offset, out float scrollX) ||
+					!TryReadFloat(data, ref offset, out float scrollY) ||
+					!TryReadFloat(data, ref offset, out float maxScrollX) ||
+					!TryReadFloat(data, ref offset, out float maxScrollY) ||
+					!TryReadFloat(data, ref offset, out float contentWidth) ||
+					!TryReadFloat(data, ref offset, out float contentHeight) ||
+					!TryReadFloat(data, ref offset, out float viewportWidth) ||
+					!TryReadFloat(data, ref offset, out float viewportHeight) ||
+					!TryReadFloat(data, ref offset, out float textAreaX) ||
+					!TryReadFloat(data, ref offset, out float textAreaWidth) ||
+					!TryReadInt32(data, ref offset, out int canScrollXInt) ||
+					!TryReadInt32(data, ref offset, out int canScrollYInt)) {
+					return result;
+				}
 
-			ReadOnlySpan<byte> data = payload;
-			int offset = 0;
-			if (!TryReadFloat(data, ref offset, out float scale) ||
-				!TryReadFloat(data, ref offset, out float scrollX) ||
-				!TryReadFloat(data, ref offset, out float scrollY) ||
-				!TryReadFloat(data, ref offset, out float maxScrollX) ||
-				!TryReadFloat(data, ref offset, out float maxScrollY) ||
-				!TryReadFloat(data, ref offset, out float contentWidth) ||
-				!TryReadFloat(data, ref offset, out float contentHeight) ||
-				!TryReadFloat(data, ref offset, out float viewportWidth) ||
-				!TryReadFloat(data, ref offset, out float viewportHeight) ||
-				!TryReadFloat(data, ref offset, out float textAreaX) ||
-				!TryReadFloat(data, ref offset, out float textAreaWidth) ||
-				!TryReadInt32(data, ref offset, out int canScrollXInt) ||
-				!TryReadInt32(data, ref offset, out int canScrollYInt)) {
+				result.Scale = scale;
+				result.ScrollX = scrollX;
+				result.ScrollY = scrollY;
+				result.MaxScrollX = maxScrollX;
+				result.MaxScrollY = maxScrollY;
+				result.ContentWidth = contentWidth;
+				result.ContentHeight = contentHeight;
+				result.ViewportWidth = viewportWidth;
+				result.ViewportHeight = viewportHeight;
+				result.TextAreaX = textAreaX;
+				result.TextAreaWidth = textAreaWidth;
+				result.CanScrollXInt = canScrollXInt;
+				result.CanScrollYInt = canScrollYInt;
 				return result;
+			} finally {
+				NativeMethods.FreeBinaryData(payloadPtr);
 			}
-
-			result.Scale = scale;
-			result.ScrollX = scrollX;
-			result.ScrollY = scrollY;
-			result.MaxScrollX = maxScrollX;
-			result.MaxScrollY = maxScrollY;
-			result.ContentWidth = contentWidth;
-			result.ContentHeight = contentHeight;
-			result.ViewportWidth = viewportWidth;
-			result.ViewportHeight = viewportHeight;
-			result.TextAreaX = textAreaX;
-			result.TextAreaWidth = textAreaWidth;
-			result.CanScrollXInt = canScrollXInt;
-			result.CanScrollYInt = canScrollYInt;
-			return result;
 		}
 
 	}
