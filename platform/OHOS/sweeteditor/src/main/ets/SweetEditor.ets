@@ -93,6 +93,15 @@ const COMPLETION_ITEM_HEIGHT = 32;
 const COMPLETION_KIND_BADGE_SIZE = 18;
 const COMPLETION_KIND_BADGE_RADIUS = 4;
 const COMPLETION_KIND_BADGE_GAP = 8;
+const INLINE_SUGGESTION_BAR_HEIGHT = 28;
+const INLINE_SUGGESTION_BAR_RADIUS = 6;
+const INLINE_SUGGESTION_BAR_HORIZONTAL_PADDING = 4;
+const INLINE_SUGGESTION_BAR_BUTTON_HORIZONTAL_PADDING = 10;
+const INLINE_SUGGESTION_BAR_DIVIDER_WIDTH = 1;
+const INLINE_SUGGESTION_BAR_DIVIDER_VERTICAL_MARGIN = 6;
+const INLINE_SUGGESTION_BAR_GAP = 2;
+const INLINE_SUGGESTION_BAR_SIDE_MARGIN = 8;
+const INLINE_SUGGESTION_BAR_ESTIMATED_WIDTH = 132;
 
 interface PreviewCapableInputController {
   on(type: 'setPreviewText', callback: (text: string, range: inputMethod.Range) => void): void;
@@ -126,6 +135,14 @@ interface SweetEditorExternalApi {
   addCompletionProvider(provider: CompletionProvider): void;
 
   triggerCompletion(): void;
+
+  showInlineSuggestion(suggestion: InlineSuggestion): void;
+
+  dismissInlineSuggestion(): void;
+
+  isInlineSuggestionShowing(): boolean;
+
+  setInlineSuggestionListener(listener: InlineSuggestionListener | null): void;
 
   requestDecorationRefresh(): void;
 
@@ -219,6 +236,22 @@ export class SweetEditorController {
     this.run((api) => api.triggerCompletion());
   }
 
+  showInlineSuggestion(suggestion: InlineSuggestion): void {
+    this.run((api) => api.showInlineSuggestion(suggestion));
+  }
+
+  dismissInlineSuggestion(): void {
+    this.run((api) => api.dismissInlineSuggestion());
+  }
+
+  isInlineSuggestionShowing(): boolean {
+    return this.api ? this.api.isInlineSuggestionShowing() : false;
+  }
+
+  setInlineSuggestionListener(listener: InlineSuggestionListener | null): void {
+    this.run((api) => api.setInlineSuggestionListener(listener));
+  }
+
   requestDecorationRefresh(): void {
     this.run((api) => api.requestDecorationRefresh());
   }
@@ -307,6 +340,22 @@ class BoundSweetEditorExternalApi implements SweetEditorExternalApi {
 
   triggerCompletion(): void {
     this.editor.triggerCompletion();
+  }
+
+  showInlineSuggestion(suggestion: InlineSuggestion): void {
+    this.editor.showInlineSuggestion(suggestion);
+  }
+
+  dismissInlineSuggestion(): void {
+    this.editor.dismissInlineSuggestion();
+  }
+
+  isInlineSuggestionShowing(): boolean {
+    return this.editor.isInlineSuggestionShowing();
+  }
+
+  setInlineSuggestionListener(listener: InlineSuggestionListener | null): void {
+    this.editor.setInlineSuggestionListener(listener);
   }
 
   requestDecorationRefresh(): void {
@@ -433,6 +482,9 @@ export struct SweetEditor {
   @State private completionPopupLeft: number = 0;
   @State private completionPopupTop: number = 0;
   @State private completionPopupWidth: number = 300;
+  @State private inlineSuggestionBarVisible: boolean = false;
+  @State private inlineSuggestionBarLeft: number = 0;
+  @State private inlineSuggestionBarTop: number = 0;
   @State private selectionMenuVisible: boolean = false;
   @State private selectionMenuItems: SelectionMenuItem[] = [];
   @State private selectionMenuLeft: number = 0;
@@ -524,6 +576,10 @@ export struct SweetEditor {
         this.buildSelectionMenuOverlay()
       }
 
+      if (this.inlineSuggestionBarVisible) {
+        this.buildInlineSuggestionBarOverlay()
+      }
+
       if (this.completionPopupVisible && this.completionPopupItems.length > 0) {
         this.buildCompletionPopupOverlay()
       }
@@ -575,6 +631,59 @@ export struct SweetEditor {
           return;
         }
         this.selectionMenuController.onMenuItemClicked(item);
+      })
+  }
+
+  @Builder
+  private buildInlineSuggestionBarOverlay(): void {
+    Row() {
+      this.buildInlineSuggestionBarButton('Accept', true)
+
+      Blank()
+        .width(INLINE_SUGGESTION_BAR_DIVIDER_WIDTH)
+        .height(INLINE_SUGGESTION_BAR_HEIGHT - INLINE_SUGGESTION_BAR_DIVIDER_VERTICAL_MARGIN * 2)
+        .backgroundColor(this.getInlineSuggestionOverlayColor())
+        .margin({ top: INLINE_SUGGESTION_BAR_DIVIDER_VERTICAL_MARGIN, bottom: INLINE_SUGGESTION_BAR_DIVIDER_VERTICAL_MARGIN })
+
+      this.buildInlineSuggestionBarButton('Dismiss', false)
+    }
+    .height(INLINE_SUGGESTION_BAR_HEIGHT)
+    .padding({ left: INLINE_SUGGESTION_BAR_HORIZONTAL_PADDING, right: INLINE_SUGGESTION_BAR_HORIZONTAL_PADDING })
+    .backgroundColor(colorToHex(this.theme.inlineSuggestionBarBgColor))
+    .borderRadius(INLINE_SUGGESTION_BAR_RADIUS)
+    .shadow({
+      radius: 8,
+      color: '#22000000',
+      offsetX: 0,
+      offsetY: 2
+    })
+    .position({
+      x: this.inlineSuggestionBarLeft,
+      y: this.inlineSuggestionBarTop
+    })
+    .zIndex(8)
+  }
+
+  @Builder
+  private buildInlineSuggestionBarButton(label: string, isAccept: boolean): void {
+    Text(label)
+      .fontSize(11)
+      .fontWeight(isAccept ? '700' : '400')
+      .fontColor(isAccept
+        ? colorToHex(this.theme.inlineSuggestionBarAcceptColor)
+        : colorToHex(this.theme.inlineSuggestionBarDismissColor))
+      .height('100%')
+      .textAlign(TextAlign.Center)
+      .padding({ left: INLINE_SUGGESTION_BAR_BUTTON_HORIZONTAL_PADDING, right: INLINE_SUGGESTION_BAR_BUTTON_HORIZONTAL_PADDING })
+      .onClick(() => {
+        if (!this.inlineSuggestionController) {
+          return;
+        }
+        if (isAccept) {
+          this.inlineSuggestionController.onAcceptClicked();
+        } else {
+          this.inlineSuggestionController.onDismissClicked();
+        }
       })
   }
 
@@ -680,6 +789,38 @@ export struct SweetEditor {
     this.completionPopupVisible = false;
     this.completionPopupItems = [];
     this.completionPopupSelectedIndex = 0;
+  }
+
+  private applyInlineSuggestionBarState(x: number, y: number, cursorHeight: number): void {
+    const maxLeft = Math.max(INLINE_SUGGESTION_BAR_SIDE_MARGIN,
+      this.viewWidth - INLINE_SUGGESTION_BAR_ESTIMATED_WIDTH - INLINE_SUGGESTION_BAR_SIDE_MARGIN);
+    const aboveTop = y - INLINE_SUGGESTION_BAR_HEIGHT - INLINE_SUGGESTION_BAR_GAP;
+    const belowTop = y + cursorHeight + INLINE_SUGGESTION_BAR_GAP;
+    let top = aboveTop;
+    if (top < INLINE_SUGGESTION_BAR_SIDE_MARGIN) {
+      top = belowTop;
+    }
+    this.inlineSuggestionBarLeft = this.clampNumber(x, INLINE_SUGGESTION_BAR_SIDE_MARGIN, maxLeft);
+    this.inlineSuggestionBarTop = this.clampNumber(
+      top,
+      INLINE_SUGGESTION_BAR_SIDE_MARGIN,
+      Math.max(INLINE_SUGGESTION_BAR_SIDE_MARGIN,
+        this.viewHeight - INLINE_SUGGESTION_BAR_HEIGHT - INLINE_SUGGESTION_BAR_SIDE_MARGIN)
+    );
+    this.inlineSuggestionBarVisible = true;
+  }
+
+  private dismissInlineSuggestionBarState(): void {
+    this.inlineSuggestionBarVisible = false;
+  }
+
+  private getInlineSuggestionOverlayColor(): string {
+    const bgColor = this.theme.inlineSuggestionBarBgColor;
+    const r = (bgColor >>> 16) & 0xFF;
+    const g = (bgColor >>> 8) & 0xFF;
+    const b = bgColor & 0xFF;
+    const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+    return luminance > 128 ? 'rgba(0, 0, 0, 0.133)' : 'rgba(255, 255, 255, 0.133)';
   }
 
   private getCompletionKindBadgeText(kind: number): string {
@@ -851,6 +992,15 @@ export struct SweetEditor {
 
     // InlineSuggestionController
     this.inlineSuggestionController = new InlineSuggestionController(this, this.eventBus);
+    this.inlineSuggestionController.setOnShowCallback((x: number, y: number, height: number): void => {
+      this.applyInlineSuggestionBarState(x, y, height);
+    });
+    this.inlineSuggestionController.setOnUpdatePositionCallback((x: number, y: number, height: number): void => {
+      this.applyInlineSuggestionBarState(x, y, height);
+    });
+    this.inlineSuggestionController.setOnDismissCallback((): void => {
+      this.dismissInlineSuggestionBarState();
+    });
 
     // SelectionMenuController
     this.selectionMenuController = new SelectionMenuController(this, this.eventBus);

@@ -129,6 +129,9 @@ export class EditorTheme {
   linkedEditingInactiveColor: number = 0x667AA2F7;
   bracketHighlightBorderColor: number = 0xCC9ECE6A;
   bracketHighlightBgColor: number = 0x2A9ECE6A;
+  inlineSuggestionBarBgColor: number = 0xF2303030;
+  inlineSuggestionBarAcceptColor: number = 0xFF4FC1FF;
+  inlineSuggestionBarDismissColor: number = 0xFFCCCCCC;
   completionBgColor: number = 0xF0252830;
   completionBorderColor: number = 0x40607090;
   completionSelectedBgColor: number = 0x3D5580BB;
@@ -175,6 +178,9 @@ export class EditorTheme {
     theme.linkedEditingInactiveColor = 0x667AA2F7;
     theme.bracketHighlightBorderColor = 0xCC9ECE6A;
     theme.bracketHighlightBgColor = 0x2A9ECE6A;
+    theme.inlineSuggestionBarBgColor = 0xF2303030;
+    theme.inlineSuggestionBarAcceptColor = 0xFF4FC1FF;
+    theme.inlineSuggestionBarDismissColor = 0xFFCCCCCC;
     theme.completionBgColor = 0xF0252830;
     theme.completionBorderColor = 0x40607090;
     theme.completionSelectedBgColor = 0x3D5580BB;
@@ -231,6 +237,9 @@ export class EditorTheme {
     theme.linkedEditingInactiveColor = 0x662563EB;
     theme.bracketHighlightBorderColor = 0xCC0F766E;
     theme.bracketHighlightBgColor = 0x260F766E;
+    theme.inlineSuggestionBarBgColor = 0xF2F0F0F0;
+    theme.inlineSuggestionBarAcceptColor = 0xFF1A73E8;
+    theme.inlineSuggestionBarDismissColor = 0xFF555555;
     theme.completionBgColor = 0xF0FAFBFD;
     theme.completionBorderColor = 0x30A0A8B8;
     theme.completionSelectedBgColor = 0x3D3B82F6;
