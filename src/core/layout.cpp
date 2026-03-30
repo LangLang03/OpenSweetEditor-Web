@@ -524,7 +524,7 @@ namespace NS_SWEETEDITOR {
         }
         size_t run_end_col = run.column + run.length;
 
-        if (!found_start && safe_start >= run.column && safe_start <= run_end_col) {
+        if (!found_start && safe_start >= run.column && safe_start < run_end_col) {
           if (run.type == VisualRunType::TAB) {
             x_start = (safe_start == run.column) ? vl_x : vl_x + run.width;
           } else {
@@ -593,14 +593,18 @@ namespace NS_SWEETEDITOR {
         for (const VisualLine& vl : ll.visual_lines) {
           for (const VisualRun& run : vl.runs) {
             if ((run.type == VisualRunType::TEXT || run.type == VisualRunType::TAB) &&
-                safe_col >= run.column && safe_col <= run.column + run.length) {
+                safe_col >= run.column && safe_col < run.column + run.length) {
               out_y = vl.line_number_position.y - scroll_y;
               return;
             }
           }
         }
-        // If not found, use line-start y
-        out_y = ll.start_y - scroll_y;
+        // If not found, use y of last visual line
+        if (!ll.visual_lines.empty()) {
+          out_y = ll.visual_lines.back().line_number_position.y - scroll_y;
+        } else {
+          out_y = ll.start_y - scroll_y;
+        }
         return;
       }
     }
