@@ -192,7 +192,7 @@ function build_osx() {
   echo "============================= MacOSX $OSX_ARCH ============================="
   OSX_BUILD_DIR="$BUILD_DIR/osx/$OSX_ARCH"
   OSX_PREBUILT_DIR="$OUTPUT_DIR/osx/$OSX_ARCH"
-  build_apple "$OSX_BUILD_DIR" "$OSX_PREBUILT_DIR" "macosx" "$OSX_ARCH" "$TARGET_NAME" "Ninja" ""
+  build_apple "$OSX_BUILD_DIR" "$OSX_PREBUILT_DIR" "macosx" "$OSX_ARCH" "$TARGET_NAME" "Xcode" ""
 }
 
 function build_apple() {
