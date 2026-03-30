@@ -1,4 +1,5 @@
 import { applyTextChangesToText, normalizeNewlines } from "../legacy/editor-core-legacy.js";
+import type { IEditorTextChange } from "../legacy/editor-input-types.js";
 
 export interface IModelOptions {
   uri?: string;
@@ -11,7 +12,7 @@ export interface ITextModel {
   readonly versionId: number;
   getValue(): string;
   setValue(text: string): void;
-  applyTextChanges(changes: unknown): void;
+  applyTextChanges(changes: Iterable<IEditorTextChange> | IEditorTextChange[] | null | undefined): void;
 }
 
 export class TextModel implements ITextModel {
@@ -43,8 +44,14 @@ export class TextModel implements ITextModel {
     this._versionId += 1;
   }
 
-  applyTextChanges(changes: unknown): void {
-    const nextValue = applyTextChangesToText(this._value, changes as never, {
+  applyTextChanges(changes: Iterable<IEditorTextChange> | IEditorTextChange[] | null | undefined): void {
+    const normalizedChanges = Array.from(changes ?? []).filter(
+      (
+        change,
+      ): change is IEditorTextChange & { range: NonNullable<IEditorTextChange["range"]> } =>
+        Boolean(change?.range?.start && change.range?.end),
+    );
+    const nextValue = applyTextChangesToText(this._value, normalizedChanges as never, {
       normalizeNewlines: true,
     });
     if (nextValue === this._value) {

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import {
   DocumentFactory,
   WebEditorCore,
@@ -10,7 +9,49 @@ import {
   DecorationApplyMode,
   DecorationProviderManager,
   SweetLineIncrementalDecorationProvider,
+  type IAnyRecord,
+  type IAnyValue,
+  type IEditorGestureEvent,
+  type IEditorKeyEvent,
+  type IEditorMetadata,
+  type IEditorTextChange,
+  type ILanguageConfiguration,
+  type ITextPosition,
+  type ITextRange,
+  type IVisibleLineRange,
 } from "@opensweeteditor/core";
+
+type IWidgetLocale = "en" | "zh-CN";
+
+interface IWidgetI18nBundle {
+  contextMenu: Record<string, string>;
+  performance: {
+    title: string;
+    hide: string;
+    open: string;
+    chartUnavailable: string;
+    stutterListTitle: string;
+    stutterListEmpty: string;
+    reasons: Record<string, string>;
+    labels: Record<string, string>;
+    legend: Record<string, string>;
+    units: {
+      ms: string;
+      pxPerSec: string;
+    };
+  };
+}
+
+interface IEChartsStatic {
+  init: (...args: IAnyValue[]) => IAnyValue;
+  graphic?: IAnyRecord;
+}
+
+declare global {
+  interface Window {
+    echarts?: IEChartsStatic;
+  }
+}
 
 const FALLBACK_EVENT_TYPE = {
   TOUCH_DOWN: 1,
@@ -82,13 +123,13 @@ const FALLBACK_HIT_TARGET_TYPE = {
   INLAY_HINT_COLOR: 6,
 };
 
-function resolveEnum(moduleObj, enumName, fallback) {
+function resolveEnum(moduleObj:IAnyValue, enumName:string, fallback:IAnyValue) {
   const enumObj = moduleObj && moduleObj[enumName];
   if (!enumObj || typeof enumObj !== "object") {
     return fallback;
   }
   const resolved = { ...fallback };
-  Object.keys(fallback).forEach((key) => {
+  Object.keys(fallback).forEach((key:string) => {
     if (!(key in enumObj)) return;
     const value = toFiniteNumber(enumObj[key]);
     if (value !== null) {
@@ -98,7 +139,7 @@ function resolveEnum(moduleObj, enumName, fallback) {
   return resolved;
 }
 
-function toFiniteNumber(value) {
+function toFiniteNumber(value:IAnyValue) {
   if (value && typeof value === "object" && "value" in value) {
     const enumValue = Number(value.value);
     if (Number.isFinite(enumValue)) {
@@ -113,7 +154,7 @@ function toFiniteNumber(value) {
   return null;
 }
 
-function toInt(value, fallback = 0) {
+function toInt(value:IAnyValue, fallback:number = 0): number {
   const n = toFiniteNumber(value);
   if (n === null) {
     return fallback;
@@ -121,7 +162,7 @@ function toInt(value, fallback = 0) {
   return Math.trunc(n);
 }
 
-function asArray(value) {
+function asArray(value:IAnyValue): IAnyValue[] {
   if (Array.isArray(value)) {
     return value;
   }
@@ -150,13 +191,13 @@ function asArray(value) {
   return [];
 }
 
-function cloneTheme(theme) {
+function cloneTheme(theme:IAnyRecord) {
   return { ...theme };
 }
 
-function forVector(vec, fn) {
+function forVector(vec:IAnyValue, fn:(value: IAnyValue, index: number) => void): void {
   if (!vec || typeof vec.size !== "function") return;
-  const size = vec.size();
+  const size = Math.max(0, toInt(vec.size(), 0));
   for (let i = 0; i < size; i += 1) {
     fn(vec.get(i), i);
   }
@@ -170,7 +211,7 @@ const DEFAULT_ECHARTS_CDN_CANDIDATES = Object.freeze([
   "https://cdn.staticfile.org/echarts/5.5.0/echarts.min.js",
 ]);
 
-const WIDGET_I18N = {
+const WIDGET_I18N: Record<IWidgetLocale, IWidgetI18nBundle> = {
   en: {
     contextMenu: {
       undo: "Undo",
@@ -271,19 +312,20 @@ const WIDGET_I18N = {
   },
 };
 
-function resolveLocale(locale) {
+function resolveLocale(locale:string): IWidgetLocale {
   const value = String(locale || "").toLowerCase();
   return value.startsWith("zh") ? "zh-CN" : "en";
 }
-function resolveI18nBundle(locale) {
-  return WIDGET_I18N[locale] || WIDGET_I18N.en;
+function resolveI18nBundle(locale:string): IWidgetI18nBundle {
+  const key = locale === "zh-CN" ? "zh-CN" : "en";
+  return WIDGET_I18N[key];
 }
 
-const echartsLoadPromiseByUrl = new Map();
+const echartsLoadPromiseByUrl = new Map<string, Promise<IAnyValue>>();
 
-function resolveEchartsCdnCandidates(cdnUrl) {
+function resolveEchartsCdnCandidates(cdnUrl:IAnyValue): string[] {
   const seen = new Set();
-  const pushCandidate = (value, out) => {
+  const pushCandidate = (value:IAnyValue, out:string[]) => {
     const url = String(value || "").trim();
     if (!url || seen.has(url)) {
       return;
@@ -292,25 +334,25 @@ function resolveEchartsCdnCandidates(cdnUrl) {
     out.push(url);
   };
 
-  const candidates = [];
+  const candidates:string[] = [];
   if (Array.isArray(cdnUrl)) {
-    cdnUrl.forEach((url) => pushCandidate(url, candidates));
+    cdnUrl.forEach((url:string) => pushCandidate(url, candidates));
   } else {
     const raw = String(cdnUrl || "").trim();
     if (raw.includes(",")) {
-      raw.split(",").forEach((url) => pushCandidate(url, candidates));
+      raw.split(",").forEach((url:string) => pushCandidate(url, candidates));
     } else {
       pushCandidate(raw, candidates);
     }
   }
 
   if (candidates.length === 0) {
-    DEFAULT_ECHARTS_CDN_CANDIDATES.forEach((url) => pushCandidate(url, candidates));
+    DEFAULT_ECHARTS_CDN_CANDIDATES.forEach((url:string) => pushCandidate(url, candidates));
   }
   return candidates;
 }
 
-function loadEchartsFromUrl(url) {
+function loadEchartsFromUrl(url:string): Promise<IAnyValue> {
   if (typeof window === "undefined" || typeof document === "undefined") {
     return Promise.reject(new Error("ECharts requires browser environment"));
   }
@@ -322,11 +364,12 @@ function loadEchartsFromUrl(url) {
   if (!normalizedUrl) {
     return Promise.reject(new Error("ECharts CDN url is empty"));
   }
-  if (echartsLoadPromiseByUrl.has(normalizedUrl)) {
-    return echartsLoadPromiseByUrl.get(normalizedUrl);
+  const cached = echartsLoadPromiseByUrl.get(normalizedUrl);
+  if (cached) {
+    return cached;
   }
 
-  const promise = new Promise((resolve, reject) => {
+  const promise = new Promise<IAnyValue>((resolve, reject) => {
     const selector = `script[data-sweeteditor-echarts="true"][src="${normalizedUrl}"]`;
     const existing = document.querySelector(selector);
     if (existing) {
@@ -370,7 +413,7 @@ function loadEchartsFromUrl(url) {
       reject(new Error(`Failed to load ECharts from ${normalizedUrl}`));
     };
     document.head.appendChild(script);
-  }).catch((error) => {
+  }).catch((error:IAnyValue) => {
     echartsLoadPromiseByUrl.delete(normalizedUrl);
     throw error;
   });
@@ -379,17 +422,17 @@ function loadEchartsFromUrl(url) {
   return promise;
 }
 
-function loadEchartsFromCdn(cdnUrl) {
+function loadEchartsFromCdn(cdnUrl:string): Promise<IAnyValue> {
   const candidates = resolveEchartsCdnCandidates(cdnUrl);
   if (candidates.length === 0) {
     return Promise.reject(new Error("No available ECharts CDN candidates"));
   }
 
-  const errors = [];
-  let chain = Promise.reject(new Error("start"));
-  candidates.forEach((url) => {
+  const errors:string[] = [];
+  let chain: Promise<IAnyValue> = Promise.reject(new Error("start"));
+  candidates.forEach((url:string) => {
     chain = chain.catch(() => (
-      loadEchartsFromUrl(url).catch((error) => {
+      loadEchartsFromUrl(url).catch((error:IAnyValue) => {
         errors.push(`${url}: ${String(error?.message || error || "Unknown error")}`);
         throw error;
       })
@@ -429,7 +472,7 @@ export const EditorEventType = Object.freeze({
   GUTTER_ICON_CLICK: "GutterIconClick",
   FOLD_TOGGLE: "FoldToggle",
   DOCUMENT_LOADED: "DocumentLoaded",
-});
+}) as Readonly<Record<string, string>>;
 
 const TextChangeAction = Object.freeze({
   INSERT: "Insert",
@@ -439,7 +482,7 @@ const TextChangeAction = Object.freeze({
   COMPOSITION: "Composition",
 });
 
-function clonePosition(position) {
+function clonePosition(position:ITextPosition | null | undefined): ITextPosition | null {
   if (!position) {
     return null;
   }
@@ -449,30 +492,35 @@ function clonePosition(position) {
   };
 }
 
-function cloneRange(range) {
+function cloneRange(range:IAnyValue): ITextRange | null {
   if (!range || !range.start || !range.end) {
     return null;
   }
+  const start = clonePosition(range.start);
+  const end = clonePosition(range.end);
+  if (!start || !end) {
+    return null;
+  }
   return {
-    start: clonePosition(range.start),
-    end: clonePosition(range.end),
+    start,
+    end,
   };
 }
 
-function equalPosition(a, b) {
+function equalPosition(a:IAnyValue, b:IAnyValue) {
   if (!a && !b) return true;
   if (!a || !b) return false;
   return toInt(a.line, -1) === toInt(b.line, -1)
     && toInt(a.column, -1) === toInt(b.column, -1);
 }
 
-function equalRange(a, b) {
+function equalRange(a:IAnyValue, b:IAnyValue) {
   if (!a && !b) return true;
   if (!a || !b) return false;
   return equalPosition(a.start, b.start) && equalPosition(a.end, b.end);
 }
 
-function isImageLikeObject(value) {
+function isImageLikeObject(value:IAnyValue) {
   if (!value || typeof value !== "object") {
     return false;
   }
@@ -494,17 +542,20 @@ function isImageLikeObject(value) {
   return false;
 }
 
-function argbToCss(argb, fallback) {
+function argbToCss(argb:IAnyValue, fallback:string): string {
   if (!argb) return fallback;
-  const a = ((argb >>> 24) & 0xff) / 255;
-  const r = (argb >>> 16) & 0xff;
-  const g = (argb >>> 8) & 0xff;
-  const b = argb & 0xff;
+  const value = toInt(argb, 0);
+  const a = ((value >>> 24) & 0xff) / 255;
+  const r = (value >>> 16) & 0xff;
+  const g = (value >>> 8) & 0xff;
+  const b = value & 0xff;
   return `rgba(${r}, ${g}, ${b}, ${a.toFixed(3)})`;
 }
 
 class Canvas2DRenderer {
-  constructor(theme = {}) {
+  [key: string]: IAnyValue;
+
+  constructor(theme:IAnyRecord = {}) {
     this.theme = { ...DEFAULT_THEME, ...cloneTheme(theme) };
     this._measureCanvas = document.createElement("canvas");
     this._measureCtx = this._measureCanvas.getContext("2d");
@@ -517,15 +568,15 @@ class Canvas2DRenderer {
 
   createTextMeasurerCallbacks() {
     return {
-      measureTextWidth: (text, fontStyle) => {
+      measureTextWidth: (text:string, fontStyle:number) => {
         this._measureCtx.font = this._fontByStyle(fontStyle);
         return this._measureCtx.measureText(text || "").width;
       },
-      measureInlayHintWidth: (text) => {
+      measureInlayHintWidth: (text:string) => {
         this._measureCtx.font = `12px ${this._fontFamily}`;
         return this._measureCtx.measureText(text || "").width;
       },
-      measureIconWidth: (iconId) => {
+      measureIconWidth: (iconId:number) => {
         const iconDescriptor = this._resolveIconDescriptor(iconId);
         const width = Number(iconDescriptor?.width);
         if (Number.isFinite(width) && width > 0) {
@@ -543,7 +594,7 @@ class Canvas2DRenderer {
     };
   }
 
-  applyTheme(theme = {}) {
+  applyTheme(theme:IAnyRecord = {}) {
     this.theme = { ...DEFAULT_THEME, ...cloneTheme(theme) };
     return this.getTheme();
   }
@@ -552,7 +603,7 @@ class Canvas2DRenderer {
     return cloneTheme(this.theme);
   }
 
-  setEditorIconProvider(provider) {
+  setEditorIconProvider(provider:IAnyValue) {
     this._iconProvider = provider || null;
   }
 
@@ -560,7 +611,7 @@ class Canvas2DRenderer {
     return this._iconProvider;
   }
 
-  _setPixelSnapContext(ctx) {
+  _setPixelSnapContext(ctx:IAnyRecord) {
     if (!ctx || typeof ctx.getTransform !== "function") {
       this._pixelRatioX = 1;
       this._pixelRatioY = 1;
@@ -573,7 +624,7 @@ class Canvas2DRenderer {
     this._pixelRatioY = Number.isFinite(ratioY) && ratioY > 0 ? ratioY : 1;
   }
 
-  _snapX(value) {
+  _snapX(value:IAnyValue) {
     const n = Number(value);
     if (!Number.isFinite(n)) {
       return 0;
@@ -581,7 +632,7 @@ class Canvas2DRenderer {
     return Math.round(n * this._pixelRatioX) / this._pixelRatioX;
   }
 
-  _snapY(value) {
+  _snapY(value:IAnyValue) {
     const n = Number(value);
     if (!Number.isFinite(n)) {
       return 0;
@@ -589,7 +640,7 @@ class Canvas2DRenderer {
     return Math.round(n * this._pixelRatioY) / this._pixelRatioY;
   }
 
-  _snapRect(x, y, width, height) {
+  _snapRect(x:number, y:number, width:number, height:number) {
     const x1 = this._snapX(x);
     const y1 = this._snapY(y);
     const x2 = this._snapX((Number(x) || 0) + Math.max(0, Number(width) || 0));
@@ -602,7 +653,7 @@ class Canvas2DRenderer {
     };
   }
 
-  render(ctx, model, viewportWidth, viewportHeight) {
+  render(ctx:IAnyRecord, model:IAnyValue, viewportWidth:number, viewportHeight:number) {
     this._setPixelSnapContext(ctx);
     ctx.fillStyle = this.theme.background;
     ctx.fillRect(0, 0, viewportWidth, viewportHeight);
@@ -615,7 +666,7 @@ class Canvas2DRenderer {
     this._drawGutter(ctx, model, viewportHeight);
   }
 
-  _drawCurrentLine(ctx, model, viewportWidth) {
+  _drawCurrentLine(ctx:IAnyRecord, model:IAnyValue, viewportWidth:number) {
     if (!model.current_line) return;
     const cursor = model.cursor;
     const h = cursor && cursor.height > 0 ? cursor.height : this._baseFontSize * 1.4;
@@ -624,23 +675,23 @@ class Canvas2DRenderer {
     ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
   }
 
-  _drawSelection(ctx, model) {
+  _drawSelection(ctx:IAnyRecord, model:IAnyValue) {
     ctx.fillStyle = this.theme.selection;
-    forVector(model.selection_rects, (rect) => {
+    forVector(model.selection_rects, (rect:IAnyValue) => {
       const snapped = this._snapRect(rect.origin.x, rect.origin.y, rect.width, rect.height);
       ctx.fillRect(snapped.x, snapped.y, snapped.width, snapped.height);
     });
   }
 
-  _drawLines(ctx, model) {
-    forVector(model.lines, (line) => {
-      forVector(line.runs, (run) => {
+  _drawLines(ctx:IAnyRecord, model:IAnyValue) {
+    forVector(model.lines, (line:IAnyValue) => {
+      forVector(line.runs, (run:IAnyValue) => {
         this._drawRun(ctx, run);
       });
     });
   }
 
-  _drawRun(ctx, run) {
+  _drawRun(ctx:IAnyRecord, run:IAnyValue) {
     if (!run) return;
     const style = run.style || {};
     const text = run.text || "";
@@ -675,14 +726,14 @@ class Canvas2DRenderer {
     }
   }
 
-  _drawCursor(ctx, model) {
+  _drawCursor(ctx:IAnyRecord, model:IAnyValue) {
     if (!model.cursor || !model.cursor.visible) return;
     const rect = this._snapRect(model.cursor.position.x, model.cursor.position.y, 2, model.cursor.height);
     ctx.fillStyle = this.theme.cursor;
     ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
   }
 
-  _drawGutter(ctx, model, viewportHeight) {
+  _drawGutter(ctx:IAnyRecord, model:IAnyValue, viewportHeight:number) {
     if (model.split_x <= 0) return;
     const gutterRect = this._snapRect(0, 0, model.split_x, viewportHeight);
     ctx.fillStyle = this.theme.background;
@@ -699,22 +750,22 @@ class Canvas2DRenderer {
 
     ctx.fillStyle = this.theme.lineNumber;
     ctx.font = `12px ${this._fontFamily}`;
-    forVector(model.lines, (line) => {
+    forVector(model.lines, (line:IAnyValue) => {
       if (line.wrap_index !== 0 || line.is_phantom_line) return;
       const p = line.line_number_position;
       ctx.fillText(String(line.logical_line + 1), p.x, this._snapY(p.y));
     });
 
-    forVector(model.gutter_icons, (item) => {
+    forVector(model.gutter_icons, (item:IAnyValue) => {
       this._drawGutterIcon(ctx, item);
     });
 
-    forVector(model.fold_markers, (item) => {
+    forVector(model.fold_markers, (item:IAnyValue) => {
       this._drawFoldMarker(ctx, item);
     });
   }
 
-  _fontByStyle(fontStyle) {
+  _fontByStyle(fontStyle:number) {
     const bold = (fontStyle & 1) !== 0;
     const italic = (fontStyle & 2) !== 0;
     const weight = bold ? "700" : "400";
@@ -722,7 +773,7 @@ class Canvas2DRenderer {
     return `${slope} ${weight} ${this._baseFontSize}px ${this._fontFamily}`;
   }
 
-  _drawInlayHintRun(ctx, run, topY, style, text) {
+  _drawInlayHintRun(ctx:IAnyRecord, run:IAnyValue, topY:number, style:IAnyValue, text:string) {
     const margin = Math.max(0, Number(run.margin) || 0);
     const padding = Math.max(0, Number(run.padding) || 0);
     const runHeight = this._baseFontSize * 1.3;
@@ -769,7 +820,7 @@ class Canvas2DRenderer {
     }
   }
 
-  _drawGutterIcon(ctx, item) {
+  _drawGutterIcon(ctx:IAnyRecord, item:IAnyValue) {
     if (!item) return;
     const width = Number(item.width);
     const height = Number(item.height);
@@ -782,7 +833,7 @@ class Canvas2DRenderer {
     this._drawIconGlyphOrImage(ctx, iconId, x, y, width, height, false);
   }
 
-  _drawFoldMarker(ctx, marker) {
+  _drawFoldMarker(ctx:IAnyRecord, marker:IAnyValue) {
     if (!marker) return;
     const width = Number(marker.width);
     const height = Number(marker.height);
@@ -816,7 +867,7 @@ class Canvas2DRenderer {
     ctx.stroke();
   }
 
-  _drawIconGlyphOrImage(ctx, iconId, x, y, width, height, inlay = false) {
+  _drawIconGlyphOrImage(ctx:IAnyRecord, iconId:number, x:number, y:number, width:number, height:number, inlay:IAnyValue = false) {
     if (iconId <= 0 || width <= 0 || height <= 0) {
       return;
     }
@@ -866,7 +917,7 @@ class Canvas2DRenderer {
     ctx.fillRect(colorRect.x, colorRect.y, colorRect.width, colorRect.height);
   }
 
-  _resolveIconDescriptor(iconId) {
+  _resolveIconDescriptor(iconId:number) {
     const provider = this._iconProvider;
     if (!provider) {
       return null;
@@ -920,7 +971,9 @@ class Canvas2DRenderer {
 }
 
 class CompletionPopupController {
-  constructor(container) {
+  [key: string]: IAnyValue;
+
+  constructor(container:IAnyValue) {
     this._container = container;
     this._panel = document.createElement("div");
     this._panel.style.position = "absolute";
@@ -948,11 +1001,11 @@ class CompletionPopupController {
     this._container.appendChild(this._panel);
   }
 
-  setConfirmListener(listener) {
+  setConfirmListener(listener:(...args: IAnyValue[]) => IAnyValue) {
     this._confirmListener = typeof listener === "function" ? listener : null;
   }
 
-  setRenderer(renderer) {
+  setRenderer(renderer:IAnyValue) {
     this._renderer = typeof renderer === "function" ? renderer : null;
     this._renderItems();
   }
@@ -961,7 +1014,7 @@ class CompletionPopupController {
     return this._panel.style.display !== "none";
   }
 
-  updateCursorPosition(x, y, height) {
+  updateCursorPosition(x:number, y:number, height:number) {
     this._cursorX = Number.isFinite(x) ? x : 0;
     this._cursorY = Number.isFinite(y) ? y : 0;
     this._cursorHeight = Math.max(12, Number.isFinite(height) ? height : 18);
@@ -970,7 +1023,7 @@ class CompletionPopupController {
     }
   }
 
-  updateItems(items) {
+  updateItems(items:IAnyValue[]) {
     this._items = asArray(items).slice();
     this._selectedIndex = 0;
     if (this._items.length === 0) {
@@ -996,7 +1049,7 @@ class CompletionPopupController {
     this._renderer = null;
   }
 
-  handleKeyEvent(event) {
+  handleKeyEvent(event:IAnyRecord) {
     if (!this.isShowing || this._items.length === 0) {
       return false;
     }
@@ -1054,7 +1107,7 @@ class CompletionPopupController {
   _renderItems() {
     this._panel.innerHTML = "";
 
-    this._items.forEach((item, index) => {
+    this._items.forEach((item:IAnyValue, index:number) => {
       const row = document.createElement("div");
       row.style.display = "flex";
       row.style.alignItems = "center";
@@ -1110,7 +1163,7 @@ class CompletionPopupController {
         this._rerenderSelection();
       });
 
-      row.addEventListener("mousedown", (event) => {
+      row.addEventListener("mousedown", (event:IAnyRecord) => {
         event.preventDefault();
         this._selectedIndex = index;
         this._confirmSelected();
@@ -1120,7 +1173,7 @@ class CompletionPopupController {
     });
   }
 
-  _kindLetter(kind) {
+  _kindLetter(kind:string) {
     switch (toInt(kind, CompletionItem.KIND_TEXT)) {
       case CompletionItem.KIND_KEYWORD: return "K";
       case CompletionItem.KIND_FUNCTION: return "F";
@@ -1134,7 +1187,7 @@ class CompletionPopupController {
     }
   }
 
-  _moveSelection(delta) {
+  _moveSelection(delta:number) {
     if (this._items.length === 0) {
       return;
     }
@@ -1162,7 +1215,9 @@ class CompletionPopupController {
   }
 }
 export class SweetEditorWidget {
-  constructor(container, wasmModule, options = {}) {
+  [key: string]: IAnyValue;
+
+  constructor(container: HTMLElement, wasmModule:IAnyValue, options: IAnyRecord = {}) {
     this.container = container;
     this._wasm = wasmModule;
     this._options = options;
@@ -1299,8 +1354,8 @@ export class SweetEditorWidget {
     };
     this._settingsFacade = this._createSettingsFacade();
 
-    this._onDocumentPointerDown = (event) => this._handleDocumentPointerDown(event);
-    this._onDocumentKeyDown = (event) => this._handleDocumentKeyDown(event);
+    this._onDocumentPointerDown = (event:IAnyRecord) => this._handleDocumentPointerDown(event);
+    this._onDocumentKeyDown = (event:IAnyRecord) => this._handleDocumentKeyDown(event);
     this._onWindowBlur = () => {
       this._documentKeyRouteActive = false;
       this._hideContextMenu();
@@ -1308,11 +1363,11 @@ export class SweetEditorWidget {
     };
 
     this._completionPopupController = new CompletionPopupController(this.container);
-    this._completionPopupController.setConfirmListener((item) => this._applyCompletionItem(item));
+    this._completionPopupController.setConfirmListener((item:IAnyValue) => this._applyCompletionItem(item));
 
     this._completionProviderManager = new CompletionProviderManager({
-      buildContext: (triggerKind, triggerCharacter) => this._buildCompletionContext(triggerKind, triggerCharacter),
-      onItemsUpdated: (items) => {
+      buildContext: (triggerKind:number, triggerCharacter:string) => this._buildCompletionContext(triggerKind, triggerCharacter),
+      onItemsUpdated: (items:IAnyValue[]) => {
         this._updateCompletionPopupCursorAnchor();
         this._completionPopupController.updateItems(items);
       },
@@ -1323,13 +1378,13 @@ export class SweetEditorWidget {
 
     const decorationOptions = options.decorationOptions || options.decorationProviderOptions || {};
     this._decorationProviderManager = new DecorationProviderManager({
-      buildContext: (ctx) => new DecorationContext(ctx),
+      buildContext: (ctx:IAnyRecord) => new DecorationContext(ctx),
       getVisibleLineRange: () => this.getVisibleLineRange(),
       ensureVisibleLineRange: () => this._refreshRenderModelSnapshot(),
       getTotalLineCount: () => this.getTotalLineCount(),
       getLanguageConfiguration: () => this._languageConfiguration,
       getMetadata: () => this._metadata,
-      onApplyMerged: (merged, visibleRange) => this._applyMergedDecorations(merged, visibleRange),
+      onApplyMerged: (merged:IAnyValue, visibleRange:IVisibleLineRange) => this._applyMergedDecorations(merged, visibleRange),
       textChangeMode: decorationOptions.textChangeMode,
       resultDispatchMode: decorationOptions.resultDispatchMode,
       providerCallMode: decorationOptions.providerCallMode,
@@ -1367,7 +1422,7 @@ export class SweetEditorWidget {
     return this._documentFactory;
   }
 
-  subscribe(eventType, listener) {
+  subscribe(eventType:IAnyValue, listener:(...args: IAnyValue[]) => IAnyValue) {
     const key = String(eventType || "");
     if (!key || typeof listener !== "function") {
       return () => {};
@@ -1382,7 +1437,7 @@ export class SweetEditorWidget {
     };
   }
 
-  unsubscribe(eventType, listener) {
+  unsubscribe(eventType:IAnyValue, listener:(...args: IAnyValue[]) => IAnyValue) {
     const key = String(eventType || "");
     if (!key || typeof listener !== "function") {
       return;
@@ -1401,7 +1456,7 @@ export class SweetEditorWidget {
     return this._settingsFacade;
   }
 
-  applyTheme(theme = {}) {
+  applyTheme(theme:IAnyRecord = {}) {
     this._renderer.applyTheme(theme || {});
     this._markDirty();
     return this.getTheme();
@@ -1411,7 +1466,7 @@ export class SweetEditorWidget {
     return this._renderer.getTheme();
   }
 
-  setEditorIconProvider(provider) {
+  setEditorIconProvider(provider:IAnyValue) {
     this._renderer.setEditorIconProvider(provider || null);
     this._markDirty();
   }
@@ -1420,7 +1475,7 @@ export class SweetEditorWidget {
     return this._renderer.getEditorIconProvider();
   }
 
-  addNewLineActionProvider(provider) {
+  addNewLineActionProvider(provider:IAnyValue) {
     if (typeof provider !== "function") {
       return;
     }
@@ -1429,25 +1484,25 @@ export class SweetEditorWidget {
     }
   }
 
-  removeNewLineActionProvider(provider) {
+  removeNewLineActionProvider(provider:IAnyValue) {
     const index = this._newLineActionProviders.indexOf(provider);
     if (index >= 0) {
       this._newLineActionProviders.splice(index, 1);
     }
   }
 
-  setScale(scale) {
+  setScale(scale:number) {
     this._core.setScale(scale);
     this._emitScrollScaleFromCore(false, true);
   }
 
-  setWrapMode(mode) {
+  setWrapMode(mode:IAnyValue) {
     const value = toInt(mode, 0);
     this._settingsState.wrapMode = value;
     this._core.setWrapMode(value);
   }
 
-  setReadOnly(readOnly) {
+  setReadOnly(readOnly:boolean) {
     const value = !!readOnly;
     this._settingsState.readOnly = value;
     this._core.setReadOnly(value);
@@ -1457,7 +1512,7 @@ export class SweetEditorWidget {
     return !!this._core.isReadOnly();
   }
 
-  setAutoIndentMode(mode) {
+  setAutoIndentMode(mode:IAnyValue) {
     const value = toInt(mode, 0);
     this._settingsState.autoIndentMode = value;
     this._core.setAutoIndentMode(value);
@@ -1467,13 +1522,13 @@ export class SweetEditorWidget {
     return this._core.getAutoIndentMode();
   }
 
-  setMaxGutterIcons(count) {
+  setMaxGutterIcons(count:number) {
     const value = Math.max(0, toInt(count, 0));
     this._settingsState.maxGutterIcons = value;
     this._core.setMaxGutterIcons(value);
   }
 
-  setLineSpacing(add, mult) {
+  setLineSpacing(add:number, mult:number) {
     const addValue = Number(add);
     const multValue = Number(mult);
     this._settingsState.lineSpacingAdd = Number.isFinite(addValue) ? addValue : 0;
@@ -1481,7 +1536,7 @@ export class SweetEditorWidget {
     this._core.setLineSpacing(this._settingsState.lineSpacingAdd, this._settingsState.lineSpacingMult);
   }
 
-  setContentStartPadding(padding) {
+  setContentStartPadding(padding:number) {
     const value = Number(padding);
     this._settingsState.contentStartPadding = Number.isFinite(value) ? value : 0;
     this._core.setContentStartPadding(this._settingsState.contentStartPadding);
@@ -1491,7 +1546,7 @@ export class SweetEditorWidget {
     return this._settingsState.contentStartPadding || 0;
   }
 
-  setDecorationScrollRefreshMinIntervalMs(intervalMs) {
+  setDecorationScrollRefreshMinIntervalMs(intervalMs:number) {
     const value = Math.max(0, toInt(intervalMs, 0));
     this.setDecorationProviderOptions({ scrollRefreshMinIntervalMs: value });
   }
@@ -1500,7 +1555,7 @@ export class SweetEditorWidget {
     return toInt(this.getDecorationProviderOptions()?.scrollRefreshMinIntervalMs, 0);
   }
 
-  setDecorationOverscanViewportMultiplier(multiplier) {
+  setDecorationOverscanViewportMultiplier(multiplier:number) {
     const value = Number(multiplier);
     this.setDecorationProviderOptions({
       overscanViewportMultiplier: Number.isFinite(value) ? Math.max(0, value) : 0.5,
@@ -1512,33 +1567,33 @@ export class SweetEditorWidget {
     return Number.isFinite(value) ? value : 0.5;
   }
 
-  insert(text) {
+  insert(text:string) {
     const result = this._core.insert(String(text ?? ""));
     this._handleTextEditResult(result, { action: TextChangeAction.INSERT });
     return result;
   }
 
-  insertText(text) {
+  insertText(text:string) {
     return this.insert(text);
   }
 
-  replace(range, newText) {
+  replace(range:ITextRange, newText:string) {
     const result = this._core.replaceText(range, String(newText ?? ""));
     this._handleTextEditResult(result, { action: TextChangeAction.INSERT });
     return result;
   }
 
-  replaceText(range, newText) {
+  replaceText(range:ITextRange, newText:string) {
     return this.replace(range, newText);
   }
 
-  delete(range) {
+  delete(range:ITextRange) {
     const result = this._core.deleteText(range);
     this._handleTextEditResult(result, { action: TextChangeAction.INSERT });
     return result;
   }
 
-  deleteText(range) {
+  deleteText(range:ITextRange) {
     return this.delete(range);
   }
 
@@ -1566,7 +1621,7 @@ export class SweetEditorWidget {
     return this._core.getCursorPosition();
   }
 
-  setCursorPosition(position) {
+  setCursorPosition(position:ITextPosition) {
     this._core.setCursorPosition(position);
     this._emitStateEventsFromCore({ forceCursor: true });
   }
@@ -1589,7 +1644,7 @@ export class SweetEditorWidget {
     return !!this._core.hasSelection();
   }
 
-  setSelection(startOrRange, startColumn, endLine, endColumn) {
+  setSelection(startOrRange:ITextRange | ITextPosition, startColumn:number, endLine:number, endColumn:number) {
     this._core.setSelection(startOrRange, startColumn, endLine, endColumn);
     this._emitStateEventsFromCore({ forceCursor: true, forceSelection: true });
   }
@@ -1608,51 +1663,51 @@ export class SweetEditorWidget {
     return String(this._core.getSelectedText() ?? "");
   }
 
-  moveCursorLeft(extendSelection = false) {
+  moveCursorLeft(extendSelection:boolean = false) {
     this._core.moveCursorLeft(extendSelection);
     this._emitStateEventsFromCore({ forceCursor: true, forceSelection: !!extendSelection });
   }
 
-  moveCursorRight(extendSelection = false) {
+  moveCursorRight(extendSelection:boolean = false) {
     this._core.moveCursorRight(extendSelection);
     this._emitStateEventsFromCore({ forceCursor: true, forceSelection: !!extendSelection });
   }
 
-  moveCursorUp(extendSelection = false) {
+  moveCursorUp(extendSelection:boolean = false) {
     this._core.moveCursorUp(extendSelection);
     this._emitStateEventsFromCore({ forceCursor: true, forceSelection: !!extendSelection });
   }
 
-  moveCursorDown(extendSelection = false) {
+  moveCursorDown(extendSelection:boolean = false) {
     this._core.moveCursorDown(extendSelection);
     this._emitStateEventsFromCore({ forceCursor: true, forceSelection: !!extendSelection });
   }
 
-  moveCursorToLineStart(extendSelection = false) {
+  moveCursorToLineStart(extendSelection:boolean = false) {
     this._core.moveCursorToLineStart(extendSelection);
     this._emitStateEventsFromCore({ forceCursor: true, forceSelection: !!extendSelection });
   }
 
-  moveCursorToLineEnd(extendSelection = false) {
+  moveCursorToLineEnd(extendSelection:boolean = false) {
     this._core.moveCursorToLineEnd(extendSelection);
     this._emitStateEventsFromCore({ forceCursor: true, forceSelection: !!extendSelection });
   }
 
-  goto(line, column = 0) {
+  goto(line:number, column:number = 0) {
     this.gotoPosition(line, column);
   }
 
-  gotoPosition(line, column = 0) {
+  gotoPosition(line:number, column:number = 0) {
     this._core.gotoPosition(line, column);
     this._emitStateEventsFromCore({ forceCursor: true, includeScrollScale: true });
   }
 
-  scrollToLine(line, behavior = 0) {
+  scrollToLine(line:number, behavior:number = 0) {
     this._core.scrollToLine(line, behavior);
     this._emitScrollScaleFromCore(true, false);
   }
 
-  setScroll(scrollX, scrollY) {
+  setScroll(scrollX:number, scrollY:number) {
     this._core.setScroll(scrollX, scrollY);
     this._emitScrollScaleFromCore(true, false);
   }
@@ -1661,7 +1716,7 @@ export class SweetEditorWidget {
     return this._core.getScrollMetrics();
   }
 
-  getPositionRect(line, column) {
+  getPositionRect(line:number, column:number) {
     return this._core.getPositionRect(line, column);
   }
 
@@ -1677,75 +1732,75 @@ export class SweetEditorWidget {
     return this._core.getLayoutMetrics();
   }
 
-  setLineInlayHints(line, hints) {
+  setLineInlayHints(line:number, hints:IAnyValue[]) {
     this._core.setLineInlayHints(line, hints);
   }
 
-  setBatchLineInlayHints(hintsByLine) {
+  setBatchLineInlayHints(hintsByLine:IAnyValue) {
     this._core.setBatchLineInlayHints(hintsByLine);
   }
 
-  setLinePhantomTexts(line, phantoms) {
+  setLinePhantomTexts(line:number, phantoms:IAnyValue) {
     this._core.setLinePhantomTexts(line, phantoms);
   }
 
-  setBatchLinePhantomTexts(phantomsByLine) {
+  setBatchLinePhantomTexts(phantomsByLine:IAnyValue) {
     this._core.setBatchLinePhantomTexts(phantomsByLine);
   }
 
-  setLineGutterIcons(line, icons) {
+  setLineGutterIcons(line:number, icons:IAnyValue[]) {
     this._core.setLineGutterIcons(line, icons);
   }
 
-  setBatchLineGutterIcons(iconsByLine) {
+  setBatchLineGutterIcons(iconsByLine:IAnyValue) {
     this._core.setBatchLineGutterIcons(iconsByLine);
   }
 
-  setLineDiagnostics(line, diagnostics) {
+  setLineDiagnostics(line:number, diagnostics:IAnyValue[]) {
     this._core.setLineDiagnostics(line, diagnostics);
   }
 
-  setBatchLineDiagnostics(diagsByLine) {
+  setBatchLineDiagnostics(diagsByLine:IAnyValue) {
     this._core.setBatchLineDiagnostics(diagsByLine);
   }
 
-  setIndentGuides(guides) {
+  setIndentGuides(guides:IAnyValue[]) {
     this._core.setIndentGuides(guides);
   }
 
-  setBatchIndentGuides(guides) {
+  setBatchIndentGuides(guides:IAnyValue[]) {
     this.setIndentGuides(guides);
   }
 
-  setBracketGuides(guides) {
+  setBracketGuides(guides:IAnyValue[]) {
     this._core.setBracketGuides(guides);
   }
 
-  setBatchBracketGuides(guides) {
+  setBatchBracketGuides(guides:IAnyValue[]) {
     this.setBracketGuides(guides);
   }
 
-  setFlowGuides(guides) {
+  setFlowGuides(guides:IAnyValue[]) {
     this._core.setFlowGuides(guides);
   }
 
-  setBatchFlowGuides(guides) {
+  setBatchFlowGuides(guides:IAnyValue[]) {
     this.setFlowGuides(guides);
   }
 
-  setSeparatorGuides(guides) {
+  setSeparatorGuides(guides:IAnyValue[]) {
     this._core.setSeparatorGuides(guides);
   }
 
-  setBatchSeparatorGuides(guides) {
+  setBatchSeparatorGuides(guides:IAnyValue[]) {
     this.setSeparatorGuides(guides);
   }
 
-  setFoldRegions(regions) {
+  setFoldRegions(regions:IAnyValue[]) {
     this._core.setFoldRegions(regions);
   }
 
-  setBatchFoldRegions(regions) {
+  setBatchFoldRegions(regions:IAnyValue[]) {
     this.setFoldRegions(regions);
   }
 
@@ -1773,13 +1828,13 @@ export class SweetEditorWidget {
     this._core.clearAllDecorations();
   }
 
-  insertSnippet(snippetTemplate) {
+  insertSnippet(snippetTemplate:string) {
     const result = this._core.insertSnippet(snippetTemplate);
     this._handleTextEditResult(result, { action: TextChangeAction.INSERT });
     return result;
   }
 
-  startLinkedEditing(model) {
+  startLinkedEditing(model:IAnyValue) {
     this._core.startLinkedEditing(model || {});
     this._markDirty();
   }
@@ -1808,19 +1863,19 @@ export class SweetEditorWidget {
     this._core.finishLinkedEditing();
   }
 
-  toggleFoldAt(line) {
+  toggleFoldAt(line:number) {
     return !!this._core.toggleFoldAt(line);
   }
 
-  toggleFold(line) {
+  toggleFold(line:number) {
     return this.toggleFoldAt(line);
   }
 
-  foldAt(line) {
+  foldAt(line:number) {
     return !!this._core.foldAt(line);
   }
 
-  unfoldAt(line) {
+  unfoldAt(line:number) {
     return !!this._core.unfoldAt(line);
   }
 
@@ -1832,11 +1887,11 @@ export class SweetEditorWidget {
     this._core.unfoldAll();
   }
 
-  isLineVisible(line) {
+  isLineVisible(line:number) {
     return !!this._core.isLineVisible(line);
   }
 
-  setMatchedBrackets(open, close, closeLine, closeColumn) {
+  setMatchedBrackets(open:IAnyValue, close:IAnyValue, closeLine:IAnyValue, closeColumn:IAnyValue) {
     if (arguments.length >= 4) {
       this._core.setMatchedBrackets(open, close, closeLine, closeColumn);
       return;
@@ -1848,7 +1903,7 @@ export class SweetEditorWidget {
     this._core.clearMatchedBrackets();
   }
 
-  setLocale(locale) {
+  setLocale(locale:string) {
     this._locale = resolveLocale(locale);
     this._i18n = resolveI18nBundle(this._locale);
     this._refreshContextMenuLabels();
@@ -1857,7 +1912,7 @@ export class SweetEditorWidget {
     this._updatePerformanceChart();
   }
 
-  setPerformanceOverlayEnabled(enabled) {
+  setPerformanceOverlayEnabled(enabled:boolean) {
     this._performanceOverlayEnabled = !!enabled;
     if (!this._performanceOverlayEnabled) {
       this._performanceOverlayVisible = false;
@@ -1879,7 +1934,7 @@ export class SweetEditorWidget {
     return !!this._performanceOverlayEnabled;
   }
 
-  setPerformanceOverlayVisible(visible) {
+  setPerformanceOverlayVisible(visible:boolean) {
     this._performanceOverlayVisible = !!visible && this._performanceOverlayEnabled;
     this._applyPerformanceOverlayVisibility();
   }
@@ -1891,10 +1946,10 @@ export class SweetEditorWidget {
   getPerformanceStats() {
     const stats = this._perfStats || {};
     const history = Array.isArray(stats.history)
-      ? stats.history.map((item) => ({ ...item }))
+      ? stats.history.map((item:IAnyValue) => ({ ...item }))
       : [];
     const stutterEvents = Array.isArray(stats.stutterEvents)
-      ? stats.stutterEvents.map((item) => ({ ...item }))
+      ? stats.stutterEvents.map((item:IAnyValue) => ({ ...item }))
       : [];
     return {
       enabled: !!this._performanceOverlayEnabled,
@@ -1918,7 +1973,7 @@ export class SweetEditorWidget {
     };
   }
 
-  setLanguageConfiguration(config) {
+  setLanguageConfiguration(config:IAnyRecord) {
     this._languageConfiguration = config || null;
     this._applyLanguageBracketPairs();
     this.requestDecorationRefresh();
@@ -1928,7 +1983,7 @@ export class SweetEditorWidget {
     return this._languageConfiguration;
   }
 
-  setMetadata(metadata) {
+  setMetadata(metadata:IEditorMetadata) {
     this._metadata = metadata ?? null;
   }
 
@@ -1943,7 +1998,7 @@ export class SweetEditorWidget {
     return String(this._document.getText() ?? "");
   }
 
-  loadText(text, options = {}) {
+  loadText(text:string, options:IAnyRecord = {}) {
     if (this._document) {
       this._document.dispose();
     }
@@ -1998,7 +2053,7 @@ export class SweetEditorWidget {
       this._document = null;
     }
 
-    this._ownedDecorationProviders.forEach((provider) => {
+    this._ownedDecorationProviders.forEach((provider:IAnyValue) => {
       if (provider && typeof provider.dispose === "function") {
         provider.dispose();
       }
@@ -2027,23 +2082,23 @@ export class SweetEditorWidget {
     this._input.remove();
   }
 
-  registerTextStyle(styleId, color, backgroundColor = 0, fontStyle = 0) {
+  registerTextStyle(styleId:number, color:number, backgroundColor:number = 0, fontStyle:number = 0) {
     this._core.registerTextStyle(styleId, color, backgroundColor, fontStyle);
   }
 
-  setLineSpans(line, layer, spans) {
+  setLineSpans(line:number, layer:IAnyValue, spans:IAnyValue[]) {
     this._core.setLineSpans(line, layer, spans);
   }
 
-  setBatchLineSpans(layer, spansByLine) {
+  setBatchLineSpans(layer:IAnyValue, spansByLine:IAnyValue) {
     this._core.setBatchLineSpans(layer, spansByLine);
   }
 
-  clearHighlights(layer = null) {
+  clearHighlights(layer:IAnyValue = null) {
     this._core.clearHighlights(layer);
   }
 
-  createSweetLineDecorationProvider(options = {}) {
+  createSweetLineDecorationProvider(options:IAnyRecord = {}) {
     return new SweetLineIncrementalDecorationProvider({
       ...options,
       fileName: options.fileName ?? options.sourceFileName ?? this._metadata?.fileName,
@@ -2054,7 +2109,7 @@ export class SweetEditorWidget {
     });
   }
 
-  addSweetLineDecorationProvider(options = {}) {
+  addSweetLineDecorationProvider(options:IAnyRecord = {}) {
     const provider = options instanceof SweetLineIncrementalDecorationProvider
       ? options
       : this.createSweetLineDecorationProvider(options);
@@ -2063,11 +2118,11 @@ export class SweetEditorWidget {
     return provider;
   }
 
-  addDecorationProvider(provider) {
+  addDecorationProvider(provider:IAnyValue) {
     this._decorationProviderManager.addProvider(provider);
   }
 
-  removeDecorationProvider(provider) {
+  removeDecorationProvider(provider:IAnyValue) {
     this._decorationProviderManager.removeProvider(provider);
     if (this._ownedDecorationProviders.has(provider)) {
       this._ownedDecorationProviders.delete(provider);
@@ -2081,7 +2136,7 @@ export class SweetEditorWidget {
     this._decorationProviderManager.requestRefresh();
   }
 
-  setDecorationProviderOptions(options = {}) {
+  setDecorationProviderOptions(options:IAnyRecord = {}) {
     this._decorationProviderManager.setOptions(options);
     if ("scrollRefreshMinIntervalMs" in options || "overscanViewportMultiplier" in options) {
       this._settingsFacade = this._createSettingsFacade();
@@ -2092,7 +2147,7 @@ export class SweetEditorWidget {
     return this._decorationProviderManager.getOptions();
   }
 
-  setDecorationOptions(options = {}) {
+  setDecorationOptions(options:IAnyRecord = {}) {
     this.setDecorationProviderOptions(options);
   }
 
@@ -2100,11 +2155,11 @@ export class SweetEditorWidget {
     return this.getDecorationProviderOptions();
   }
 
-  addCompletionProvider(provider) {
+  addCompletionProvider(provider:IAnyValue) {
     this._completionProviderManager.addProvider(provider);
   }
 
-  removeCompletionProvider(provider) {
+  removeCompletionProvider(provider:IAnyValue) {
     this._completionProviderManager.removeProvider(provider);
   }
 
@@ -2112,7 +2167,7 @@ export class SweetEditorWidget {
     this._completionProviderManager.triggerCompletion(CompletionTriggerKind.INVOKED, null);
   }
 
-  showCompletionItems(items) {
+  showCompletionItems(items:IAnyValue[]) {
     this._completionProviderManager.showItems(items);
   }
 
@@ -2120,11 +2175,11 @@ export class SweetEditorWidget {
     this._completionProviderManager.dismiss();
   }
 
-  setCompletionItemRenderer(renderer) {
+  setCompletionItemRenderer(renderer:IAnyValue) {
     this._completionPopupController.setRenderer(renderer);
   }
 
-  getVisibleLineRange(options = {}) {
+  getVisibleLineRange(options:IAnyRecord = {}) {
     const preferFreshModel = Boolean(options?.preferFreshModel ?? false);
     const model = preferFreshModel
       ? (this._refreshRenderModelSnapshot() || this._lastRenderModel)
@@ -2136,7 +2191,7 @@ export class SweetEditorWidget {
     let start = Number.MAX_SAFE_INTEGER;
     let end = -1;
 
-    forVector(model.lines, (line) => {
+    forVector(model.lines, (line:IAnyValue) => {
       const logicalLine = toInt(line.logical_line, -1);
       if (logicalLine < 0) {
         return;
@@ -2165,37 +2220,37 @@ export class SweetEditorWidget {
 
   _createSettingsFacade() {
     return {
-      setScale: (scale) => this.setScale(scale),
+      setScale: (scale:number) => this.setScale(scale),
       getScale: () => {
         const view = this._core.getViewState() || {};
         const value = Number(view.scale);
         return Number.isFinite(value) ? value : 1;
       },
-      setWrapMode: (mode) => this.setWrapMode(mode),
+      setWrapMode: (mode:IAnyValue) => this.setWrapMode(mode),
       getWrapMode: () => this._settingsState.wrapMode,
-      setReadOnly: (readOnly) => this.setReadOnly(readOnly),
+      setReadOnly: (readOnly:boolean) => this.setReadOnly(readOnly),
       isReadOnly: () => this.isReadOnly(),
-      setAutoIndentMode: (mode) => this.setAutoIndentMode(mode),
+      setAutoIndentMode: (mode:IAnyValue) => this.setAutoIndentMode(mode),
       getAutoIndentMode: () => this.getAutoIndentMode(),
-      setMaxGutterIcons: (count) => this.setMaxGutterIcons(count),
+      setMaxGutterIcons: (count:number) => this.setMaxGutterIcons(count),
       getMaxGutterIcons: () => this._settingsState.maxGutterIcons,
-      setLineSpacing: (add, mult) => this.setLineSpacing(add, mult),
+      setLineSpacing: (add:number, mult:number) => this.setLineSpacing(add, mult),
       getLineSpacing: () => ({
         add: this._settingsState.lineSpacingAdd,
         mult: this._settingsState.lineSpacingMult,
       }),
-      setDecorationScrollRefreshMinIntervalMs: (intervalMs) =>
+      setDecorationScrollRefreshMinIntervalMs: (intervalMs:number) =>
         this.setDecorationScrollRefreshMinIntervalMs(intervalMs),
       getDecorationScrollRefreshMinIntervalMs: () =>
         this.getDecorationScrollRefreshMinIntervalMs(),
-      setDecorationOverscanViewportMultiplier: (multiplier) =>
+      setDecorationOverscanViewportMultiplier: (multiplier:number) =>
         this.setDecorationOverscanViewportMultiplier(multiplier),
       getDecorationOverscanViewportMultiplier: () =>
         this.getDecorationOverscanViewportMultiplier(),
     };
   }
 
-  _applySettingsObject(settings) {
+  _applySettingsObject(settings:IAnyRecord) {
     if (!settings || typeof settings !== "object") {
       return;
     }
@@ -2227,7 +2282,7 @@ export class SweetEditorWidget {
     }
   }
 
-  _emitEvent(eventType, payload = {}) {
+  _emitEvent(eventType:IAnyValue, payload:IAnyRecord = {}) {
     const key = String(eventType || "");
     if (!key) {
       return;
@@ -2242,7 +2297,7 @@ export class SweetEditorWidget {
       timestamp: Date.now(),
       ...payload,
     };
-    listeners.forEach((listener) => {
+    listeners.forEach((listener:(...args: IAnyValue[]) => IAnyValue) => {
       try {
         listener(event);
       } catch (error) {
@@ -2251,7 +2306,7 @@ export class SweetEditorWidget {
     });
   }
 
-  _emitTextChanged(action, range, text) {
+  _emitTextChanged(action:string, range:ITextRange | null, text:string | null) {
     this._emitEvent(EditorEventType.TEXT_CHANGED, {
       action: String(action || TextChangeAction.INSERT),
       changeRange: cloneRange(range),
@@ -2261,7 +2316,7 @@ export class SweetEditorWidget {
     });
   }
 
-  _emitContextMenuEvent(cursorPosition, screenPoint, nativeEvent) {
+  _emitContextMenuEvent(cursorPosition:ITextPosition | null, screenPoint:IAnyValue, nativeEvent:IAnyRecord | null) {
     const x = Number(screenPoint?.x) || 0;
     const y = Number(screenPoint?.y) || 0;
     const now = Date.now();
@@ -2304,7 +2359,7 @@ export class SweetEditorWidget {
     this._lastScale = Number(metrics?.scale ?? 1) || 1;
   }
 
-  _emitCursorChanged(cursorPosition, force = false) {
+  _emitCursorChanged(cursorPosition:ITextPosition | null, force:boolean = false) {
     const cursor = clonePosition(cursorPosition);
     if (!force && equalPosition(cursor, this._lastCursorPosition)) {
       return;
@@ -2315,7 +2370,7 @@ export class SweetEditorWidget {
     });
   }
 
-  _emitSelectionChanged(hasSelection, selection, cursorPosition, force = false) {
+  _emitSelectionChanged(hasSelection:boolean, selection:IAnyValue, cursorPosition:ITextPosition | null, force:boolean = false) {
     const normalizedHasSelection = !!hasSelection;
     const normalizedSelection = normalizedHasSelection ? cloneRange(selection) : null;
     if (
@@ -2335,7 +2390,7 @@ export class SweetEditorWidget {
     });
   }
 
-  _emitScrollScaleValues(scrollX, scrollY, scale, forceScroll = false, forceScale = false) {
+  _emitScrollScaleValues(scrollX:number, scrollY:number, scale:number, forceScroll:IAnyValue = false, forceScale:IAnyValue = false) {
     const nextScrollX = Number.isFinite(scrollX) ? scrollX : this._lastScrollX;
     const nextScrollY = Number.isFinite(scrollY) ? scrollY : this._lastScrollY;
     const nextScale = Number.isFinite(scale) ? scale : this._lastScale;
@@ -2362,7 +2417,7 @@ export class SweetEditorWidget {
     }
   }
 
-  _emitScrollScaleFromCore(forceScroll = false, forceScale = false) {
+  _emitScrollScaleFromCore(forceScroll:IAnyValue = false, forceScale:IAnyValue = false) {
     const metrics = this._safeGetScrollMetrics();
     if (!metrics) {
       return;
@@ -2376,7 +2431,7 @@ export class SweetEditorWidget {
     );
   }
 
-  _emitScrollScaleFromGestureResult(result, emitScroll = true, emitScale = false) {
+  _emitScrollScaleFromGestureResult(result:IAnyValue, emitScroll:boolean = true, emitScale:boolean = false) {
     if (!result) {
       return;
     }
@@ -2386,7 +2441,7 @@ export class SweetEditorWidget {
     this._emitScrollScaleValues(scrollX, scrollY, scale, emitScroll, emitScale);
   }
 
-  _emitStateEventsFromCore(options = {}) {
+  _emitStateEventsFromCore(options:IAnyRecord = {}) {
     const forceCursor = !!options.forceCursor;
     const forceSelection = !!options.forceSelection;
     const includeScrollScale = !!options.includeScrollScale;
@@ -2410,7 +2465,7 @@ export class SweetEditorWidget {
     }
   }
 
-  _dispatchHitTargetEvents(hitTarget, screenPoint, nativeEvent) {
+  _dispatchHitTargetEvents(hitTarget:IAnyValue, screenPoint:IAnyValue, nativeEvent:IAnyRecord | null) {
     if (!hitTarget) {
       return;
     }
@@ -2468,7 +2523,7 @@ export class SweetEditorWidget {
     }
   }
 
-  _fireGestureEvents(result, screenPoint, nativeEvent = null) {
+  _fireGestureEvents(result:IAnyValue, screenPoint:IAnyValue, nativeEvent:IAnyRecord | null = null) {
     if (!result) {
       return;
     }
@@ -2616,16 +2671,16 @@ export class SweetEditorWidget {
   }
 
   _bindEvents() {
-    this._canvas.addEventListener("pointerdown", (e) => this._onPointerDown(e));
-    this._canvas.addEventListener("pointermove", (e) => this._onPointerMove(e));
-    this._canvas.addEventListener("pointerup", (e) => this._onPointerUp(e));
-    this._canvas.addEventListener("pointercancel", (e) => this._onPointerCancel(e));
-    this._canvas.addEventListener("wheel", (e) => this._onWheel(e), { passive: false });
-    this._canvas.addEventListener("contextmenu", (e) => this._onContextMenu(e));
+    this._canvas.addEventListener("pointerdown", (e:IAnyRecord) => this._onPointerDown(e));
+    this._canvas.addEventListener("pointermove", (e:IAnyRecord) => this._onPointerMove(e));
+    this._canvas.addEventListener("pointerup", (e:IAnyRecord) => this._onPointerUp(e));
+    this._canvas.addEventListener("pointercancel", (e:IAnyRecord) => this._onPointerCancel(e));
+    this._canvas.addEventListener("wheel", (e:IAnyRecord) => this._onWheel(e), { passive: false });
+    this._canvas.addEventListener("contextmenu", (e:IAnyRecord) => this._onContextMenu(e));
 
-    this._input.addEventListener("keydown", (e) => this._onKeyDown(e));
-    this._input.addEventListener("beforeinput", (e) => this._onBeforeInput(e));
-    this._input.addEventListener("compositionstart", (e) => {
+    this._input.addEventListener("keydown", (e:IAnyRecord) => this._onKeyDown(e));
+    this._input.addEventListener("beforeinput", (e:IAnyRecord) => this._onBeforeInput(e));
+    this._input.addEventListener("compositionstart", (e:IAnyRecord) => {
       this._debugInputLog("compositionstart", {
         data: typeof e?.data === "string" ? e.data : "",
         inputValueLength: String(this._input?.value || "").length,
@@ -2642,7 +2697,7 @@ export class SweetEditorWidget {
       this._core.compositionStart();
     });
 
-    this._input.addEventListener("compositionupdate", (e) => {
+    this._input.addEventListener("compositionupdate", (e:IAnyRecord) => {
       this._invalidatePrintableFallback();
       const composingText = typeof e.data === "string" ? e.data : (this._input.value || "");
       this._debugInputLog("compositionupdate", {
@@ -2652,7 +2707,7 @@ export class SweetEditorWidget {
       this._core.compositionUpdate(composingText);
     });
 
-    this._input.addEventListener("compositionend", (e) => {
+    this._input.addEventListener("compositionend", (e:IAnyRecord) => {
       this._debugInputLog("compositionend", {
         data: typeof e.data === "string" ? e.data : "",
         inputValueLength: String(this._input?.value || "").length,
@@ -2687,17 +2742,17 @@ export class SweetEditorWidget {
       }, 0);
     });
 
-    this._input.addEventListener("input", (e) => this._onInput(e));
-    this._input.addEventListener("copy", (e) => this._handleClipboardCopyCut(e, false));
-    this._input.addEventListener("cut", (e) => this._handleClipboardCopyCut(e, true));
-    this._input.addEventListener("paste", (e) => this._handleClipboardPaste(e));
+    this._input.addEventListener("input", (e:IAnyRecord) => this._onInput(e));
+    this._input.addEventListener("copy", (e:IAnyRecord) => this._handleClipboardCopyCut(e, false));
+    this._input.addEventListener("cut", (e:IAnyRecord) => this._handleClipboardCopyCut(e, true));
+    this._input.addEventListener("paste", (e:IAnyRecord) => this._handleClipboardPaste(e));
 
     document.addEventListener("pointerdown", this._onDocumentPointerDown, true);
     document.addEventListener("keydown", this._onDocumentKeyDown, true);
     window.addEventListener("blur", this._onWindowBlur);
   }
 
-  _isCompositionInputType(inputType) {
+  _isCompositionInputType(inputType:string) {
     const type = String(inputType || "");
     return type.startsWith("insertComposition") || type.startsWith("deleteComposition");
   }
@@ -2752,7 +2807,7 @@ export class SweetEditorWidget {
     hideButton.style.borderRadius = "4px";
     hideButton.style.cursor = "pointer";
     hideButton.style.font = "inherit";
-    hideButton.addEventListener("click", (event) => {
+    hideButton.addEventListener("click", (event:IAnyRecord) => {
       event.preventDefault();
       event.stopPropagation();
       this.setPerformanceOverlayVisible(false);
@@ -2768,7 +2823,7 @@ export class SweetEditorWidget {
     metrics.style.gap = "4px 14px";
     panel.appendChild(metrics);
 
-    const metricRows = {};
+    const metricRows: Record<string, { row: HTMLDivElement; label: HTMLSpanElement; value: HTMLSpanElement }> = {};
     [
       "fps",
       "frame",
@@ -2780,7 +2835,7 @@ export class SweetEditorWidget {
       "stutterCount",
       "stutterLast",
       "stutterPeak",
-    ].forEach((key) => {
+    ].forEach((key:string) => {
       const row = document.createElement("div");
       row.style.display = "flex";
       row.style.justifyContent = "space-between";
@@ -2845,7 +2900,7 @@ export class SweetEditorWidget {
     openButton.style.borderRadius = "4px";
     openButton.style.cursor = "pointer";
     openButton.style.font = "12px Menlo, Consolas, Monaco, monospace";
-    openButton.addEventListener("click", (event) => {
+    openButton.addEventListener("click", (event:IAnyRecord) => {
       event.preventDefault();
       event.stopPropagation();
       this.setPerformanceOverlayVisible(true);
@@ -2879,7 +2934,7 @@ export class SweetEditorWidget {
     return Date.now();
   }
 
-  _smoothValue(previous, current, alpha = 0.18) {
+  _smoothValue(previous:IAnyValue, current:IAnyValue, alpha:IAnyValue = 0.18) {
     const value = Number(current);
     if (!Number.isFinite(value)) {
       return Number(previous) || 0;
@@ -2891,7 +2946,7 @@ export class SweetEditorWidget {
     return prev + (value - prev) * alpha;
   }
 
-  _formatPerfRelativeSeconds(timestampMs) {
+  _formatPerfRelativeSeconds(timestampMs:number) {
     const value = Number(timestampMs);
     if (!Number.isFinite(value) || value < 0) {
       return "t+0.00s";
@@ -2899,7 +2954,7 @@ export class SweetEditorWidget {
     return `t+${(value / 1000).toFixed(2)}s`;
   }
 
-  _classifyStutterReason(elapsedMs, now) {
+  _classifyStutterReason(elapsedMs:number, now:IAnyValue) {
     const stats = this._perfStats || {};
     const sample = stats.lastRenderSample;
     const stutter = Math.max(0, Number(elapsedMs) || 0);
@@ -2924,7 +2979,7 @@ export class SweetEditorWidget {
     return "blocked";
   }
 
-  _recordStutterEvent(elapsedMs, now) {
+  _recordStutterEvent(elapsedMs:number, now:IAnyValue) {
     if (!this._perfStats) {
       return;
     }
@@ -2980,7 +3035,7 @@ export class SweetEditorWidget {
       return;
     }
 
-    events.forEach((event) => {
+    events.forEach((event:IAnyRecord) => {
       const row = document.createElement("div");
       row.style.display = "flex";
       row.style.flexDirection = "column";
@@ -3044,7 +3099,7 @@ export class SweetEditorWidget {
       this._performanceOverlayStutterListTitleNode.textContent = perfI18n.stutterListTitle || "Stutter Events";
     }
     const labels = perfI18n.labels || {};
-    Object.entries(this._performanceOverlayMetricRows || {}).forEach(([key, row]) => {
+    Object.entries(this._performanceOverlayMetricRows || {}).forEach(([key, row]: [string, IAnyValue]) => {
       row.label.textContent = `${labels[key] || key}:`;
     });
   }
@@ -3059,7 +3114,7 @@ export class SweetEditorWidget {
     const units = perfI18n.units || WIDGET_I18N.en.performance.units;
     const rows = this._performanceOverlayMetricRows || {};
 
-    const formatted = {
+    const formatted: Record<string, string> = {
       fps: `${stats.fps.toFixed(1)}`,
       frame: `${stats.avgFrameMs.toFixed(2)} ${units.ms}`,
       build: `${stats.avgBuildMs.toFixed(2)} ${units.ms}`,
@@ -3072,7 +3127,7 @@ export class SweetEditorWidget {
       stutterPeak: `${stats.maxStutterMs.toFixed(2)} ${units.ms}`,
     };
 
-    Object.entries(rows).forEach(([key, row]) => {
+    Object.entries(rows).forEach(([key, row]: [string, IAnyValue]) => {
       row.value.textContent = formatted[key] || "--";
     });
     this._refreshStutterEventList();
@@ -3082,7 +3137,7 @@ export class SweetEditorWidget {
         ? `${perfI18n.chartUnavailable}: ${this._performanceChartFallbackReason || "-"}`
         : null;
       const recentStutterLines = Array.isArray(stats.stutterEvents)
-        ? stats.stutterEvents.slice(-3).reverse().map((event, index) => {
+        ? stats.stutterEvents.slice(-3).reverse().map((event:IAnyRecord, index:number) => {
           const reasonMap = perfI18n.reasons || WIDGET_I18N.en.performance.reasons;
           const reason = reasonMap[event.reason] || reasonMap.unknown || event.reason || "Unknown";
           return `#${index + 1} ${reason} ${Number(event.elapsedMs || 0).toFixed(2)} ${units.ms}`;
@@ -3157,7 +3212,7 @@ export class SweetEditorWidget {
     }
 
     this._performanceChartLoadPromise = loadEchartsFromCdn(this._performanceOverlayChartCdnUrl)
-      .then((echarts) => {
+      .then((echarts:IAnyValue) => {
         this._performanceChartLoadPromise = null;
         if (
           !this._performanceOverlayEnabled
@@ -3178,7 +3233,7 @@ export class SweetEditorWidget {
             this._performanceOverlayTextFallback.style.display = "none";
           }
           this._updatePerformanceChart();
-        } catch (error) {
+        } catch (error:IAnyValue) {
           this._performanceChart = null;
           this._performanceChartFailed = true;
           this._performanceChartFallbackReason = String(error?.message || error || "");
@@ -3189,7 +3244,7 @@ export class SweetEditorWidget {
           this._refreshPerformanceOverlayValues();
         }
       })
-      .catch((error) => {
+      .catch((error:IAnyValue) => {
         this._performanceChartLoadPromise = null;
         this._performanceChartFailed = true;
         this._performanceChartFallbackReason = String(error?.message || error || "");
@@ -3209,12 +3264,12 @@ export class SweetEditorWidget {
     const legend = perfI18n.legend || WIDGET_I18N.en.performance.legend;
     const units = perfI18n.units || WIDGET_I18N.en.performance.units;
     const history = Array.isArray(this._perfStats.history) ? this._perfStats.history : [];
-    const fpsData = history.map((entry) => [entry.timestamp, entry.fps]);
-    const frameData = history.map((entry) => [entry.timestamp, entry.frameMs]);
-    const buildData = history.map((entry) => [entry.timestamp, entry.buildMs]);
-    const drawData = history.map((entry) => [entry.timestamp, entry.drawMs]);
-    const rafLagData = history.map((entry) => [entry.timestamp, entry.rafLagMs]);
-    const stutterData = history.map((entry) => [entry.timestamp, entry.stutterMs]);
+    const fpsData = history.map((entry:IAnyRecord) => [entry.timestamp, entry.fps]);
+    const frameData = history.map((entry:IAnyRecord) => [entry.timestamp, entry.frameMs]);
+    const buildData = history.map((entry:IAnyRecord) => [entry.timestamp, entry.buildMs]);
+    const drawData = history.map((entry:IAnyRecord) => [entry.timestamp, entry.drawMs]);
+    const rafLagData = history.map((entry:IAnyRecord) => [entry.timestamp, entry.rafLagMs]);
+    const stutterData = history.map((entry:IAnyRecord) => [entry.timestamp, entry.stutterMs]);
 
     this._performanceChart.setOption({
       animation: false,
@@ -3369,7 +3424,7 @@ export class SweetEditorWidget {
     this._performanceMonitorLastSampleAt = 0;
   }
 
-  _recordPerformanceSample(sample = {}) {
+  _recordPerformanceSample(sample:IAnyValue = {}) {
     if (!this._performanceOverlayEnabled || !this._perfStats) {
       return;
     }
@@ -3400,7 +3455,7 @@ export class SweetEditorWidget {
     }
   }
 
-  _pushPerformanceHistorySample(now) {
+  _pushPerformanceHistorySample(now:IAnyValue) {
     if (!this._perfStats) {
       return;
     }
@@ -3425,7 +3480,7 @@ export class SweetEditorWidget {
     stats.history = history;
   }
 
-  _updatePerformanceOverlay(now = this._nowMs()) {
+  _updatePerformanceOverlay(now:IAnyValue = this._nowMs()) {
     if (!this._performanceOverlayEnabled || !this._perfStats) {
       return;
     }
@@ -3453,7 +3508,7 @@ export class SweetEditorWidget {
     this._updatePerformanceChart();
   }
 
-  _debugInputTargetName(target) {
+  _debugInputTargetName(target:IAnyValue) {
     if (!target) {
       return "null";
     }
@@ -3474,7 +3529,7 @@ export class SweetEditorWidget {
     return `${tag}${id}${cls}`;
   }
 
-  _debugInputLog(eventName, payload = {}) {
+  _debugInputLog(eventName:string, payload:IAnyRecord = {}) {
     if (!this._debugInputLogsEnabled) {
       return;
     }
@@ -3505,7 +3560,7 @@ export class SweetEditorWidget {
     if (!this._pendingPrintableFallbackTimers || this._pendingPrintableFallbackTimers.size === 0) {
       return;
     }
-    this._pendingPrintableFallbackTimers.forEach((timerId) => clearTimeout(timerId));
+    this._pendingPrintableFallbackTimers.forEach((timerId:IAnyValue) => clearTimeout(timerId));
     this._pendingPrintableFallbackTimers.clear();
   }
 
@@ -3516,7 +3571,7 @@ export class SweetEditorWidget {
     });
   }
 
-  _extractInputText(event, allowValueFallback = true) {
+  _extractInputText(event:IAnyRecord, allowValueFallback:IAnyValue = true) {
     if (typeof event?.data === "string" && event.data.length > 0) {
       return event.data;
     }
@@ -3526,7 +3581,7 @@ export class SweetEditorWidget {
     return String(this._input?.value || "");
   }
 
-  _applyDomTextInput(event, options = {}) {
+  _applyDomTextInput(event:IAnyRecord, options:IAnyRecord = {}) {
     const inputType = String(event?.inputType || "");
     const preventDefault = options.preventDefault === true;
     const allowValueFallback = options.allowValueFallback !== false;
@@ -3585,7 +3640,7 @@ export class SweetEditorWidget {
     return true;
   }
 
-  _shouldSchedulePrintableFallback(event) {
+  _shouldSchedulePrintableFallback(event:IAnyRecord) {
     if (!event || event.ctrlKey || event.metaKey || event.altKey) {
       return false;
     }
@@ -3593,7 +3648,7 @@ export class SweetEditorWidget {
     return key.length === 1;
   }
 
-  _schedulePrintableFallback(event) {
+  _schedulePrintableFallback(event:IAnyRecord) {
     if (!this._shouldSchedulePrintableFallback(event)) {
       this._debugInputLog("fallback.skip", {
         key: event?.key ?? "",
@@ -3633,7 +3688,7 @@ export class SweetEditorWidget {
     return true;
   }
 
-  _onBeforeInput(e) {
+  _onBeforeInput(e:IAnyRecord) {
     const inputType = e.inputType || "";
     this._debugInputLog("beforeinput.start", {
       inputType,
@@ -3669,7 +3724,7 @@ export class SweetEditorWidget {
     }
   }
 
-  _onInput(e) {
+  _onInput(e:IAnyRecord) {
     this._debugInputLog("input.start", {
       inputType: e.inputType || "",
       data: typeof e.data === "string" ? e.data : "",
@@ -3729,7 +3784,7 @@ export class SweetEditorWidget {
     }
   }
 
-  _onPointerDown(event) {
+  _onPointerDown(event:IAnyRecord) {
     this._hideContextMenu();
     this._documentKeyRouteActive = true;
     this._input.focus();
@@ -3756,7 +3811,7 @@ export class SweetEditorWidget {
     event.preventDefault();
   }
 
-  _onPointerMove(event) {
+  _onPointerMove(event:IAnyRecord) {
     const point = this._eventPoint(event);
     if (event.pointerType === "mouse") {
       if ((event.buttons & 1) !== 0) {
@@ -3771,7 +3826,7 @@ export class SweetEditorWidget {
     event.preventDefault();
   }
 
-  _onPointerUp(event) {
+  _onPointerUp(event:IAnyRecord) {
     const point = this._eventPoint(event);
     if (typeof this._canvas.releasePointerCapture === "function") {
       try {
@@ -3793,7 +3848,7 @@ export class SweetEditorWidget {
     event.preventDefault();
   }
 
-  _onPointerCancel(event) {
+  _onPointerCancel(event:IAnyRecord) {
     if (event.pointerType !== "mouse") {
       this._dispatchGesture(this._eventType.TOUCH_CANCEL, Array.from(this._activeTouches.values()), event);
       this._activeTouches.delete(event.pointerId);
@@ -3801,14 +3856,14 @@ export class SweetEditorWidget {
     }
   }
 
-  _onWheel(event) {
+  _onWheel(event:IAnyRecord) {
     this._hideContextMenu();
     const point = this._eventPoint(event);
     this._dispatchGesture(this._eventType.MOUSE_WHEEL, [point], event, event.deltaX, -event.deltaY, 1.0);
     event.preventDefault();
   }
 
-  _onContextMenu(event) {
+  _onContextMenu(event:IAnyRecord) {
     event.preventDefault();
     this._documentKeyRouteActive = true;
     this._input.focus();
@@ -3822,7 +3877,7 @@ export class SweetEditorWidget {
     this._emitContextMenuEvent(this._core.getCursorPosition(), { x, y }, event);
   }
 
-  _handleDocumentPointerDown(event) {
+  _handleDocumentPointerDown(event:IAnyRecord) {
     const target = event?.target ?? null;
     this._documentKeyRouteActive = !!(target && this.container.contains(target));
     if (this._contextMenuVisible && this._contextMenu && !this._contextMenu.contains(event.target)) {
@@ -3830,19 +3885,20 @@ export class SweetEditorWidget {
     }
   }
 
-  _isBodyLikeElement(target) {
+  _isBodyLikeElement(target:IAnyValue) {
     return target === document.body || target === document.documentElement;
   }
 
-  _isTextEntryElement(target) {
+  _isTextEntryElement(target:IAnyValue) {
     if (!target || !(target instanceof Element)) {
       return false;
     }
-    const tagName = target.tagName;
-    return tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT" || target.isContentEditable;
+    const element = target as HTMLElement;
+    const tagName = element.tagName;
+    return tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT" || element.isContentEditable;
   }
 
-  _shouldRouteDocumentKeyEvent(event) {
+  _shouldRouteDocumentKeyEvent(event:IAnyRecord) {
     if (!event || this._disposed || !this._input) {
       return false;
     }
@@ -3886,7 +3942,7 @@ export class SweetEditorWidget {
     return false;
   }
 
-  _handleDocumentKeyDown(event) {
+  _handleDocumentKeyDown(event:IAnyRecord) {
     const targetName = this._debugInputTargetName(event?.target ?? null);
     const shouldRoute = !event.defaultPrevented && this._shouldRouteDocumentKeyEvent(event);
     this._debugInputLog("document.keydown", {
@@ -3917,7 +3973,7 @@ export class SweetEditorWidget {
     this._onKeyDown(event);
   }
 
-  _onKeyDown(event) {
+  _onKeyDown(event:IAnyRecord) {
     const hasCompositionFlow = this._hasActiveCompositionFlow();
     this._debugInputLog("keydown.start", {
       key: event?.key ?? "",
@@ -4033,9 +4089,9 @@ export class SweetEditorWidget {
     }
   }
 
-  _dispatchGesture(type, points, domEvent, wheelX = 0, wheelY = 0, directScale = 1.0) {
+  _dispatchGesture(type:string, points:IAnyValue[], domEvent:IAnyRecord, wheelX:number = 0, wheelY:number = 0, directScale:number = 1.0) {
     const pointVector = new this._wasm.PointFVector();
-    points.forEach((p) => pointVector.push_back({ x: p.x, y: p.y }));
+    points.forEach((p:IAnyValue) => pointVector.push_back({ x: p.x, y: p.y }));
 
     const result = this._core.handleGestureEvent({
       type,
@@ -4081,7 +4137,7 @@ export class SweetEditorWidget {
     this._edgeTimer = null;
   }
 
-  _modifiers(event) {
+  _modifiers(event:IAnyRecord) {
     let mods = 0;
     if (event.shiftKey) mods |= this._modifier.SHIFT;
     if (event.ctrlKey) mods |= this._modifier.CTRL;
@@ -4090,7 +4146,7 @@ export class SweetEditorWidget {
     return mods;
   }
 
-  _mapKeyCode(event) {
+  _mapKeyCode(event:IAnyRecord) {
     switch (event.key) {
       case "Backspace": return this._keyCode.BACKSPACE;
       case "Tab": return this._keyCode.TAB;
@@ -4118,7 +4174,7 @@ export class SweetEditorWidget {
     return 0;
   }
 
-  _mapLegacyKeyCode(event) {
+  _mapLegacyKeyCode(event:IAnyRecord) {
     const rawCode = Number(event?.keyCode ?? event?.which);
     if (!Number.isFinite(rawCode)) {
       return 0;
@@ -4142,7 +4198,7 @@ export class SweetEditorWidget {
     }
   }
 
-  _eventPoint(event) {
+  _eventPoint(event:IAnyRecord) {
     const rect = this._canvas.getBoundingClientRect();
     return {
       x: event.clientX - rect.left,
@@ -4150,7 +4206,7 @@ export class SweetEditorWidget {
     };
   }
 
-  _syncInputAnchor(model, viewportWidth, viewportHeight) {
+  _syncInputAnchor(model:IAnyValue, viewportWidth:number, viewportHeight:number) {
     if (!this._input) return;
 
     let cursorX = 0;
@@ -4298,7 +4354,7 @@ export class SweetEditorWidget {
     );
   }
 
-  _buildCompletionContext(triggerKind, triggerCharacter) {
+  _buildCompletionContext(triggerKind:number, triggerCharacter:string) {
     const cursor = this._core.getCursorPosition();
     if (!cursor) {
       return null;
@@ -4322,8 +4378,8 @@ export class SweetEditorWidget {
     });
   }
 
-  _applyCompletionItem(item) {
-    const completionItem = item instanceof CompletionItem ? item : new CompletionItem(item || {});
+  _applyCompletionItem(item:IAnyValue) {
+    const completionItem = (item instanceof CompletionItem ? item : new CompletionItem(item || {})) as IAnyValue;
     let text = completionItem.insertText ?? completionItem.label;
     let replaceRange = null;
 
@@ -4351,14 +4407,14 @@ export class SweetEditorWidget {
     this._handleTextEditResult(insertResult, { action: TextChangeAction.INSERT });
   }
 
-  _isEmptyRange(range) {
+  _isEmptyRange(range:ITextRange | null | undefined) {
     if (!range || !range.start || !range.end) {
       return true;
     }
     return range.start.line === range.end.line && range.start.column === range.end.column;
   }
 
-  _handleKeyEventResult(result, options = {}) {
+  _handleKeyEventResult(result:IAnyValue, options:IAnyRecord = {}) {
     if (!result) {
       return;
     }
@@ -4402,7 +4458,7 @@ export class SweetEditorWidget {
     this.requestDecorationRefresh();
   }
 
-  _handleTextEditResult(editResult, options = {}) {
+  _handleTextEditResult(editResult:IAnyValue, options:IAnyRecord = {}) {
     if (!editResult) {
       return;
     }
@@ -4410,7 +4466,7 @@ export class SweetEditorWidget {
     const action = options.action ?? TextChangeAction.INSERT;
     const emitStateEvents = options.emitStateEvents !== false;
     const changed = Boolean(editResult.changed ?? false);
-    const changes = asArray(editResult.changes).map((change) => ({
+    const changes: IEditorTextChange[] = asArray(editResult.changes).map((change:IAnyValue) => ({
       range: cloneRange(change?.range),
       oldText: String(change?.oldText ?? change?.old_text ?? ""),
       newText: String(change?.newText ?? change?.new_text ?? ""),
@@ -4422,9 +4478,11 @@ export class SweetEditorWidget {
       emitStateEvents,
       changesCount: changes.length,
       firstRange: firstChange?.range ?? null,
-      firstOldLen: firstChange ? firstChange.oldText.length : 0,
-      firstNewLen: firstChange ? firstChange.newText.length : 0,
-      firstHasNewline: firstChange ? (firstChange.oldText.includes("\n") || firstChange.newText.includes("\n")) : false,
+      firstOldLen: firstChange ? String(firstChange.oldText ?? "").length : 0,
+      firstNewLen: firstChange ? String(firstChange.newText ?? firstChange.new_text ?? "").length : 0,
+      firstHasNewline: firstChange
+        ? (String(firstChange.oldText ?? "").includes("\n") || String(firstChange.newText ?? firstChange.new_text ?? "").includes("\n"))
+        : false,
     });
 
     if (!changed && changes.length === 0) {
@@ -4432,8 +4490,8 @@ export class SweetEditorWidget {
     }
 
     if (changes.length > 0) {
-      changes.forEach((change) => {
-        this._emitTextChanged(action, change.range, change.newText);
+      changes.forEach((change:IEditorTextChange) => {
+        this._emitTextChanged(action, change.range, change.newText ?? change.new_text ?? null);
       });
     } else {
       this._emitTextChanged(action, null, null);
@@ -4446,7 +4504,7 @@ export class SweetEditorWidget {
     }
   }
 
-  _triggerCompletionFromTextChanges(changes) {
+  _triggerCompletionFromTextChanges(changes:IEditorTextChange[]) {
     if (!this._completionProviderManager) {
       return;
     }
@@ -4462,7 +4520,7 @@ export class SweetEditorWidget {
       return;
     }
 
-    const primary = changes[0] || {};
+    const primary = (changes[0] || {}) as IAnyRecord;
     const newText = String(primary.newText ?? primary.new_text ?? "");
 
     if (newText.length === 1) {
@@ -4482,9 +4540,9 @@ export class SweetEditorWidget {
     }
   }
 
-  _applyMergedDecorations(merged, visibleRange) {
-    const startLine = toInt(visibleRange?.startLine, 0);
-    const endLine = toInt(visibleRange?.endLine, -1);
+  _applyMergedDecorations(merged:IAnyValue, visibleRange:IVisibleLineRange) {
+    const startLine = toInt(visibleRange?.startLine ?? visibleRange?.start, 0);
+    const endLine = toInt(visibleRange?.endLine ?? visibleRange?.end, -1);
 
     this._core.beginBatch();
     try {
@@ -4539,7 +4597,7 @@ export class SweetEditorWidget {
     }
   }
 
-  _applySpanMode(layer, mode, startLine, endLine) {
+  _applySpanMode(layer:IAnyValue, mode:IAnyValue, startLine:number, endLine:number) {
     if (mode === DecorationApplyMode.REPLACE_ALL) {
       this._core.clearHighlights(layer);
       return;
@@ -4549,7 +4607,7 @@ export class SweetEditorWidget {
     }
   }
 
-  _applyInlayMode(mode, startLine, endLine) {
+  _applyInlayMode(mode:IAnyValue, startLine:number, endLine:number) {
     if (mode === DecorationApplyMode.REPLACE_ALL) {
       this._core.clearInlayHints();
       return;
@@ -4559,7 +4617,7 @@ export class SweetEditorWidget {
     }
   }
 
-  _applyDiagnosticMode(mode, startLine, endLine) {
+  _applyDiagnosticMode(mode:IAnyValue, startLine:number, endLine:number) {
     if (mode === DecorationApplyMode.REPLACE_ALL) {
       this._core.clearDiagnostics();
       return;
@@ -4569,7 +4627,7 @@ export class SweetEditorWidget {
     }
   }
 
-  _applyGutterMode(mode, startLine, endLine) {
+  _applyGutterMode(mode:IAnyValue, startLine:number, endLine:number) {
     if (mode === DecorationApplyMode.REPLACE_ALL) {
       this._core.clearGutterIcons();
       return;
@@ -4579,7 +4637,7 @@ export class SweetEditorWidget {
     }
   }
 
-  _applyPhantomMode(mode, startLine, endLine) {
+  _applyPhantomMode(mode:IAnyValue, startLine:number, endLine:number) {
     if (mode === DecorationApplyMode.REPLACE_ALL) {
       this._core.clearPhantomTexts();
       return;
@@ -4589,7 +4647,7 @@ export class SweetEditorWidget {
     }
   }
 
-  _buildEmptyLineMap(startLine, endLine) {
+  _buildEmptyLineMap(startLine:number, endLine:number) {
     const out = new Map();
     if (endLine < startLine) {
       return out;
@@ -4606,16 +4664,16 @@ export class SweetEditorWidget {
       return;
     }
 
-    const pairs = [];
-    rawPairs.forEach((pair) => {
+    const pairs:Array<{ open: number; close: number; autoClose: boolean; surround: boolean }> = [];
+    rawPairs.forEach((pair:IAnyValue) => {
       const openText = String(pair.open ?? "");
       const closeText = String(pair.close ?? "");
       if (!openText || !closeText) {
         return;
       }
 
-      const open = openText.codePointAt(0);
-      const close = closeText.codePointAt(0);
+      const open = openText.codePointAt(0) ?? Number.NaN;
+      const close = closeText.codePointAt(0) ?? Number.NaN;
       if (!Number.isFinite(open) || !Number.isFinite(close)) {
         return;
       }
@@ -4657,7 +4715,7 @@ export class SweetEditorWidget {
     menu.style.pointerEvents = "auto";
 
     const entries = ["undo", "redo", "-", "cut", "copy", "paste", "-", "selectAll"];
-    entries.forEach((entry) => {
+    entries.forEach((entry:string) => {
       if (entry === "-") {
         const separator = document.createElement("div");
         separator.style.height = "1px";
@@ -4688,7 +4746,7 @@ export class SweetEditorWidget {
       button.addEventListener("mouseleave", () => {
         button.style.background = "transparent";
       });
-      button.addEventListener("click", async (evt) => {
+      button.addEventListener("click", async (evt:Event) => {
         evt.preventDefault();
         evt.stopPropagation();
         await this._runContextAction(entry);
@@ -4707,12 +4765,12 @@ export class SweetEditorWidget {
   _refreshContextMenuLabels() {
     if (!this._contextMenuButtons) return;
     const labels = this._i18n?.contextMenu || WIDGET_I18N.en.contextMenu;
-    Object.entries(this._contextMenuButtons).forEach(([key, button]) => {
+    Object.entries(this._contextMenuButtons).forEach(([key, button]: [string, IAnyValue]) => {
       button.textContent = labels[key] || key;
     });
   }
 
-  _setContextMenuItemDisabled(action, disabled) {
+  _setContextMenuItemDisabled(action:string, disabled:IAnyValue) {
     const button = this._contextMenuButtons[action];
     if (!button) return;
     button.disabled = !!disabled;
@@ -4740,7 +4798,7 @@ export class SweetEditorWidget {
     this._setContextMenuItemDisabled("paste", !canReadClipboard);
   }
 
-  _showContextMenu(x, y) {
+  _showContextMenu(x:number, y:number) {
     if (!this._contextMenu) return;
     const containerRect = this.container.getBoundingClientRect();
     const menu = this._contextMenu;
@@ -4764,7 +4822,7 @@ export class SweetEditorWidget {
     this._contextMenuVisible = false;
   }
 
-  async _runContextAction(action) {
+  async _runContextAction(action:string) {
     switch (action) {
       case "undo": {
         const result = this._core.undo();
@@ -4799,7 +4857,7 @@ export class SweetEditorWidget {
     }
   }
 
-  async _copySelectionToClipboard(isCut) {
+  async _copySelectionToClipboard(isCut:boolean) {
     if (!this._core.hasSelection()) return;
     const selectedText = this._core.getSelectedText() || "";
     if (!selectedText) return;
@@ -4814,7 +4872,7 @@ export class SweetEditorWidget {
     }
   }
 
-  async _writeClipboardText(text) {
+  async _writeClipboardText(text:string) {
     if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
       try {
         await navigator.clipboard.writeText(text);
@@ -4848,7 +4906,7 @@ export class SweetEditorWidget {
     }
   }
 
-  _handleClipboardCopyCut(event, isCut) {
+  _handleClipboardCopyCut(event:IAnyRecord, isCut:boolean) {
     if (!this._core.hasSelection()) {
       return;
     }
@@ -4875,7 +4933,7 @@ export class SweetEditorWidget {
     event.preventDefault();
   }
 
-  _handleClipboardPaste(event) {
+  _handleClipboardPaste(event:IAnyRecord) {
     this._invalidatePrintableFallback();
     if (!event.clipboardData || !event.clipboardData.getData) {
       return;

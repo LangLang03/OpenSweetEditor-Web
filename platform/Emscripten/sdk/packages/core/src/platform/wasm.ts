@@ -1,14 +1,19 @@
 import { loadSweetEditorCore } from "../legacy/editor-core-legacy.js";
+import type { IAnyRecord, ISweetEditorWasmModule } from "../legacy/embind-contracts.js";
+
+export interface IWasmModuleOptions extends IAnyRecord {
+  locateFile?: (path: string) => string;
+}
+
+export type IWasmModuleFactory =
+  (options: IWasmModuleOptions) => ISweetEditorWasmModule | Promise<ISweetEditorWasmModule>;
 
 export interface IWasmLoadOptions {
   modulePath?: string;
-  moduleFactory?: unknown;
-  moduleOptions?: {
-    locateFile?: (path: string) => string;
-    [key: string]: unknown;
-  };
+  moduleFactory?: IWasmModuleFactory;
+  moduleOptions?: IWasmModuleOptions;
 }
 
-export async function loadWasmModule(options: IWasmLoadOptions = {}): Promise<unknown> {
-  return loadSweetEditorCore(options as never);
+export async function loadWasmModule(options: IWasmLoadOptions = {}): Promise<ISweetEditorWasmModule> {
+  return loadSweetEditorCore(options as never) as Promise<ISweetEditorWasmModule>;
 }

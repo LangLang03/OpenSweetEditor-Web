@@ -1,4 +1,62 @@
-// @ts-nocheck
+import type {
+  IAnyRecord,
+  IAnyValue,
+  INativeDocument,
+  INativeEditorCore,
+  ISweetEditorWasmModule,
+  ITextPosition,
+  ITextRange,
+} from "./embind-contracts.js";
+import type {
+  IEditorGestureEvent,
+  IEditorKeyEvent,
+  IEditorMetadata,
+  IEditorTextChange,
+  ILanguageConfiguration,
+  IVisibleLineRange,
+} from "./editor-input-types.js";
+
+type TextInput = string | null | undefined;
+
+interface IPoint {
+  line: number;
+  column: number;
+}
+
+type IRange = ITextRange;
+
+interface ITextChange {
+  range: IRange;
+  oldText?: string;
+  old_text?: string;
+  newText?: string;
+  new_text?: string;
+}
+
+type ITimeoutHandle = ReturnType<typeof setTimeout>;
+
+interface IWasmLoadOptions {
+  moduleFactory?: ((options: IAnyRecord) => IAnyValue | Promise<IAnyValue>) | IAnyValue;
+  modulePath?: string;
+  moduleOptions?: IAnyRecord;
+}
+
+interface ICompletionItemInit {
+  label?: string;
+  detail?: string | null;
+  insertText?: string | null;
+  insertTextFormat?: number;
+  textEdit?: {
+    range?: IRange;
+    newText?: string;
+  } | null;
+  filterText?: string | null;
+  sortKey?: string | null;
+  kind?: number;
+}
+
+type IEnumFallback = Readonly<Record<string, number>>;
+
 const FALLBACK_SPAN_LAYER = Object.freeze({
   SYNTAX: 0,
   SEMANTIC: 1,
@@ -22,13 +80,17 @@ const FALLBACK_DIAGNOSTIC_SEVERITY = Object.freeze({
   DIAG_HINT: 3,
 });
 
-function resolveEnum(moduleObj, enumName, fallback) {
-  const enumObj = moduleObj && moduleObj[enumName];
+function resolveEnum<TEnum extends IEnumFallback>(
+  moduleObj: IAnyRecord | null | undefined,
+  enumName: string,
+  fallback: TEnum,
+): TEnum {
+  const enumObj = (moduleObj?.[enumName] ?? null) as IAnyRecord | null;
   if (!enumObj || typeof enumObj !== "object") {
     return fallback;
   }
-  const resolved = { ...fallback };
-  Object.keys(fallback).forEach((key) => {
+  const resolved: Record<string, number> = { ...fallback };
+  Object.keys(fallback).forEach((key:string) => {
     if (!(key in enumObj)) {
       return;
     }
@@ -37,10 +99,10 @@ function resolveEnum(moduleObj, enumName, fallback) {
       resolved[key] = value;
     }
   });
-  return Object.freeze(resolved);
+  return Object.freeze(resolved) as TEnum;
 }
 
-function toFiniteNumber(value) {
+function toFiniteNumber(value:IAnyValue) {
   if (value && typeof value === "object" && "value" in value) {
     const enumValue = Number(value.value);
     if (Number.isFinite(enumValue)) {
@@ -55,7 +117,7 @@ function toFiniteNumber(value) {
   return null;
 }
 
-function toInt(value, fallback = 0) {
+function toInt(value:IAnyValue, fallback:IAnyValue = 0) {
   const n = toFiniteNumber(value);
   if (n === null) {
     return fallback;
@@ -63,15 +125,15 @@ function toInt(value, fallback = 0) {
   return Math.trunc(n);
 }
 
-export function normalizeNewlines(text) {
+export function normalizeNewlines(text: TextInput): string {
   return String(text ?? "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
 }
 
-function hasLineBreak(text) {
+function hasLineBreak(text:string) {
   return /[\r\n]/.test(String(text ?? ""));
 }
 
-export function countLogicalLines(text) {
+export function countLogicalLines(text: TextInput): number {
   const source = String(text ?? "");
   if (source.length === 0) {
     return 1;
@@ -94,7 +156,7 @@ export function countLogicalLines(text) {
   return lines;
 }
 
-function asArray(value) {
+function asArray(value:IAnyValue) {
   if (Array.isArray(value)) {
     return value;
   }
@@ -123,19 +185,19 @@ function asArray(value) {
   return [];
 }
 
-function ensureLine(value) {
+function ensureLine(value:IAnyValue) {
   return Math.max(0, toInt(value, 0));
 }
 
-function ensureColumn(value) {
+function ensureColumn(value:IAnyValue) {
   return Math.max(0, toInt(value, 0));
 }
 
-function ensureLength(value) {
+function ensureLength(value:IAnyValue) {
   return Math.max(0, toInt(value, 0));
 }
 
-function ensureRange(range, fallbackPosition = null) {
+function ensureRange(range:IAnyValue, fallbackPosition:IAnyValue = null) {
   if (range && range.start && range.end) {
     return {
       start: {
@@ -168,7 +230,12 @@ function ensureRange(range, fallbackPosition = null) {
   };
 }
 
-export function clampVisibleLineRange(start, end, totalLines, maxLineSpan = Number.POSITIVE_INFINITY) {
+export function clampVisibleLineRange(
+  start: number,
+  end: number,
+  totalLines: number,
+  maxLineSpan:number = Number.POSITIVE_INFINITY,
+): { start: number; end: number } {
   const total = Math.max(0, toInt(totalLines, 0));
   if (total <= 0) {
     return { start: 0, end: -1 };
@@ -190,7 +257,12 @@ export function clampVisibleLineRange(start, end, totalLines, maxLineSpan = Numb
   return { start: s, end: e };
 }
 
-export function applyLineChangeToLines(lines, range, newText, options = {}) {
+export function applyLineChangeToLines(
+  lines: string[],
+  range: IRange,
+  newText: TextInput,
+  options: { normalizeNewlines?: boolean } = {},
+): void {
   if (!Array.isArray(lines)) {
     return;
   }
@@ -235,19 +307,19 @@ export function applyLineChangeToLines(lines, range, newText, options = {}) {
 
   const replacement = [];
   if (inserted.length === 1) {
-    replacement.push(`${prefix}${inserted[0]}${suffix}`);
+    replacement.push(`${prefix}${inserted[0] ?? ""}${suffix}`);
   } else {
-    replacement.push(`${prefix}${inserted[0]}`);
+    replacement.push(`${prefix}${inserted[0] ?? ""}`);
     for (let i = 1; i < inserted.length - 1; i += 1) {
-      replacement.push(inserted[i]);
+      replacement.push(inserted[i] ?? "");
     }
-    replacement.push(`${inserted[inserted.length - 1]}${suffix}`);
+    replacement.push(`${inserted[inserted.length - 1] ?? ""}${suffix}`);
   }
 
   lines.splice(startLine, endLine - startLine + 1, ...replacement);
 }
 
-function lineColumnToOffset(text, targetLine, targetColumn) {
+function lineColumnToOffset(text:string, targetLine:IAnyValue, targetColumn:IAnyValue) {
   const source = String(text ?? "");
   const targetLineNo = Math.max(0, toInt(targetLine, 0));
   const targetColumnNo = Math.max(0, toInt(targetColumn, 0));
@@ -284,7 +356,12 @@ function lineColumnToOffset(text, targetLine, targetColumn) {
   return index;
 }
 
-export function applyTextChangeToText(originalText, range, newText, options = {}) {
+export function applyTextChangeToText(
+  originalText: TextInput,
+  range: IRange,
+  newText: TextInput,
+  options: { normalizeNewlines?: boolean } = {},
+): string {
   const source = String(originalText ?? "");
   const normalizedRange = ensureRange(range);
   let startOffset = lineColumnToOffset(source, normalizedRange.start.line, normalizedRange.start.column);
@@ -301,9 +378,13 @@ export function applyTextChangeToText(originalText, range, newText, options = {}
   return `${source.slice(0, startOffset)}${insertedText}${source.slice(endOffset)}`;
 }
 
-export function applyTextChangesToText(originalText, changes, options = {}) {
+export function applyTextChangesToText(
+  originalText: TextInput,
+  changes: Iterable<ITextChange> | ITextChange[] | null | undefined,
+  options: { normalizeNewlines?: boolean } = {},
+): string {
   let output = String(originalText ?? "");
-  asArray(changes).forEach((change) => {
+  asArray(changes).forEach((change: ITextChange) => {
     output = applyTextChangeToText(
       output,
       change?.range,
@@ -314,7 +395,7 @@ export function applyTextChangesToText(originalText, changes, options = {}) {
   return output;
 }
 
-function isLineStructureChange(change) {
+function isLineStructureChange(change:IEditorTextChange) {
   const range = ensureRange(change?.range);
   if (range.start.line !== range.end.line) {
     return true;
@@ -324,7 +405,7 @@ function isLineStructureChange(change) {
     || hasLineBreak(change?.newText ?? change?.new_text ?? "");
 }
 
-function normalizePosition(position) {
+function normalizePosition(position:ITextPosition | null) {
   if (!position) {
     return { line: 0, column: 0 };
   }
@@ -334,20 +415,20 @@ function normalizePosition(position) {
   };
 }
 
-function iterateLineEntries(input, callback) {
+function iterateLineEntries(input:IAnyValue, callback:(...args: IAnyValue[]) => IAnyValue) {
   if (!input) {
     return;
   }
 
   if (input instanceof Map) {
-    input.forEach((items, line) => {
+    input.forEach((items:IAnyValue[], line:number) => {
       callback(ensureLine(line), asArray(items));
     });
     return;
   }
 
   if (Array.isArray(input)) {
-    input.forEach((entry, index) => {
+    input.forEach((entry:IAnyRecord, index:number) => {
       if (Array.isArray(entry) && entry.length >= 2) {
         callback(ensureLine(entry[0]), asArray(entry[1]));
         return;
@@ -363,28 +444,28 @@ function iterateLineEntries(input, callback) {
   }
 
   if (typeof input === "object") {
-    Object.keys(input).forEach((lineKey) => {
+    Object.keys(input).forEach((lineKey:IAnyValue) => {
       callback(ensureLine(lineKey), asArray(input[lineKey]));
     });
   }
 }
 
-function cloneLineMap(input) {
+function cloneLineMap(input:IAnyValue) {
   if (input == null) {
     return null;
   }
   const out = new Map();
-  iterateLineEntries(input, (line, items) => {
-    out.set(line, items.map((item) => ({ ...item })));
+  iterateLineEntries(input, (line:number, items:IAnyValue[]) => {
+    out.set(line, items.map((item:IAnyValue) => ({ ...item })));
   });
   return out;
 }
 
-function cloneList(input) {
+function cloneList(input:IAnyValue) {
   if (input == null) {
     return null;
   }
-  return asArray(input).map((item) => {
+  return asArray(input).map((item:IAnyValue) => {
     if (item == null || typeof item !== "object") {
       return item;
     }
@@ -395,22 +476,22 @@ function cloneList(input) {
   });
 }
 
-function appendLineMap(target, source) {
+function appendLineMap(target:IAnyValue, source:IAnyValue) {
   if (!source) {
     return;
   }
-  source.forEach((items, line) => {
+  source.forEach((items:IAnyValue[], line:number) => {
     if (!target.has(line)) {
       target.set(line, []);
     }
     const outItems = target.get(line);
-    items.forEach((item) => {
+    items.forEach((item:IAnyValue) => {
       outItems.push({ ...item });
     });
   });
 }
 
-function modePriority(mode) {
+function modePriority(mode:IAnyValue) {
   switch (mode) {
     case DecorationApplyMode.REPLACE_ALL:
       return 2;
@@ -422,18 +503,18 @@ function modePriority(mode) {
   }
 }
 
-function mergeMode(current, next) {
+function mergeMode(current:IAnyValue, next:IAnyValue) {
   return modePriority(next) > modePriority(current) ? next : current;
 }
 
-function normalizeCompletionKind(kind) {
+function normalizeCompletionKind(kind:IAnyValue) {
   const n = toInt(kind, CompletionItem.KIND_TEXT);
   return n >= CompletionItem.KIND_KEYWORD && n <= CompletionItem.KIND_TEXT
     ? n
     : CompletionItem.KIND_TEXT;
 }
 
-function normalizeInsertTextFormat(format) {
+function normalizeInsertTextFormat(format:IAnyValue) {
   const n = toInt(format, CompletionItem.INSERT_TEXT_FORMAT_PLAIN_TEXT);
   if (n === CompletionItem.INSERT_TEXT_FORMAT_SNIPPET) {
     return n;
@@ -441,18 +522,18 @@ function normalizeInsertTextFormat(format) {
   return CompletionItem.INSERT_TEXT_FORMAT_PLAIN_TEXT;
 }
 
-function normalizeCompletionItem(input) {
+function normalizeCompletionItem(input:IAnyValue) {
   if (input instanceof CompletionItem) {
     return input;
   }
   return new CompletionItem(input || {});
 }
 
-function normalizeCompletionItems(items) {
-  return asArray(items).map((item) => normalizeCompletionItem(item));
+function normalizeCompletionItems(items:IAnyValue[]) {
+  return asArray(items).map((item:IAnyValue) => normalizeCompletionItem(item));
 }
 
-function safeCall(fn) {
+function safeCall(fn:(...args: IAnyValue[]) => IAnyValue) {
   try {
     return fn();
   } catch (error) {
@@ -461,7 +542,7 @@ function safeCall(fn) {
   }
 }
 
-export async function loadSweetEditorCore(options = {}) {
+export async function loadSweetEditorCore(options: IWasmLoadOptions = {}): Promise<IAnyValue> {
   const { moduleFactory, modulePath, moduleOptions = {} } = options;
 
   let factory = moduleFactory;
@@ -481,7 +562,7 @@ export async function loadSweetEditorCore(options = {}) {
 
   const finalOptions = { ...moduleOptions };
   if (moduleBaseUrl && typeof finalOptions.locateFile !== "function") {
-    finalOptions.locateFile = (path) => {
+    finalOptions.locateFile = (path:string) => {
       const url = new URL(path, moduleBaseUrl);
       if (moduleBaseUrl.search && !url.search) {
         url.search = moduleBaseUrl.search;
@@ -494,7 +575,11 @@ export async function loadSweetEditorCore(options = {}) {
 }
 
 export class Document {
-  constructor(nativeDocument, kind) {
+  [key: string]: IAnyValue;
+  protected _native: INativeDocument | null;
+  kind: string;
+
+  constructor(nativeDocument: INativeDocument | null, kind: string) {
     if (new.target === Document) {
       throw new TypeError("Document is abstract. Use DocumentFactory.");
     }
@@ -502,28 +587,28 @@ export class Document {
     this.kind = kind;
   }
 
-  getNative() {
+  getNative(): IAnyRecord | null {
     return this._native;
   }
 
-  getText() {
-    return this._native.getU8Text();
+  getText(): string {
+    return this._native?.getU8Text() ?? "";
   }
 
-  getLineCount() {
-    return this._native.getLineCount();
+  getLineCount(): number {
+    return this._native?.getLineCount() ?? 0;
   }
 
-  getLineText(line) {
-    return this._native.getLineU16Text(line);
+  getLineText(line: number): string {
+    return this._native?.getLineU16Text(line) ?? "";
   }
 
-  getPositionFromCharIndex(charIndex) {
-    return this._native.getPositionFromCharIndex(charIndex);
+  getPositionFromCharIndex(charIndex: number): IPoint {
+    return this._native?.getPositionFromCharIndex(charIndex) ?? { line: 0, column: 0 };
   }
 
-  getCharIndexFromPosition(position) {
-    return this._native.getCharIndexFromPosition(position);
+  getCharIndexFromPosition(position: IPoint): number {
+    return this._native?.getCharIndexFromPosition(position) ?? 0;
   }
 
   dispose() {
@@ -535,23 +620,26 @@ export class Document {
 }
 
 class PieceTableDocumentImpl extends Document {
-  constructor(nativeDocument) {
+  constructor(nativeDocument:INativeDocument) {
     super(nativeDocument, "piece-table");
   }
 }
 
 class LineArrayDocumentImpl extends Document {
-  constructor(nativeDocument) {
+  constructor(nativeDocument:INativeDocument) {
     super(nativeDocument, "line-array");
   }
 }
 
 export class DocumentFactory {
-  constructor(wasmModule) {
+  [key: string]: IAnyValue;
+  private readonly _wasm: IAnyRecord;
+
+  constructor(wasmModule: IAnyRecord) {
     this._wasm = wasmModule;
   }
 
-  fromText(text, options = {}) {
+  fromText(text: TextInput, options: { kind?: "piece-table" | "line-array" } = {}): Document {
     const kind = options.kind || "piece-table";
     if (kind === "line-array") {
       return this.fromLineArray(text);
@@ -559,16 +647,23 @@ export class DocumentFactory {
     return this.fromPieceTable(text);
   }
 
-  fromPieceTable(text) {
-    return new PieceTableDocumentImpl(new this._wasm.PieceTableDocument(text || ""));
+  fromPieceTable(text: TextInput): Document {
+    return new PieceTableDocumentImpl(new this._wasm.PieceTableDocument(text || "") as INativeDocument);
   }
 
-  fromLineArray(text) {
-    return new LineArrayDocumentImpl(new this._wasm.LineArrayDocument(text || ""));
+  fromLineArray(text: TextInput): Document {
+    return new LineArrayDocumentImpl(new this._wasm.LineArrayDocument(text || "") as INativeDocument);
   }
 }
 export class WebEditorCore {
-  constructor(wasmModule, textMeasurerCallbacks, editorOptions = {}, onDidMutate = null) {
+  [key: string]: IAnyValue;
+
+  constructor(
+    wasmModule: IAnyRecord,
+    textMeasurerCallbacks: IAnyRecord,
+    editorOptions: IAnyRecord = {},
+    onDidMutate: (() => void) | null = null,
+  ) {
     this._wasm = wasmModule;
     this._onDidMutate = typeof onDidMutate === "function" ? onDidMutate : null;
     this._notifySuppressed = 0;
@@ -606,7 +701,7 @@ export class WebEditorCore {
     }
   }
 
-  withBatch(fn) {
+  withBatch(fn:(...args: IAnyValue[]) => IAnyValue) {
     this.beginBatch();
     try {
       return fn();
@@ -615,7 +710,7 @@ export class WebEditorCore {
     }
   }
 
-  _invoke(method, ...args) {
+  _invoke(method:string, ...args:IAnyValue[]) {
     const fn = this._native?.[method];
     if (typeof fn !== "function") {
       throw new Error(`EditorCore method not found: ${method}`);
@@ -623,24 +718,24 @@ export class WebEditorCore {
     return fn.apply(this._native, args);
   }
 
-  call(method, ...args) {
+  call(method:string, ...args:IAnyValue[]) {
     const result = this._invoke(method, ...args);
     this._notifyMutate();
     return result;
   }
 
-  read(method, ...args) {
+  read(method:string, ...args:IAnyValue[]) {
     return this._invoke(method, ...args);
   }
 
-  loadDocument(document) {
+  loadDocument(document:IAnyValue) {
     const nativeDoc = typeof document?.getNative === "function" ? document.getNative() : document;
     const result = this._native.loadDocument(nativeDoc);
     this._notifyMutate();
     return result;
   }
 
-  setViewport(width, height) {
+  setViewport(width:number, height:number) {
     const result = this._native.setViewport({ width, height });
     this._notifyMutate();
     return result;
@@ -650,7 +745,7 @@ export class WebEditorCore {
     return this.read("buildRenderModel");
   }
 
-  handleGestureEvent(eventData) {
+  handleGestureEvent(eventData:IEditorGestureEvent) {
     const result = this._native.handleGestureEventRaw(
       eventData.type ?? 0,
       eventData.points,
@@ -663,7 +758,7 @@ export class WebEditorCore {
     return result;
   }
 
-  handleKeyEvent(eventData) {
+  handleKeyEvent(eventData:IEditorKeyEvent) {
     const result = this._native.handleKeyEventRaw(
       eventData.key_code ?? 0,
       eventData.text ?? "",
@@ -691,19 +786,19 @@ export class WebEditorCore {
     return result;
   }
 
-  setFoldArrowMode(mode) {
+  setFoldArrowMode(mode:IAnyValue) {
     const result = this._native.setFoldArrowMode(toInt(mode, 0));
     this._notifyMutate();
     return result;
   }
 
-  setWrapMode(mode) {
+  setWrapMode(mode:IAnyValue) {
     const result = this._native.setWrapMode(toInt(mode, 0));
     this._notifyMutate();
     return result;
   }
 
-  setTabSize(tabSize) {
+  setTabSize(tabSize:number) {
     if (typeof this._native?.setTabSize === "function") {
       const result = this._native.setTabSize(Math.max(1, toInt(tabSize, 4)));
       this._notifyMutate();
@@ -711,14 +806,14 @@ export class WebEditorCore {
     }
   }
 
-  setScale(scale) {
+  setScale(scale:number) {
     const value = Number(scale);
     const result = this._native.setScale(Number.isFinite(value) ? value : 1.0);
     this._notifyMutate();
     return result;
   }
 
-  setLineSpacing(add, mult) {
+  setLineSpacing(add:number, mult:number) {
     const addValue = Number(add);
     const multValue = Number(mult);
     const result = this._native.setLineSpacing(
@@ -729,20 +824,20 @@ export class WebEditorCore {
     return result;
   }
 
-  setContentStartPadding(padding) {
+  setContentStartPadding(padding:number) {
     const value = Number(padding);
     const result = this._native.setContentStartPadding(Number.isFinite(value) ? value : 0.0);
     this._notifyMutate();
     return result;
   }
 
-  setShowSplitLine(show) {
+  setShowSplitLine(show:boolean) {
     const result = this._native.setShowSplitLine(Boolean(show));
     this._notifyMutate();
     return result;
   }
 
-  setCurrentLineRenderMode(mode) {
+  setCurrentLineRenderMode(mode:IAnyValue) {
     const result = this._native.setCurrentLineRenderMode(toInt(mode, 0));
     this._notifyMutate();
     return result;
@@ -760,19 +855,19 @@ export class WebEditorCore {
     return this.read("getLayoutMetrics");
   }
 
-  insert(text) {
+  insert(text:string) {
     const result = this._native.insertText(String(text ?? ""));
     this._notifyMutate();
     return result;
   }
 
-  replaceText(range, newText) {
+  replaceText(range:ITextRange, newText:string) {
     const result = this._native.replaceText(ensureRange(range), String(newText ?? ""));
     this._notifyMutate();
     return result;
   }
 
-  deleteText(range) {
+  deleteText(range:ITextRange) {
     const result = this._native.deleteText(ensureRange(range));
     this._notifyMutate();
     return result;
@@ -844,20 +939,22 @@ export class WebEditorCore {
     return result;
   }
 
-  setCursorPosition(position) {
+  setCursorPosition(position:ITextPosition) {
     const result = this._native.setCursorPosition(normalizePosition(position));
     this._notifyMutate();
     return result;
   }
 
-  setSelection(startOrRange, startColumn, endLine, endColumn) {
+  setSelection(startOrRange:ITextRange | ITextPosition, startColumn:number, endLine:number, endColumn:number) {
     let result;
-    if (startOrRange && typeof startOrRange === "object" && startOrRange.start && startOrRange.end) {
-      result = this._native.setSelection(ensureRange(startOrRange));
+    const asRange = startOrRange as ITextRange;
+    if (asRange && typeof asRange === "object" && asRange.start && asRange.end) {
+      result = this._native.setSelection(ensureRange(asRange));
     } else {
+      const position = startOrRange as ITextPosition;
       const range = ensureRange({
         start: {
-          line: ensureLine(startOrRange),
+          line: ensureLine(position?.line),
           column: ensureColumn(startColumn),
         },
         end: {
@@ -887,37 +984,37 @@ export class WebEditorCore {
     return this.read("getSelectedText");
   }
 
-  moveCursorLeft(extendSelection = false) {
+  moveCursorLeft(extendSelection:boolean = false) {
     const result = this._native.moveCursorLeft(Boolean(extendSelection));
     this._notifyMutate();
     return result;
   }
 
-  moveCursorRight(extendSelection = false) {
+  moveCursorRight(extendSelection:boolean = false) {
     const result = this._native.moveCursorRight(Boolean(extendSelection));
     this._notifyMutate();
     return result;
   }
 
-  moveCursorUp(extendSelection = false) {
+  moveCursorUp(extendSelection:boolean = false) {
     const result = this._native.moveCursorUp(Boolean(extendSelection));
     this._notifyMutate();
     return result;
   }
 
-  moveCursorDown(extendSelection = false) {
+  moveCursorDown(extendSelection:boolean = false) {
     const result = this._native.moveCursorDown(Boolean(extendSelection));
     this._notifyMutate();
     return result;
   }
 
-  moveCursorToLineStart(extendSelection = false) {
+  moveCursorToLineStart(extendSelection:boolean = false) {
     const result = this._native.moveCursorToLineStart(Boolean(extendSelection));
     this._notifyMutate();
     return result;
   }
 
-  moveCursorToLineEnd(extendSelection = false) {
+  moveCursorToLineEnd(extendSelection:boolean = false) {
     const result = this._native.moveCursorToLineEnd(Boolean(extendSelection));
     this._notifyMutate();
     return result;
@@ -929,13 +1026,13 @@ export class WebEditorCore {
     return result;
   }
 
-  compositionUpdate(text) {
+  compositionUpdate(text:string) {
     const result = this._native.compositionUpdate(String(text ?? ""));
     this._notifyMutate();
     return result;
   }
 
-  compositionEnd(committedText) {
+  compositionEnd(committedText:IAnyValue) {
     const result = this._native.compositionEnd(String(committedText ?? ""));
     this._notifyMutate();
     return result;
@@ -951,7 +1048,7 @@ export class WebEditorCore {
     return this.read("isComposing");
   }
 
-  setCompositionEnabled(enabled) {
+  setCompositionEnabled(enabled:boolean) {
     const result = this._native.setCompositionEnabled(Boolean(enabled));
     this._notifyMutate();
     return result;
@@ -961,7 +1058,7 @@ export class WebEditorCore {
     return this.read("isCompositionEnabled");
   }
 
-  setReadOnly(readOnly) {
+  setReadOnly(readOnly:boolean) {
     const result = this._native.setReadOnly(Boolean(readOnly));
     this._notifyMutate();
     return result;
@@ -971,7 +1068,7 @@ export class WebEditorCore {
     return this.read("isReadOnly");
   }
 
-  setAutoIndentMode(mode) {
+  setAutoIndentMode(mode:IAnyValue) {
     const result = this._native.setAutoIndentMode(toInt(mode, 0));
     this._notifyMutate();
     return result;
@@ -981,7 +1078,7 @@ export class WebEditorCore {
     return this.read("getAutoIndentMode");
   }
 
-  setHandleConfig(config) {
+  setHandleConfig(config:IAnyRecord) {
     const result = this._native.setHandleConfig(config || {});
     this._notifyMutate();
     return result;
@@ -994,7 +1091,7 @@ export class WebEditorCore {
     return null;
   }
 
-  setScrollbarConfig(config) {
+  setScrollbarConfig(config:IAnyRecord) {
     const result = this._native.setScrollbarConfig(config || {});
     this._notifyMutate();
     return result;
@@ -1007,7 +1104,7 @@ export class WebEditorCore {
     return null;
   }
 
-  getPositionRect(line, column) {
+  getPositionRect(line:number, column:number) {
     if (typeof this._native?.getPositionScreenRect === "function") {
       return this.read("getPositionScreenRect", ensureLine(line), ensureColumn(column));
     }
@@ -1021,19 +1118,19 @@ export class WebEditorCore {
     return this.read("getCursorRect");
   }
 
-  scrollToLine(line, behavior = 0) {
+  scrollToLine(line:number, behavior:number = 0) {
     const result = this._native.scrollToLine(ensureLine(line), toInt(behavior, 0));
     this._notifyMutate();
     return result;
   }
 
-  gotoPosition(line, column) {
+  gotoPosition(line:number, column:number) {
     const result = this._native.gotoPosition(ensureLine(line), ensureColumn(column));
     this._notifyMutate();
     return result;
   }
 
-  setScroll(scrollX, scrollY) {
+  setScroll(scrollX:number, scrollY:number) {
     const x = Number(scrollX);
     const y = Number(scrollY);
     const result = this._native.setScroll(
@@ -1044,13 +1141,13 @@ export class WebEditorCore {
     return result;
   }
 
-  insertSnippet(snippetTemplate) {
+  insertSnippet(snippetTemplate:string) {
     const result = this._native.insertSnippet(String(snippetTemplate ?? ""));
     this._notifyMutate();
     return result;
   }
 
-  startLinkedEditing(model) {
+  startLinkedEditing(model:IAnyValue) {
     const result = this._native.startLinkedEditing(model || {});
     this._notifyMutate();
     return result;
@@ -1090,19 +1187,19 @@ export class WebEditorCore {
     return result;
   }
 
-  toggleFoldAt(line) {
+  toggleFoldAt(line:number) {
     const result = this._native.toggleFoldAt(ensureLine(line));
     this._notifyMutate();
     return result;
   }
 
-  foldAt(line) {
+  foldAt(line:number) {
     const result = this._native.foldAt(ensureLine(line));
     this._notifyMutate();
     return result;
   }
 
-  unfoldAt(line) {
+  unfoldAt(line:number) {
     const result = this._native.unfoldAt(ensureLine(line));
     this._notifyMutate();
     return result;
@@ -1120,11 +1217,11 @@ export class WebEditorCore {
     return result;
   }
 
-  isLineVisible(line) {
+  isLineVisible(line:number) {
     return this.read("isLineVisible", ensureLine(line));
   }
 
-  setMatchedBrackets(open, close) {
+  setMatchedBrackets(open:IAnyValue, close:IAnyValue) {
     let result;
     if (arguments.length >= 4) {
       const openPosition = { line: ensureLine(arguments[0]), column: ensureColumn(arguments[1]) };
@@ -1175,7 +1272,7 @@ export class WebEditorCore {
     return this.read("isInLinkedEditing");
   }
 
-  registerTextStyle(styleId, color, backgroundColor = 0, fontStyle = 0) {
+  registerTextStyle(styleId:number, color:number, backgroundColor:number = 0, fontStyle:number = 0) {
     const style = {
       color: toInt(color, 0),
       background_color: toInt(backgroundColor, 0),
@@ -1186,34 +1283,34 @@ export class WebEditorCore {
     return result;
   }
 
-  setLineSpans(line, layer, spans) {
+  setLineSpans(line:number, layer:IAnyValue, spans:IAnyValue[]) {
     const lineNo = ensureLine(line);
     const layerValue = toInt(layer, this._spanLayer.SYNTAX);
     const src = asArray(spans);
-    this._callWithVector("StyleSpanVector", src, (span) => ({
+    this._callWithVector("StyleSpanVector", src, (span:IAnyValue) => ({
       column: ensureColumn(span.column),
       length: ensureLength(span.length),
       style_id: toInt(span.styleId ?? span.style_id, 0),
-    }), (vec) => {
+    }), (vec:IAnyValue) => {
       const result = this._native.setLineSpans(lineNo, layerValue, vec);
       this._notifyMutate();
       return result;
     });
   }
 
-  setBatchLineSpans(layer, spansByLine) {
+  setBatchLineSpans(layer:IAnyValue, spansByLine:IAnyValue) {
     const layerValue = toInt(layer, this._spanLayer.SYNTAX);
     const batched = this._callBatchLineEntries(
       "LineStyleSpansEntryVector",
       "StyleSpanVector",
       "spans",
       spansByLine,
-      (span) => ({
+      (span:IAnyValue) => ({
         column: ensureColumn(span.column),
         length: ensureLength(span.length),
         style_id: toInt(span.styleId ?? span.style_id, 0),
       }),
-      (entryVec) => {
+      (entryVec:IAnyValue) => {
         const result = this._native.setBatchLineSpans(layerValue, entryVec);
         return result;
       },
@@ -1223,30 +1320,30 @@ export class WebEditorCore {
       return;
     }
     this.withBatch(() => {
-      iterateLineEntries(spansByLine, (line, spans) => {
+      iterateLineEntries(spansByLine, (line:number, spans:IAnyValue[]) => {
         this.setLineSpans(line, layerValue, spans);
       });
     });
   }
 
-  setLineInlayHints(line, hints) {
+  setLineInlayHints(line:number, hints:IAnyValue[]) {
     const lineNo = ensureLine(line);
     const src = asArray(hints);
-    this._callWithVector("InlayHintVector", src, (hint) => this._toNativeInlayHint(hint), (vec) => {
+    this._callWithVector("InlayHintVector", src, (hint:IAnyValue) => this._toNativeInlayHint(hint), (vec:IAnyValue) => {
       const result = this._native.setLineInlayHints(lineNo, vec);
       this._notifyMutate();
       return result;
     });
   }
 
-  setBatchLineInlayHints(hintsByLine) {
+  setBatchLineInlayHints(hintsByLine:IAnyValue) {
     const batched = this._callBatchLineEntries(
       "LineInlayHintsEntryVector",
       "InlayHintVector",
       "hints",
       hintsByLine,
-      (hint) => this._toNativeInlayHint(hint),
-      (entryVec) => {
+      (hint:IAnyValue) => this._toNativeInlayHint(hint),
+      (entryVec:IAnyValue) => {
         const result = this._native.setBatchLineInlayHints(entryVec);
         return result;
       },
@@ -1256,36 +1353,36 @@ export class WebEditorCore {
       return;
     }
     this.withBatch(() => {
-      iterateLineEntries(hintsByLine, (line, hints) => {
+      iterateLineEntries(hintsByLine, (line:number, hints:IAnyValue[]) => {
         this.setLineInlayHints(line, hints);
       });
     });
   }
 
-  setLinePhantomTexts(line, phantoms) {
+  setLinePhantomTexts(line:number, phantoms:IAnyValue) {
     const lineNo = ensureLine(line);
     const src = asArray(phantoms);
-    this._callWithVector("PhantomTextVector", src, (phantom) => ({
+    this._callWithVector("PhantomTextVector", src, (phantom:IAnyValue) => ({
       column: ensureColumn(phantom.column),
       text: String(phantom.text ?? ""),
-    }), (vec) => {
+    }), (vec:IAnyValue) => {
       const result = this._native.setLinePhantomTexts(lineNo, vec);
       this._notifyMutate();
       return result;
     });
   }
 
-  setBatchLinePhantomTexts(phantomsByLine) {
+  setBatchLinePhantomTexts(phantomsByLine:IAnyValue) {
     const batched = this._callBatchLineEntries(
       "LinePhantomTextsEntryVector",
       "PhantomTextVector",
       "phantoms",
       phantomsByLine,
-      (phantom) => ({
+      (phantom:IAnyValue) => ({
         column: ensureColumn(phantom.column),
         text: String(phantom.text ?? ""),
       }),
-      (entryVec) => {
+      (entryVec:IAnyValue) => {
         const result = this._native.setBatchLinePhantomTexts(entryVec);
         return result;
       },
@@ -1295,34 +1392,34 @@ export class WebEditorCore {
       return;
     }
     this.withBatch(() => {
-      iterateLineEntries(phantomsByLine, (line, phantoms) => {
+      iterateLineEntries(phantomsByLine, (line:number, phantoms:IAnyValue) => {
         this.setLinePhantomTexts(line, phantoms);
       });
     });
   }
 
-  setLineGutterIcons(line, icons) {
+  setLineGutterIcons(line:number, icons:IAnyValue[]) {
     const lineNo = ensureLine(line);
     const src = asArray(icons);
-    this._callWithVector("GutterIconVector", src, (icon) => ({
+    this._callWithVector("GutterIconVector", src, (icon:IAnyValue) => ({
       icon_id: toInt(icon.iconId ?? icon.icon_id ?? icon, 0),
-    }), (vec) => {
+    }), (vec:IAnyValue) => {
       const result = this._native.setLineGutterIcons(lineNo, vec);
       this._notifyMutate();
       return result;
     });
   }
 
-  setBatchLineGutterIcons(iconsByLine) {
+  setBatchLineGutterIcons(iconsByLine:IAnyValue) {
     const batched = this._callBatchLineEntries(
       "LineGutterIconsEntryVector",
       "GutterIconVector",
       "icons",
       iconsByLine,
-      (icon) => ({
+      (icon:IAnyValue) => ({
         icon_id: toInt(icon.iconId ?? icon.icon_id ?? icon, 0),
       }),
-      (entryVec) => {
+      (entryVec:IAnyValue) => {
         const result = this._native.setBatchLineGutterIcons(entryVec);
         return result;
       },
@@ -1332,40 +1429,40 @@ export class WebEditorCore {
       return;
     }
     this.withBatch(() => {
-      iterateLineEntries(iconsByLine, (line, icons) => {
+      iterateLineEntries(iconsByLine, (line:number, icons:IAnyValue[]) => {
         this.setLineGutterIcons(line, icons);
       });
     });
   }
 
-  setLineDiagnostics(line, diagnostics) {
+  setLineDiagnostics(line:number, diagnostics:IAnyValue[]) {
     const lineNo = ensureLine(line);
     const src = asArray(diagnostics);
-    this._callWithVector("DiagnosticSpanVector", src, (item) => ({
+    this._callWithVector("DiagnosticSpanVector", src, (item:IAnyValue) => ({
       column: ensureColumn(item.column),
       length: ensureLength(item.length),
       severity: this._toNativeEnumValue("DiagnosticSeverity", item.severity, this._diagnosticSeverity.DIAG_HINT),
       color: toInt(item.color, 0),
-    }), (vec) => {
+    }), (vec:IAnyValue) => {
       const result = this._native.setLineDiagnostics(lineNo, vec);
       this._notifyMutate();
       return result;
     });
   }
 
-  setBatchLineDiagnostics(diagsByLine) {
+  setBatchLineDiagnostics(diagsByLine:IAnyValue) {
     const batched = this._callBatchLineEntries(
       "LineDiagnosticsEntryVector",
       "DiagnosticSpanVector",
       "diagnostics",
       diagsByLine,
-      (item) => ({
+      (item:IAnyValue) => ({
         column: ensureColumn(item.column),
         length: ensureLength(item.length),
         severity: this._toNativeEnumValue("DiagnosticSeverity", item.severity, this._diagnosticSeverity.DIAG_HINT),
         color: toInt(item.color, 0),
       }),
-      (entryVec) => {
+      (entryVec:IAnyValue) => {
         const result = this._native.setBatchLineDiagnostics(entryVec);
         return result;
       },
@@ -1375,78 +1472,78 @@ export class WebEditorCore {
       return;
     }
     this.withBatch(() => {
-      iterateLineEntries(diagsByLine, (line, diagnostics) => {
+      iterateLineEntries(diagsByLine, (line:number, diagnostics:IAnyValue[]) => {
         this.setLineDiagnostics(line, diagnostics);
       });
     });
   }
 
-  setIndentGuides(guides) {
-    this._callWithVector("IndentGuideVector", asArray(guides), (item) => ({
+  setIndentGuides(guides:IAnyValue[]) {
+    this._callWithVector("IndentGuideVector", asArray(guides), (item:IAnyValue) => ({
       start: normalizePosition(item.start),
       end: normalizePosition(item.end),
-    }), (vec) => {
+    }), (vec:IAnyValue) => {
       const result = this._native.setIndentGuides(vec);
       this._notifyMutate();
       return result;
     });
   }
 
-  setBracketGuides(guides) {
-    this._callWithVector("BracketGuideVector", asArray(guides), (item) => ({
+  setBracketGuides(guides:IAnyValue[]) {
+    this._callWithVector("BracketGuideVector", asArray(guides), (item:IAnyValue) => ({
       parent: normalizePosition(item.parent),
       end: normalizePosition(item.end),
-      children: asArray(item.children).map((child) => normalizePosition(child)),
-    }), (vec) => {
+      children: asArray(item.children).map((child:IAnyValue) => normalizePosition(child)),
+    }), (vec:IAnyValue) => {
       const result = this._native.setBracketGuides(vec);
       this._notifyMutate();
       return result;
     });
   }
 
-  setFlowGuides(guides) {
-    this._callWithVector("FlowGuideVector", asArray(guides), (item) => ({
+  setFlowGuides(guides:IAnyValue[]) {
+    this._callWithVector("FlowGuideVector", asArray(guides), (item:IAnyValue) => ({
       start: normalizePosition(item.start),
       end: normalizePosition(item.end),
-    }), (vec) => {
+    }), (vec:IAnyValue) => {
       const result = this._native.setFlowGuides(vec);
       this._notifyMutate();
       return result;
     });
   }
 
-  setSeparatorGuides(guides) {
-    this._callWithVector("SeparatorGuideVector", asArray(guides), (item) => ({
+  setSeparatorGuides(guides:IAnyValue[]) {
+    this._callWithVector("SeparatorGuideVector", asArray(guides), (item:IAnyValue) => ({
       line: ensureLine(item.line),
       style: this._toNativeEnumValue("SeparatorStyle", item.style, this._separatorStyle.SINGLE),
       count: Math.max(0, toInt(item.count, 0)),
       text_end_column: Math.max(0, toInt(item.textEndColumn ?? item.text_end_column, 0)),
-    }), (vec) => {
+    }), (vec:IAnyValue) => {
       const result = this._native.setSeparatorGuides(vec);
       this._notifyMutate();
       return result;
     });
   }
 
-  setFoldRegions(regions) {
-    this._callWithVector("FoldRegionVector", asArray(regions), (item) => ({
+  setFoldRegions(regions:IAnyValue[]) {
+    this._callWithVector("FoldRegionVector", asArray(regions), (item:IAnyValue) => ({
       start_line: ensureLine(item.startLine ?? item.start_line),
       end_line: ensureLine(item.endLine ?? item.end_line),
       collapsed: Boolean(item.collapsed),
-    }), (vec) => {
+    }), (vec:IAnyValue) => {
       const result = this._native.setFoldRegions(vec);
       this._notifyMutate();
       return result;
     });
   }
 
-  setMaxGutterIcons(count) {
+  setMaxGutterIcons(count:number) {
     const result = this._native.setMaxGutterIcons(Math.max(0, toInt(count, 0)));
     this._notifyMutate();
     return result;
   }
 
-  clearHighlights(layer = null) {
+  clearHighlights(layer:IAnyValue = null) {
     let result;
     if (layer == null) {
       result = this._native.clearHighlights();
@@ -1493,20 +1590,20 @@ export class WebEditorCore {
     return result;
   }
 
-  setBracketPairs(bracketPairs) {
-    this._callWithVector("BracketPairVector", asArray(bracketPairs), (pair) => ({
+  setBracketPairs(bracketPairs:IAnyValue) {
+    this._callWithVector("BracketPairVector", asArray(bracketPairs), (pair:IAnyValue) => ({
       open: toInt(pair.open, 0),
       close: toInt(pair.close, 0),
       auto_close: Boolean(pair.autoClose ?? pair.auto_close),
       surround: Boolean(pair.surround),
-    }), (vec) => {
+    }), (vec:IAnyValue) => {
       const result = this._native.setBracketPairs(vec);
       this._notifyMutate();
       return result;
     });
   }
 
-  _toNativeInlayHint(hint) {
+  _toNativeInlayHint(hint:IAnyValue) {
     const typeValue = toInt(hint.type, this._inlayType.TEXT);
     const nativeType = this._toNativeEnumValue("InlayType", typeValue, this._inlayType.TEXT);
     if (typeValue === this._inlayType.ICON) {
@@ -1536,7 +1633,7 @@ export class WebEditorCore {
     };
   }
 
-  _toNativeEnumValue(enumName, value, fallback = 0) {
+  _toNativeEnumValue(enumName:string, value:IAnyValue, fallback:IAnyValue = 0) {
     const numericValue = toInt(value, fallback);
     const enumType = this._wasm?.[enumName];
     const enumValues = enumType?.values;
@@ -1546,9 +1643,9 @@ export class WebEditorCore {
     return numericValue;
   }
 
-  _callBatchLineEntries(entryVectorName, itemVectorName, entryFieldName, entriesByLine, itemMapper, fn) {
-    const normalizedEntries = [];
-    iterateLineEntries(entriesByLine, (line, items) => {
+  _callBatchLineEntries(entryVectorName:IAnyValue, itemVectorName:IAnyValue, entryFieldName:IAnyValue, entriesByLine:IAnyValue, itemMapper:(...args: IAnyValue[]) => IAnyValue, fn:(...args: IAnyValue[]) => IAnyValue) {
+    const normalizedEntries:Array<{ line: number; items: IAnyValue[] }> = [];
+    iterateLineEntries(entriesByLine, (line:number, items:IAnyValue[]) => {
       normalizedEntries.push({
         line: ensureLine(line),
         items: asArray(items),
@@ -1566,10 +1663,10 @@ export class WebEditorCore {
 
     const entryVec = new EntryVectorCtor();
     try {
-      normalizedEntries.forEach((entry) => {
+      normalizedEntries.forEach((entry:IAnyRecord) => {
         const itemVec = new ItemVectorCtor();
         try {
-          entry.items.forEach((item) => {
+          entry.items.forEach((item:IAnyValue) => {
             itemVec.push_back(itemMapper(item));
           });
           entryVec.push_back({
@@ -1591,14 +1688,14 @@ export class WebEditorCore {
     }
   }
 
-  _callWithVector(vectorName, items, mapper, fn) {
+  _callWithVector(vectorName:IAnyValue, items:IAnyValue[], mapper:(...args: IAnyValue[]) => IAnyValue, fn:(...args: IAnyValue[]) => IAnyValue) {
     const Ctor = this._wasm?.[vectorName];
     if (typeof Ctor !== "function") {
       throw new Error(`Vector constructor not found: ${vectorName}`);
     }
     const vec = new Ctor();
     try {
-      asArray(items).forEach((item) => {
+      asArray(items).forEach((item:IAnyValue) => {
         vec.push_back(mapper(item));
       });
       fn(vec);
@@ -1637,6 +1734,8 @@ export const CompletionTriggerKind = Object.freeze({
 });
 
 export class CompletionItem {
+  [key: string]: IAnyValue;
+
   static KIND_KEYWORD = 0;
   static KIND_FUNCTION = 1;
   static KIND_VARIABLE = 2;
@@ -1650,7 +1749,7 @@ export class CompletionItem {
   static INSERT_TEXT_FORMAT_PLAIN_TEXT = 1;
   static INSERT_TEXT_FORMAT_SNIPPET = 2;
 
-  constructor(init = {}) {
+  constructor(init: ICompletionItemInit = {}) {
     this.label = String(init.label ?? "");
     this.detail = init.detail == null ? null : String(init.detail);
     this.insertText = init.insertText == null ? null : String(init.insertText);
@@ -1672,6 +1771,8 @@ export class CompletionItem {
 }
 
 export class CompletionContext {
+  [key: string]: IAnyValue;
+
   constructor({
     triggerKind = CompletionTriggerKind.INVOKED,
     triggerCharacter = null,
@@ -1680,19 +1781,29 @@ export class CompletionContext {
     wordRange = null,
     languageConfiguration = null,
     editorMetadata = null,
+  }: {
+    triggerKind?: number;
+    triggerCharacter?: string | null;
+    cursorPosition?: IPoint;
+    lineText?: string;
+    wordRange?: IRange | null;
+    languageConfiguration?: IAnyRecord | null;
+    editorMetadata?: IAnyRecord | null;
   } = {}) {
     this.triggerKind = toInt(triggerKind, CompletionTriggerKind.INVOKED);
     this.triggerCharacter = triggerCharacter == null ? null : String(triggerCharacter);
     this.cursorPosition = normalizePosition(cursorPosition);
     this.lineText = String(lineText ?? "");
-    this.wordRange = ensureRange(wordRange, this.cursorPosition);
+    this.wordRange = ensureRange(wordRange ?? null, this.cursorPosition);
     this.languageConfiguration = languageConfiguration;
     this.editorMetadata = editorMetadata;
   }
 }
 
 export class CompletionResult {
-  constructor(items = [], isIncomplete = false) {
+  [key: string]: IAnyValue;
+
+  constructor(items: ICompletionItemInit[] = [], isIncomplete:boolean = false) {
     this.items = normalizeCompletionItems(items);
     this.isIncomplete = Boolean(isIncomplete);
   }
@@ -1701,7 +1812,9 @@ export class CompletionResult {
 }
 
 export class CompletionReceiver {
-  accept(_result) {
+  [key: string]: IAnyValue;
+
+  accept(_result:IAnyValue) {
     throw new Error("CompletionReceiver.accept must be implemented");
   }
 
@@ -1711,17 +1824,21 @@ export class CompletionReceiver {
 }
 
 export class CompletionProvider {
-  isTriggerCharacter(_ch) {
+  [key: string]: IAnyValue;
+
+  isTriggerCharacter(_ch: string): boolean {
     return false;
   }
 
-  provideCompletions(_context, _receiver) {
+  provideCompletions(_context: CompletionContext, _receiver: CompletionReceiver): void {
     // Host app should implement.
   }
 }
 
 class ManagedCompletionReceiver extends CompletionReceiver {
-  constructor(manager, provider, generation) {
+  [key: string]: IAnyValue;
+
+  constructor(manager:IAnyValue, provider:IAnyValue, generation:number) {
     super();
     this._manager = manager;
     this._provider = provider;
@@ -1733,7 +1850,7 @@ class ManagedCompletionReceiver extends CompletionReceiver {
     this._cancelled = true;
   }
 
-  accept(result) {
+  accept(result:IAnyValue) {
     if (this._cancelled || this._generation !== this._manager._generation) {
       return false;
     }
@@ -1749,8 +1866,39 @@ class ManagedCompletionReceiver extends CompletionReceiver {
   }
 }
 
+interface ICompletionProviderLike {
+  isTriggerCharacter?: (ch: string) => boolean;
+  provideCompletions: (context: IAnyValue, receiver: CompletionReceiver) => void;
+}
+
+interface ICompletionListenerLike {
+  onItemsUpdated?: (items: CompletionItem[]) => void;
+  onDismissed?: () => void;
+}
+
+interface ICompletionManagerOptions {
+  buildContext?: (triggerKind: number, triggerCharacter: string) => IAnyValue | null;
+  onItemsUpdated?: (items: CompletionItem[]) => void;
+  onDismissed?: () => void;
+  debounceCharacterMs?: number;
+  debounceInvokedMs?: number;
+}
+
 export class CompletionProviderManager {
-  constructor(options = {}) {
+  _providers: Set<ICompletionProviderLike>;
+  _activeReceivers: Map<ICompletionProviderLike, ManagedCompletionReceiver>;
+  _generation: number;
+  _mergedItems: CompletionItem[];
+  _buildContext: ((triggerKind: number, triggerCharacter: string) => IAnyValue | null) | null;
+  _onItemsUpdated: ((items: CompletionItem[]) => void) | null;
+  _onDismissed: (() => void) | null;
+  _debounceCharacterMs: number;
+  _debounceInvokedMs: number;
+  _lastTriggerKind: number;
+  _lastTriggerChar: string | null;
+  _refreshTimer: ITimeoutHandle | 0;
+
+  constructor(options:ICompletionManagerOptions = {}) {
     this._providers = new Set();
     this._activeReceivers = new Map();
     this._generation = 0;
@@ -1768,19 +1916,19 @@ export class CompletionProviderManager {
     this._refreshTimer = 0;
   }
 
-  setListener(listener = null) {
+  setListener(listener:ICompletionListenerLike | null = null) {
     this._onItemsUpdated = typeof listener?.onItemsUpdated === "function" ? listener.onItemsUpdated : null;
     this._onDismissed = typeof listener?.onDismissed === "function" ? listener.onDismissed : null;
   }
 
-  addProvider(provider) {
+  addProvider(provider:ICompletionProviderLike) {
     if (!provider) {
       return;
     }
     this._providers.add(provider);
   }
 
-  removeProvider(provider) {
+  removeProvider(provider:ICompletionProviderLike) {
     if (!provider) {
       return;
     }
@@ -1792,17 +1940,17 @@ export class CompletionProviderManager {
     }
   }
 
-  isTriggerCharacter(ch) {
+  isTriggerCharacter(ch:string) {
     const chText = String(ch ?? "");
     for (const provider of this._providers) {
-      if (safeCall(() => provider.isTriggerCharacter(chText))) {
+      if (safeCall(() => provider.isTriggerCharacter?.(chText))) {
         return true;
       }
     }
     return false;
   }
 
-  triggerCompletion(triggerKind = CompletionTriggerKind.INVOKED, triggerCharacter = null) {
+  triggerCompletion(triggerKind:number = CompletionTriggerKind.INVOKED, triggerCharacter:string | null = null) {
     if (this._providers.size === 0) {
       return;
     }
@@ -1825,7 +1973,7 @@ export class CompletionProviderManager {
     }, Math.max(0, delay));
   }
 
-  showItems(items) {
+  showItems(items:IAnyValue[]) {
     if (this._refreshTimer) {
       clearTimeout(this._refreshTimer);
       this._refreshTimer = 0;
@@ -1855,7 +2003,7 @@ export class CompletionProviderManager {
     this._emitDismiss();
   }
 
-  _executeRefresh(triggerKind, triggerCharacter) {
+  _executeRefresh(triggerKind:number, triggerCharacter:string | null) {
     this._generation += 1;
     const generation = this._generation;
 
@@ -1863,7 +2011,7 @@ export class CompletionProviderManager {
     this._mergedItems = [];
 
     const context = this._buildContext
-      ? this._buildContext(triggerKind, triggerCharacter)
+      ? this._buildContext(triggerKind, triggerCharacter ?? "")
       : null;
 
     if (!context) {
@@ -1883,19 +2031,19 @@ export class CompletionProviderManager {
   }
 
   _cancelAllReceivers() {
-    this._activeReceivers.forEach((receiver) => {
+    this._activeReceivers.forEach((receiver:IAnyValue) => {
       receiver.cancel();
     });
     this._activeReceivers.clear();
   }
 
-  _onProviderResult(_provider, result, generation) {
+  _onProviderResult(_provider:ICompletionProviderLike, result:IAnyValue, generation:number) {
     if (generation !== this._generation) {
       return;
     }
 
     this._mergedItems.push(...normalizeCompletionItems(result.items));
-    this._mergedItems.sort((a, b) => {
+    this._mergedItems.sort((a:IAnyValue, b:IAnyValue) => {
       const keyA = a.sortKey || a.label;
       const keyB = b.sortKey || b.label;
       return keyA.localeCompare(keyB);
@@ -1909,7 +2057,7 @@ export class CompletionProviderManager {
     this._emitItemsUpdated(this._mergedItems);
   }
 
-  _emitItemsUpdated(items) {
+  _emitItemsUpdated(items:IAnyValue[]) {
     if (this._onItemsUpdated) {
       this._onItemsUpdated(items.slice());
     }
@@ -1959,6 +2107,8 @@ export const DecorationProviderCallMode = Object.freeze({
 });
 
 export class DecorationContext {
+  [key: string]: IAnyValue;
+
   constructor({
     visibleStartLine = 0,
     visibleEndLine = -1,
@@ -1968,13 +2118,22 @@ export class DecorationContext {
     textChanges = [],
     languageConfiguration = null,
     editorMetadata = null,
+  }: {
+    visibleStartLine?: number;
+    visibleEndLine?: number;
+    viewportStartLine?: number;
+    viewportEndLine?: number;
+    totalLineCount?: number;
+    textChanges?: ITextChange[];
+    languageConfiguration?: IAnyRecord | null;
+    editorMetadata?: IAnyRecord | null;
   } = {}) {
     this.visibleStartLine = ensureLine(visibleStartLine);
     this.visibleEndLine = toInt(visibleEndLine, -1);
     this.viewportStartLine = ensureLine(viewportStartLine);
     this.viewportEndLine = toInt(viewportEndLine, this.visibleEndLine);
     this.totalLineCount = Math.max(0, toInt(totalLineCount, 0));
-    this.textChanges = asArray(textChanges).map((change) => ({
+    this.textChanges = asArray(textChanges).map((change:IEditorTextChange) => ({
       range: ensureRange(change.range),
       oldText: String(change.oldText ?? change.old_text ?? ""),
       newText: String(change.newText ?? change.new_text ?? ""),
@@ -1985,7 +2144,9 @@ export class DecorationContext {
 }
 
 export class DecorationResult {
-  constructor(init = {}) {
+  [key: string]: IAnyValue;
+
+  constructor(init: IAnyRecord = {}) {
     this.syntaxSpans = init.syntaxSpans ?? null;
     this.semanticSpans = init.semanticSpans ?? null;
     this.inlayHints = init.inlayHints ?? null;
@@ -2013,7 +2174,9 @@ export class DecorationResult {
 }
 
 export class DecorationReceiver {
-  accept(_result) {
+  [key: string]: IAnyValue;
+
+  accept(_result:IAnyValue) {
     throw new Error("DecorationReceiver.accept must be implemented");
   }
 
@@ -2023,16 +2186,18 @@ export class DecorationReceiver {
 }
 
 export class DecorationProvider {
+  [key: string]: IAnyValue;
+
   getCapabilities() {
     return DecorationType.SYNTAX_HIGHLIGHT;
   }
 
-  provideDecorations(_context, _receiver) {
+  provideDecorations(_context:IAnyValue, _receiver:IAnyValue) {
     // Host app should implement.
   }
 }
 
-function splitSourceLines(text) {
+function splitSourceLines(text:string) {
   const lines = String(text ?? "").split("\n");
   if (lines.length === 0) {
     return [""];
@@ -2040,18 +2205,18 @@ function splitSourceLines(text) {
   return lines;
 }
 
-function safeDeleteNativeHandle(handle) {
+function safeDeleteNativeHandle(handle:IAnyValue) {
   if (handle && typeof handle.delete === "function") {
     handle.delete();
   }
 }
 
-function iterateNativeList(list, fn) {
+function iterateNativeList(list:IAnyValue, fn:(...args: IAnyValue[]) => IAnyValue) {
   if (!list || typeof fn !== "function") {
     return;
   }
   if (Array.isArray(list)) {
-    list.forEach((item, index) => fn(item, index));
+    list.forEach((item:IAnyValue, index:number) => fn(item, index));
     return;
   }
   if (typeof list.size === "function" && typeof list.get === "function") {
@@ -2062,7 +2227,7 @@ function iterateNativeList(list, fn) {
   }
 }
 
-function extractSingleLineStyleSpan(token) {
+function extractSingleLineStyleSpan(token:IAnyValue) {
   if (!token || !token.range || !token.range.start || !token.range.end) {
     return null;
   }
@@ -2085,12 +2250,12 @@ function extractSingleLineStyleSpan(token) {
   };
 }
 
-function extractStyleSpansFromLineHighlight(lineHighlight, expectedLine = null) {
-  const out = [];
+function extractStyleSpansFromLineHighlight(lineHighlight:IAnyValue, expectedLine:IAnyValue = null) {
+  const out:Array<{ column: number; length: number; styleId: number }> = [];
   if (!lineHighlight) {
     return out;
   }
-  iterateNativeList(lineHighlight.spans, (token) => {
+  iterateNativeList(lineHighlight.spans, (token:IAnyValue) => {
     const span = extractSingleLineStyleSpan(token);
     if (!span) {
       return;
@@ -2104,11 +2269,11 @@ function extractStyleSpansFromLineHighlight(lineHighlight, expectedLine = null) 
       styleId: span.styleId,
     });
   });
-  out.sort((a, b) => a.column - b.column);
+  out.sort((a:IAnyValue, b:IAnyValue) => a.column - b.column);
   return out;
 }
 
-function withSweetLineTextRange(sweetLine, range, fn) {
+function withSweetLineTextRange(sweetLine:IAnyValue, range:ITextRange, fn:(...args: IAnyValue[]) => IAnyValue) {
   const slRange = new sweetLine.TextRange();
   const start = new sweetLine.TextPosition();
   const end = new sweetLine.TextPosition();
@@ -2134,7 +2299,9 @@ function withSweetLineTextRange(sweetLine, range, fn) {
 }
 
 export class SweetLineIncrementalDecorationProvider extends DecorationProvider {
-  constructor(options = {}) {
+  [key: string]: IAnyValue;
+
+  constructor(options:IAnyRecord = {}) {
     super();
     this._sweetLine = options.sweetLine ?? options.runtime?.sweetLine ?? null;
     this._highlightEngine = options.highlightEngine ?? options.runtime?.engine ?? null;
@@ -2176,7 +2343,7 @@ export class SweetLineIncrementalDecorationProvider extends DecorationProvider {
       : null;
     this._buildAnalysisUri = typeof options.buildAnalysisUri === "function"
       ? options.buildAnalysisUri
-      : (fileName) => `file:///${String(fileName || this._defaultFileName)}`;
+      : (fileName:string) => `file:///${String(fileName || this._defaultFileName)}`;
     this._decorate = typeof options.decorate === "function"
       ? options.decorate
       : null;
@@ -2223,19 +2390,19 @@ export class SweetLineIncrementalDecorationProvider extends DecorationProvider {
     return Math.max(0, this._sourceLines.length);
   }
 
-  setDocumentSource(fileName, text) {
+  setDocumentSource(fileName:string, text:string) {
     this._sourceFileName = String(fileName || this._defaultFileName);
     this._setSourceText(text);
     this._resetLineAnalyzeState();
     this._disposeAnalyzer();
   }
 
-  provideDecorations(context, receiver) {
+  provideDecorations(context:IAnyValue, receiver:IAnyValue) {
     if (!this._sweetLine || !this._highlightEngine || !receiver) {
       return;
     }
 
-    const changes = asArray(context?.textChanges).map((change) => ({
+    const changes = asArray(context?.textChanges).map((change:IEditorTextChange) => ({
       range: ensureRange(change?.range),
       oldText: String(change?.oldText ?? change?.old_text ?? ""),
       newText: String(change?.newText ?? change?.new_text ?? ""),
@@ -2309,7 +2476,7 @@ export class SweetLineIncrementalDecorationProvider extends DecorationProvider {
     );
   }
 
-  _buildVisibleRangeForRendering(context, totalLineCount) {
+  _buildVisibleRangeForRendering(context:IAnyValue, totalLineCount:number) {
     const viewportStartLine = context?.viewportStartLine ?? context?.visibleStartLine ?? 0;
     const viewportEndLine = context?.viewportEndLine ?? context?.visibleEndLine ?? (viewportStartLine + 120);
     const viewportRange = clampVisibleLineRange(
@@ -2336,7 +2503,7 @@ export class SweetLineIncrementalDecorationProvider extends DecorationProvider {
     );
   }
 
-  _buildLazyAnalyzeRange(visibleRange, totalLineCount) {
+  _buildLazyAnalyzeRange(visibleRange:IVisibleLineRange, totalLineCount:number) {
     const start = Math.max(0, toInt(visibleRange?.start, 0));
     const end = Math.max(start - 1, toInt(visibleRange?.end, start - 1));
     if (end < start) {
@@ -2355,7 +2522,7 @@ export class SweetLineIncrementalDecorationProvider extends DecorationProvider {
     );
   }
 
-  _resolveAnalyzerExtension(fileName) {
+  _resolveAnalyzerExtension(fileName:string) {
     const name = String(fileName || "");
     const dot = name.lastIndexOf(".");
     if (dot <= 0 || dot >= name.length - 1) {
@@ -2364,7 +2531,7 @@ export class SweetLineIncrementalDecorationProvider extends DecorationProvider {
     return `.${name.slice(dot + 1).toLowerCase()}`;
   }
 
-  _ensureTextAnalyzer(fileName, fileChanged) {
+  _ensureTextAnalyzer(fileName:string, fileChanged:boolean) {
     if (!fileChanged && this._analysisReady && this._textAnalyzer && this._lineInfo) {
       return true;
     }
@@ -2412,12 +2579,12 @@ export class SweetLineIncrementalDecorationProvider extends DecorationProvider {
     this._lineSpanCache.clear();
   }
 
-  _invalidateLineAnalyzeByChanges(changes) {
+  _invalidateLineAnalyzeByChanges(changes:IEditorTextChange[]) {
     if (!changes || changes.length === 0) {
       return;
     }
     let startLine = Number.POSITIVE_INFINITY;
-    changes.forEach((change) => {
+    changes.forEach((change:IEditorTextChange) => {
       const line = toInt(change?.range?.start?.line, Number.POSITIVE_INFINITY);
       if (Number.isFinite(line) && line < startLine) {
         startLine = line;
@@ -2429,7 +2596,7 @@ export class SweetLineIncrementalDecorationProvider extends DecorationProvider {
     this._invalidateLineAnalyzeFromLine(startLine);
   }
 
-  _invalidateLineAnalyzeFromLine(line) {
+  _invalidateLineAnalyzeFromLine(line:number) {
     const lineNo = Math.max(0, toInt(line, 0));
     const clamped = Math.min(lineNo, this._sourceLines.length);
     this._lineAnalyzeCursor = Math.min(this._lineAnalyzeCursor, clamped);
@@ -2443,14 +2610,14 @@ export class SweetLineIncrementalDecorationProvider extends DecorationProvider {
     );
     this._lineStartStates.length = Math.max(1, Math.min(this._lineStartStates.length, clamped + 1));
     this._lineStartOffsets.length = Math.max(1, Math.min(this._lineStartOffsets.length, clamped + 1));
-    for (const key of Array.from(this._lineSpanCache.keys())) {
+    for (const key of Array.from(this._lineSpanCache.keys()) as number[]) {
       if (key >= clamped) {
         this._lineSpanCache.delete(key);
       }
     }
   }
 
-  _scheduleLineAnalyze(range, receiver) {
+  _scheduleLineAnalyze(range:IVisibleLineRange, receiver:IAnyValue) {
     if (!this._textAnalyzer || !this._lineInfo || !receiver) {
       return;
     }
@@ -2480,7 +2647,7 @@ export class SweetLineIncrementalDecorationProvider extends DecorationProvider {
     this._lineAnalyzeJobId += 1;
   }
 
-  _analyzeLineRangeSynchronously(startLine, endLine) {
+  _analyzeLineRangeSynchronously(startLine:number, endLine:number) {
     const totalLines = Math.max(0, this._sourceLines.length);
     if (totalLines <= 0) {
       return 0;
@@ -2501,7 +2668,7 @@ export class SweetLineIncrementalDecorationProvider extends DecorationProvider {
     return processed;
   }
 
-  _runLineAnalyzeChunk(jobId, receiver) {
+  _runLineAnalyzeChunk(jobId:number, receiver:IAnyValue) {
     if (jobId !== this._lineAnalyzeJobId || !receiver || receiver.isCancelled) {
       return;
     }
@@ -2579,7 +2746,7 @@ export class SweetLineIncrementalDecorationProvider extends DecorationProvider {
     }
   }
 
-  _collectCachedSyntaxSpans(visibleRange) {
+  _collectCachedSyntaxSpans(visibleRange:IVisibleLineRange) {
     const out = new Map();
     const startLine = Math.max(0, toInt(visibleRange?.start, 0));
     const endLine = Math.max(startLine - 1, toInt(visibleRange?.end, startLine - 1));
@@ -2593,7 +2760,7 @@ export class SweetLineIncrementalDecorationProvider extends DecorationProvider {
       const spans = this._lineSpanCache.get(line) || [];
       out.set(
         line,
-        spans.map((span) => ({
+        spans.map((span:IAnyValue) => ({
           column: span.column,
           length: span.length,
           styleId: span.styleId,
@@ -2603,12 +2770,12 @@ export class SweetLineIncrementalDecorationProvider extends DecorationProvider {
     return out;
   }
 
-  _setSourceText(text) {
+  _setSourceText(text:string) {
     this._sourceText = normalizeNewlines(text);
     this._sourceLines = splitSourceLines(this._sourceText);
   }
 
-  _resolveContextFileName(context) {
+  _resolveContextFileName(context:IAnyValue) {
     let fileName = this._sourceFileName || this._defaultFileName;
     const metadataFileName = context?.editorMetadata?.fileName;
     if (metadataFileName) {
@@ -2639,15 +2806,20 @@ export class SweetLineIncrementalDecorationProvider extends DecorationProvider {
     return true;
   }
 
-  _applyTextChanges(changes) {
+  _applyTextChanges(changes:IEditorTextChange[]) {
     if (!changes || changes.length === 0) {
       return;
     }
-    this._sourceText = applyTextChangesToText(this._sourceText, changes);
+    const normalizedChanges:ITextChange[] = changes.map((change:IEditorTextChange) => ({
+      range: ensureRange(change?.range),
+      oldText: String(change?.oldText ?? change?.old_text ?? ""),
+      newText: String(change?.newText ?? change?.new_text ?? ""),
+    }));
+    this._sourceText = applyTextChangesToText(this._sourceText, normalizedChanges);
     this._sourceLines = splitSourceLines(this._sourceText);
   }
 
-  _tryRebuildAnalyzer(fileName) {
+  _tryRebuildAnalyzer(fileName:string) {
     try {
       this._rebuildAnalyzer(fileName);
       return true;
@@ -2658,25 +2830,25 @@ export class SweetLineIncrementalDecorationProvider extends DecorationProvider {
     }
   }
 
-  _tryAnalyzeIncremental(changes, fileName) {
+  _tryAnalyzeIncremental(changes:IEditorTextChange[], fileName:string) {
     try {
-      const hasStructuralChange = changes.some((change) => isLineStructureChange(change));
+      const hasStructuralChange = changes.some((change:IEditorTextChange) => isLineStructureChange(change));
       if (hasStructuralChange) {
         this._rebuildAnalyzer(fileName);
         return true;
       }
 
-      changes.forEach((change) => {
+      changes.forEach((change:IEditorTextChange) => {
         if (!change?.range) {
           return;
         }
         const newText = normalizeNewlines(change.newText ?? "");
-        withSweetLineTextRange(this._sweetLine, change.range, (slRange) => {
+        withSweetLineTextRange(this._sweetLine, change.range, (slRange:IAnyValue) => {
           this._cacheHighlight = this._documentAnalyzer.analyzeIncremental(slRange, newText);
         });
       });
 
-      const shouldResyncText = changes.some((change) => {
+      const shouldResyncText = changes.some((change:IEditorTextChange) => {
         const range = change?.range;
         if (!range || !range.start || !range.end) {
           return false;
@@ -2684,7 +2856,7 @@ export class SweetLineIncrementalDecorationProvider extends DecorationProvider {
         if (range.start.line !== range.end.line) {
           return true;
         }
-        return hasLineBreak(change.oldText) || hasLineBreak(change.newText);
+        return hasLineBreak(change.oldText ?? "") || hasLineBreak(change.newText ?? "");
       });
 
       if (this._syncSourceOnTextChange && this._getDocumentText && shouldResyncText) {
@@ -2731,7 +2903,7 @@ export class SweetLineIncrementalDecorationProvider extends DecorationProvider {
     this._analyzedFileName = "";
   }
 
-  _rebuildAnalyzer(fileName) {
+  _rebuildAnalyzer(fileName:string) {
     this._disposeAnalyzer();
     this._analysisDocument = new this._sweetLine.Document(
       this._buildAnalysisUri(fileName),
@@ -2743,7 +2915,7 @@ export class SweetLineIncrementalDecorationProvider extends DecorationProvider {
     this._analyzedFileName = fileName;
   }
 
-  _collectSyntaxSpans(visibleRange) {
+  _collectSyntaxSpans(visibleRange:IVisibleLineRange) {
     const out = new Map();
     const startLine = Math.max(0, toInt(visibleRange?.start, 0));
     const endLine = Math.max(startLine - 1, toInt(visibleRange?.end, startLine - 1));
@@ -2756,7 +2928,7 @@ export class SweetLineIncrementalDecorationProvider extends DecorationProvider {
       return out;
     }
 
-    const getLineHighlight = (line) => {
+    const getLineHighlight = (line:number) => {
       if (typeof lineHighlights.size === "function" && typeof lineHighlights.get === "function") {
         const total = Math.max(0, toInt(lineHighlights.size(), 0));
         if (line < 0 || line >= total) {
@@ -2775,7 +2947,7 @@ export class SweetLineIncrementalDecorationProvider extends DecorationProvider {
       if (!lineHighlight) {
         continue;
       }
-      iterateNativeList(lineHighlight.spans, (token) => {
+      iterateNativeList(lineHighlight.spans, (token:IAnyValue) => {
         const span = extractSingleLineStyleSpan(token);
         if (!span || span.line < startLine || span.line > endLine) {
           return;
@@ -2793,15 +2965,17 @@ export class SweetLineIncrementalDecorationProvider extends DecorationProvider {
       });
     }
 
-    out.forEach((spans) => {
-      spans.sort((a, b) => a.column - b.column);
+    out.forEach((spans:IAnyValue[]) => {
+      spans.sort((a:IAnyValue, b:IAnyValue) => a.column - b.column);
     });
     return out;
   }
 }
 
 class ManagedDecorationReceiver extends DecorationReceiver {
-  constructor(manager, provider, generation) {
+  [key: string]: IAnyValue;
+
+  constructor(manager:IAnyValue, provider:IAnyValue, generation:number) {
     super();
     this._manager = manager;
     this._provider = provider;
@@ -2818,7 +2992,7 @@ class ManagedDecorationReceiver extends DecorationReceiver {
     this._inSyncPhase = false;
   }
 
-  accept(result) {
+  accept(result:IAnyValue) {
     if (this._cancelled || this._generation !== this._manager._generation) {
       return false;
     }
@@ -2841,7 +3015,7 @@ class ManagedDecorationReceiver extends DecorationReceiver {
   }
 }
 
-function cloneDecorationResult(result) {
+function cloneDecorationResult(result:IAnyValue) {
   return {
     syntaxSpans: cloneLineMap(result.syntaxSpans),
     semanticSpans: cloneLineMap(result.semanticSpans),
@@ -2869,7 +3043,7 @@ function cloneDecorationResult(result) {
   };
 }
 
-function mergeDecorationPatch(target, patch) {
+function mergeDecorationPatch(target:IAnyValue, patch:IAnyValue) {
   const fields = [
     ["syntaxSpans", "syntaxSpansMode"],
     ["semanticSpans", "semanticSpansMode"],
@@ -2884,7 +3058,7 @@ function mergeDecorationPatch(target, patch) {
     ["phantomTexts", "phantomTextsMode"],
   ];
 
-  fields.forEach(([dataKey, modeKey]) => {
+  fields.forEach(([dataKey, modeKey]:IAnyValue) => {
     if (patch[dataKey] != null) {
       target[dataKey] = patch[dataKey];
       target[modeKey] = patch[modeKey];
@@ -2898,7 +3072,7 @@ function mergeDecorationPatch(target, patch) {
   });
 }
 
-function normalizeDecorationTextChangeMode(mode) {
+function normalizeDecorationTextChangeMode(mode:IAnyValue) {
   const value = String(mode ?? "").toLowerCase();
   if (value === DecorationTextChangeMode.FULL) {
     return DecorationTextChangeMode.FULL;
@@ -2909,7 +3083,7 @@ function normalizeDecorationTextChangeMode(mode) {
   return DecorationTextChangeMode.INCREMENTAL;
 }
 
-function normalizeDecorationResultDispatchMode(mode) {
+function normalizeDecorationResultDispatchMode(mode:IAnyValue) {
   const value = String(mode ?? "").toLowerCase();
   if (value === DecorationResultDispatchMode.SYNC) {
     return DecorationResultDispatchMode.SYNC;
@@ -2920,7 +3094,7 @@ function normalizeDecorationResultDispatchMode(mode) {
   return DecorationResultDispatchMode.BOTH;
 }
 
-function normalizeDecorationProviderCallMode(mode) {
+function normalizeDecorationProviderCallMode(mode:IAnyValue) {
   const value = String(mode ?? "").toLowerCase();
   if (value === DecorationProviderCallMode.ASYNC) {
     return DecorationProviderCallMode.ASYNC;
@@ -2928,8 +3102,62 @@ function normalizeDecorationProviderCallMode(mode) {
   return DecorationProviderCallMode.SYNC;
 }
 
+type IDecorationTextChangeMode = (typeof DecorationTextChangeMode)[keyof typeof DecorationTextChangeMode];
+type IDecorationResultDispatchMode = (typeof DecorationResultDispatchMode)[keyof typeof DecorationResultDispatchMode];
+type IDecorationProviderCallMode = (typeof DecorationProviderCallMode)[keyof typeof DecorationProviderCallMode];
+
+interface IDecorationProviderLike {
+  provideDecorations: (context: IAnyValue, receiver: DecorationReceiver) => void;
+}
+
+interface IDecorationProviderState {
+  snapshot: IAnyRecord | null;
+  activeReceiver: ManagedDecorationReceiver | null;
+}
+
+interface IDecorationManagerOptions {
+  buildContext?: (input: IAnyRecord) => IAnyValue;
+  getVisibleLineRange?: () => IAnyValue;
+  ensureVisibleLineRange?: () => void;
+  getTotalLineCount?: () => IAnyValue;
+  getLanguageConfiguration?: () => ILanguageConfiguration | IAnyRecord | null;
+  getMetadata?: () => IEditorMetadata | IAnyRecord | null;
+  onApplyMerged?: (merged: IAnyRecord, visibleRange: IVisibleLineRange) => void;
+  scrollRefreshMinIntervalMs?: number;
+  overscanViewportMultiplier?: number;
+  textChangeMode?: IDecorationTextChangeMode;
+  resultDispatchMode?: IDecorationResultDispatchMode;
+  providerCallMode?: IDecorationProviderCallMode;
+  applySynchronously?: boolean;
+}
+
 export class DecorationProviderManager {
-  constructor(options = {}) {
+  _providers: Set<IDecorationProviderLike>;
+  _providerStates: Map<IDecorationProviderLike, IDecorationProviderState>;
+  _buildContext: ((input: IAnyRecord) => IAnyValue) | null;
+  _getVisibleLineRange: (() => IAnyValue) | null;
+  _ensureVisibleLineRange: (() => void) | null;
+  _getTotalLineCount: (() => IAnyValue) | null;
+  _getLanguageConfiguration: (() => ILanguageConfiguration | IAnyRecord | null) | null;
+  _getMetadata: (() => IEditorMetadata | IAnyRecord | null) | null;
+  _onApplyMerged: ((merged: IAnyRecord, visibleRange: IVisibleLineRange) => void) | null;
+  _refreshTimer: ITimeoutHandle | 0;
+  _scrollRefreshTimer: ITimeoutHandle | 0;
+  _applyTimer: ITimeoutHandle | 0;
+  _pendingTextChanges: ITextChange[];
+  _applyScheduled: boolean;
+  _generation: number;
+  _lastVisibleStartLine: number;
+  _lastVisibleEndLine: number;
+  _lastScrollRefreshTickMs: number;
+  _scrollRefreshMinIntervalMs: number;
+  _overscanViewportMultiplier: number;
+  _textChangeMode: IDecorationTextChangeMode;
+  _resultDispatchMode: IDecorationResultDispatchMode;
+  _providerCallMode: IDecorationProviderCallMode;
+  _applySynchronously: boolean;
+
+  constructor(options:IDecorationManagerOptions = {}) {
     this._providers = new Set();
     this._providerStates = new Map();
 
@@ -2966,7 +3194,7 @@ export class DecorationProviderManager {
     this.setOptions(options);
   }
 
-  setOptions(options = {}) {
+  setOptions(options:IDecorationManagerOptions = {}) {
     if (!options || typeof options !== "object") {
       return;
     }
@@ -3002,7 +3230,7 @@ export class DecorationProviderManager {
     };
   }
 
-  addProvider(provider) {
+  addProvider(provider:IDecorationProviderLike) {
     if (!provider) {
       return;
     }
@@ -3016,7 +3244,7 @@ export class DecorationProviderManager {
     this.requestRefresh();
   }
 
-  removeProvider(provider) {
+  removeProvider(provider:IDecorationProviderLike) {
     if (!provider) {
       return;
     }
@@ -3039,11 +3267,11 @@ export class DecorationProviderManager {
     this._scheduleRefresh(0, null);
   }
 
-  onTextChanged(changes) {
+  onTextChanged(changes:IEditorTextChange[]) {
     if (this._textChangeMode === DecorationTextChangeMode.DISABLED) {
       return;
     }
-    this._scheduleRefresh(50, asArray(changes));
+    this._scheduleRefresh(50, changes);
   }
 
   onScrollChanged() {
@@ -3068,11 +3296,11 @@ export class DecorationProviderManager {
     }, Math.max(0, delay));
   }
 
-  _scheduleRefresh(delayMs, changes) {
+  _scheduleRefresh(delayMs:IAnyValue, changes:IEditorTextChange[] | null) {
     let effectiveDelayMs = Math.max(0, toInt(delayMs, 0));
     if (changes && changes.length > 0) {
-      const normalizedChanges = [];
-      changes.forEach((change) => {
+      const normalizedChanges:ITextChange[] = [];
+      changes.forEach((change:IEditorTextChange) => {
         const normalizedChange = {
           range: ensureRange(change.range),
           oldText: String(change.oldText ?? change.old_text ?? ""),
@@ -3110,7 +3338,8 @@ export class DecorationProviderManager {
 
     let visibleRange = this._resolveVisibleRange();
     if (visibleRange.end < visibleRange.start && this._ensureVisibleLineRange) {
-      safeCall(() => this._ensureVisibleLineRange());
+      const ensureVisibleLineRange = this._ensureVisibleLineRange;
+      safeCall(() => ensureVisibleLineRange());
       visibleRange = this._resolveVisibleRange();
     }
     this._lastVisibleStartLine = visibleRange.start;
@@ -3163,7 +3392,7 @@ export class DecorationProviderManager {
     }
   }
 
-  _invokeProvider(provider, context, receiver) {
+  _invokeProvider(provider:IDecorationProviderLike, context:IAnyValue, receiver:ManagedDecorationReceiver) {
     const run = () => {
       if (receiver.isCancelled) {
         return;
@@ -3191,7 +3420,7 @@ export class DecorationProviderManager {
     return { start, end };
   }
 
-  _resolveContextRange(visibleRange, totalLineCount) {
+  _resolveContextRange(visibleRange:IVisibleLineRange, totalLineCount:number) {
     if (totalLineCount <= 0 || visibleRange.end < visibleRange.start) {
       return { start: visibleRange.start, end: visibleRange.end };
     }
@@ -3205,7 +3434,7 @@ export class DecorationProviderManager {
     };
   }
 
-  _onProviderPatch(provider, patch, generation) {
+  _onProviderPatch(provider:IDecorationProviderLike, patch:IAnyValue, generation:number) {
     if (generation !== this._generation) {
       return;
     }
@@ -3245,7 +3474,7 @@ export class DecorationProviderManager {
   }
 
   _applyMerged() {
-    const merged = {
+    const merged:IAnyRecord = {
       syntaxSpans: new Map(),
       semanticSpans: new Map(),
       inlayHints: new Map(),
@@ -3319,12 +3548,17 @@ export class DecorationProviderManager {
 
       merged.foldRegionsMode = mergeMode(merged.foldRegionsMode, snapshot.foldRegionsMode);
       if (snapshot.foldRegions) {
-        merged.foldRegions.push(...cloneList(snapshot.foldRegions));
+        const foldRegions = cloneList(snapshot.foldRegions);
+        if (foldRegions) {
+          merged.foldRegions.push(...foldRegions);
+        }
       }
     }
 
     if (this._onApplyMerged) {
       this._onApplyMerged(merged, {
+        start: this._lastVisibleStartLine,
+        end: this._lastVisibleEndLine,
         startLine: this._lastVisibleStartLine,
         endLine: this._lastVisibleEndLine,
       });

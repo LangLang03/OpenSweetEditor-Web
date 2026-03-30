@@ -1,4 +1,5 @@
-import type { IDisposable, ITextModel } from "@opensweeteditor/core";
+import type { IAnyRecord, IDisposable, ISweetEditorWasmModule, ITextModel } from "@opensweeteditor/core";
+import type { SweetEditorWidget } from "@opensweeteditor/widget";
 
 export interface ICompletionContext {
   readonly triggerKind: number;
@@ -32,28 +33,36 @@ export interface ICompletionProvider {
 }
 
 export interface IDecorationProvider {
-  capabilities?: Record<string, unknown>;
-  provideDecorations(context: unknown, model: ITextModel): Promise<unknown> | unknown;
+  capabilities?: IAnyRecord;
+  provideDecorations(context: IAnyRecord, model: ITextModel): Promise<IAnyRecord | null | void> | IAnyRecord | null | void;
+}
+
+export interface ILegacyDecorationProvider {
+  getCapabilities?: () => IAnyRecord | number;
+  provideDecorations?: (
+    context: IAnyRecord,
+    receiver: { accept: (result: IAnyRecord) => void },
+  ) => void | Promise<void>;
 }
 
 export interface IWasmOptions {
-  module?: unknown;
+  module?: ISweetEditorWasmModule;
   modulePath?: string;
-  moduleFactory?: unknown;
-  moduleOptions?: Record<string, unknown>;
+  moduleFactory?: (options?: IAnyRecord) => Promise<ISweetEditorWasmModule> | ISweetEditorWasmModule;
+  moduleOptions?: IAnyRecord;
 }
 
 export interface ICreateEditorOptions {
   wasm?: IWasmOptions;
   locale?: string;
-  theme?: Record<string, unknown>;
+  theme?: IAnyRecord;
   model?: ITextModel;
   value?: string;
   language?: string;
   uri?: string;
-  decorationOptions?: Record<string, unknown>;
-  performanceOverlay?: boolean | Record<string, unknown>;
-  widgetOptions?: Record<string, unknown>;
+  decorationOptions?: IAnyRecord;
+  performanceOverlay?: boolean | IAnyRecord;
+  widgetOptions?: IAnyRecord;
 }
 
 export interface IEditor {
@@ -62,10 +71,9 @@ export interface IEditor {
   getModel(): ITextModel;
   setModel(model: ITextModel): void;
   registerCompletionProvider(provider: ICompletionProvider): IDisposable;
-  registerDecorationProvider(provider: IDecorationProvider | unknown): IDisposable;
+  registerDecorationProvider(provider: IDecorationProvider | ILegacyDecorationProvider): IDisposable;
   onDidChangeModelContent(listener: (model: ITextModel) => void): IDisposable;
   triggerCompletion(): void;
-  getNativeWidget(): unknown;
+  getNativeWidget(): SweetEditorWidget;
   dispose(): void;
 }
-

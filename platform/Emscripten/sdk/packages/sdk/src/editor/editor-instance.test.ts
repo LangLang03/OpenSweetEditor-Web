@@ -1,16 +1,18 @@
 /* @vitest-environment jsdom */
 import { describe, expect, it, vi } from "vitest";
+import type { ISweetEditorWasmModule } from "@opensweeteditor/core";
+import type { SweetEditorWidget } from "@opensweeteditor/widget";
 
 import { createEditor, createModel, getBundledSyntaxPath, getBundledWasmModulePath } from "./editor-instance.js";
 
 class FakeWidget {
   private readonly listeners = new Map<string, Set<() => void>>();
   private _text = "";
-  completionProviders: unknown[] = [];
-  decorationProviders: unknown[] = [];
+  completionProviders: object[] = [];
+  decorationProviders: object[] = [];
   disposeCalled = false;
   triggerCompletionCalled = false;
-  metadata: Record<string, unknown> | null = null;
+  metadata: Record<string, any> | null = null;
 
   subscribe(event: string, listener: () => void): void {
     if (!this.listeners.has(event)) {
@@ -33,27 +35,27 @@ class FakeWidget {
     return this._text;
   }
 
-  addCompletionProvider(provider: unknown): void {
+  addCompletionProvider(provider: object): void {
     this.completionProviders.push(provider);
   }
 
-  removeCompletionProvider(provider: unknown): void {
-    this.completionProviders = this.completionProviders.filter((item) => item !== provider);
+  removeCompletionProvider(provider: object): void {
+    this.completionProviders = this.completionProviders.filter((item: object) => item !== provider);
   }
 
-  addDecorationProvider(provider: unknown): void {
+  addDecorationProvider(provider: object): void {
     this.decorationProviders.push(provider);
   }
 
-  removeDecorationProvider(provider: unknown): void {
-    this.decorationProviders = this.decorationProviders.filter((item) => item !== provider);
+  removeDecorationProvider(provider: object): void {
+    this.decorationProviders = this.decorationProviders.filter((item: object) => item !== provider);
   }
 
   triggerCompletion(): void {
     this.triggerCompletionCalled = true;
   }
 
-  setMetadata(metadata: Record<string, unknown>): void {
+  setMetadata(metadata: Record<string, any>): void {
     this.metadata = metadata;
   }
 
@@ -80,8 +82,8 @@ describe("editor instance", () => {
       document.createElement("div"),
       { model },
       {
-        loadWasm: async () => ({}),
-        createWidget: () => widget,
+        loadWasm: async () => ({} as ISweetEditorWasmModule),
+        createWidget: () => widget as unknown as SweetEditorWidget,
       },
     );
 
@@ -106,8 +108,8 @@ describe("editor instance", () => {
       document.createElement("div"),
       {},
       {
-        loadWasm: async () => ({}),
-        createWidget: () => widget,
+        loadWasm: async () => ({} as ISweetEditorWasmModule),
+        createWidget: () => widget as unknown as SweetEditorWidget,
       },
     );
 

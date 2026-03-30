@@ -4,6 +4,8 @@ import {
   createTextModel,
   loadWasmModule,
   toDisposable,
+  type IAnyRecord,
+  type ISweetEditorWasmModule,
   type ITextModel,
   type IDisposable,
 } from "@opensweeteditor/core";
@@ -17,12 +19,13 @@ import type {
   ICreateEditorOptions,
   IDecorationProvider,
   IEditor,
+  ILegacyDecorationProvider,
   IWasmOptions,
 } from "../types.js";
 
 interface ICreateEditorOverrides {
-  createWidget?: (container: HTMLElement, wasmModule: unknown, options: Record<string, unknown>) => unknown;
-  loadWasm?: (options: ICreateEditorOptions["wasm"]) => Promise<unknown>;
+  createWidget?: (container: HTMLElement, wasmModule: ISweetEditorWasmModule, options: IAnyRecord) => SweetEditorWidget;
+  loadWasm?: (options: ICreateEditorOptions["wasm"]) => Promise<ISweetEditorWasmModule>;
 }
 
 const BUNDLED_RUNTIME_MODULE_RELATIVE_PATH = "../../runtime/sweeteditor.js";
@@ -41,7 +44,7 @@ function normalizeCompletionResult(result: ICompletionList | ICompletionItem[] |
   };
 }
 
-function mapCompletionContext(context: Record<string, unknown> | null | undefined): ICompletionContext {
+function mapCompletionContext(context: IAnyRecord | null | undefined): ICompletionContext {
   const cursor = context?.cursorPosition as { line?: number; column?: number } | undefined;
   return {
     triggerKind: Number(context?.triggerKind ?? CompletionTriggerKind.INVOKED),
@@ -60,7 +63,7 @@ function makeLegacyOptions(
   options: ICreateEditorOptions,
   model: ITextModel,
   resolvedModulePath: string | undefined,
-): Record<string, unknown> {
+): IAnyRecord {
   return {
     ...(options.widgetOptions ?? {}),
     locale: options.locale,
@@ -143,8 +146,8 @@ class EditorInstance implements IEditor {
   setModel(model: ITextModel): void {
     this._model = model;
     this._widget.loadText(model.getValue());
-    if (typeof (this._widget as { setMetadata?: (metadata: Record<string, unknown>) => void }).setMetadata === "function") {
-      (this._widget as { setMetadata: (metadata: Record<string, unknown>) => void }).setMetadata({
+    if (typeof (this._widget as { setMetadata?: (metadata: IAnyRecord) => void }).setMetadata === "function") {
+      (this._widget as { setMetadata: (metadata: IAnyRecord) => void }).setMetadata({
         fileName: model.uri,
         language: model.language,
       });
@@ -154,7 +157,7 @@ class EditorInstance implements IEditor {
   registerCompletionProvider(provider: ICompletionProvider): IDisposable {
     const legacyProvider = {
       isTriggerCharacter: (ch: string) => Array.isArray(provider.triggerCharacters) && provider.triggerCharacters.includes(ch),
-      provideCompletions: async (context: Record<string, unknown>, receiver: { accept: (result: ICompletionList) => void }) => {
+      provideCompletions: async (context: IAnyRecord, receiver: { accept: (result: ICompletionList) => void }) => {
         const mappedContext = mapCompletionContext(context);
         const resolved = await provider.provideCompletions(mappedContext, this._model);
         receiver.accept(normalizeCompletionResult(resolved));
@@ -169,20 +172,20 @@ class EditorInstance implements IEditor {
     return disposable;
   }
 
-  registerDecorationProvider(provider: IDecorationProvider | unknown): IDisposable {
-    const legacyProvider = (
-      typeof (provider as IDecorationProvider).provideDecorations === "function"
-        ? {
-          getCapabilities: () => (provider as IDecorationProvider).capabilities ?? {},
-          provideDecorations: async (context: unknown, receiver: { accept: (result: unknown) => void }) => {
-            const patch = await (provider as IDecorationProvider).provideDecorations(context, this._model);
-            if (patch != null) {
-              receiver.accept(patch);
-            }
-          },
-        }
-        : provider
-    );
+  registerDecorationProvider(provider: IDecorationProvider | ILegacyDecorationProvider): IDisposable {
+    const maybeLegacy = provider as ILegacyDecorationProvider;
+    const isLegacyProvider = typeof maybeLegacy.getCapabilities === "function";
+    const legacyProvider: ILegacyDecorationProvider = isLegacyProvider
+      ? maybeLegacy
+      : {
+        getCapabilities: () => (provider as IDecorationProvider).capabilities ?? {},
+        provideDecorations: async (context: IAnyRecord, receiver: { accept: (result: IAnyRecord) => void }) => {
+          const patch = await (provider as IDecorationProvider).provideDecorations(context, this._model);
+          if (patch != null) {
+            receiver.accept(patch as IAnyRecord);
+          }
+        },
+      };
 
     this._widget.addDecorationProvider(legacyProvider as never);
     const disposable = toDisposable(() => {
@@ -203,7 +206,7 @@ class EditorInstance implements IEditor {
     this._widget.triggerCompletion();
   }
 
-  getNativeWidget(): unknown {
+  getNativeWidget(): SweetEditorWidget {
     return this._widget;
   }
 
@@ -244,7 +247,11 @@ export async function createEditor(
     if (wasmOptions?.module) {
       return wasmOptions.module;
     }
-    const loadOptions: { modulePath?: string; moduleFactory?: unknown; moduleOptions?: Record<string, unknown> } = {};
+    const loadOptions: {
+      modulePath?: string;
+      moduleFactory?: NonNullable<IWasmOptions["moduleFactory"]>;
+      moduleOptions?: IAnyRecord;
+    } = {};
     if (resolvedModulePath !== undefined) {
       loadOptions.modulePath = resolvedModulePath;
     }
@@ -260,8 +267,10 @@ export async function createEditor(
   const wasmModule = await wasmLoader(options.wasm);
   const legacyOptions = makeLegacyOptions(options, model, resolvedModulePath);
 
-  const widgetFactory = overrides.createWidget ?? ((host, moduleObj, widgetOptions) => new SweetEditorWidget(host, moduleObj, widgetOptions));
-  const widget = widgetFactory(container, wasmModule, legacyOptions) as SweetEditorWidget;
+  const widgetFactory = overrides.createWidget ?? ((host: HTMLElement, moduleObj: ISweetEditorWasmModule, widgetOptions: IAnyRecord) => (
+    new SweetEditorWidget(host, moduleObj, widgetOptions)
+  ));
+  const widget = widgetFactory(container, wasmModule, legacyOptions);
 
   const editor = new EditorInstance(widget, model);
   editor.setModel(model);
