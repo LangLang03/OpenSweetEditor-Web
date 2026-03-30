@@ -46,7 +46,7 @@ It is suited for long-term editor infrastructure in IDEs, AI programming tools, 
 | OHOS | Implemented | ArkUI Canvas | ArkUI | this repo: [platform/OHOS](./platform/OHOS) |
 | Web | Testing (Unofficial) | - | - | fork repo: [LangLang03/OpenSweetEditor-Web](https://github.com/LangLang03/OpenSweetEditor-Web/tree/main/platform/Emscripten) |
 | Flutter | In Progress | - | Flutter | - |
-| Compose Multiplatform | Planned | - | Compose | - |
+| Compose Multiplatform | In Progress | Compose Canvas | Compose | fork repo: [SweetEditor-Compose](https://github.com/lumkit/SweetEditor-Compose) |
 | Qt | Planned | - | Qt | - |
 | C# Avalonia UI | Planned | - | - | - |
 | C# WinUI | Planned | - | - | - |
