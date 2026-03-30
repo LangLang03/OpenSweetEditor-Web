@@ -1,3 +1,4 @@
+// @ts-nocheck
 import {
   DocumentFactory,
   WebEditorCore,
@@ -9,7 +10,7 @@ import {
   DecorationApplyMode,
   DecorationProviderManager,
   SweetLineIncrementalDecorationProvider,
-} from "./editor-core.js";
+} from "@opensweeteditor/core";
 
 const FALLBACK_EVENT_TYPE = {
   TOUCH_DOWN: 1,

@@ -1,0 +1,17 @@
+{
+  "name": "@opensweeteditor/demo",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "preview": "vite preview",
+    "typecheck": "pnpm --filter @opensweeteditor/core run build && pnpm --filter @opensweeteditor/widget run build && pnpm --filter @opensweeteditor/sdk run build && pnpm --filter @opensweeteditor/providers-sweetline run build && tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src --ext .ts"
+  },
+  "dependencies": {
+    "@opensweeteditor/providers-sweetline": "workspace:*",
+    "@opensweeteditor/sdk": "workspace:*"
+  }
+}

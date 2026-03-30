@@ -1,16 +1,47 @@
 import {
-  createSweetEditor,
   CompletionItem,
   CompletionResult,
   DecorationApplyMode,
-  DecorationTextChangeMode,
-  DecorationResultDispatchMode,
   DecorationProviderCallMode,
   DecorationResult,
-  normalizeNewlines,
+  DecorationResultDispatchMode,
+  DecorationTextChangeMode,
   countLogicalLines,
-} from "../index.js?v=20260326_27";
-import loadSweetLineModule from "../libs/sweetline/libsweetline.js?v=20260326_27";
+  createEditor,
+  createModel,
+  normalizeNewlines,
+} from "@opensweeteditor/sdk";
+
+type SweetLineModuleLoader = (options?: Record<string, unknown>) => Promise<any>;
+type LanguageKind = "cpp" | "java" | "kotlin" | "lua";
+
+interface IDemoCompletionItem {
+  label: string;
+  detail: string;
+  kind: number;
+  insertText: string;
+  sortKey: string;
+  insertTextFormat?: number;
+}
+
+interface IWidgetLike {
+  registerTextStyle(styleId: number, color: number, backgroundColor?: number, fontStyle?: number): void;
+  setContentStartPadding?(padding: number): void;
+  setPerformanceOverlayEnabled?(enabled: boolean): void;
+  setPerformanceOverlayVisible?(visible: boolean): void;
+  addSweetLineDecorationProvider?(options: Record<string, unknown>): any;
+  addCompletionProvider?(provider: unknown): void;
+  clearAllDecorations?(): void;
+  setDecorationProviderOptions?(options: Record<string, unknown>): void;
+  setMetadata?(metadata: Record<string, unknown>): void;
+  setLanguageConfiguration?(config: Record<string, unknown>): void;
+  setScroll?(x: number, y: number): void;
+  requestDecorationRefresh?(): void;
+  getText?(): string;
+  undo?(): void;
+  redo?(): void;
+  triggerCompletion?(): void;
+}
 
 const DEMO_FILE_FALLBACKS = Object.freeze({
   "View.java": `package demo;
@@ -92,7 +123,7 @@ const INLAY_COLOR_TYPE = 2;
 const MAX_RENDER_LINES_PER_PASS = 420;
 const SYNTAX_JSON_FILES = Object.freeze(["cpp.json", "java.json", "kotlin.json", "lua.json"]);
 
-const MEMBER_COMPLETIONS = Object.freeze({
+const MEMBER_COMPLETIONS: Readonly<Record<LanguageKind, IDemoCompletionItem[]>> = Object.freeze({
   cpp: [
     { label: "size", detail: "size_t", kind: CompletionItem.KIND_FUNCTION, insertText: "size()", sortKey: "a_size" },
     { label: "begin", detail: "iterator", kind: CompletionItem.KIND_FUNCTION, insertText: "begin()", sortKey: "b_begin" },
@@ -119,7 +150,7 @@ const MEMBER_COMPLETIONS = Object.freeze({
   ],
 });
 
-const GLOBAL_COMPLETIONS = Object.freeze({
+const GLOBAL_COMPLETIONS: Readonly<Record<LanguageKind, IDemoCompletionItem[]>> = Object.freeze({
   cpp: [
     { label: "std::string", detail: "class", kind: CompletionItem.KIND_CLASS, insertText: "std::string", sortKey: "a_std_string" },
     { label: "std::vector", detail: "template class", kind: CompletionItem.KIND_CLASS, insertText: "std::vector<>", sortKey: "b_std_vector" },
@@ -150,7 +181,15 @@ const GLOBAL_COMPLETIONS = Object.freeze({
   ],
 });
 
-function resolveLanguageKind(fileName) {
+function toInt(value: unknown, fallback = 0): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) {
+    return fallback;
+  }
+  return Math.trunc(n);
+}
+
+function resolveLanguageKind(fileName: string): LanguageKind {
   const lower = String(fileName || "").toLowerCase();
   if (lower.endsWith(".java")) return "java";
   if (lower.endsWith(".kt")) return "kotlin";
@@ -158,7 +197,7 @@ function resolveLanguageKind(fileName) {
   return "cpp";
 }
 
-function resolveLanguageConfiguration(fileName) {
+function resolveLanguageConfiguration(fileName: string): { bracketPairs: Array<{ open: string; close: string; autoClose?: boolean; surround?: boolean }> } {
   const kind = resolveLanguageKind(fileName);
   if (kind === "lua") {
     return {
@@ -169,6 +208,7 @@ function resolveLanguageConfiguration(fileName) {
       ],
     };
   }
+
   return {
     bracketPairs: [
       { open: "(", close: ")" },
@@ -180,14 +220,14 @@ function resolveLanguageConfiguration(fileName) {
   };
 }
 
-function truncateDemoTextForWeb(text) {
+function truncateDemoTextForWeb(text: string): { text: string; truncated: boolean } {
   return {
     text: normalizeNewlines(text),
     truncated: false,
   };
 }
 
-function parseColorLiteralArgb(literal) {
+function parseColorLiteralArgb(literal: string): number | null {
   if (!literal || !/^0X[0-9A-Fa-f]{6,8}$/.test(literal)) {
     return null;
   }
@@ -202,7 +242,7 @@ function parseColorLiteralArgb(literal) {
   return value >>> 0;
 }
 
-function findLineCommentStart(line, marker) {
+function findLineCommentStart(line: string, marker: string): number {
   if (!marker || marker.length === 0) {
     return -1;
   }
@@ -235,19 +275,17 @@ function findLineCommentStart(line, marker) {
   return -1;
 }
 
-function toInt(value, fallback = 0) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) {
-    return fallback;
-  }
-  return Math.trunc(n);
-}
-
-function buildDemoInlayAndDiagnostics(lines, fileName, startLine, endLine, liteMode = false) {
+function buildDemoInlayAndDiagnostics(
+  lines: string[],
+  fileName: string,
+  startLine: number,
+  endLine: number,
+  liteMode = false,
+): { inlayHints: Map<number, unknown[]>; diagnostics: Map<number, unknown[]> } {
   const kind = resolveLanguageKind(fileName);
 
-  const inlayHints = new Map();
-  const diagnostics = new Map();
+  const inlayHints = new Map<number, unknown[]>();
+  const diagnostics = new Map<number, unknown[]>();
 
   for (let line = startLine; line <= endLine; line += 1) {
     const lineText = lines[line] ?? "";
@@ -264,7 +302,7 @@ function buildDemoInlayAndDiagnostics(lines, fileName, startLine, endLine, liteM
       if (!inlayHints.has(line)) {
         inlayHints.set(line, []);
       }
-      inlayHints.get(line).push({
+      inlayHints.get(line)?.push({
         type: INLAY_COLOR_TYPE,
         column: (colorMatch.index ?? 0) + colorMatch[0].length + 1,
         color,
@@ -278,7 +316,7 @@ function buildDemoInlayAndDiagnostics(lines, fileName, startLine, endLine, liteM
       const fixmePos = comment.toUpperCase().indexOf("FIXME");
       if (fixmePos >= 0) {
         if (!diagnostics.has(line)) diagnostics.set(line, []);
-        diagnostics.get(line).push({
+        diagnostics.get(line)?.push({
           column: commentPos + fixmePos,
           length: 5,
           severity: 0,
@@ -289,7 +327,7 @@ function buildDemoInlayAndDiagnostics(lines, fileName, startLine, endLine, liteM
       const todoPos = comment.toUpperCase().indexOf("TODO");
       if (todoPos >= 0) {
         if (!diagnostics.has(line)) diagnostics.set(line, []);
-        diagnostics.get(line).push({
+        diagnostics.get(line)?.push({
           column: commentPos + todoPos,
           length: 4,
           severity: 1,
@@ -302,7 +340,7 @@ function buildDemoInlayAndDiagnostics(lines, fileName, startLine, endLine, liteM
   return { inlayHints, diagnostics };
 }
 
-function registerSweetLineStyleMap(engine) {
+function registerSweetLineStyleMap(engine: any): void {
   engine.registerStyleName("keyword", STYLE.KEYWORD);
   engine.registerStyleName("type", STYLE.TYPE);
   engine.registerStyleName("string", STYLE.STRING);
@@ -321,58 +359,7 @@ function registerSweetLineStyleMap(engine) {
   engine.registerStyleName("punctuation", STYLE.PUNCTUATION);
 }
 
-let sweetLineRuntimePromise = null;
-
-async function ensureSweetLineRuntime(versionTag) {
-  if (sweetLineRuntimePromise) {
-    return sweetLineRuntimePromise;
-  }
-
-  sweetLineRuntimePromise = (async () => {
-    const sweetLine = await loadSweetLineModule({
-      locateFile: (path) => {
-        if (String(path).endsWith(".wasm")) {
-          return new URL(`../libs/sweetline/${path}?v=${versionTag}`, import.meta.url).href;
-        }
-        return new URL(`../libs/sweetline/${path}`, import.meta.url).href;
-      },
-    });
-
-    const config = new sweetLine.HighlightConfig();
-    config.showIndex = false;
-    config.inlineStyle = false;
-    config.tabSize = 4;
-
-    const engine = new sweetLine.HighlightEngine(config);
-    registerSweetLineStyleMap(engine);
-
-    let compiled = 0;
-    for (const syntaxFile of SYNTAX_JSON_FILES) {
-      const syntaxUrl = new URL(`./syntaxes/${syntaxFile}?v=${versionTag}`, import.meta.url);
-      try {
-        const response = await fetch(syntaxUrl.href, { cache: "no-store" });
-        if (!response.ok) {
-          console.warn(`SweetLine syntax load failed: ${syntaxFile}`);
-          continue;
-        }
-        engine.compileSyntaxFromJson(await response.text());
-        compiled += 1;
-      } catch (_) {
-        console.warn(`SweetLine syntax load failed: ${syntaxFile}`);
-      }
-    }
-
-    if (compiled === 0) {
-      console.warn("SweetLine syntax load skipped: no syntax JSON compiled.");
-    }
-
-    return { sweetLine, engine };
-  })();
-
-  return sweetLineRuntimePromise;
-}
-
-function buildDemoDecorationPatch(payload = {}) {
+function buildDemoDecorationPatch(payload: Record<string, any> = {}): DecorationResult | null {
   const sourceLines = Array.isArray(payload.sourceLines) && payload.sourceLines.length > 0
     ? payload.sourceLines
     : [""];
@@ -401,9 +388,9 @@ function buildDemoDecorationPatch(payload = {}) {
     });
   }
 
-  const receiver = payload.receiver;
+  const receiver = payload.receiver as { isCancelled?: boolean; accept?: (r: DecorationResult) => void } | undefined;
   setTimeout(() => {
-    if (!receiver || receiver.isCancelled) {
+    if (!receiver || receiver.isCancelled || typeof receiver.accept !== "function") {
       return;
     }
     receiver.accept(new DecorationResult({
@@ -419,21 +406,23 @@ function buildDemoDecorationPatch(payload = {}) {
 }
 
 class DemoCompletionProvider {
-  constructor(getFileName) {
+  private readonly _getFileName: () => string;
+
+  constructor(getFileName: () => string) {
     this._getFileName = getFileName;
   }
 
-  isTriggerCharacter(ch) {
+  isTriggerCharacter(ch: string): boolean {
     return ch === "." || ch === ":";
   }
 
-  provideCompletions(context, receiver) {
+  provideCompletions(context: Record<string, any>, receiver: { isCancelled?: boolean; accept: (result: CompletionResult) => void }): void {
     const fileName = context?.editorMetadata?.fileName || this._getFileName();
     const kind = resolveLanguageKind(fileName);
 
     if (context?.triggerKind === 1 && context?.triggerCharacter === ".") {
       const items = MEMBER_COMPLETIONS[kind] || MEMBER_COMPLETIONS.cpp;
-      receiver.accept(new CompletionResult(items, false));
+      receiver.accept(new CompletionResult(items as never[], false));
       return;
     }
 
@@ -442,19 +431,19 @@ class DemoCompletionProvider {
       if (receiver.isCancelled) {
         return;
       }
-      receiver.accept(new CompletionResult(items, false));
+      receiver.accept(new CompletionResult(items as never[], false));
     }, 200);
   }
 }
 
-async function loadDemoFiles(versionTag) {
+async function loadDemoFiles(runtimeBase: URL, versionTag: string): Promise<{ fileNames: string[]; fileMap: Map<string, string>; fileState: Map<string, { truncated: boolean }> }> {
   const fileNames = Object.keys(DEMO_FILE_FALLBACKS).slice().sort((a, b) => a.localeCompare(b));
-  const fileMap = new Map();
-  const fileState = new Map();
+  const fileMap = new Map<string, string>();
+  const fileState = new Map<string, { truncated: boolean }>();
 
   await Promise.all(fileNames.map(async (fileName) => {
-    const fallback = DEMO_FILE_FALLBACKS[fileName];
-    const url = new URL(`./files/${encodeURIComponent(fileName)}?v=${versionTag}`, import.meta.url);
+    const fallback = DEMO_FILE_FALLBACKS[fileName as keyof typeof DEMO_FILE_FALLBACKS];
+    const url = new URL(`files/${encodeURIComponent(fileName)}?v=${versionTag}`, runtimeBase);
     try {
       const response = await fetch(url.href, { cache: "no-store" });
       if (!response.ok) {
@@ -466,7 +455,7 @@ async function loadDemoFiles(versionTag) {
       const loaded = truncateDemoTextForWeb(await response.text());
       fileMap.set(fileName, loaded.text);
       fileState.set(fileName, { truncated: loaded.truncated });
-    } catch (_) {
+    } catch {
       const fallbackResult = truncateDemoTextForWeb(fallback);
       fileMap.set(fileName, fallbackResult.text);
       fileState.set(fileName, { truncated: fallbackResult.truncated });
@@ -476,23 +465,23 @@ async function loadDemoFiles(versionTag) {
   return { fileNames, fileMap, fileState };
 }
 
-function registerDemoStyles(editor) {
-  editor.registerTextStyle(STYLE.KEYWORD, 0xFF7AA2F7, 0, 1);
-  editor.registerTextStyle(STYLE.TYPE, 0xFF4EC9B0, 0, 0);
-  editor.registerTextStyle(STYLE.STRING, 0xFFCE9178, 0, 0);
-  editor.registerTextStyle(STYLE.COMMENT, 0xFF6A9955, 0, 2);
-  editor.registerTextStyle(STYLE.BUILTIN, 0xFF7DCFFF, 0, 0);
-  editor.registerTextStyle(STYLE.NUMBER, 0xFFB5CEA8, 0, 0);
-  editor.registerTextStyle(STYLE.CLASS, 0xFFE0AF68, 0, 1);
-  editor.registerTextStyle(STYLE.FUNCTION, 0xFF73DACA, 0, 0);
-  editor.registerTextStyle(STYLE.VARIABLE, 0xFFD7DEE9, 0, 0);
-  editor.registerTextStyle(STYLE.ANNOTATION, 0xFF4FC1FF, 0, 0);
-  editor.registerTextStyle(STYLE.PUNCTUATION, 0xFFD4D4D4, 0, 0);
-  editor.registerTextStyle(STYLE.PREPROCESSOR, 0xFFF7768E, 0, 0);
-  editor.registerTextStyle(STYLE.COLOR, 0xFFFF9E64, 0, 1);
+function registerDemoStyles(widget: IWidgetLike): void {
+  widget.registerTextStyle(STYLE.KEYWORD, 0xFF7AA2F7, 0, 1);
+  widget.registerTextStyle(STYLE.TYPE, 0xFF4EC9B0, 0, 0);
+  widget.registerTextStyle(STYLE.STRING, 0xFFCE9178, 0, 0);
+  widget.registerTextStyle(STYLE.COMMENT, 0xFF6A9955, 0, 2);
+  widget.registerTextStyle(STYLE.BUILTIN, 0xFF7DCFFF, 0, 0);
+  widget.registerTextStyle(STYLE.NUMBER, 0xFFB5CEA8, 0, 0);
+  widget.registerTextStyle(STYLE.CLASS, 0xFFE0AF68, 0, 1);
+  widget.registerTextStyle(STYLE.FUNCTION, 0xFF73DACA, 0, 0);
+  widget.registerTextStyle(STYLE.VARIABLE, 0xFFD7DEE9, 0, 0);
+  widget.registerTextStyle(STYLE.ANNOTATION, 0xFF4FC1FF, 0, 0);
+  widget.registerTextStyle(STYLE.PUNCTUATION, 0xFFD4D4D4, 0, 0);
+  widget.registerTextStyle(STYLE.PREPROCESSOR, 0xFFF7768E, 0, 0);
+  widget.registerTextStyle(STYLE.COLOR, 0xFFFF9E64, 0, 1);
 }
 
-function resolveDecorationRuntimeOptionsByLineCount(lineCount) {
+function resolveDecorationRuntimeOptionsByLineCount(lineCount: number): { scrollRefreshMinIntervalMs: number; overscanViewportMultiplier: number } {
   const total = Math.max(0, toInt(lineCount, 0));
   if (total >= 80000) {
     return { scrollRefreshMinIntervalMs: 140, overscanViewportMultiplier: 0.10 };
@@ -509,204 +498,259 @@ function resolveDecorationRuntimeOptionsByLineCount(lineCount) {
   return { scrollRefreshMinIntervalMs: 50, overscanViewportMultiplier: 0.5 };
 }
 
-const host = document.getElementById("editor");
-const fileSelect = document.getElementById("fileSelect");
-const openLocalBtn = document.getElementById("openLocalBtn");
-const localFileInput = document.getElementById("localFileInput");
-const undoBtn = document.getElementById("undoBtn");
-const redoBtn = document.getElementById("redoBtn");
-const completeBtn = document.getElementById("completeBtn");
-const statusText = document.getElementById("statusText");
-
-const wasmVersion = Date.now();
-const locale = (navigator.language || "").toLowerCase().startsWith("zh") ? "zh-CN" : "en";
-const DEMO_DECORATION_OPTIONS = Object.freeze({
-  // `INCREMENTAL`: pass textChanges to provider (provider can do incremental analyze)
-  // `FULL`: force full analyze on every text change
-  // `DISABLED`: ignore text-change driven refresh
-  textChangeMode: DecorationTextChangeMode.INCREMENTAL,
-  // `BOTH`: allow sync + async receiver.accept
-  // `SYNC`: only allow sync results
-  // `ASYNC`: only allow async results
-  resultDispatchMode: DecorationResultDispatchMode.BOTH,
-  // `SYNC`: call provider immediately
-  // `ASYNC`: call provider in macrotask
-  providerCallMode: DecorationProviderCallMode.SYNC,
-  applySynchronously: false,
-});
-
-const { fileNames, fileMap, fileState } = await loadDemoFiles(wasmVersion);
-const initialFileName = fileNames[0] || "example.kt";
-const initialText = fileMap.get(initialFileName) || DEMO_FILE_FALLBACKS[initialFileName] || "";
-const initialDecorationRuntimeOptions = resolveDecorationRuntimeOptionsByLineCount(countLogicalLines(initialText));
-
-const editor = await createSweetEditor(host, {
-  modulePath: `../sweeteditor.js?v=${wasmVersion}`,
-  locale,
-  text: initialText,
-  performanceOverlay: {
-    enabled: true,
-    visible: true,
-    stutterThresholdMs: 50,
-    chart: {
-      enabled: true,
+async function ensureSweetLineRuntime(runtimeBase: URL, versionTag: string): Promise<{ sweetLine: any; engine: any }> {
+  const moduleUrl = new URL(`libs/sweetline/libsweetline.js?v=${versionTag}`, runtimeBase);
+  const mod = await import(/* @vite-ignore */ moduleUrl.href);
+  const loader = (mod.default ?? mod) as SweetLineModuleLoader;
+  const sweetLine = await loader({
+    locateFile: (path: string) => {
+      if (String(path).endsWith(".wasm")) {
+        return new URL(`libs/sweetline/${path}?v=${versionTag}`, runtimeBase).href;
+      }
+      return new URL(`libs/sweetline/${path}`, runtimeBase).href;
     },
-  },
-  decorationOptions: {
-    ...DEMO_DECORATION_OPTIONS,
-    ...initialDecorationRuntimeOptions,
-  },
-});
-editor.setPerformanceOverlayEnabled(true);
-editor.setPerformanceOverlayVisible(true);
-
-registerDemoStyles(editor);
-editor.setContentStartPadding(5);
-const sweetLineRuntime = await ensureSweetLineRuntime(wasmVersion);
-
-let activeFileName = initialFileName;
-const demoDecorationProvider = editor.addSweetLineDecorationProvider({
-  sweetLine: sweetLineRuntime.sweetLine,
-  highlightEngine: sweetLineRuntime.engine,
-  fileName: initialFileName,
-  text: initialText,
-  maxRenderLinesPerPass: MAX_RENDER_LINES_PER_PASS,
-  syntaxSpansMode: DecorationApplyMode.MERGE,
-  syncSourceOnTextChange: true,
-  decorate: buildDemoDecorationPatch,
-});
-
-const demoCompletionProvider = new DemoCompletionProvider(() => activeFileName);
-editor.addCompletionProvider(demoCompletionProvider);
-
-function setStatus(message) {
-  statusText.textContent = message;
-}
-
-function ensureFileOption(fileName) {
-  for (let i = 0; i < fileSelect.options.length; i += 1) {
-    if (fileSelect.options[i].value === fileName) {
-      return;
-    }
-  }
-
-  const option = document.createElement("option");
-  option.value = fileName;
-  option.textContent = fileName;
-  fileSelect.appendChild(option);
-}
-
-function getUniqueLocalFileName(fileName) {
-  const raw = String(fileName || "").trim();
-  const base = raw.length > 0 ? raw : `local-${Date.now()}.txt`;
-  if (!fileMap.has(base)) {
-    return base;
-  }
-
-  const dot = base.lastIndexOf(".");
-  const hasExt = dot > 0 && dot < base.length - 1;
-  const stem = hasExt ? base.slice(0, dot) : base;
-  const ext = hasExt ? base.slice(dot) : "";
-
-  let index = 2;
-  while (true) {
-    const candidate = `${stem} (${index})${ext}`;
-    if (!fileMap.has(candidate)) {
-      return candidate;
-    }
-    index += 1;
-  }
-}
-
-function applyFileContent(fileName, text, options = {}) {
-  const { truncated = false } = options;
-  fileMap.set(fileName, text);
-  fileState.set(fileName, { truncated: !!truncated });
-  ensureFileOption(fileName);
-  fileSelect.value = fileName;
-  loadFile(fileName);
-}
-
-function snapshotActiveFileContent() {
-  if (!activeFileName) {
-    return;
-  }
-
-  try {
-    const currentText = String(editor.getText() ?? "");
-    fileMap.set(activeFileName, currentText);
-    fileState.set(activeFileName, { truncated: false });
-  } catch (error) {
-    console.warn("Snapshot active file failed:", error);
-  }
-}
-
-function loadFile(fileName) {
-  const normalizedFileName = String(fileName || "");
-  if (!normalizedFileName) {
-    setStatus("Load failed: empty file name");
-    return;
-  }
-
-  if (activeFileName && activeFileName !== normalizedFileName) {
-    snapshotActiveFileContent();
-  }
-
-  const knownFile = fileMap.has(normalizedFileName) || Object.prototype.hasOwnProperty.call(DEMO_FILE_FALLBACKS, normalizedFileName);
-  if (!knownFile) {
-    setStatus(`Load failed: ${normalizedFileName} not found`);
-    return;
-  }
-
-  const text = fileMap.has(normalizedFileName)
-    ? fileMap.get(normalizedFileName)
-    : (DEMO_FILE_FALLBACKS[normalizedFileName] || "");
-
-  try {
-    activeFileName = normalizedFileName;
-    if (typeof editor.clearAllDecorations === "function") {
-      editor.clearAllDecorations();
-    }
-    demoDecorationProvider.setDocumentSource(normalizedFileName, text);
-    editor.setDecorationProviderOptions(
-      resolveDecorationRuntimeOptionsByLineCount(demoDecorationProvider.getLineCount()),
-    );
-    editor.setMetadata({ fileName: normalizedFileName });
-    editor.setLanguageConfiguration(resolveLanguageConfiguration(normalizedFileName));
-    editor.loadText(text);
-    editor.setScroll(0, 0);
-    editor.requestDecorationRefresh();
-    setStatus(`Loaded: ${normalizedFileName}`);
-  } catch (error) {
-    console.error("Failed to load file:", normalizedFileName, error);
-    setStatus(`Load failed: ${normalizedFileName}`);
-  }
-}
-
-for (const fileName of fileNames) {
-  const option = document.createElement("option");
-  option.value = fileName;
-  option.textContent = fileName;
-  fileSelect.appendChild(option);
-}
-
-fileSelect.value = initialFileName;
-loadFile(initialFileName);
-
-const onFileSelectChanged = () => {
-  loadFile(fileSelect.value);
-};
-
-fileSelect.addEventListener("change", onFileSelectChanged);
-fileSelect.addEventListener("input", onFileSelectChanged);
-
-if (openLocalBtn && localFileInput) {
-  openLocalBtn.addEventListener("click", () => {
-    localFileInput.click();
   });
 
-  localFileInput.addEventListener("change", async () => {
-    const localFile = localFileInput.files && localFileInput.files[0];
+  const config = new sweetLine.HighlightConfig();
+  config.showIndex = false;
+  config.inlineStyle = false;
+  config.tabSize = 4;
+
+  const engine = new sweetLine.HighlightEngine(config);
+  registerSweetLineStyleMap(engine);
+
+  for (const syntaxFile of SYNTAX_JSON_FILES) {
+    const syntaxUrl = new URL(`syntaxes/${syntaxFile}?v=${versionTag}`, runtimeBase);
+    try {
+      const response = await fetch(syntaxUrl.href, { cache: "no-store" });
+      if (!response.ok) {
+        console.warn(`SweetLine syntax load failed: ${syntaxFile}`);
+        continue;
+      }
+      engine.compileSyntaxFromJson(await response.text());
+    } catch {
+      console.warn(`SweetLine syntax load failed: ${syntaxFile}`);
+    }
+  }
+  return { sweetLine, engine };
+}
+
+function setStatus(message: string): void {
+  const statusText = document.getElementById("statusText");
+  if (statusText) {
+    statusText.textContent = message;
+  }
+}
+
+async function bootstrap(): Promise<void> {
+  const host = document.getElementById("editor") as HTMLElement | null;
+  const fileSelect = document.getElementById("fileSelect") as HTMLSelectElement | null;
+  const openLocalBtn = document.getElementById("openLocalBtn") as HTMLButtonElement | null;
+  const localFileInput = document.getElementById("localFileInput") as HTMLInputElement | null;
+  const undoBtn = document.getElementById("undoBtn") as HTMLButtonElement | null;
+  const redoBtn = document.getElementById("redoBtn") as HTMLButtonElement | null;
+  const completeBtn = document.getElementById("completeBtn") as HTMLButtonElement | null;
+
+  if (!host || !fileSelect || !openLocalBtn || !localFileInput || !undoBtn || !redoBtn || !completeBtn) {
+    throw new Error("Demo DOM missing required elements");
+  }
+  const fileSelectEl = fileSelect;
+  const openLocalBtnEl = openLocalBtn;
+  const localFileInputEl = localFileInput;
+  const undoBtnEl = undoBtn;
+  const redoBtnEl = redoBtn;
+  const completeBtnEl = completeBtn;
+
+  const wasmVersion = String(Date.now());
+  const locale = (navigator.language || "").toLowerCase().startsWith("zh") ? "zh-CN" : "en";
+  const runtimeBase = new URL("./runtime/", window.location.href);
+
+  const DEMO_DECORATION_OPTIONS = Object.freeze({
+    textChangeMode: DecorationTextChangeMode.INCREMENTAL,
+    resultDispatchMode: DecorationResultDispatchMode.BOTH,
+    providerCallMode: DecorationProviderCallMode.SYNC,
+    applySynchronously: false,
+  });
+
+  const { fileNames, fileMap, fileState } = await loadDemoFiles(runtimeBase, wasmVersion);
+  const initialFileName = fileNames[0] || "example.kt";
+  const initialText = fileMap.get(initialFileName) || DEMO_FILE_FALLBACKS[initialFileName as keyof typeof DEMO_FILE_FALLBACKS] || "";
+  const initialDecorationRuntimeOptions = resolveDecorationRuntimeOptionsByLineCount(countLogicalLines(initialText));
+
+  const editor = await createEditor(host, {
+    model: createModel(initialText, {
+      uri: `inmemory://demo/${initialFileName}`,
+      language: resolveLanguageKind(initialFileName),
+    }),
+    locale,
+    wasm: {
+      modulePath: new URL(`sweeteditor.js?v=${wasmVersion}`, runtimeBase).href,
+    },
+    performanceOverlay: {
+      enabled: true,
+      visible: true,
+      stutterThresholdMs: 50,
+      chart: {
+        enabled: true,
+      },
+    },
+    decorationOptions: {
+      ...DEMO_DECORATION_OPTIONS,
+      ...initialDecorationRuntimeOptions,
+    },
+  });
+
+  const widget = editor.getNativeWidget() as IWidgetLike;
+  widget.setPerformanceOverlayEnabled?.(true);
+  widget.setPerformanceOverlayVisible?.(true);
+
+  registerDemoStyles(widget);
+  widget.setContentStartPadding?.(5);
+
+  setStatus("Loading SweetLine runtime...");
+  const sweetLineRuntime = await ensureSweetLineRuntime(runtimeBase, wasmVersion);
+
+  let activeFileName = initialFileName;
+  const demoDecorationProvider = widget.addSweetLineDecorationProvider?.({
+    sweetLine: sweetLineRuntime.sweetLine,
+    highlightEngine: sweetLineRuntime.engine,
+    fileName: initialFileName,
+    text: initialText,
+    maxRenderLinesPerPass: MAX_RENDER_LINES_PER_PASS,
+    syntaxSpansMode: DecorationApplyMode.MERGE,
+    syncSourceOnTextChange: true,
+    decorate: buildDemoDecorationPatch,
+  });
+
+  const demoCompletionProvider = new DemoCompletionProvider(() => activeFileName);
+  widget.addCompletionProvider?.(demoCompletionProvider);
+
+  function ensureFileOption(fileName: string): void {
+    for (let i = 0; i < fileSelectEl.options.length; i += 1) {
+      const existing = fileSelectEl.options.item(i);
+      if (existing && existing.value === fileName) {
+        return;
+      }
+    }
+
+    const option = document.createElement("option");
+    option.value = fileName;
+    option.textContent = fileName;
+    fileSelectEl.appendChild(option);
+  }
+
+  function getUniqueLocalFileName(fileName: string): string {
+    const raw = String(fileName || "").trim();
+    const base = raw.length > 0 ? raw : `local-${Date.now()}.txt`;
+    if (!fileMap.has(base)) {
+      return base;
+    }
+
+    const dot = base.lastIndexOf(".");
+    const hasExt = dot > 0 && dot < base.length - 1;
+    const stem = hasExt ? base.slice(0, dot) : base;
+    const ext = hasExt ? base.slice(dot) : "";
+
+    let index = 2;
+    while (true) {
+      const candidate = `${stem} (${index})${ext}`;
+      if (!fileMap.has(candidate)) {
+        return candidate;
+      }
+      index += 1;
+    }
+  }
+
+  function snapshotActiveFileContent(): void {
+    if (!activeFileName) {
+      return;
+    }
+    try {
+      const currentText = String(widget.getText?.() ?? editor.getValue());
+      fileMap.set(activeFileName, currentText);
+      fileState.set(activeFileName, { truncated: false });
+    } catch (error) {
+      console.warn("Snapshot active file failed:", error);
+    }
+  }
+
+  function loadFile(fileName: string): void {
+    const normalizedFileName = String(fileName || "");
+    if (!normalizedFileName) {
+      setStatus("Load failed: empty file name");
+      return;
+    }
+
+    if (activeFileName && activeFileName !== normalizedFileName) {
+      snapshotActiveFileContent();
+    }
+
+    const knownFile = fileMap.has(normalizedFileName)
+      || Object.prototype.hasOwnProperty.call(DEMO_FILE_FALLBACKS, normalizedFileName);
+    if (!knownFile) {
+      setStatus(`Load failed: ${normalizedFileName} not found`);
+      return;
+    }
+
+    const text = fileMap.has(normalizedFileName)
+      ? (fileMap.get(normalizedFileName) ?? "")
+      : (DEMO_FILE_FALLBACKS[normalizedFileName as keyof typeof DEMO_FILE_FALLBACKS] || "");
+
+    try {
+      activeFileName = normalizedFileName;
+      widget.clearAllDecorations?.();
+      demoDecorationProvider?.setDocumentSource?.(normalizedFileName, text);
+      widget.setDecorationProviderOptions?.(
+        resolveDecorationRuntimeOptionsByLineCount(demoDecorationProvider?.getLineCount?.() ?? countLogicalLines(text)),
+      );
+      widget.setMetadata?.({ fileName: normalizedFileName });
+      widget.setLanguageConfiguration?.(resolveLanguageConfiguration(normalizedFileName));
+
+      editor.setModel(createModel(text, {
+        uri: `inmemory://demo/${normalizedFileName}`,
+        language: resolveLanguageKind(normalizedFileName),
+      }));
+      widget.setScroll?.(0, 0);
+      widget.requestDecorationRefresh?.();
+      setStatus(`Loaded: ${normalizedFileName}`);
+    } catch (error) {
+      console.error("Failed to load file:", normalizedFileName, error);
+      setStatus(`Load failed: ${normalizedFileName}`);
+    }
+  }
+
+  function applyFileContent(fileName: string, text: string, options: { truncated?: boolean } = {}): void {
+    const { truncated = false } = options;
+    fileMap.set(fileName, text);
+    fileState.set(fileName, { truncated: !!truncated });
+    ensureFileOption(fileName);
+    fileSelectEl.value = fileName;
+    loadFile(fileName);
+  }
+
+  for (const fileName of fileNames) {
+    const option = document.createElement("option");
+    option.value = fileName;
+    option.textContent = fileName;
+    fileSelectEl.appendChild(option);
+  }
+
+  fileSelectEl.value = initialFileName;
+  loadFile(initialFileName);
+
+  const onFileSelectChanged = (): void => {
+    loadFile(fileSelectEl.value);
+  };
+
+  fileSelectEl.addEventListener("change", onFileSelectChanged);
+  fileSelectEl.addEventListener("input", onFileSelectChanged);
+
+  openLocalBtnEl.addEventListener("click", () => {
+    localFileInputEl.click();
+  });
+
+  localFileInputEl.addEventListener("change", async () => {
+    const localFile = localFileInputEl.files && localFileInputEl.files[0];
     if (!localFile) {
       return;
     }
@@ -722,21 +766,24 @@ if (openLocalBtn && localFileInput) {
       console.error("Failed to load local file:", error);
       setStatus("Load local failed");
     } finally {
-      localFileInput.value = "";
+      localFileInputEl.value = "";
     }
+  });
+
+  undoBtnEl.addEventListener("click", () => {
+    widget.undo?.();
+  });
+
+  redoBtnEl.addEventListener("click", () => {
+    widget.redo?.();
+  });
+
+  completeBtnEl.addEventListener("click", () => {
+    widget.triggerCompletion?.();
   });
 }
 
-undoBtn.addEventListener("click", () => {
-  editor.undo();
+bootstrap().catch((error) => {
+  console.error(error);
+  setStatus(`Error: ${String(error)}`);
 });
-
-redoBtn.addEventListener("click", () => {
-  editor.redo();
-});
-
-completeBtn.addEventListener("click", () => {
-  editor.triggerCompletion();
-});
-
-

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OpenSweetEditor Web SDK v2 Demo</title>
+  <style>
+    :root {
+      --bg: #101214;
+      --bg2: #1a1f27;
+      --line: #2a303a;
+      --text: #e5e7eb;
+      --subtle: #95a0b3;
+      --btn: #232a35;
+      --btn-hover: #2b3442;
+    }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: "Segoe UI", "PingFang SC", sans-serif; }
+    .layout { display: grid; grid-template-rows: auto 1fr; height: 100%; }
+    .toolbar { display: flex; align-items: center; gap: 8px; padding: 10px; border-bottom: 1px solid var(--line); background: var(--bg2); }
+    .toolbar button, .toolbar select {
+      background: var(--btn);
+      color: var(--text);
+      border: 1px solid #3a4556;
+      border-radius: 6px;
+      font-size: 13px;
+      padding: 6px 10px;
+      cursor: pointer;
+    }
+    .toolbar button:hover { background: var(--btn-hover); }
+    .status { margin-left: auto; color: var(--subtle); font-size: 12px; }
+    #editor { height: 100%; min-height: 0; }
+  </style>
+  <script type="module" crossorigin src="./assets/index-eUG5Mcy0.js"></script>
+</head>
+<body>
+<div class="layout">
+  <div class="toolbar">
+    <label for="fileSelect">File</label>
+    <select id="fileSelect"></select>
+    <button id="openLocalBtn" type="button">Open Local</button>
+    <input id="localFileInput" type="file" accept=".txt,.java,.kt,.kts,.lua,.c,.cc,.cpp,.cxx,.h,.hpp,.m,.mm,.js,.ts,.json,.xml,.html,.css,.md,.py,.go,.rs,.swift,.cs,.sh,.bat,.ps1" style="display:none" />
+    <button id="undoBtn" type="button">Undo</button>
+    <button id="redoBtn" type="button">Redo</button>
+    <button id="completeBtn" type="button">Complete</button>
+    <span id="statusText" class="status">Booting...</span>
+  </div>
+  <div id="editor"></div>
+</div>
+</body>
+</html>

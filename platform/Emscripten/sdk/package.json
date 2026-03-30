@@ -1,0 +1,29 @@
+{
+  "name": "@opensweeteditor/web-sdk-workspace",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.30.3",
+  "engines": {
+    "node": ">=20 <26",
+    "pnpm": ">=10.30.0 <11"
+  },
+  "scripts": {
+    "build:packages": "pnpm --filter @opensweeteditor/core run build && pnpm --filter @opensweeteditor/widget run build && pnpm --filter @opensweeteditor/providers-sweetline run build && pnpm --filter @opensweeteditor/sdk run build",
+    "build": "pnpm run build:packages && pnpm --filter @opensweeteditor/demo run build",
+    "test": "pnpm -r --if-present run test",
+    "lint": "pnpm -r --if-present run lint",
+    "typecheck": "pnpm -r --if-present run typecheck",
+    "build:web-dist": "node ./scripts/build-web-dist.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^24.6.1",
+    "@typescript-eslint/eslint-plugin": "^8.44.0",
+    "@typescript-eslint/parser": "^8.44.0",
+    "eslint": "^9.36.0",
+    "fs-extra": "^11.3.2",
+    "jsdom": "^26.1.0",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.7",
+    "vitest": "^3.2.4"
+  }
+}

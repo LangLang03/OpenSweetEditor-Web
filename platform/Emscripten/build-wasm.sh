@@ -36,3 +36,18 @@ cp -f "$WASM_WASM" "$WEB_DIR/sweeteditor.wasm"
 
 echo "Wasm build done: $WASM_JS"
 echo "Synced wasm artifacts to web directory, ready to package: $WEB_DIR"
+
+SDK_DIR="$REPO_ROOT/platform/Emscripten/sdk"
+if [[ -f "$SDK_DIR/package.json" ]]; then
+  if ! command -v pnpm >/dev/null 2>&1; then
+    echo "pnpm not found. Please install pnpm to build web sdk distribution." >&2
+    exit 1
+  fi
+
+  pushd "$SDK_DIR" >/dev/null
+  echo "Installing/updating pnpm workspace dependencies..."
+  pnpm install --no-frozen-lockfile
+  echo "Building Web SDK distribution to platform/Emscripten/web ..."
+  pnpm build:web-dist "--wasm-js=$WASM_JS" "--wasm-wasm=$WASM_WASM"
+  popd >/dev/null
+fi

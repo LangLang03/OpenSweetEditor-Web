@@ -54,3 +54,28 @@ Copy-Item -Force $wasmWasm (Join-Path $webDir "sweeteditor.wasm")
 
 Write-Host "Wasm build done: $wasmJs"
 Write-Host "Synced wasm artifacts to web directory, ready to package: $webDir"
+
+$sdkDir = Join-Path $repoRoot "platform/Emscripten/sdk"
+if (Test-Path (Join-Path $sdkDir "package.json")) {
+  $pnpm = Get-Command pnpm -ErrorAction SilentlyContinue
+  if (-not $pnpm) {
+    throw "pnpm not found. Please install pnpm to build web sdk distribution."
+  }
+
+  Push-Location $sdkDir
+  try {
+    Write-Host "Installing/updating pnpm workspace dependencies..."
+    & $pnpm.Source install --no-frozen-lockfile
+    if ($LASTEXITCODE -ne 0) {
+      throw "pnpm install failed in $sdkDir"
+    }
+
+    Write-Host "Building Web SDK distribution to platform/Emscripten/web ..."
+    & $pnpm.Source build:web-dist "--wasm-js=$wasmJs" "--wasm-wasm=$wasmWasm"
+    if ($LASTEXITCODE -ne 0) {
+      throw "pnpm build:web-dist failed in $sdkDir"
+    }
+  } finally {
+    Pop-Location
+  }
+}

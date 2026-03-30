@@ -1,3 +1,4 @@
+// @ts-nocheck
 const FALLBACK_SPAN_LAYER = Object.freeze({
   SYNTAX: 0,
   SEMANTIC: 1,
