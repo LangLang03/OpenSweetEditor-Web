@@ -46,7 +46,7 @@ SweetEditor 是一套跨平台代码编辑器内核，面向需要在 Android、
 | OHOS | 已实现 | ArkUI Canvas | ArkUI | 当前仓库：[platform/OHOS](./platform/OHOS) |
 | Web | 测试中（非官方） | - | - | fork 仓库：[LangLang03/OpenSweetEditor-Web](https://github.com/LangLang03/OpenSweetEditor-Web/tree/main/platform/Emscripten) |
 | Flutter | 进行中 | - | Flutter | - |
-| Compose Multiplatform | 待实现 | - | Compose | - |
+| Compose Multiplatform | 进行中 | Compose Canvas | Compose | fork 仓库：[SweetEditor-Compose](https://github.com/lumkit/SweetEditor-Compose) |
 | Qt | 待实现 | - | Qt | - |
 | C# Avalonia UI | 待实现 | - | - | - |
 | C# WinUI | 待实现 | - | - | - |
