@@ -1419,6 +1419,7 @@ namespace NS_SWEETEDITOR {
           if (start_u16_index > 0 || end_u16_index < run.text.length()) {
             run.x = text_area_x + crop_start_x - scroll_x;
             run.text = run.text.substr(start_u16_index, end_u16_index - start_u16_index);
+            run.width = measureWidth(run.text, run.style.font_style);
           }
         }
       }
