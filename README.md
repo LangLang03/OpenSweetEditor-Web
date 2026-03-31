@@ -80,22 +80,13 @@ It is suited for long-term editor infrastructure in IDEs, AI programming tools, 
                +--------------------------------------------------+
 ```
 
-SweetEditor uses a **unified-core, separated-rendering** architecture: the C++ core handles editing logic and layout, while platform layers only deal with input bridging and native drawing.
-
 > Web support is currently experimental testing work maintained in the unofficial fork repository: [LangLang03/OpenSweetEditor-Web](https://github.com/LangLang03/OpenSweetEditor-Web).
 
 > For the full architecture documentation, see [Architecture](docs/en/architecture.md)
 
 ## Core Capabilities
 
-- **Document and editing model**: UTF-8 document model, Piece Table, large-file loading, insert/delete/replace, undo/redo, line operations
-- **Cursor and navigation**: cursor positioning, selection control, word queries, scroll positioning, floating-anchor position queries
-- **Input system**: full-path support for mouse, touch, keyboard, and IME composition input
-- **Layout and rendering**: word wrapping, auto indentation, folding arrow mode, incremental layout, viewport clipping, render model output
-- **Styling and decorations**: syntax and semantic highlighting, Inlay Hints, Ghost Text, diagnostic decorations, gutter icons, four types of structural guides, bracket highlighting
-- **Advanced editing features**: code folding, snippets, linked editing
-- **Platform extension mechanisms**: DecorationProvider, CompletionProvider, asynchronous refresh, and completion UI support
-- **Performance infrastructure**: SIMD Unicode transcoding, measurement cache, font metrics cache, viewport-level rebuild and rendering
+The C++ core covers document editing (Piece Table, undo/redo, large-file loading), text layout (word wrapping, incremental layout, viewport clipping), styling and decorations (syntax/semantic highlighting, Inlay Hints, Ghost Text, diagnostics, structural guides), advanced editing (code folding, snippets, linked editing), and platform extension mechanisms (DecorationProvider, CompletionProvider). Performance is built on SIMD Unicode transcoding, measurement caching, and viewport-level rendering.
 
 For the complete capability list, see [EditorCore API](docs/en/api-editor-core.md).
 
@@ -111,13 +102,7 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 cmake --build . -j
 ```
 
-For platform quick-start documentation, see:
-
-- Android: [English](docs/en/api-platform-android.md#quick-start)
-- Swing: [English](docs/en/api-platform-swing.md#quick-start)
-- OHOS: [English](docs/en/api-platform-ohos.md#quick-start)
-
-For WebAssembly testing builds, use the unofficial fork repository: [LangLang03/OpenSweetEditor-Web](https://github.com/LangLang03/OpenSweetEditor-Web). For other platforms, see the corresponding platform documentation.
+For platform quick-start guides and WebAssembly testing builds, see the [Platform API Index](docs/en/api-platform.md).
 
 ### Minimal Integration Example
 
@@ -163,6 +148,7 @@ Testing uses [Catch2](https://github.com/catchorg/Catch2).
 | [Architecture](docs/en/architecture.md) | Core architecture, module design, data flow, and rendering pipeline |
 | [EditorCore API](docs/en/api-editor-core.md) | Reference for the C++ core layer and C API |
 | [Platform API Index](docs/en/api-platform.md) | Entry point for Android, Swing, Apple, WinForms, and OHOS platform API docs |
+| [Platform Implementation Standard](docs/en/platform-implementation-standard.md) | Required types, module structure, API contracts, and compliance rules for all platform implementations |
 | [Contributing](docs/en/join.md) | Repository structure, reading entry points, and platform synchronization checkpoints |
 
 ## Contributing

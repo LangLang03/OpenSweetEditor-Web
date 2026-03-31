@@ -6,9 +6,10 @@ This document gives practical development entry points based on the current repo
 
 1. `docs/en/architecture.md`
 2. `docs/en/api-editor-core.md`
-3. `src/include/*.h`
-4. `src/core/*.cpp`
-5. Read `platform/*` last
+3. `docs/en/platform-implementation-standard.md`
+4. `src/include/*.h`
+5. `src/core/*.cpp`
+6. Read `platform/*` last
 
 ## Repository Map
 
@@ -102,6 +103,10 @@ This document gives practical development entry points based on the current repo
 - `platform/Apple/Sources/SweetEditoriOS`
 - `platform/Apple/Sources/SweetEditorMacOS`
   - iOS / macOS platform views
+
+## Platform Implementation Standard
+
+If you are implementing a new platform or maintaining an existing one, see the [Platform Implementation Standard](platform-implementation-standard.md) for the full list of required types, module structure, API contracts, and compliance rules that every platform must follow.
 
 ## If You Change X, Start from Y
 

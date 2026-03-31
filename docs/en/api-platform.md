@@ -10,6 +10,7 @@ This document describes the current repository code state (2026-03). If the docu
 - [WinForms Platform API](./api-platform-winforms.md)
 - [OHOS Platform API](./api-platform-ohos.md)
 - [C++ Core / C API](./api-editor-core.md)
+- [Platform Implementation Standard](./platform-implementation-standard.md)
 
 ## Current Platform Status
 

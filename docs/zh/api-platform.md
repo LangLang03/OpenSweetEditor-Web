@@ -10,6 +10,7 @@
 - [WinForms 平台 API](./api-platform-winforms.md)
 - [OHOS 平台 API](./api-platform-ohos.md)
 - [C++ 核心 / C API](./api-editor-core.md)
+- [平台实现标准](./platform-implementation-standard.md)
 
 ## 当前平台状态
 
