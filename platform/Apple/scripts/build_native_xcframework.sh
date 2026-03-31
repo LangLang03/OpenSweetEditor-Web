@@ -10,9 +10,13 @@ MACOS_UNIVERSAL_BUILD_DIR="${REPO_ROOT}/build/apple-macos-universal"
 IOS_DEVICE_BUILD_DIR="${REPO_ROOT}/build/apple-ios-device"
 IOS_SIM_BUILD_DIR="${REPO_ROOT}/build/apple-ios-simulator"
 OUTPUT_DIR="${APPLE_DIR}/binaries"
-OUTPUT_XCFRAMEWORK="${OUTPUT_DIR}/SweetNativeCore.xcframework"
+OUTPUT_XCFRAMEWORK_IOS="${OUTPUT_DIR}/SweetNativeCoreIOS.xcframework"
+OUTPUT_XCFRAMEWORK_OSX="${OUTPUT_DIR}/SweetNativeCoreOSX.xcframework"
 FRAMEWORK_NAME="SweetNativeCore.framework"
 FRAMEWORK_BINARY_NAME="SweetNativeCore"
+
+# Parse argument: "ios", "osx", or empty (build both)
+BUILD_TARGET="${1:-all}"
 
 mkdir -p "${OUTPUT_DIR}"
 
@@ -97,66 +101,100 @@ function make_universal_macos_framework() {
   lipo -create "${arm_binary}" "${x64_binary}" -output "${universal_binary}"
 }
 
-configure_apple_build "${MACOS_BUILD_DIR}" \
-  -DCMAKE_OSX_ARCHITECTURES=arm64
+function build_ios() {
+  configure_apple_build "${IOS_DEVICE_BUILD_DIR}" \
+    -DCMAKE_SYSTEM_NAME=iOS \
+    -DCMAKE_OSX_SYSROOT=iphoneos \
+    -DCMAKE_OSX_ARCHITECTURES=arm64
 
-cmake --build "${MACOS_BUILD_DIR}" --config Release
+  cmake --build "${IOS_DEVICE_BUILD_DIR}" --config Release
 
-configure_apple_build "${MACOS_X64_BUILD_DIR}" \
-  -DCMAKE_OSX_ARCHITECTURES=x86_64
+  configure_apple_build "${IOS_SIM_BUILD_DIR}" \
+    -DCMAKE_SYSTEM_NAME=iOS \
+    -DCMAKE_OSX_SYSROOT=iphonesimulator \
+    -DCMAKE_OSX_ARCHITECTURES=arm64
 
-cmake --build "${MACOS_X64_BUILD_DIR}" --config Release
+  cmake --build "${IOS_SIM_BUILD_DIR}" --config Release
 
-configure_apple_build "${IOS_DEVICE_BUILD_DIR}" \
-  -DCMAKE_SYSTEM_NAME=iOS \
-  -DCMAKE_OSX_SYSROOT=iphoneos \
-  -DCMAKE_OSX_ARCHITECTURES=arm64
+  IOS_DEVICE_FRAMEWORK_PATH="$(locate_framework_dir "${IOS_DEVICE_BUILD_DIR}")"
+  IOS_SIM_FRAMEWORK_PATH="$(locate_framework_dir "${IOS_SIM_BUILD_DIR}")"
 
-cmake --build "${IOS_DEVICE_BUILD_DIR}" --config Release
+  if [[ ! -d "${IOS_DEVICE_FRAMEWORK_PATH}" ]]; then
+    echo "Native iOS device framework not found under ${IOS_DEVICE_BUILD_DIR}" >&2
+    exit 1
+  fi
 
-configure_apple_build "${IOS_SIM_BUILD_DIR}" \
-  -DCMAKE_SYSTEM_NAME=iOS \
-  -DCMAKE_OSX_SYSROOT=iphonesimulator \
-  -DCMAKE_OSX_ARCHITECTURES=arm64
+  if [[ ! -d "${IOS_SIM_FRAMEWORK_PATH}" ]]; then
+    echo "Native iOS simulator framework not found under ${IOS_SIM_BUILD_DIR}" >&2
+    exit 1
+  fi
 
-cmake --build "${IOS_SIM_BUILD_DIR}" --config Release
+  rm -rf "${OUTPUT_XCFRAMEWORK_IOS}"
 
-MACOS_FRAMEWORK_PATH="$(locate_framework_dir "${MACOS_BUILD_DIR}")"
-MACOS_X64_FRAMEWORK_PATH="$(locate_framework_dir "${MACOS_X64_BUILD_DIR}")"
-IOS_DEVICE_FRAMEWORK_PATH="$(locate_framework_dir "${IOS_DEVICE_BUILD_DIR}")"
-IOS_SIM_FRAMEWORK_PATH="$(locate_framework_dir "${IOS_SIM_BUILD_DIR}")"
+  # Create iOS XCFramework (Device + Simulator)
+  xcodebuild -create-xcframework \
+    -framework "${IOS_DEVICE_FRAMEWORK_PATH}" \
+    -framework "${IOS_SIM_FRAMEWORK_PATH}" \
+    -output "${OUTPUT_XCFRAMEWORK_IOS}"
 
-if [[ ! -d "${MACOS_FRAMEWORK_PATH}" ]]; then
-  echo "Native macOS framework not found under ${MACOS_BUILD_DIR}" >&2
-  exit 1
-fi
+  echo "Generated ${OUTPUT_XCFRAMEWORK_IOS}"
+}
 
-if [[ ! -d "${MACOS_X64_FRAMEWORK_PATH}" ]]; then
-  echo "Native macOS x86_64 framework not found under ${MACOS_X64_BUILD_DIR}" >&2
-  exit 1
-fi
+function build_osx() {
+  configure_apple_build "${MACOS_BUILD_DIR}" \
+    -DCMAKE_OSX_ARCHITECTURES=arm64
 
-if [[ ! -d "${IOS_DEVICE_FRAMEWORK_PATH}" ]]; then
-  echo "Native iOS device framework not found under ${IOS_DEVICE_BUILD_DIR}" >&2
-  exit 1
-fi
+  cmake --build "${MACOS_BUILD_DIR}" --config Release
 
-if [[ ! -d "${IOS_SIM_FRAMEWORK_PATH}" ]]; then
-  echo "Native iOS simulator framework not found under ${IOS_SIM_BUILD_DIR}" >&2
-  exit 1
-fi
+  configure_apple_build "${MACOS_X64_BUILD_DIR}" \
+    -DCMAKE_OSX_ARCHITECTURES=x86_64
 
-MACOS_UNIVERSAL_FRAMEWORK_PATH="${MACOS_UNIVERSAL_BUILD_DIR}/${FRAMEWORK_NAME}"
-make_universal_macos_framework \
-  "${MACOS_FRAMEWORK_PATH}" \
-  "${MACOS_X64_FRAMEWORK_PATH}" \
-  "${MACOS_UNIVERSAL_FRAMEWORK_PATH}"
+  cmake --build "${MACOS_X64_BUILD_DIR}" --config Release
 
-rm -rf "${OUTPUT_XCFRAMEWORK}"
-xcodebuild -create-xcframework \
-  -framework "${MACOS_UNIVERSAL_FRAMEWORK_PATH}" \
-  -framework "${IOS_DEVICE_FRAMEWORK_PATH}" \
-  -framework "${IOS_SIM_FRAMEWORK_PATH}" \
-  -output "${OUTPUT_XCFRAMEWORK}"
+  MACOS_FRAMEWORK_PATH="$(locate_framework_dir "${MACOS_BUILD_DIR}")"
+  MACOS_X64_FRAMEWORK_PATH="$(locate_framework_dir "${MACOS_X64_BUILD_DIR}")"
 
-echo "Generated ${OUTPUT_XCFRAMEWORK}"
+  if [[ ! -d "${MACOS_FRAMEWORK_PATH}" ]]; then
+    echo "Native macOS framework not found under ${MACOS_BUILD_DIR}" >&2
+    exit 1
+  fi
+
+  if [[ ! -d "${MACOS_X64_FRAMEWORK_PATH}" ]]; then
+    echo "Native macOS x86_64 framework not found under ${MACOS_X64_BUILD_DIR}" >&2
+    exit 1
+  fi
+
+  MACOS_UNIVERSAL_FRAMEWORK_PATH="${MACOS_UNIVERSAL_BUILD_DIR}/${FRAMEWORK_NAME}"
+  make_universal_macos_framework \
+    "${MACOS_FRAMEWORK_PATH}" \
+    "${MACOS_X64_FRAMEWORK_PATH}" \
+    "${MACOS_UNIVERSAL_FRAMEWORK_PATH}"
+
+  rm -rf "${OUTPUT_XCFRAMEWORK_OSX}"
+
+  # Create macOS XCFramework (Universal)
+  xcodebuild -create-xcframework \
+    -framework "${MACOS_UNIVERSAL_FRAMEWORK_PATH}" \
+    -output "${OUTPUT_XCFRAMEWORK_OSX}"
+
+  echo "Generated ${OUTPUT_XCFRAMEWORK_OSX}"
+}
+
+# Main execution
+case "${BUILD_TARGET}" in
+  ios)
+    build_ios
+    ;;
+  osx)
+    build_osx
+    ;;
+  all|"")
+    build_ios
+    build_osx
+    ;;
+  *)
+    echo "Unknown target: ${BUILD_TARGET}" >&2
+    echo "Usage: $0 [ios|osx|all]" >&2
+    exit 1
+    ;;
+esac
