@@ -1,0 +1,170 @@
+import '../editor_core.dart' as core;
+
+/// Base class for editor events.
+abstract class EditorEvent {}
+
+/// Editor event listener callback.
+typedef EditorEventListener<T extends EditorEvent> = void Function(T event);
+
+/// Text change action type.
+enum TextChangeAction { insert, delete_, key, composition, undo, redo }
+
+class TextChangedEvent implements EditorEvent {
+  final TextChangeAction action;
+  final core.TextRange? changeRange;
+  final String? text;
+
+  const TextChangedEvent({required this.action, this.changeRange, this.text});
+}
+
+class CursorChangedEvent implements EditorEvent {
+  final core.TextPosition cursorPosition;
+
+  const CursorChangedEvent({required this.cursorPosition});
+}
+
+class SelectionChangedEvent implements EditorEvent {
+  final bool hasSelection;
+  final core.TextRange? selection;
+  final core.TextPosition cursorPosition;
+
+  const SelectionChangedEvent({
+    required this.hasSelection,
+    this.selection,
+    required this.cursorPosition,
+  });
+}
+
+class ScrollChangedEvent implements EditorEvent {
+  final double scrollX;
+  final double scrollY;
+
+  const ScrollChangedEvent({required this.scrollX, required this.scrollY});
+}
+
+class ScaleChangedEvent implements EditorEvent {
+  final double scale;
+
+  const ScaleChangedEvent({required this.scale});
+}
+
+class LongPressEvent implements EditorEvent {
+  final core.TextPosition cursorPosition;
+  final core.PointF screenPoint;
+
+  const LongPressEvent({
+    required this.cursorPosition,
+    required this.screenPoint,
+  });
+}
+
+class DoubleTapEvent implements EditorEvent {
+  final core.TextPosition cursorPosition;
+  final bool hasSelection;
+  final core.TextRange? selection;
+  final core.PointF screenPoint;
+
+  const DoubleTapEvent({
+    required this.cursorPosition,
+    required this.hasSelection,
+    this.selection,
+    required this.screenPoint,
+  });
+}
+
+class ContextMenuEvent implements EditorEvent {
+  final core.TextPosition cursorPosition;
+  final core.PointF screenPoint;
+
+  const ContextMenuEvent({
+    required this.cursorPosition,
+    required this.screenPoint,
+  });
+}
+
+class GutterIconClickEvent implements EditorEvent {
+  final int line;
+  final int iconId;
+  final core.PointF screenPoint;
+
+  const GutterIconClickEvent({
+    required this.line,
+    required this.iconId,
+    required this.screenPoint,
+  });
+}
+
+class InlayHintClickEvent implements EditorEvent {
+  final int line;
+  final int column;
+  final int iconId;
+  final bool isIcon;
+  final bool isColor;
+  final int colorValue;
+  final core.PointF screenPoint;
+
+  const InlayHintClickEvent({
+    required this.line,
+    required this.column,
+    this.iconId = 0,
+    this.isIcon = false,
+    this.isColor = false,
+    this.colorValue = 0,
+    required this.screenPoint,
+  });
+
+  factory InlayHintClickEvent.icon({
+    required int line,
+    required int column,
+    required int iconId,
+    required bool isIcon,
+    required core.PointF screenPoint,
+  }) {
+    return InlayHintClickEvent(
+      line: line,
+      column: column,
+      iconId: iconId,
+      isIcon: isIcon,
+      screenPoint: screenPoint,
+    );
+  }
+
+  factory InlayHintClickEvent.color({
+    required int line,
+    required int column,
+    required int colorValue,
+    required core.PointF screenPoint,
+  }) {
+    return InlayHintClickEvent(
+      line: line,
+      column: column,
+      isColor: true,
+      colorValue: colorValue,
+      screenPoint: screenPoint,
+    );
+  }
+}
+
+class FoldToggleEvent implements EditorEvent {
+  final int line;
+  final bool isGutter;
+  final core.PointF screenPoint;
+
+  const FoldToggleEvent({
+    required this.line,
+    required this.isGutter,
+    required this.screenPoint,
+  });
+}
+
+class DocumentLoadedEvent implements EditorEvent {}
+
+class SelectionMenuItemClickEvent implements EditorEvent {
+  final String itemId;
+  final String itemLabel;
+
+  const SelectionMenuItemClickEvent({
+    required this.itemId,
+    required this.itemLabel,
+  });
+}
