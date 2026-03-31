@@ -1,4 +1,4 @@
-# SweetEditor Web Platform (Emscripten, SDK v2)
+﻿# SweetEditor Web Platform (Emscripten, SDK v2)
 
 > Status: Testing phase. API may continue evolving.
 

@@ -1,13 +1,13 @@
-# OpenSweetEditor Web SDK Workspace
+﻿# OpenSweetEditor Web SDK Workspace
 
 TypeScript-based Web SDK v2 workspace (pnpm).
 
 Current npm line:
 
-- `@sweeteditor/core@0.0.2`
-- `@sweeteditor/widget@0.0.2`
-- `@sweeteditor/providers-sweetline@0.0.2`
-- `@sweeteditor/sdk@0.0.2`
+- `@sweeteditor/core@0.0.4`
+- `@sweeteditor/widget@0.0.4`
+- `@sweeteditor/providers-sweetline@0.0.4`
+- `@sweeteditor/sdk@0.0.4`
 
 ## Documentation
 
@@ -115,9 +115,9 @@ Web CDN usage is ESM-first (`<script type="module">`), not global-IIFE style.
 <script type="importmap">
 {
   "imports": {
-    "@sweeteditor/core": "https://cdn.jsdelivr.net/npm/@sweeteditor/core@0.0.2/dist/index.js",
-    "@sweeteditor/widget": "https://cdn.jsdelivr.net/npm/@sweeteditor/widget@0.0.2/dist/index.js",
-    "@sweeteditor/sdk": "https://cdn.jsdelivr.net/npm/@sweeteditor/sdk@0.0.2/dist/index.js"
+    "@sweeteditor/core": "https://cdn.jsdelivr.net/npm/@sweeteditor/core@0.0.4/dist/index.js",
+    "@sweeteditor/widget": "https://cdn.jsdelivr.net/npm/@sweeteditor/widget@0.0.4/dist/index.js",
+    "@sweeteditor/sdk": "https://cdn.jsdelivr.net/npm/@sweeteditor/sdk@0.0.4/dist/index.js"
   }
 }
 </script>
@@ -212,5 +212,6 @@ After:
 import type { IPlainObject } from "@sweeteditor/sdk";
 // or use Record<string, unknown>
 ```
+
 
 
