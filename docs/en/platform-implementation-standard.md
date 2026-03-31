@@ -690,7 +690,7 @@ The callback contract MUST satisfy all of the following:
 - `dismissed` payload MUST include the dismissed `InlineSuggestion` value, or an equivalent payload / identifier, unless the platform's callback form is a no-payload dismissed signal and that limitation is explicitly documented
 - For a single shown suggestion instance, `accepted` MUST fire at most once and `dismissed` MUST fire at most once
 - After either `accepted` or `dismissed` fires for a shown suggestion instance, no further callbacks for that same suggestion instance MAY be emitted
-- If `showInlineSuggestion()` replaces an already-visible suggestion, the previous suggestion instance MUST transition through `dismissed` before the new suggestion becomes current
+- If `showInlineSuggestion()` replaces an already-visible suggestion, the platform MAY either emit `dismissed` for the previous suggestion before switching, or replace it quietly without a `dismissed` callback; in either case the previous suggestion instance MUST NOT emit further callbacks after replacement
 - After widget destruction, unbind, or controller disposal, no further host-visible inline-suggestion callbacks MAY be emitted
 
 | Callback | Constraint | Trigger Condition |
@@ -1119,7 +1119,7 @@ Resource creation and destruction follow explicit ordering constraints to preven
 | Phase | Constraint | Rule |
 |---|---|---|
 | Creation | **MUST** | `EditorCore` instance MUST be created during widget initialization (imperative frameworks: constructor or init; declarative frameworks: on first widget mount) |
-| Release path | **MUST** | The platform MUST provide a mechanism that can eventually release `EditorCore` and its native / C++ resources; the release timing MAY be tied to explicit `dispose()` / `close()`, host-managed lifecycle, an equivalent platform cleanup hook, or another platform-idiomatic mechanism |
+| Release path | **MUST** | The platform MUST provide a mechanism that can eventually release `EditorCore` and its native / C++ resources; the release timing MAY be tied to explicit `dispose()` / `close()`, host-managed lifecycle, an equivalent platform cleanup hook, or another platform-idiomatic mechanism. View detachment, widget unmount, or temporary removal from the view tree is NOT by itself required to be the release moment |
 | Post-release calls | **MUST** | After `EditorCore` resources are released, any method call MUST be a no-op or throw an explicit "already destroyed" exception; MUST NOT access freed C++ memory |
 | Repeated release | **MUST** | Multiple invocations of the release logic MUST be idempotent (no-op); MUST NOT cause double-free |
 
@@ -1152,7 +1152,7 @@ When the platform performs editor release / dispose / close / final teardown, su
 5. Release platform-specific resources (textures, canvases, timers, etc.)
 ```
 
-> The internal order of steps 1-3 MAY be adjusted, but MUST complete before step 4. Step 4 MUST complete before step 5. The standard no longer requires step 4 to be tied to the specific moment when the widget is permanently removed from the view tree.
+> The internal order of steps 1-3 MAY be adjusted, but MUST complete before step 4. Step 4 MUST complete before step 5. The standard does not require step 4 to be tied to view detachment, widget unmount, or the specific moment when the widget is permanently removed from the view tree.
 
 ---
 

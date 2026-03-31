@@ -1,6 +1,6 @@
 <div align="center">
 
-**English** | [Simplified Chinese](README_zh.md)
+**English** | [简体中文](README_zh.md)
 
 # SweetEditor
 
