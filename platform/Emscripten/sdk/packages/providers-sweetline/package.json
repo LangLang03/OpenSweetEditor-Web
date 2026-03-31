@@ -1,6 +1,6 @@
 {
   "name": "@sweeteditor/providers-sweetline",
-  "version": "0.0.4",
+  "version": "0.0.5-rc.1",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
