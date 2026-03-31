@@ -64,6 +64,20 @@ class FakeWidget {
   }
 }
 
+interface IRegisteredCompletionProvider {
+  provideCompletions: (
+    context: unknown,
+    receiver: { accept: (result: unknown) => void },
+  ) => Promise<void> | void;
+}
+
+interface IRegisteredDecorationProvider {
+  provideDecorations: (
+    context: unknown,
+    receiver: { accept: (result: unknown) => void },
+  ) => Promise<void> | void;
+}
+
 describe("editor instance", () => {
   it("resolves bundled wasm module path", () => {
     expect(getBundledWasmModulePath()).toContain("/runtime/sweeteditor.js");
@@ -127,6 +141,102 @@ describe("editor instance", () => {
     expect(widget.decorationProviders.length).toBe(1);
     decorationDisposable.dispose();
     expect(widget.decorationProviders.length).toBe(0);
+  });
+
+  it("normalizes completion context before forwarding to SDK provider", async () => {
+    const widget = new FakeWidget();
+    const editor = await createEditor(
+      document.createElement("div"),
+      {},
+      {
+        loadWasm: async () => ({} as ISweetEditorWasmModule),
+        createWidget: () => widget as unknown as SweetEditorWidget,
+      },
+    );
+
+    const provideCompletions = vi.fn().mockResolvedValue([{ label: "println" }]);
+    editor.registerCompletionProvider({
+      provideCompletions,
+    });
+
+    const registered = widget.completionProviders[0] as IRegisteredCompletionProvider;
+    const accepted: unknown[] = [];
+    await registered.provideCompletions(
+      {
+        triggerKind: 1,
+        triggerCharacter: ".",
+        cursorPosition: { line: 7, column: 3 },
+        word: "pri",
+      },
+      {
+        accept: (result: unknown) => {
+          accepted.push(result);
+        },
+      },
+    );
+
+    expect(provideCompletions).toHaveBeenCalledTimes(1);
+    expect(provideCompletions).toHaveBeenCalledWith(
+      {
+        triggerKind: 1,
+        triggerCharacter: ".",
+        cursorPosition: { line: 7, column: 3 },
+        word: "pri",
+      },
+      editor.getModel(),
+    );
+    expect(accepted).toEqual([
+      {
+        items: [{ label: "println" }],
+        isIncomplete: false,
+      },
+    ]);
+  });
+
+  it("normalizes legacy snake_case decoration changes for typed providers", async () => {
+    const widget = new FakeWidget();
+    const editor = await createEditor(
+      document.createElement("div"),
+      {},
+      {
+        loadWasm: async () => ({} as ISweetEditorWasmModule),
+        createWidget: () => widget as unknown as SweetEditorWidget,
+      },
+    );
+
+    const provideDecorations = vi.fn().mockResolvedValue({ syntaxSpans: new Map(), syntaxSpansMode: 2 });
+    editor.registerDecorationProvider({
+      provideDecorations,
+    });
+
+    const registered = widget.decorationProviders[0] as IRegisteredDecorationProvider;
+    const accepted: unknown[] = [];
+    await registered.provideDecorations(
+      {
+        textChanges: [{
+          range: null,
+          old_text: "before",
+          new_text: "after",
+        }],
+      },
+      {
+        accept: (result: unknown) => {
+          accepted.push(result);
+        },
+      },
+    );
+
+    expect(provideDecorations).toHaveBeenCalledTimes(1);
+    const [contextArg, modelArg] = provideDecorations.mock.calls[0] ?? [];
+    expect(modelArg).toBe(editor.getModel());
+    expect(contextArg).toMatchObject({
+      textChanges: [{
+        range: null,
+        oldText: "before",
+        newText: "after",
+      }],
+    });
+    expect(accepted).toEqual([{ syntaxSpans: new Map(), syntaxSpansMode: 2 }]);
   });
 });
 

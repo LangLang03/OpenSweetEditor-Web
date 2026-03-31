@@ -3,7 +3,7 @@ import tsParser from "@typescript-eslint/parser";
 
 export default [
   {
-    ignores: ["**/dist/**", "**/legacy/**", "**/assets/**"],
+    ignores: ["**/dist/**", "**/assets/**"],
   },
   {
     files: ["**/*.ts"],
@@ -24,7 +24,8 @@ export default [
         "error",
         {
           "argsIgnorePattern": "^_",
-          "varsIgnorePattern": "^_"
+          "varsIgnorePattern": "^_",
+          "caughtErrorsIgnorePattern": "^_"
         }
       ]
     },

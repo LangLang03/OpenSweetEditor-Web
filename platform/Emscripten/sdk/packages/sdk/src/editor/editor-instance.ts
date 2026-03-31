@@ -1,10 +1,9 @@
-import {
+﻿import {
   CompletionTriggerKind,
   DisposableStore,
   createTextModel,
   loadWasmModule,
   toDisposable,
-  type IAnyRecord,
   type ISweetEditorWasmModule,
   type ITextModel,
   type IDisposable,
@@ -17,19 +16,46 @@ import type {
   ICompletionList,
   ICompletionProvider,
   ICreateEditorOptions,
+  IDecorationContext,
+  IDecorationPatch,
   IDecorationProvider,
   IEditor,
   ILegacyDecorationProvider,
+  IPlainObject,
   IWasmOptions,
 } from "../types.js";
 
 interface ICreateEditorOverrides {
-  createWidget?: (container: HTMLElement, wasmModule: ISweetEditorWasmModule, options: IAnyRecord) => SweetEditorWidget;
+  createWidget?: (container: HTMLElement, wasmModule: ISweetEditorWasmModule, options: IPlainObject) => SweetEditorWidget;
   loadWasm?: (options: ICreateEditorOptions["wasm"]) => Promise<ISweetEditorWasmModule>;
+}
+
+interface ILegacyCompletionReceiver {
+  accept: (result: ICompletionList) => void;
+}
+
+interface ILegacyCompletionProvider {
+  isTriggerCharacter?: (ch: string) => boolean;
+  provideCompletions: (context: unknown, receiver: ILegacyCompletionReceiver) => Promise<void>;
+}
+
+interface ILegacyDecorationReceiver {
+  accept: (result: IDecorationPatch) => void;
+}
+
+interface IMetadataAwareWidget {
+  setMetadata: (metadata: { fileName?: string; language?: string }) => void;
 }
 
 const BUNDLED_RUNTIME_MODULE_RELATIVE_PATH = "../../runtime/sweeteditor.js";
 const BUNDLED_RUNTIME_SYNTAX_ROOT_RELATIVE_PATH = "../../runtime/syntaxes/";
+
+function asRecord(value: unknown): IPlainObject | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  return value as IPlainObject;
+}
 
 function normalizeCompletionResult(result: ICompletionList | ICompletionItem[] | null | undefined): ICompletionList {
   if (!result) {
@@ -44,26 +70,64 @@ function normalizeCompletionResult(result: ICompletionList | ICompletionItem[] |
   };
 }
 
-function mapCompletionContext(context: IAnyRecord | null | undefined): ICompletionContext {
-  const cursor = context?.cursorPosition as { line?: number; column?: number } | undefined;
+function mapCompletionContext(context: unknown): ICompletionContext {
+  const record = asRecord(context);
+  const cursorRecord = asRecord(record?.cursorPosition);
   return {
-    triggerKind: Number(context?.triggerKind ?? CompletionTriggerKind.INVOKED),
-    triggerCharacter: context?.triggerCharacter ? String(context.triggerCharacter) : null,
-    cursorPosition: cursor
+    triggerKind: Number(record?.triggerKind ?? CompletionTriggerKind.INVOKED),
+    triggerCharacter: record?.triggerCharacter ? String(record.triggerCharacter) : null,
+    cursorPosition: cursorRecord
       ? {
-        line: Number(cursor.line ?? 0),
-        column: Number(cursor.column ?? 0),
+        line: Number(cursorRecord.line ?? 0),
+        column: Number(cursorRecord.column ?? 0),
       }
       : null,
-    word: context?.word ? String(context.word) : "",
+    word: record?.word ? String(record.word) : "",
   };
+}
+
+function normalizeDecorationContext(context: unknown): IDecorationContext {
+  const record = asRecord(context);
+  if (!record) {
+    return {};
+  }
+
+  const normalized: IDecorationContext = {
+    ...record,
+  };
+
+  if (Array.isArray(record.textChanges)) {
+    const textChanges: NonNullable<IDecorationContext["textChanges"]> = [];
+    for (const change of record.textChanges) {
+      const changeRecord = asRecord(change);
+      if (!changeRecord) {
+        continue;
+      }
+
+      const normalizedChange: NonNullable<IDecorationContext["textChanges"]>[number] = {
+        range: (changeRecord.range ?? null) as NonNullable<IDecorationContext["textChanges"]>[number]["range"],
+      };
+      const oldText = changeRecord.oldText ?? changeRecord.old_text;
+      const newText = changeRecord.newText ?? changeRecord.new_text;
+      if (oldText != null) {
+        normalizedChange.oldText = String(oldText);
+      }
+      if (newText != null) {
+        normalizedChange.newText = String(newText);
+      }
+      textChanges.push(normalizedChange);
+    }
+    normalized.textChanges = textChanges;
+  }
+
+  return normalized;
 }
 
 function makeLegacyOptions(
   options: ICreateEditorOptions,
   model: ITextModel,
   resolvedModulePath: string | undefined,
-): IAnyRecord {
+): IPlainObject {
   return {
     ...(options.widgetOptions ?? {}),
     locale: options.locale,
@@ -75,6 +139,17 @@ function makeLegacyOptions(
     moduleFactory: options.wasm?.moduleFactory,
     moduleOptions: options.wasm?.moduleOptions,
   };
+}
+
+function isLegacyDecorationProvider(provider: IDecorationProvider | ILegacyDecorationProvider): provider is ILegacyDecorationProvider {
+  const maybeLegacy = provider as ILegacyDecorationProvider;
+  if (typeof maybeLegacy.getCapabilities === "function") {
+    return true;
+  }
+  if (typeof maybeLegacy.provideDecorations !== "function") {
+    return false;
+  }
+  return maybeLegacy.provideDecorations.length >= 2;
 }
 
 export function getBundledWasmModulePath(): string {
@@ -146,8 +221,10 @@ class EditorInstance implements IEditor {
   setModel(model: ITextModel): void {
     this._model = model;
     this._widget.loadText(model.getValue());
-    if (typeof (this._widget as { setMetadata?: (metadata: IAnyRecord) => void }).setMetadata === "function") {
-      (this._widget as { setMetadata: (metadata: IAnyRecord) => void }).setMetadata({
+
+    const metadataAwareWidget = this._widget as SweetEditorWidget & Partial<IMetadataAwareWidget>;
+    if (typeof metadataAwareWidget.setMetadata === "function") {
+      metadataAwareWidget.setMetadata({
         fileName: model.uri,
         language: model.language,
       });
@@ -155,41 +232,39 @@ class EditorInstance implements IEditor {
   }
 
   registerCompletionProvider(provider: ICompletionProvider): IDisposable {
-    const legacyProvider = {
+    const legacyProvider: ILegacyCompletionProvider = {
       isTriggerCharacter: (ch: string) => Array.isArray(provider.triggerCharacters) && provider.triggerCharacters.includes(ch),
-      provideCompletions: async (context: IAnyRecord, receiver: { accept: (result: ICompletionList) => void }) => {
+      provideCompletions: async (context: unknown, receiver: ILegacyCompletionReceiver) => {
         const mappedContext = mapCompletionContext(context);
         const resolved = await provider.provideCompletions(mappedContext, this._model);
         receiver.accept(normalizeCompletionResult(resolved));
       },
     };
 
-    this._widget.addCompletionProvider(legacyProvider as never);
+    this._widget.addCompletionProvider(legacyProvider);
     const disposable = toDisposable(() => {
-      this._widget.removeCompletionProvider(legacyProvider as never);
+      this._widget.removeCompletionProvider(legacyProvider);
     });
     this._store.add(disposable);
     return disposable;
   }
 
   registerDecorationProvider(provider: IDecorationProvider | ILegacyDecorationProvider): IDisposable {
-    const maybeLegacy = provider as ILegacyDecorationProvider;
-    const isLegacyProvider = typeof maybeLegacy.getCapabilities === "function";
-    const legacyProvider: ILegacyDecorationProvider = isLegacyProvider
-      ? maybeLegacy
+    const legacyProvider: ILegacyDecorationProvider = isLegacyDecorationProvider(provider)
+      ? provider
       : {
-        getCapabilities: () => (provider as IDecorationProvider).capabilities ?? {},
-        provideDecorations: async (context: IAnyRecord, receiver: { accept: (result: IAnyRecord) => void }) => {
-          const patch = await (provider as IDecorationProvider).provideDecorations(context, this._model);
+        getCapabilities: () => provider.capabilities ?? {},
+        provideDecorations: async (context: IDecorationContext, receiver: ILegacyDecorationReceiver) => {
+          const patch = await provider.provideDecorations(normalizeDecorationContext(context), this._model);
           if (patch != null) {
-            receiver.accept(patch as IAnyRecord);
+            receiver.accept(patch);
           }
         },
       };
 
-    this._widget.addDecorationProvider(legacyProvider as never);
+    this._widget.addDecorationProvider(legacyProvider);
     const disposable = toDisposable(() => {
-      this._widget.removeDecorationProvider(legacyProvider as never);
+      this._widget.removeDecorationProvider(legacyProvider);
     });
     this._store.add(disposable);
     return disposable;
@@ -250,7 +325,7 @@ export async function createEditor(
     const loadOptions: {
       modulePath?: string;
       moduleFactory?: NonNullable<IWasmOptions["moduleFactory"]>;
-      moduleOptions?: IAnyRecord;
+      moduleOptions?: IPlainObject;
     } = {};
     if (resolvedModulePath !== undefined) {
       loadOptions.modulePath = resolvedModulePath;
@@ -267,13 +342,13 @@ export async function createEditor(
   const wasmModule = await wasmLoader(options.wasm);
   const legacyOptions = makeLegacyOptions(options, model, resolvedModulePath);
 
-  const widgetFactory = overrides.createWidget ?? ((host: HTMLElement, moduleObj: ISweetEditorWasmModule, widgetOptions: IAnyRecord) => (
-    new SweetEditorWidget(host, moduleObj, widgetOptions)
-  ));
+  const widgetFactory = overrides.createWidget
+    ?? ((host: HTMLElement, moduleObj: ISweetEditorWasmModule, widgetOptions: IPlainObject) => (
+      new SweetEditorWidget(host, moduleObj, widgetOptions)
+    ));
   const widget = widgetFactory(container, wasmModule, legacyOptions);
 
   const editor = new EditorInstance(widget, model);
   editor.setModel(model);
   return editor;
 }
-

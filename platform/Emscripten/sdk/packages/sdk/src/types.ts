@@ -1,5 +1,7 @@
-import type { IAnyRecord, IDisposable, ISweetEditorWasmModule, ITextModel } from "@sweeteditor/core";
+import type { IDisposable, ISweetEditorWasmModule, ITextModel, ITextRange } from "@sweeteditor/core";
 import type { SweetEditorWidget } from "@sweeteditor/widget";
+
+export type IPlainObject = Record<string, unknown>;
 
 export interface ICompletionContext {
   readonly triggerKind: number;
@@ -32,37 +34,97 @@ export interface ICompletionProvider {
   ): Promise<ICompletionList | ICompletionItem[] | null | undefined> | ICompletionList | ICompletionItem[] | null | undefined;
 }
 
+export interface IEditorTextChange {
+  range: ITextRange | null;
+  oldText?: string;
+  newText?: string;
+}
+
+export interface IDecorationContext {
+  visibleStartLine?: number;
+  visibleEndLine?: number;
+  viewportStartLine?: number;
+  viewportEndLine?: number;
+  totalLineCount?: number;
+  textChanges?: IEditorTextChange[];
+  languageConfiguration?: IPlainObject | null;
+  editorMetadata?: IPlainObject | null;
+  [key: string]: unknown;
+}
+
+export interface IDecorationPatch {
+  syntaxSpans?: unknown;
+  semanticSpans?: unknown;
+  inlayHints?: unknown;
+  diagnostics?: unknown;
+  indentGuides?: unknown;
+  bracketGuides?: unknown;
+  flowGuides?: unknown;
+  separatorGuides?: unknown;
+  foldRegions?: unknown;
+  gutterIcons?: unknown;
+  phantomTexts?: unknown;
+  syntaxSpansMode?: number;
+  semanticSpansMode?: number;
+  inlayHintsMode?: number;
+  diagnosticsMode?: number;
+  indentGuidesMode?: number;
+  bracketGuidesMode?: number;
+  flowGuidesMode?: number;
+  separatorGuidesMode?: number;
+  foldRegionsMode?: number;
+  gutterIconsMode?: number;
+  phantomTextsMode?: number;
+  [key: string]: unknown;
+}
+
 export interface IDecorationProvider {
-  capabilities?: IAnyRecord;
-  provideDecorations(context: IAnyRecord, model: ITextModel): Promise<IAnyRecord | null | void> | IAnyRecord | null | void;
+  capabilities?: IPlainObject;
+  provideDecorations(
+    context: IDecorationContext,
+    model: ITextModel,
+  ): Promise<IDecorationPatch | null | void> | IDecorationPatch | null | void;
 }
 
 export interface ILegacyDecorationProvider {
-  getCapabilities?: () => IAnyRecord | number;
+  getCapabilities?: () => IPlainObject | number;
   provideDecorations?: (
-    context: IAnyRecord,
-    receiver: { accept: (result: IAnyRecord) => void },
+    context: IDecorationContext,
+    receiver: { accept: (result: IDecorationPatch) => void },
   ) => void | Promise<void>;
 }
 
 export interface IWasmOptions {
   module?: ISweetEditorWasmModule;
   modulePath?: string;
-  moduleFactory?: (options?: IAnyRecord) => Promise<ISweetEditorWasmModule> | ISweetEditorWasmModule;
-  moduleOptions?: IAnyRecord;
+  moduleFactory?: (options?: IPlainObject) => Promise<ISweetEditorWasmModule> | ISweetEditorWasmModule;
+  moduleOptions?: IPlainObject;
+}
+
+export interface IEditorDecorationOptions extends IPlainObject {}
+
+export interface IEditorWidgetOptions extends IPlainObject {}
+
+export interface IEditorTheme extends IPlainObject {}
+
+export interface IEditorPerformanceOverlayOptions extends IPlainObject {}
+
+export interface IEditorCreateMetadata {
+  uri?: string;
+  language?: string;
 }
 
 export interface ICreateEditorOptions {
   wasm?: IWasmOptions;
   locale?: string;
-  theme?: IAnyRecord;
+  theme?: IEditorTheme;
   model?: ITextModel;
   value?: string;
   language?: string;
   uri?: string;
-  decorationOptions?: IAnyRecord;
-  performanceOverlay?: boolean | IAnyRecord;
-  widgetOptions?: IAnyRecord;
+  decorationOptions?: IEditorDecorationOptions;
+  performanceOverlay?: boolean | IEditorPerformanceOverlayOptions;
+  widgetOptions?: IEditorWidgetOptions;
 }
 
 export interface IEditor {

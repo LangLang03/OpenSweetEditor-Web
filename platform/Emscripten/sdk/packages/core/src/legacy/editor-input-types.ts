@@ -10,13 +10,13 @@ export interface IEditorGestureEvent {
   type: number;
   points: IEditorPointerPoint[] | IAnyRecord;
   modifiers?: number;
-  wheel_delta_x?: number;
-  wheel_delta_y?: number;
-  direct_scale?: number;
+  wheelDeltaX?: number;
+  wheelDeltaY?: number;
+  directScale?: number;
 }
 
 export interface IEditorKeyEvent {
-  key_code: number;
+  keyCode: number;
   text?: string;
   modifiers?: number;
 }
@@ -24,9 +24,7 @@ export interface IEditorKeyEvent {
 export interface IEditorTextChange {
   range: ITextRange | null;
   oldText?: string;
-  old_text?: string;
   newText?: string;
-  new_text?: string;
 }
 
 export interface IVisibleLineRange {

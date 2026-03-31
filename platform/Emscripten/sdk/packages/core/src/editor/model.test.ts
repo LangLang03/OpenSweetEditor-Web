@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { applyTextChangesToText, normalizeNewlines } from "../legacy/editor-core-legacy.js";
+import { applyTextChangesToText, normalizeNewlines } from "../legacy/text-change-utils.js";
 import { createTextModel } from "./model.js";
 
 describe("text model", () => {

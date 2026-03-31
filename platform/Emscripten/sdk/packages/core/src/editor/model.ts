@@ -1,4 +1,4 @@
-import { applyTextChangesToText, normalizeNewlines } from "../legacy/editor-core-legacy.js";
+import { applyTextChangesToText, normalizeNewlines } from "../legacy/text-change-utils.js";
 import type { IEditorTextChange } from "../legacy/editor-input-types.js";
 
 export interface IModelOptions {

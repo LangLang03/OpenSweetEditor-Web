@@ -1,4 +1,4 @@
-import { loadSweetEditorCore } from "../legacy/editor-core-legacy.js";
+import { loadSweetEditorCore } from "../legacy/web-editor-core.js";
 import type { IAnyRecord, ISweetEditorWasmModule } from "../legacy/embind-contracts.js";
 
 export interface IWasmModuleOptions extends IAnyRecord {

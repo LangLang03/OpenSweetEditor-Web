@@ -31,6 +31,35 @@ platform/Emscripten/sdk
 `-- scripts
 ```
 
+## Architecture Overview
+
+The legacy runtime is now split into focused modules while preserving
+backward-compatible entry files:
+
+```text
+packages/core/src/legacy
+|-- editor-core-legacy.ts                # compatibility re-export entry
+|-- editor-core-legacy.internal.ts       # legacy implementation body
+|-- text-change-utils.ts                 # text change helpers
+|-- document.ts                          # Document/DocumentFactory
+|-- web-editor-core.ts                   # WebEditorCore + wasm loader bridge
+|-- completion.ts                        # completion subsystem
+`-- decoration.ts                        # decoration subsystem
+
+packages/widget/src/legacy
+|-- sweet-editor-widget-legacy.ts        # compatibility re-export entry
+|-- sweet-editor-widget-legacy.internal.ts
+|-- widget-constants.ts
+|-- widget-renderer.ts
+|-- widget-completion-popup.ts
+`-- widget-core.ts
+```
+
+Compatibility promise:
+
+- runtime behavior and top-level export names remain stable
+- TypeScript type contracts are intentionally tightened in v2 workspace
+
 ## Common Commands
 
 ```bash
@@ -115,5 +144,73 @@ Override flags:
 - `SWEETEDITOR_ENABLE_LOG`
 - `SWEETEDITOR_ENABLE_PERF_LOG`
 - `SWEETEDITOR_DEBUG_MODE`
+
+## Migration Guide (Type Changes)
+
+This workspace update tightens public type contracts for `@sweeteditor/sdk`
+and `@sweeteditor/widget`.
+
+### 1) snake_case -> camelCase public input
+
+Before:
+
+```ts
+const change = { old_text: "a", new_text: "b" };
+const keyEvent = { key_code: 13 };
+const gestureEvent = { wheel_delta_x: 0, wheel_delta_y: 20, direct_scale: 1 };
+```
+
+After:
+
+```ts
+const change = { oldText: "a", newText: "b" };
+const keyEvent = { keyCode: 13 };
+const gestureEvent = { wheelDeltaX: 0, wheelDeltaY: 20, directScale: 1 };
+```
+
+Runtime adapters still accept historical snake_case payloads from legacy
+bridges, but snake_case is no longer the public TypeScript contract.
+
+### 2) Decoration provider typing is explicit
+
+Before:
+
+```ts
+registerDecorationProvider({
+  provideDecorations(context: Record<string, any>) {
+    return { spansByLine: new Map() };
+  },
+});
+```
+
+After:
+
+```ts
+registerDecorationProvider({
+  provideDecorations(context) {
+    return {
+      syntaxSpans: new Map(),
+      syntaxSpansMode: 2,
+    };
+  },
+});
+```
+
+Use `IDecorationContext` and `IDecorationPatch` exported by `@sweeteditor/sdk`.
+
+### 3) Generic any-like records removed from sdk/widget public surface
+
+Before:
+
+```ts
+import type { IAnyRecord } from "@sweeteditor/core";
+```
+
+After:
+
+```ts
+import type { IPlainObject } from "@sweeteditor/sdk";
+// or use Record<string, unknown>
+```
 
 
