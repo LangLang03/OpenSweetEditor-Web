@@ -749,6 +749,14 @@ export class WebEditorCore {
     return fn.apply(this._native, args);
   }
 
+  _invokeOptional(method:string, ...args:IAnyValue[]) {
+    const fn = this._native?.[method];
+    if (typeof fn !== "function") {
+      return undefined;
+    }
+    return fn.apply(this._native, args);
+  }
+
   call(method:string, ...args:IAnyValue[]) {
     const result = this._invoke(method, ...args);
     this._notifyMutate();
@@ -764,6 +772,10 @@ export class WebEditorCore {
     const result = this._native.loadDocument(nativeDoc);
     this._notifyMutate();
     return result;
+  }
+
+  setDocument(document:IAnyValue) {
+    return this.loadDocument(document);
   }
 
   setViewport(width:number, height:number) {
@@ -790,6 +802,24 @@ export class WebEditorCore {
     return result;
   }
 
+  handleGestureEventEx(eventData:IEditorGestureEvent) {
+    const eventRecord = eventData as IAnyRecord;
+    const result = this._invokeOptional(
+      "handleGestureEventEx",
+      eventData.type ?? 0,
+      eventData.points,
+      eventData.modifiers ?? 0,
+      toFiniteNumber(eventData.wheelDeltaX ?? eventRecord.wheel_delta_x) ?? 0,
+      toFiniteNumber(eventData.wheelDeltaY ?? eventRecord.wheel_delta_y) ?? 0,
+      toFiniteNumber(eventData.directScale ?? eventRecord.direct_scale) ?? 1.0,
+    );
+    if (typeof result !== "undefined") {
+      this._notifyMutate();
+      return result;
+    }
+    return this.handleGestureEvent(eventData);
+  }
+
   handleKeyEvent(eventData:IEditorKeyEvent) {
     const eventRecord = eventData as IAnyRecord;
     const result = this._native.handleKeyEventRaw(
@@ -810,6 +840,14 @@ export class WebEditorCore {
   tickFling() {
     const result = this._native.tickFling();
     this._notifyMutate();
+    return result;
+  }
+
+  tickAnimations() {
+    const result = this._invokeOptional("tickAnimations");
+    if (typeof result !== "undefined") {
+      this._notifyMutate();
+    }
     return result;
   }
 
@@ -876,6 +914,22 @@ export class WebEditorCore {
     return result;
   }
 
+  setGutterSticky(sticky:boolean) {
+    const result = this._invokeOptional("setGutterSticky", Boolean(sticky));
+    if (typeof result !== "undefined") {
+      this._notifyMutate();
+    }
+    return result;
+  }
+
+  setGutterVisible(visible:boolean) {
+    const result = this._invokeOptional("setGutterVisible", Boolean(visible));
+    if (typeof result !== "undefined") {
+      this._notifyMutate();
+    }
+    return result;
+  }
+
   getViewState() {
     return this.read("getViewState");
   }
@@ -892,6 +946,10 @@ export class WebEditorCore {
     const result = this._native.insertText(String(text ?? ""));
     this._notifyMutate();
     return result;
+  }
+
+  insertText(text:string) {
+    return this.insert(text);
   }
 
   replaceText(range:ITextRange, newText:string) {
@@ -1174,6 +1232,14 @@ export class WebEditorCore {
     return result;
   }
 
+  ensureCursorVisible() {
+    const result = this._invokeOptional("ensureCursorVisible");
+    if (typeof result !== "undefined") {
+      this._notifyMutate();
+    }
+    return result;
+  }
+
   insertSnippet(snippetTemplate:string) {
     const result = this._native.insertSnippet(String(snippetTemplate ?? ""));
     this._notifyMutate();
@@ -1224,6 +1290,10 @@ export class WebEditorCore {
     const result = this._native.toggleFoldAt(ensureLine(line));
     this._notifyMutate();
     return result;
+  }
+
+  toggleFold(line:number) {
+    return this.toggleFoldAt(line);
   }
 
   foldAt(line:number) {
@@ -1316,6 +1386,47 @@ export class WebEditorCore {
     return result;
   }
 
+  registerBatchTextStyles(data:IAnyValue) {
+    const entries:Array<{ styleId: number; style: IAnyRecord }> = [];
+    if (data instanceof Map) {
+      data.forEach((style:IAnyValue, key:IAnyValue) => {
+        entries.push({ styleId: toInt(key, 0), style: (style && typeof style === "object") ? style : {} });
+      });
+    } else if (Array.isArray(data)) {
+      data.forEach((entry:IAnyValue) => {
+        if (!entry || typeof entry !== "object") {
+          return;
+        }
+        const styleId = toInt(entry.styleId ?? entry.style_id ?? entry.id, 0);
+        const style = (entry.style && typeof entry.style === "object") ? entry.style : entry;
+        entries.push({ styleId, style });
+      });
+    } else if (data && typeof data === "object") {
+      Object.keys(data).forEach((key:string) => {
+        const style = data[key];
+        entries.push({
+          styleId: toInt(key, 0),
+          style: (style && typeof style === "object") ? style : {},
+        });
+      });
+    }
+
+    if (entries.length === 0) {
+      return;
+    }
+
+    this.withBatch(() => {
+      entries.forEach((entry) => {
+        this.registerTextStyle(
+          entry.styleId,
+          toInt(entry.style.color, 0),
+          toInt(entry.style.backgroundColor ?? entry.style.background_color, 0),
+          toInt(entry.style.fontStyle ?? entry.style.font_style, 0),
+        );
+      });
+    });
+  }
+
   setLineSpans(line:number, layer:IAnyValue, spans:IAnyValue[]) {
     const lineNo = ensureLine(line);
     const layerValue = toInt(layer, this._spanLayer.SYNTAX);
@@ -1357,6 +1468,15 @@ export class WebEditorCore {
         this.setLineSpans(line, layerValue, spans);
       });
     });
+  }
+
+  clearLineSpans(line:number, layer:IAnyValue) {
+    const result = this._invokeOptional("clearLineSpans", ensureLine(line), toInt(layer, this._spanLayer.SYNTAX));
+    if (typeof result !== "undefined") {
+      this._notifyMutate();
+      return result;
+    }
+    return this.setLineSpans(line, layer, []);
   }
 
   setLineInlayHints(line:number, hints:IAnyValue[]) {
@@ -1585,6 +1705,10 @@ export class WebEditorCore {
     }
     this._notifyMutate();
     return result;
+  }
+
+  clearHighlightsLayer(layer:IAnyValue) {
+    return this.clearHighlights(layer);
   }
 
   clearInlayHints() {

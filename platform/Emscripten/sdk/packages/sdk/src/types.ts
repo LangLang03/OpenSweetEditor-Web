@@ -1,5 +1,20 @@
-import type { IDisposable, ISweetEditorWasmModule, ITextModel, ITextRange } from "@sweeteditor/core";
-import type { SweetEditorWidget } from "@sweeteditor/widget";
+import type {
+  BracketGuide,
+  DiagnosticItem,
+  FlowGuide,
+  FoldRegion,
+  GutterIcon,
+  IDisposable,
+  IndentGuide,
+  InlayHint,
+  ISweetEditorWasmModule,
+  ITextModel,
+  ITextRange,
+  PhantomText,
+  SeparatorGuide,
+  StyleSpan,
+} from "@sweeteditor/core";
+import type { SweetEditorController, SweetEditorWidget } from "@sweeteditor/widget";
 
 export type IPlainObject = Record<string, unknown>;
 
@@ -53,17 +68,17 @@ export interface IDecorationContext {
 }
 
 export interface IDecorationPatch {
-  syntaxSpans?: unknown;
-  semanticSpans?: unknown;
-  inlayHints?: unknown;
-  diagnostics?: unknown;
-  indentGuides?: unknown;
-  bracketGuides?: unknown;
-  flowGuides?: unknown;
-  separatorGuides?: unknown;
-  foldRegions?: unknown;
-  gutterIcons?: unknown;
-  phantomTexts?: unknown;
+  syntaxSpans?: ILineDataMap<StyleSpan>;
+  semanticSpans?: ILineDataMap<StyleSpan>;
+  inlayHints?: ILineDataMap<InlayHint>;
+  diagnostics?: ILineDataMap<DiagnosticItem>;
+  indentGuides?: IndentGuide[];
+  bracketGuides?: BracketGuide[];
+  flowGuides?: FlowGuide[];
+  separatorGuides?: SeparatorGuide[];
+  foldRegions?: FoldRegion[];
+  gutterIcons?: ILineDataMap<GutterIcon>;
+  phantomTexts?: ILineDataMap<PhantomText>;
   syntaxSpansMode?: number;
   semanticSpansMode?: number;
   inlayHintsMode?: number;
@@ -103,7 +118,14 @@ export interface IWasmOptions {
 
 export interface IEditorDecorationOptions extends IPlainObject {}
 
-export interface IEditorWidgetOptions extends IPlainObject {}
+export type ILineDataMap<T> =
+  | Record<number, T[]>
+  | Map<number, T[]>
+  | Array<{ line: number; items?: T[]; spans?: T[]; hints?: T[]; phantoms?: T[]; icons?: T[]; diagnostics?: T[] }>;
+
+export interface IEditorWidgetOptions extends IPlainObject {
+  controller?: SweetEditorController;
+}
 
 export interface IEditorTheme extends IPlainObject {}
 
@@ -118,6 +140,7 @@ export interface ICreateEditorOptions {
   wasm?: IWasmOptions;
   locale?: string;
   theme?: IEditorTheme;
+  controller?: SweetEditorController;
   model?: ITextModel;
   value?: string;
   language?: string;

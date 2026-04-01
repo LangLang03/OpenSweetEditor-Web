@@ -122,6 +122,8 @@ const FALLBACK_HIT_TARGET_TYPE = {
 
 const DEFAULT_TOUCH_LONG_PRESS_MS = 520;
 const DEFAULT_TOUCH_LONG_PRESS_SLOP_PX = 10;
+const DEFAULT_DECORATION_SCROLL_REFRESH_MIN_INTERVAL_MS = 16;
+const DEFAULT_DECORATION_OVERSCAN_VIEWPORT_MULTIPLIER = 1.5;
 
 function resolveEnum(moduleObj:IAnyValue, enumName:string, fallback:IAnyValue) {
   const enumObj = moduleObj && moduleObj[enumName];
@@ -459,7 +461,22 @@ const DEFAULT_THEME = {
   gutterIconFallback: "rgba(255,255,255,0.68)",
 };
 
-export const EditorEventType = Object.freeze({
+export const EditorEventType = {
+  TEXT_CHANGED: "TextChangedEvent",
+  CURSOR_CHANGED: "CursorChangedEvent",
+  SELECTION_CHANGED: "SelectionChangedEvent",
+  SCROLL_CHANGED: "ScrollChangedEvent",
+  SCALE_CHANGED: "ScaleChangedEvent",
+  LONG_PRESS: "LongPressEvent",
+  DOUBLE_TAP: "DoubleTapEvent",
+  CONTEXT_MENU: "ContextMenuEvent",
+  INLAY_HINT_CLICK: "InlayHintClickEvent",
+  GUTTER_ICON_CLICK: "GutterIconClickEvent",
+  FOLD_TOGGLE: "FoldToggleEvent",
+  DOCUMENT_LOADED: "DocumentLoadedEvent",
+} as const;
+
+const LEGACY_EDITOR_EVENT_TYPE = {
   TEXT_CHANGED: "TextChanged",
   CURSOR_CHANGED: "CursorChanged",
   SELECTION_CHANGED: "SelectionChanged",
@@ -472,7 +489,54 @@ export const EditorEventType = Object.freeze({
   GUTTER_ICON_CLICK: "GutterIconClick",
   FOLD_TOGGLE: "FoldToggle",
   DOCUMENT_LOADED: "DocumentLoaded",
+} as const;
+
+const EVENT_STANDARD_TO_LEGACY = Object.freeze({
+  [EditorEventType.TEXT_CHANGED]: LEGACY_EDITOR_EVENT_TYPE.TEXT_CHANGED,
+  [EditorEventType.CURSOR_CHANGED]: LEGACY_EDITOR_EVENT_TYPE.CURSOR_CHANGED,
+  [EditorEventType.SELECTION_CHANGED]: LEGACY_EDITOR_EVENT_TYPE.SELECTION_CHANGED,
+  [EditorEventType.SCROLL_CHANGED]: LEGACY_EDITOR_EVENT_TYPE.SCROLL_CHANGED,
+  [EditorEventType.SCALE_CHANGED]: LEGACY_EDITOR_EVENT_TYPE.SCALE_CHANGED,
+  [EditorEventType.LONG_PRESS]: LEGACY_EDITOR_EVENT_TYPE.LONG_PRESS,
+  [EditorEventType.DOUBLE_TAP]: LEGACY_EDITOR_EVENT_TYPE.DOUBLE_TAP,
+  [EditorEventType.CONTEXT_MENU]: LEGACY_EDITOR_EVENT_TYPE.CONTEXT_MENU,
+  [EditorEventType.INLAY_HINT_CLICK]: LEGACY_EDITOR_EVENT_TYPE.INLAY_HINT_CLICK,
+  [EditorEventType.GUTTER_ICON_CLICK]: LEGACY_EDITOR_EVENT_TYPE.GUTTER_ICON_CLICK,
+  [EditorEventType.FOLD_TOGGLE]: LEGACY_EDITOR_EVENT_TYPE.FOLD_TOGGLE,
+  [EditorEventType.DOCUMENT_LOADED]: LEGACY_EDITOR_EVENT_TYPE.DOCUMENT_LOADED,
 }) as Readonly<Record<string, string>>;
+
+const EVENT_LEGACY_TO_STANDARD = Object.freeze({
+  [LEGACY_EDITOR_EVENT_TYPE.TEXT_CHANGED]: EditorEventType.TEXT_CHANGED,
+  [LEGACY_EDITOR_EVENT_TYPE.CURSOR_CHANGED]: EditorEventType.CURSOR_CHANGED,
+  [LEGACY_EDITOR_EVENT_TYPE.SELECTION_CHANGED]: EditorEventType.SELECTION_CHANGED,
+  [LEGACY_EDITOR_EVENT_TYPE.SCROLL_CHANGED]: EditorEventType.SCROLL_CHANGED,
+  [LEGACY_EDITOR_EVENT_TYPE.SCALE_CHANGED]: EditorEventType.SCALE_CHANGED,
+  [LEGACY_EDITOR_EVENT_TYPE.LONG_PRESS]: EditorEventType.LONG_PRESS,
+  [LEGACY_EDITOR_EVENT_TYPE.DOUBLE_TAP]: EditorEventType.DOUBLE_TAP,
+  [LEGACY_EDITOR_EVENT_TYPE.CONTEXT_MENU]: EditorEventType.CONTEXT_MENU,
+  [LEGACY_EDITOR_EVENT_TYPE.INLAY_HINT_CLICK]: EditorEventType.INLAY_HINT_CLICK,
+  [LEGACY_EDITOR_EVENT_TYPE.GUTTER_ICON_CLICK]: EditorEventType.GUTTER_ICON_CLICK,
+  [LEGACY_EDITOR_EVENT_TYPE.FOLD_TOGGLE]: EditorEventType.FOLD_TOGGLE,
+  [LEGACY_EDITOR_EVENT_TYPE.DOCUMENT_LOADED]: EditorEventType.DOCUMENT_LOADED,
+}) as Readonly<Record<string, string>>;
+
+function resolveEventDispatchKeys(eventType:string): string[] {
+  if (!eventType) {
+    return [];
+  }
+  const keys = new Set<string>();
+  keys.add(eventType);
+  const standard = EVENT_LEGACY_TO_STANDARD[eventType];
+  if (standard) {
+    keys.add(standard);
+  }
+  const legacy = EVENT_STANDARD_TO_LEGACY[eventType];
+  if (legacy) {
+    keys.add(legacy);
+  }
+  return Array.from(keys);
+}
 
 const TextChangeAction = Object.freeze({
   INSERT: "Insert",
@@ -1221,6 +1285,11 @@ export class SweetEditorWidget {
     this.container = container;
     this._wasm = wasmModule;
     this._options = options;
+    this._controller = (
+      options.controller
+      && typeof options.controller.bind === "function"
+      && typeof options.controller.unbind === "function"
+    ) ? options.controller : null;
     this._locale = resolveLocale(options.locale || (typeof navigator !== "undefined" ? navigator.language : "en"));
     this._i18n = resolveI18nBundle(this._locale);
     this._eventType = resolveEnum(wasmModule, "EventType", FALLBACK_EVENT_TYPE);
@@ -1240,6 +1309,7 @@ export class SweetEditorWidget {
 
     this._documentFactory = new DocumentFactory(wasmModule);
     this._document = null;
+    this._ownsDocument = false;
     this._languageConfiguration = options.languageConfiguration || null;
     this._metadata = options.metadata || null;
 
@@ -1270,7 +1340,7 @@ export class SweetEditorWidget {
     } else if (options.performanceOverlay === true) {
       this._performanceOverlayEnabled = true;
     } else if (options.performanceOverlay && typeof options.performanceOverlay === "object") {
-      this._performanceOverlayEnabled = Boolean(perfOverlayOptions.enabled ?? true);
+      this._performanceOverlayEnabled = Boolean(perfOverlayOptions.enabled ?? false);
     } else {
       this._performanceOverlayEnabled = false;
     }
@@ -1354,12 +1424,27 @@ export class SweetEditorWidget {
     this._bracketPairsUnsupportedLogged = false;
     this._lastContextMenuEvent = { time: 0, x: 0, y: 0 };
     this._settingsState = {
+      editorTextSize: Number.isFinite(Number(options.editorOptions?.editorTextSize))
+        ? Number(options.editorOptions?.editorTextSize)
+        : 14,
+      fontFamily: String(options.editorOptions?.fontFamily ?? options.editorOptions?.typeface ?? "Menlo, Consolas, Monaco, monospace"),
+      scale: Number.isFinite(Number(options.editorOptions?.scale))
+        ? Number(options.editorOptions?.scale)
+        : 1,
+      foldArrowMode: toInt(options.editorOptions?.foldArrowMode, 1),
       wrapMode: options.editorOptions?.wrapMode ?? null,
+      showSplitLine: options.editorOptions?.showSplitLine ?? true,
+      gutterSticky: options.editorOptions?.gutterSticky ?? true,
+      gutterVisible: options.editorOptions?.gutterVisible ?? true,
+      currentLineRenderMode: toInt(options.editorOptions?.currentLineRenderMode, 1),
       readOnly: !!options.editorOptions?.readOnly,
       autoIndentMode: options.editorOptions?.autoIndentMode ?? null,
       maxGutterIcons: options.editorOptions?.maxGutterIcons ?? 0,
       lineSpacingAdd: options.editorOptions?.lineSpacingAdd ?? 0,
       lineSpacingMult: options.editorOptions?.lineSpacingMult ?? 1,
+      contentStartPadding: Number.isFinite(Number(options.editorOptions?.contentStartPadding))
+        ? Number(options.editorOptions?.contentStartPadding)
+        : 0,
     };
     this._settingsFacade = this._createSettingsFacade();
 
@@ -1415,6 +1500,7 @@ export class SweetEditorWidget {
     if (options.settings && typeof options.settings === "object") {
       this._applySettingsObject(options.settings);
     }
+    this._applySettingsObject(this._settingsState);
     this._applyLanguageBracketPairs();
 
     if (options.text != null) {
@@ -1423,6 +1509,9 @@ export class SweetEditorWidget {
 
     this._syncEventStateFromCore();
     this._markDirty();
+    if (this._controller) {
+      this._controller.bind(this);
+    }
   }
 
   getCore() {
@@ -1487,7 +1576,9 @@ export class SweetEditorWidget {
   }
 
   addNewLineActionProvider(provider:IAnyValue) {
-    if (typeof provider !== "function") {
+    const isSupportedProvider = typeof provider === "function"
+      || (provider && typeof provider.provideNewLineAction === "function");
+    if (!isSupportedProvider) {
       return;
     }
     if (!this._newLineActionProviders.includes(provider)) {
@@ -1503,14 +1594,106 @@ export class SweetEditorWidget {
   }
 
   setScale(scale:number) {
-    this._core.setScale(scale);
+    const value = Number(scale);
+    this._settingsState.scale = Number.isFinite(value) ? value : 1;
+    this._core.setScale(this._settingsState.scale);
     this._emitScrollScaleFromCore(false, true);
+  }
+
+  getScale() {
+    return Number(this._settingsState.scale ?? 1);
+  }
+
+  setEditorTextSize(size:number) {
+    const value = Number(size);
+    this._settingsState.editorTextSize = Number.isFinite(value) ? Math.max(6, value) : 14;
+    this._renderer._baseFontSize = this._settingsState.editorTextSize;
+    this._core.onFontMetricsChanged();
+    this._markDirty();
+  }
+
+  getEditorTextSize() {
+    return Number(this._settingsState.editorTextSize ?? 14);
+  }
+
+  setFontFamily(family:string) {
+    const value = String(family ?? "").trim();
+    this._settingsState.fontFamily = value || "Menlo, Consolas, Monaco, monospace";
+    this._renderer._fontFamily = this._settingsState.fontFamily;
+    this._core.onFontMetricsChanged();
+    this._markDirty();
+  }
+
+  getFontFamily() {
+    return String(this._settingsState.fontFamily ?? "Menlo, Consolas, Monaco, monospace");
+  }
+
+  setTypeface(typeface:string) {
+    this.setFontFamily(typeface);
+  }
+
+  getTypeface() {
+    return this.getFontFamily();
+  }
+
+  setFoldArrowMode(mode:IAnyValue) {
+    const value = toInt(mode, 1);
+    this._settingsState.foldArrowMode = value;
+    this._core.setFoldArrowMode(value);
+  }
+
+  getFoldArrowMode() {
+    return toInt(this._settingsState.foldArrowMode, 1);
   }
 
   setWrapMode(mode:IAnyValue) {
     const value = toInt(mode, 0);
     this._settingsState.wrapMode = value;
     this._core.setWrapMode(value);
+  }
+
+  getWrapMode() {
+    return toInt(this._settingsState.wrapMode, 0);
+  }
+
+  setShowSplitLine(show:boolean) {
+    const value = Boolean(show);
+    this._settingsState.showSplitLine = value;
+    this._core.setShowSplitLine(value);
+  }
+
+  isShowSplitLine() {
+    return Boolean(this._settingsState.showSplitLine);
+  }
+
+  setGutterSticky(sticky:boolean) {
+    const value = Boolean(sticky);
+    this._settingsState.gutterSticky = value;
+    this._core.setGutterSticky(value);
+  }
+
+  isGutterSticky() {
+    return Boolean(this._settingsState.gutterSticky);
+  }
+
+  setGutterVisible(visible:boolean) {
+    const value = Boolean(visible);
+    this._settingsState.gutterVisible = value;
+    this._core.setGutterVisible(value);
+  }
+
+  isGutterVisible() {
+    return Boolean(this._settingsState.gutterVisible);
+  }
+
+  setCurrentLineRenderMode(mode:IAnyValue) {
+    const value = toInt(mode, 1);
+    this._settingsState.currentLineRenderMode = value;
+    this._core.setCurrentLineRenderMode(value);
+  }
+
+  getCurrentLineRenderMode() {
+    return toInt(this._settingsState.currentLineRenderMode, 1);
   }
 
   setReadOnly(readOnly:boolean) {
@@ -1539,12 +1722,24 @@ export class SweetEditorWidget {
     this._core.setMaxGutterIcons(value);
   }
 
+  getMaxGutterIcons() {
+    return toInt(this._settingsState.maxGutterIcons, 0);
+  }
+
   setLineSpacing(add:number, mult:number) {
     const addValue = Number(add);
     const multValue = Number(mult);
     this._settingsState.lineSpacingAdd = Number.isFinite(addValue) ? addValue : 0;
     this._settingsState.lineSpacingMult = Number.isFinite(multValue) ? multValue : 1;
     this._core.setLineSpacing(this._settingsState.lineSpacingAdd, this._settingsState.lineSpacingMult);
+  }
+
+  getLineSpacingAdd() {
+    return Number(this._settingsState.lineSpacingAdd ?? 0);
+  }
+
+  getLineSpacingMult() {
+    return Number(this._settingsState.lineSpacingMult ?? 1);
   }
 
   setContentStartPadding(padding:number) {
@@ -1563,19 +1758,24 @@ export class SweetEditorWidget {
   }
 
   getDecorationScrollRefreshMinIntervalMs() {
-    return toInt(this.getDecorationProviderOptions()?.scrollRefreshMinIntervalMs, 0);
+    return toInt(
+      this.getDecorationProviderOptions()?.scrollRefreshMinIntervalMs,
+      DEFAULT_DECORATION_SCROLL_REFRESH_MIN_INTERVAL_MS,
+    );
   }
 
   setDecorationOverscanViewportMultiplier(multiplier:number) {
     const value = Number(multiplier);
     this.setDecorationProviderOptions({
-      overscanViewportMultiplier: Number.isFinite(value) ? Math.max(0, value) : 0.5,
+      overscanViewportMultiplier: Number.isFinite(value)
+        ? Math.max(0, value)
+        : DEFAULT_DECORATION_OVERSCAN_VIEWPORT_MULTIPLIER,
     });
   }
 
   getDecorationOverscanViewportMultiplier() {
     const value = Number(this.getDecorationProviderOptions()?.overscanViewportMultiplier);
-    return Number.isFinite(value) ? value : 0.5;
+    return Number.isFinite(value) ? value : DEFAULT_DECORATION_OVERSCAN_VIEWPORT_MULTIPLIER;
   }
 
   insert(text:string) {
@@ -1606,6 +1806,48 @@ export class SweetEditorWidget {
 
   deleteText(range:ITextRange) {
     return this.delete(range);
+  }
+
+  moveLineUp() {
+    const result = this._core.moveLineUp();
+    this._handleTextEditResult(result, { action: TextChangeAction.INSERT });
+    return !!(result && (result.changed || asArray(result.changes).length > 0));
+  }
+
+  moveLineDown() {
+    const result = this._core.moveLineDown();
+    this._handleTextEditResult(result, { action: TextChangeAction.INSERT });
+    return !!(result && (result.changed || asArray(result.changes).length > 0));
+  }
+
+  copyLineUp() {
+    const result = this._core.copyLineUp();
+    this._handleTextEditResult(result, { action: TextChangeAction.INSERT });
+    return !!(result && (result.changed || asArray(result.changes).length > 0));
+  }
+
+  copyLineDown() {
+    const result = this._core.copyLineDown();
+    this._handleTextEditResult(result, { action: TextChangeAction.INSERT });
+    return !!(result && (result.changed || asArray(result.changes).length > 0));
+  }
+
+  deleteLine() {
+    const result = this._core.deleteLine();
+    this._handleTextEditResult(result, { action: TextChangeAction.INSERT });
+    return !!(result && (result.changed || asArray(result.changes).length > 0));
+  }
+
+  insertLineAbove() {
+    const result = this._core.insertLineAbove();
+    this._handleTextEditResult(result, { action: TextChangeAction.INSERT });
+    return !!(result && (result.changed || asArray(result.changes).length > 0));
+  }
+
+  insertLineBelow() {
+    const result = this._core.insertLineBelow();
+    this._handleTextEditResult(result, { action: TextChangeAction.INSERT });
+    return !!(result && (result.changed || asArray(result.changes).length > 0));
   }
 
   undo() {
@@ -1672,6 +1914,33 @@ export class SweetEditorWidget {
 
   getSelectedText() {
     return String(this._core.getSelectedText() ?? "");
+  }
+
+  getWordRangeAtCursor() {
+    return this._core.getWordRangeAtCursor();
+  }
+
+  getWordAtCursor() {
+    return String(this._core.getWordAtCursor() ?? "");
+  }
+
+  copyToClipboard() {
+    void this._copySelectionToClipboard(false);
+  }
+
+  cutToClipboard() {
+    void this._copySelectionToClipboard(true);
+  }
+
+  pasteFromClipboard() {
+    void (async () => {
+      const text = await this._readClipboardText();
+      if (!text) {
+        return;
+      }
+      const result = this._core.insert(text);
+      this._handleTextEditResult(result, { action: TextChangeAction.INSERT });
+    })();
   }
 
   moveCursorLeft(extendSelection:boolean = false) {
@@ -2009,12 +2278,39 @@ export class SweetEditorWidget {
     return String(this._document.getText() ?? "");
   }
 
+  getDocument() {
+    return this._document;
+  }
+
+  loadDocument(document:IAnyValue) {
+    if (!document) {
+      return;
+    }
+    if (this._document && this._ownsDocument && typeof this._document.dispose === "function") {
+      this._document.dispose();
+    }
+
+    this._document = document;
+    this._ownsDocument = false;
+    this._core.loadDocument(this._document);
+
+    this._decorationProviderManager.onDocumentLoaded();
+    this.dismissCompletion();
+    this._syncEventStateFromCore();
+    this._emitEvent(EditorEventType.DOCUMENT_LOADED, {
+      textLength: this.getText().length,
+      lineCount: this.getTotalLineCount(),
+    });
+    this._markDirty();
+  }
+
   loadText(text:string, options:IAnyRecord = {}) {
-    if (this._document) {
+    if (this._document && this._ownsDocument && typeof this._document.dispose === "function") {
       this._document.dispose();
     }
 
     this._document = this._documentFactory.fromText(String(text ?? ""), options);
+    this._ownsDocument = true;
     this._core.loadDocument(this._document);
 
     this._decorationProviderManager.onDocumentLoaded();
@@ -2064,10 +2360,11 @@ export class SweetEditorWidget {
       this._resizeObserver = null;
     }
 
-    if (this._document) {
+    if (this._document && this._ownsDocument && typeof this._document.dispose === "function") {
       this._document.dispose();
-      this._document = null;
     }
+    this._document = null;
+    this._ownsDocument = false;
 
     this._ownedDecorationProviders.forEach((provider:IAnyValue) => {
       if (provider && typeof provider.dispose === "function") {
@@ -2075,6 +2372,27 @@ export class SweetEditorWidget {
       }
     });
     this._ownedDecorationProviders.clear();
+
+    const decorationProviders = this._decorationProviderManager?._providers;
+    if (decorationProviders instanceof Set) {
+      Array.from(decorationProviders).forEach((provider:IAnyValue) => {
+        this._decorationProviderManager.removeProvider(provider);
+      });
+    }
+    const completionProviders = this._completionProviderManager?._providers;
+    if (completionProviders instanceof Set) {
+      Array.from(completionProviders).forEach((provider:IAnyValue) => {
+        this._completionProviderManager.removeProvider(provider);
+      });
+    }
+    this._completionProviderManager.dismiss();
+
+    this._listeners.clear();
+    this._newLineActionProviders = [];
+    if (this._controller) {
+      this._controller.unbind();
+      this._controller = null;
+    }
 
     this._core.dispose();
 
@@ -2091,15 +2409,16 @@ export class SweetEditorWidget {
     this._stopPerformanceMonitor();
     this._teardownPerformanceOverlay();
 
-    this._listeners.clear();
-    this._newLineActionProviders = [];
-
     this._canvas.remove();
     this._input.remove();
   }
 
   registerTextStyle(styleId:number, color:number, backgroundColor:number = 0, fontStyle:number = 0) {
     this._core.registerTextStyle(styleId, color, backgroundColor, fontStyle);
+  }
+
+  registerBatchTextStyles(stylesById:IAnyValue) {
+    this._core.registerBatchTextStyles(stylesById);
   }
 
   setLineSpans(line:number, layer:IAnyValue, spans:IAnyValue[]) {
@@ -2112,6 +2431,10 @@ export class SweetEditorWidget {
 
   clearHighlights(layer:IAnyValue = null) {
     this._core.clearHighlights(layer);
+  }
+
+  flush() {
+    this._markDirty();
   }
 
   createSweetLineDecorationProvider(options:IAnyRecord = {}) {
@@ -2153,8 +2476,27 @@ export class SweetEditorWidget {
   }
 
   setDecorationProviderOptions(options:IAnyRecord = {}) {
-    this._decorationProviderManager.setOptions(options);
-    if ("scrollRefreshMinIntervalMs" in options || "overscanViewportMultiplier" in options) {
+    const normalizedOptions:IAnyRecord = { ...(options || {}) };
+    if (
+      "decorationScrollRefreshMinIntervalMs" in normalizedOptions
+      && !("scrollRefreshMinIntervalMs" in normalizedOptions)
+    ) {
+      normalizedOptions.scrollRefreshMinIntervalMs = normalizedOptions.decorationScrollRefreshMinIntervalMs;
+    }
+    if (
+      "decorationOverscanViewportMultiplier" in normalizedOptions
+      && !("overscanViewportMultiplier" in normalizedOptions)
+    ) {
+      normalizedOptions.overscanViewportMultiplier = normalizedOptions.decorationOverscanViewportMultiplier;
+    }
+
+    this._decorationProviderManager.setOptions(normalizedOptions);
+    if (
+      "scrollRefreshMinIntervalMs" in normalizedOptions
+      || "overscanViewportMultiplier" in normalizedOptions
+      || "decorationScrollRefreshMinIntervalMs" in normalizedOptions
+      || "decorationOverscanViewportMultiplier" in normalizedOptions
+    ) {
       this._settingsFacade = this._createSettingsFacade();
     }
   }
@@ -2236,14 +2578,26 @@ export class SweetEditorWidget {
 
   _createSettingsFacade() {
     return {
+      setEditorTextSize: (size:number) => this.setEditorTextSize(size),
+      getEditorTextSize: () => this.getEditorTextSize(),
+      setFontFamily: (family:string) => this.setFontFamily(family),
+      getFontFamily: () => this.getFontFamily(),
+      setTypeface: (typeface:string) => this.setTypeface(typeface),
+      getTypeface: () => this.getTypeface(),
       setScale: (scale:number) => this.setScale(scale),
-      getScale: () => {
-        const view = this._core.getViewState() || {};
-        const value = Number(view.scale);
-        return Number.isFinite(value) ? value : 1;
-      },
+      getScale: () => this.getScale(),
+      setFoldArrowMode: (mode:IAnyValue) => this.setFoldArrowMode(mode),
+      getFoldArrowMode: () => this.getFoldArrowMode(),
       setWrapMode: (mode:IAnyValue) => this.setWrapMode(mode),
-      getWrapMode: () => this._settingsState.wrapMode,
+      getWrapMode: () => this.getWrapMode(),
+      setShowSplitLine: (show:boolean) => this.setShowSplitLine(show),
+      isShowSplitLine: () => this.isShowSplitLine(),
+      setGutterSticky: (sticky:boolean) => this.setGutterSticky(sticky),
+      isGutterSticky: () => this.isGutterSticky(),
+      setGutterVisible: (visible:boolean) => this.setGutterVisible(visible),
+      isGutterVisible: () => this.isGutterVisible(),
+      setCurrentLineRenderMode: (mode:IAnyValue) => this.setCurrentLineRenderMode(mode),
+      getCurrentLineRenderMode: () => this.getCurrentLineRenderMode(),
       setReadOnly: (readOnly:boolean) => this.setReadOnly(readOnly),
       isReadOnly: () => this.isReadOnly(),
       setAutoIndentMode: (mode:IAnyValue) => this.setAutoIndentMode(mode),
@@ -2251,10 +2605,14 @@ export class SweetEditorWidget {
       setMaxGutterIcons: (count:number) => this.setMaxGutterIcons(count),
       getMaxGutterIcons: () => this._settingsState.maxGutterIcons,
       setLineSpacing: (add:number, mult:number) => this.setLineSpacing(add, mult),
+      getLineSpacingAdd: () => this.getLineSpacingAdd(),
+      getLineSpacingMult: () => this.getLineSpacingMult(),
       getLineSpacing: () => ({
-        add: this._settingsState.lineSpacingAdd,
-        mult: this._settingsState.lineSpacingMult,
+        add: this.getLineSpacingAdd(),
+        mult: this.getLineSpacingMult(),
       }),
+      setContentStartPadding: (padding:number) => this.setContentStartPadding(padding),
+      getContentStartPadding: () => this.getContentStartPadding(),
       setDecorationScrollRefreshMinIntervalMs: (intervalMs:number) =>
         this.setDecorationScrollRefreshMinIntervalMs(intervalMs),
       getDecorationScrollRefreshMinIntervalMs: () =>
@@ -2263,6 +2621,7 @@ export class SweetEditorWidget {
         this.setDecorationOverscanViewportMultiplier(multiplier),
       getDecorationOverscanViewportMultiplier: () =>
         this.getDecorationOverscanViewportMultiplier(),
+      flush: () => this.flush(),
     };
   }
 
@@ -2270,11 +2629,34 @@ export class SweetEditorWidget {
     if (!settings || typeof settings !== "object") {
       return;
     }
+    if ("editorTextSize" in settings) {
+      this.setEditorTextSize(settings.editorTextSize);
+    }
+    if ("fontFamily" in settings) {
+      this.setFontFamily(String(settings.fontFamily ?? ""));
+    } else if ("typeface" in settings) {
+      this.setTypeface(String(settings.typeface ?? ""));
+    }
     if ("scale" in settings) {
       this.setScale(settings.scale);
     }
+    if ("foldArrowMode" in settings) {
+      this.setFoldArrowMode(settings.foldArrowMode);
+    }
     if ("wrapMode" in settings) {
       this.setWrapMode(settings.wrapMode);
+    }
+    if ("showSplitLine" in settings) {
+      this.setShowSplitLine(settings.showSplitLine);
+    }
+    if ("gutterSticky" in settings) {
+      this.setGutterSticky(settings.gutterSticky);
+    }
+    if ("gutterVisible" in settings) {
+      this.setGutterVisible(settings.gutterVisible);
+    }
+    if ("currentLineRenderMode" in settings) {
+      this.setCurrentLineRenderMode(settings.currentLineRenderMode);
     }
     if ("readOnly" in settings) {
       this.setReadOnly(settings.readOnly);
@@ -2290,11 +2672,20 @@ export class SweetEditorWidget {
       const mult = "lineSpacingMult" in settings ? settings.lineSpacingMult : this._settingsState.lineSpacingMult;
       this.setLineSpacing(add, mult);
     }
-    if ("scrollRefreshMinIntervalMs" in settings) {
-      this.setDecorationScrollRefreshMinIntervalMs(settings.scrollRefreshMinIntervalMs);
+    if ("contentStartPadding" in settings) {
+      this.setContentStartPadding(settings.contentStartPadding);
     }
-    if ("overscanViewportMultiplier" in settings) {
-      this.setDecorationOverscanViewportMultiplier(settings.overscanViewportMultiplier);
+    if ("decorationScrollRefreshMinIntervalMs" in settings || "scrollRefreshMinIntervalMs" in settings) {
+      const intervalMs = "decorationScrollRefreshMinIntervalMs" in settings
+        ? settings.decorationScrollRefreshMinIntervalMs
+        : settings.scrollRefreshMinIntervalMs;
+      this.setDecorationScrollRefreshMinIntervalMs(intervalMs);
+    }
+    if ("decorationOverscanViewportMultiplier" in settings || "overscanViewportMultiplier" in settings) {
+      const multiplier = "decorationOverscanViewportMultiplier" in settings
+        ? settings.decorationOverscanViewportMultiplier
+        : settings.overscanViewportMultiplier;
+      this.setDecorationOverscanViewportMultiplier(multiplier);
     }
   }
 
@@ -2303,22 +2694,37 @@ export class SweetEditorWidget {
     if (!key) {
       return;
     }
-    const listeners = this._listeners.get(key);
-    if (!listeners || listeners.size === 0) {
+    const dispatchKeys = resolveEventDispatchKeys(key);
+    if (dispatchKeys.length === 0) {
       return;
     }
-    const event = {
-      type: key,
-      editor: this,
-      timestamp: Date.now(),
-      ...payload,
-    };
-    listeners.forEach((listener:(...args: IAnyValue[]) => IAnyValue) => {
-      try {
-        listener(event);
-      } catch (error) {
-        console.error(`SweetEditorWidget listener error (${key}):`, error);
+    const seenListeners = new Set<(...args: IAnyValue[]) => IAnyValue>();
+    const timestamp = Date.now();
+    dispatchKeys.forEach((dispatchKey:string) => {
+      const listeners = this._listeners.get(dispatchKey);
+      if (!listeners || listeners.size === 0) {
+        return;
       }
+      const event = {
+        type: dispatchKey,
+        standardType: EVENT_LEGACY_TO_STANDARD[dispatchKey] ?? dispatchKey,
+        legacyType: EVENT_STANDARD_TO_LEGACY[dispatchKey] ?? dispatchKey,
+        editor: this,
+        timestamp,
+        payload: { ...payload },
+        ...payload,
+      };
+      listeners.forEach((listener:(...args: IAnyValue[]) => IAnyValue) => {
+        if (seenListeners.has(listener)) {
+          return;
+        }
+        seenListeners.add(listener);
+        try {
+          listener(event);
+        } catch (error) {
+          console.error(`SweetEditorWidget listener error (${dispatchKey}):`, error);
+        }
+      });
     });
   }
 
@@ -2646,7 +3052,9 @@ export class SweetEditorWidget {
     };
     for (const provider of this._newLineActionProviders) {
       try {
-        const action = provider(context);
+        const action = typeof provider === "function"
+          ? provider(context)
+          : provider.provideNewLineAction(context);
         if (action == null) {
           continue;
         }

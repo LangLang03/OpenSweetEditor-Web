@@ -128,12 +128,14 @@ function makeLegacyOptions(
   model: ITextModel,
   resolvedModulePath: string | undefined,
 ): IPlainObject {
+  const widgetOptions = options.widgetOptions ?? {};
   return {
-    ...(options.widgetOptions ?? {}),
+    ...widgetOptions,
     locale: options.locale,
     theme: options.theme,
     decorationOptions: options.decorationOptions,
     performanceOverlay: options.performanceOverlay,
+    controller: options.controller ?? widgetOptions.controller,
     text: model.getValue(),
     modulePath: options.wasm?.modulePath ?? resolvedModulePath,
     moduleFactory: options.wasm?.moduleFactory,
