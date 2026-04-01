@@ -6,9 +6,10 @@
 
 1. `docs/zh/architecture.md`
 2. `docs/zh/api-editor-core.md`
-3. `src/include/*.h`
-4. `src/core/*.cpp`
-5. 最后再看 `platform/*`
+3. `docs/zh/platform-implementation-standard.md`
+4. `src/include/*.h`
+5. `src/core/*.cpp`
+6. 最后再看 `platform/*`
 
 ## 仓库地图
 
@@ -96,6 +97,10 @@
 - `platform/Apple/Sources/SweetEditoriOS`
 - `platform/Apple/Sources/SweetEditorMacOS`
   - iOS / macOS 平台视图
+
+## 平台实现标准
+
+如果你正在实现新平台或维护现有平台，请参阅 [平台实现标准](platform-implementation-standard.md)，其中定义了所有平台实现必须遵循的类型清单、模块结构、API 契约与合规规则。
 
 ## 修改什么，就从哪里进
 

@@ -12,6 +12,7 @@ This document describes the current repository code state (2026-03). If the docu
 - [Web Platform API (Guide)](./api-platform-web.md)
 - [Web SDK v2 Full API Reference (100%)](./api-platform-web-sdk-v2-reference.md)
 - [C++ Core / C API](./api-editor-core.md)
+- [Platform Implementation Standard](./platform-implementation-standard.md)
 
 ## Current Platform Status
 
