@@ -77,25 +77,50 @@ class SweetEditorController {
   }
 
   void selectAll() {
-    _state?._editorCore?.selectAll();
-    _state?._flush();
+    _state?._interactionController.selectAll();
   }
 
   String getSelectedText() => _state?._editorCore?.getSelectedText() ?? '';
 
   void insertText(String text) {
-    _state?._editorCore?.insertText(text);
-    _state?._flush();
+    _state?._interactionController.insertText(text);
+  }
+
+  void replaceText(
+    int startLine,
+    int startColumn,
+    int endLine,
+    int endColumn,
+    String text,
+  ) {
+    _state?._interactionController.replaceText(
+      core.TextRange(
+        core.TextPosition(startLine, startColumn),
+        core.TextPosition(endLine, endColumn),
+      ),
+      text,
+    );
+  }
+
+  void deleteText(int startLine, int startColumn, int endLine, int endColumn) {
+    _state?._interactionController.deleteText(
+      core.TextRange(
+        core.TextPosition(startLine, startColumn),
+        core.TextPosition(endLine, endColumn),
+      ),
+    );
+  }
+
+  void insertSnippet(String snippetTemplate) {
+    _state?._interactionController.insertSnippet(snippetTemplate);
   }
 
   void undo() {
-    _state?._editorCore?.undo();
-    _state?._flush();
+    _state?._interactionController.undo();
   }
 
   void redo() {
-    _state?._editorCore?.redo();
-    _state?._flush();
+    _state?._interactionController.redo();
   }
 
   bool get canUndo => _state?._editorCore?.canUndo ?? false;
@@ -122,8 +147,22 @@ class SweetEditorController {
   void removeNewLineActionProvider(NewLineActionProvider provider) =>
       _state?._newLineActionProviderManager.removeProvider(provider);
 
+  void triggerCompletion() =>
+      _state?._completionProviderManager.triggerCompletion(
+        CompletionTriggerKind.invoked,
+        null,
+      );
+
+  void dismissCompletion() => _state?._completionProviderManager.dismiss();
+
+  bool get isCompletionShowing =>
+      _state?._completionPopupController.isShowing ?? false;
+
   void showInlineSuggestion(InlineSuggestion suggestion) =>
       _state?._inlineSuggestionController.show(suggestion);
+
+  void dismissInlineSuggestion() =>
+      _state?._inlineSuggestionController.dismiss();
 
   bool get isInlineSuggestionShowing =>
       _state?._inlineSuggestionController.isShowing ?? false;

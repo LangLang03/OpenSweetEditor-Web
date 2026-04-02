@@ -1,5 +1,11 @@
 part of '../sweeteditor.dart';
 
+const double _kSelectionMenuMeasureHeight = 36;
+const double _kSelectionMenuMeasureHorizontalInset = 4;
+const double _kSelectionMenuMeasureItemHorizontalPadding = 12;
+const double _kSelectionMenuMeasureFontSize = 12;
+const double _kSelectionMenuMeasureDividerWidth = 1;
+
 class EditorOverlayCoordinator {
   EditorOverlayCoordinator({required EditorSession session}) : _session = session {
     _session.completionPopupController.bindOverlay(
@@ -63,7 +69,10 @@ class EditorOverlayCoordinator {
     }
   }
 
-  Offset computeSelectionMenuPosition(Size viewportSize) {
+  Offset computeSelectionMenuPosition(
+    Size viewportSize,
+    List<SelectionMenuItem> items,
+  ) {
     final model = _session.renderModel;
     final start = model.selectionStartHandle;
     final end = model.selectionEndHandle;
@@ -87,8 +96,8 @@ class EditorOverlayCoordinator {
       bottomY = 0;
     }
 
-    const menuWidth = 240.0;
-    const menuHeight = 36.0;
+    final menuWidth = _measureSelectionMenuWidth(items);
+    const menuHeight = _kSelectionMenuMeasureHeight;
     const offsetY = 8.0;
     const handleClearance = 32.0;
 
@@ -138,5 +147,25 @@ class EditorOverlayCoordinator {
       update: (data) => updateOverlay(data),
       hide: () => updateOverlay(null),
     );
+  }
+
+  double _measureSelectionMenuWidth(List<SelectionMenuItem> items) {
+    if (items.isEmpty) return 0;
+    var width = _kSelectionMenuMeasureHorizontalInset * 2;
+    for (var i = 0; i < items.length; i++) {
+      if (i > 0) {
+        width += _kSelectionMenuMeasureDividerWidth;
+      }
+      final painter = TextPainter(
+        text: TextSpan(
+          text: items[i].label,
+          style: const TextStyle(fontSize: _kSelectionMenuMeasureFontSize),
+        ),
+        textDirection: TextDirection.ltr,
+        maxLines: 1,
+      )..layout();
+      width += painter.width + _kSelectionMenuMeasureItemHorizontalPadding * 2;
+    }
+    return width;
   }
 }

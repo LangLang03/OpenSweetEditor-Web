@@ -78,6 +78,16 @@ class SelectionMenuController {
     }
   }
 
+  void onSelectAll() {
+    _scheduleShow(true);
+  }
+
+  void onTextChanged() {
+    _handleDragActive = false;
+    _hiddenByViewportGesture = false;
+    _hideImmediate();
+  }
+
   List<SelectionMenuItem> _buildItems(bool hasSelection) {
     if (_itemProvider != null) {
       final context =

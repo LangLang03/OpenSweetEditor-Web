@@ -48,14 +48,22 @@ class EditorSettings {
   double _decorationOverscanViewportMultiplier = 1.5;
   bool _textSizeCustomized = false;
   bool _fontFamilyCustomized = false;
+  bool _gutterStickyCustomized = false;
   EditorSettingsHost? _host;
 
-  void seedDefaults({required double textSize, required String fontFamily}) {
+  void seedDefaults({
+    required double textSize,
+    required String fontFamily,
+    bool? gutterSticky,
+  }) {
     if (!_textSizeCustomized) {
       _textSize = textSize;
     }
     if (!_fontFamilyCustomized) {
       _fontFamily = fontFamily;
+    }
+    if (!_gutterStickyCustomized && gutterSticky != null) {
+      _gutterSticky = gutterSticky;
     }
   }
 
@@ -152,6 +160,7 @@ class EditorSettings {
 
   void setGutterSticky(bool sticky) {
     _gutterSticky = sticky;
+    _gutterStickyCustomized = true;
     _host?.applyGutterSticky(sticky);
     _host?.flushEditor();
   }

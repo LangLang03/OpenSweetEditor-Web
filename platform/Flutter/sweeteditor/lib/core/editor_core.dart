@@ -778,6 +778,21 @@ class EditorCore {
     return _readNativeUtf8(bindings.editor_get_selected_text(_handle));
   }
 
+  TextRange getWordRangeAtCursor() {
+    _ensureOpen();
+    return using((arena) {
+      final sl = arena.allocate<ffi.Size>(ffi.sizeOf<ffi.Size>());
+      final sc = arena.allocate<ffi.Size>(ffi.sizeOf<ffi.Size>());
+      final el = arena.allocate<ffi.Size>(ffi.sizeOf<ffi.Size>());
+      final ec = arena.allocate<ffi.Size>(ffi.sizeOf<ffi.Size>());
+      bindings.editor_get_word_range_at_cursor(_handle, sl, sc, el, ec);
+      return TextRange(
+        TextPosition(sl.value, sc.value),
+        TextPosition(el.value, ec.value),
+      );
+    });
+  }
+
   String getWordAtCursor() {
     _ensureOpen();
     return _readNativeUtf8(bindings.editor_get_word_at_cursor(_handle));

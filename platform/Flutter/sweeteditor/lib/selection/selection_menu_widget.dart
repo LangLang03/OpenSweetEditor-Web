@@ -2,6 +2,13 @@ import 'package:flutter/material.dart';
 
 import 'selection_types.dart';
 
+const double _kSelectionMenuHeight = 36;
+const double _kSelectionMenuHorizontalInset = 4;
+const double _kSelectionMenuItemHorizontalPadding = 12;
+const double _kSelectionMenuFontSize = 12;
+const double _kSelectionMenuDividerWidth = 1;
+const double _kSelectionMenuDividerHeight = 20;
+
 /// Floating selection menu rendered from a list of [SelectionMenuItem]s.
 class SelectionMenuWidget extends StatelessWidget {
   const SelectionMenuWidget({
@@ -40,8 +47,10 @@ class SelectionMenuWidget extends StatelessWidget {
               ),
             ],
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          height: 36,
+          padding: const EdgeInsets.symmetric(
+            horizontal: _kSelectionMenuHorizontalInset,
+          ),
+          height: _kSelectionMenuHeight,
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -60,13 +69,15 @@ class SelectionMenuWidget extends StatelessWidget {
     return GestureDetector(
       onTap: item.enabled ? () => onItemTap(item) : null,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        padding: const EdgeInsets.symmetric(
+          horizontal: _kSelectionMenuItemHorizontalPadding,
+        ),
         child: Center(
           child: Text(
             item.label,
             style: TextStyle(
               color: Color(item.enabled ? textColor : disabledTextColor),
-              fontSize: 12,
+              fontSize: _kSelectionMenuFontSize,
             ),
           ),
         ),
@@ -76,8 +87,8 @@ class SelectionMenuWidget extends StatelessWidget {
 
   Widget _divider() {
     return Container(
-      width: 1,
-      height: 20,
+      width: _kSelectionMenuDividerWidth,
+      height: _kSelectionMenuDividerHeight,
       color: Color(textColor).withValues(alpha: 0.15),
     );
   }
