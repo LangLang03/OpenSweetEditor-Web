@@ -273,7 +273,7 @@ GestureResult editorHandleGestureEventRaw(EditorCore& editor, int32_t type, cons
   GestureEvent event;
   event.type = static_cast<EventType>(type);
   event.points = points;
-  event.modifiers = static_cast<Modifier>(modifiers);
+  event.modifiers = static_cast<KeyModifier>(modifiers);
   event.wheel_delta_x = wheel_delta_x;
   event.wheel_delta_y = wheel_delta_y;
   event.direct_scale = direct_scale;
@@ -284,7 +284,7 @@ KeyEventResult editorHandleKeyEventRaw(EditorCore& editor, int32_t key_code, con
   KeyEvent event;
   event.key_code = static_cast<KeyCode>(key_code);
   event.text = text;
-  event.modifiers = static_cast<Modifier>(modifiers);
+  event.modifiers = static_cast<KeyModifier>(modifiers);
   return editor.handleKeyEvent(event);
 }
 
@@ -318,12 +318,12 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
     .value("Y", KeyCode::Y)
     .value("K", KeyCode::K);
 
-  enum_<Modifier>("Modifier")
-    .value("NONE", Modifier::NONE)
-    .value("SHIFT", Modifier::SHIFT)
-    .value("CTRL", Modifier::CTRL)
-    .value("ALT", Modifier::ALT)
-    .value("META", Modifier::META);
+  enum_<KeyModifier>("Modifier")
+    .value("NONE", KeyModifier::NONE)
+    .value("SHIFT", KeyModifier::SHIFT)
+    .value("CTRL", KeyModifier::CTRL)
+    .value("ALT", KeyModifier::ALT)
+    .value("META", KeyModifier::META);
 
   enum_<ScrollBehavior>("ScrollBehavior")
     .value("GOTO_TOP", ScrollBehavior::GOTO_TOP)
