@@ -289,7 +289,7 @@ TEST_CASE("C API basic edit, composition and linked editing flow") {
   CHECK(layout_metrics.font_height == Catch::Approx(10.0f));
   CHECK(layout_metrics.font_ascent == Catch::Approx(8.0f));
   CHECK(layout_metrics.line_spacing_add == Catch::Approx(0.0f));
-  CHECK(layout_metrics.line_spacing_mult == Catch::Approx(1.0f));
+  CHECK(layout_metrics.line_spacing_mult == Catch::Approx(1.2f));
   CHECK(layout_metrics.max_gutter_icons == 0);
   CHECK(layout_metrics.inlay_hint_padding == Catch::Approx(2.0f));
   CHECK(layout_metrics.inlay_hint_margin == Catch::Approx(1.0f));

@@ -80,7 +80,7 @@ namespace NS_SWEETEDITOR {
 
     /// Convert whole-document character offset to line/column position
     /// @param char_index Character offset from document start (UTF-16 character count)
-    virtual TextPosition getPositionFromCharIndex(size_t char_index) const = 0;
+    virtual TextPosition getPositionFromCharIndex(size_t char_index) = 0;
 
     /// Convert line/column position to whole-document character offset
     virtual size_t getCharIndexFromPosition(const TextPosition& position) = 0;
@@ -146,7 +146,7 @@ namespace NS_SWEETEDITOR {
     size_t getLineCount() const override;
     U16String getLineU16Text(size_t line) const override;
     uint32_t getLineColumns(size_t line) override;
-    TextPosition getPositionFromCharIndex(size_t char_index) const override;
+    TextPosition getPositionFromCharIndex(size_t char_index) override;
     size_t getCharIndexFromPosition(const TextPosition& position) override;
     void insertU8Text(const TextPosition& position, const U8String& text) override;
     void deleteU8Text(const TextRange& range) override;
@@ -184,7 +184,7 @@ namespace NS_SWEETEDITOR {
     size_t getLineCount() const override;
     U16String getLineU16Text(size_t line) const override;
     uint32_t getLineColumns(size_t line) override;
-    TextPosition getPositionFromCharIndex(size_t char_index) const override;
+    TextPosition getPositionFromCharIndex(size_t char_index) override;
     size_t getCharIndexFromPosition(const TextPosition& position) override;
     void insertU8Text(const TextPosition& position, const U8String& text) override;
     void deleteU8Text(const TextRange& range) override;
@@ -215,7 +215,7 @@ namespace NS_SWEETEDITOR {
     void updateLogicalLinesByDeleteText(size_t start_byte, size_t byte_length);
     size_t getByteOffsetFromPosition(const TextPosition& position) const;
     size_t getLineFromByteOffset(size_t byte_offset) const;
-    size_t getLineFromCharIndex(size_t char_index) const;
+    size_t getLineFromCharIndex(size_t char_index);
     size_t getByteLengthOfLine(size_t line) const;
     const char* getSegmentData(const BufferSegment& segment) const;
   };

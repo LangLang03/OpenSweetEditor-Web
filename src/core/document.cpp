@@ -68,16 +68,24 @@ namespace NS_SWEETEDITOR {
     return m_logical_lines_[line].cached_text.size();
   }
 
-  TextPosition PieceTableDocument::getPositionFromCharIndex(size_t char_index) const {
+  TextPosition PieceTableDocument::getPositionFromCharIndex(size_t char_index) {
     if (m_logical_lines_.empty()) {
       return TextPosition{0, 0};
     }
     if (char_index == 0) {
       return TextPosition{0, 0};
     }
+    for (size_t i = 0; i < m_logical_lines_.size(); ++i) {
+      updateDirtyLine(i, m_logical_lines_[i]);
+    }
     const size_t target_line = getLineFromCharIndex(char_index);
-    const LogicalLine& logical_line = m_logical_lines_[target_line];
-    size_t column = char_index - logical_line.start_char;
+    size_t column = char_index - m_logical_lines_[target_line].start_char;
+    size_t byte_len = getByteLengthOfLine(target_line);
+    U8String line_u8 = getU8Text(m_logical_lines_[target_line].start_byte, byte_len);
+    size_t max_col = simdutf::count_utf8(line_u8.data(), line_u8.size());
+    if (column > max_col) {
+      column = max_col;
+    }
     return TextPosition{target_line, column};
   }
 
@@ -112,8 +120,182 @@ namespace NS_SWEETEDITOR {
   }
 
   void PieceTableDocument::replaceU8Text(const TextRange& range, const U8String& text) {
-    deleteU8Text(range);
-    insertU8Text(range.start, text);
+    size_t start_byte = getByteOffsetFromPosition(range.start);
+    size_t end_byte = getByteOffsetFromPosition(range.end);
+    size_t delete_length = end_byte - start_byte;
+
+    if (delete_length == 0 && text.empty()) {
+      return;
+    }
+    if (delete_length == 0) {
+      insertU8Text(start_byte, text);
+      return;
+    }
+    if (text.empty()) {
+      deleteU8Text(start_byte, delete_length);
+      return;
+    }
+
+    // Segment table: delete the old range
+    size_t delete_end = start_byte + delete_length;
+    size_t current_byte = 0;
+    auto it = m_buffer_segments_.begin();
+    while (it != m_buffer_segments_.end()) {
+      size_t seg_len_original = it->byte_length;
+      size_t seg_start = current_byte;
+      size_t seg_end = current_byte + seg_len_original;
+      size_t intersect_start = std::max(seg_start, start_byte);
+      size_t intersect_end = std::min(seg_end, delete_end);
+      if (intersect_start < intersect_end) {
+        size_t delete_len_in_seg = intersect_end - intersect_start;
+        if (intersect_start == seg_start && intersect_end == seg_end) {
+          it = m_buffer_segments_.erase(it);
+        } else if (intersect_start == seg_start) {
+          it->start_byte += delete_len_in_seg;
+          it->byte_length -= delete_len_in_seg;
+          ++it;
+        } else if (intersect_end == seg_end) {
+          it->byte_length -= delete_len_in_seg;
+          ++it;
+        } else {
+          size_t left_len = intersect_start - seg_start;
+          BufferSegment right = *it;
+          right.start_byte += (left_len + delete_len_in_seg);
+          right.byte_length -= (left_len + delete_len_in_seg);
+          it->byte_length = left_len;
+          it = m_buffer_segments_.insert(it + 1, right);
+          ++it;
+        }
+      } else {
+        ++it;
+      }
+      current_byte += seg_len_original;
+      if (current_byte >= delete_end) {
+        break;
+      }
+    }
+    m_total_bytes_ -= delete_length;
+
+    // Segment table: insert new text at the same position
+    size_t edit_buffer_start = m_edit_buffer_->currentEnd();
+    m_edit_buffer_->append(text);
+    BufferSegment new_seg = {SegmentType::EDITED, edit_buffer_start, text.size()};
+    bool is_inserted = false;
+    current_byte = 0;
+    for (auto sit = m_buffer_segments_.begin(); sit != m_buffer_segments_.end(); ++sit) {
+      if (current_byte + sit->byte_length > start_byte) {
+        size_t offset_in_seg = start_byte - current_byte;
+        if (offset_in_seg == 0) {
+          m_buffer_segments_.insert(sit, new_seg);
+          is_inserted = true;
+          break;
+        }
+        BufferSegment right = *sit;
+        right.start_byte += offset_in_seg;
+        right.byte_length -= offset_in_seg;
+        sit->byte_length = offset_in_seg;
+        sit = m_buffer_segments_.insert(sit + 1, new_seg);
+        m_buffer_segments_.insert(sit + 1, right);
+        is_inserted = true;
+        break;
+      }
+      current_byte += sit->byte_length;
+    }
+    if (!is_inserted) {
+      m_buffer_segments_.push_back(new_seg);
+    }
+    m_total_bytes_ += text.size();
+
+    // Logical lines: single combined update for delete + insert
+    size_t line = getLineFromByteOffset(start_byte);
+    m_logical_lines_[line].is_char_dirty = true;
+    m_logical_lines_[line].is_layout_dirty = true;
+    m_logical_lines_[line].height = -1;
+
+    // Remove lines whose start_byte falls within the deleted range
+    size_t low = 0, high = m_logical_lines_.size();
+    while (low < high) {
+      size_t mid = low + (high - low) / 2;
+      if (m_logical_lines_[mid].start_byte <= start_byte) low = mid + 1;
+      else high = mid;
+    }
+    size_t line_to_remove = low;
+
+    // After deletion, bytes shift by -delete_length; find first line beyond delete end
+    low = line_to_remove;
+    high = m_logical_lines_.size();
+    while (low < high) {
+      size_t mid = low + (high - low) / 2;
+      if (m_logical_lines_[mid].start_byte <= start_byte + delete_length) low = mid + 1;
+      else high = mid;
+    }
+    size_t line_to_keep = low;
+
+    LineEnding original_last_ending = LineEnding::NONE;
+    if (line_to_remove < line_to_keep) {
+      original_last_ending = m_logical_lines_[line_to_keep - 1].line_ending;
+      m_logical_lines_.erase(m_logical_lines_.begin() + line_to_remove,
+                             m_logical_lines_.begin() + line_to_keep);
+    } else {
+      original_last_ending = m_logical_lines_[line].line_ending;
+    }
+
+    // Scan new text for line breaks and build new LogicalLine entries
+    LineEnding pre_insert_ending = m_logical_lines_[line].line_ending;
+    Vector<LogicalLine> new_lines;
+    for (size_t i = 0; i < text.size(); ++i) {
+      if (text[i] == '\r') {
+        if (i + 1 < text.size() && text[i + 1] == '\n') {
+          LogicalLine ll;
+          ll.start_byte = start_byte + i + 2;
+          ll.is_char_dirty = true;
+          new_lines.push_back(ll);
+          if (new_lines.size() == 1) {
+            m_logical_lines_[line].line_ending = LineEnding::CRLF;
+          } else {
+            new_lines[new_lines.size() - 2].line_ending = LineEnding::CRLF;
+          }
+          ++i;
+        } else {
+          LogicalLine ll;
+          ll.start_byte = start_byte + i + 1;
+          ll.is_char_dirty = true;
+          new_lines.push_back(ll);
+          if (new_lines.size() == 1) {
+            m_logical_lines_[line].line_ending = LineEnding::CR;
+          } else {
+            new_lines[new_lines.size() - 2].line_ending = LineEnding::CR;
+          }
+        }
+      } else if (text[i] == '\n') {
+        LogicalLine ll;
+        ll.start_byte = start_byte + i + 1;
+        ll.is_char_dirty = true;
+        new_lines.push_back(ll);
+        if (new_lines.size() == 1) {
+          m_logical_lines_[line].line_ending = LineEnding::LF;
+        } else {
+          new_lines[new_lines.size() - 2].line_ending = LineEnding::LF;
+        }
+      }
+    }
+
+    if (!new_lines.empty()) {
+      new_lines.back().line_ending = original_last_ending;
+      m_logical_lines_.insert(m_logical_lines_.begin() + line + 1,
+                              new_lines.begin(), new_lines.end());
+    } else {
+      m_logical_lines_[line].line_ending = original_last_ending;
+    }
+
+    // Shift start_byte for all following lines by net change
+    long net_shift = static_cast<long>(text.size()) - static_cast<long>(delete_length);
+    size_t start_shift_line = line + 1 + new_lines.size();
+    for (size_t i = start_shift_line; i < m_logical_lines_.size(); ++i) {
+      m_logical_lines_[i].start_byte = static_cast<size_t>(
+          static_cast<long>(m_logical_lines_[i].start_byte) + net_shift);
+      m_logical_lines_[i].is_char_dirty = true;
+    }
   }
 
   U8String PieceTableDocument::getU8Text(const TextRange& range) {
@@ -546,37 +728,18 @@ namespace NS_SWEETEDITOR {
     return low - 1;
   }
 
-  size_t PieceTableDocument::getLineFromCharIndex(size_t char_index) const {
-    size_t left = 0;
-    size_t right = m_logical_lines_.size() - 1;
-    size_t target_line = 0;
-    while (left <= right) {
-      size_t mid = left + (right - left) / 2;
-      const LogicalLine& logical_line = m_logical_lines_[mid];
-      if (mid + 1 < m_logical_lines_.size() && m_logical_lines_[mid + 1].start_char <= char_index) {
-        // If the next line's starting char index <= char_index,
-        // the target line is after the current line
-        left = mid + 1;
-      } else if (logical_line.start_char > char_index) {
-        // If the current line's starting char index > char_index,
-        // the target line is before the current line
-        if (mid == 0) {
-          break;
-        }
-        right = mid - 1;
+  size_t PieceTableDocument::getLineFromCharIndex(size_t char_index) {
+    size_t low = 0;
+    size_t high = m_logical_lines_.size();
+    while (low < high) {
+      size_t mid = low + (high - low) / 2;
+      if (m_logical_lines_[mid].start_char <= char_index) {
+        low = mid + 1;
       } else {
-        target_line = mid;
-        break;
+        high = mid;
       }
     }
-    // Boundary handling
-    if (left < m_logical_lines_.size()) {
-      target_line = left;
-    }
-    if (target_line >= m_logical_lines_.size()) {
-      target_line = m_logical_lines_.size() - 1;
-    }
-    return target_line;
+    return (low > 0) ? low - 1 : 0;
   }
 
   size_t PieceTableDocument::getByteLengthOfLine(size_t line) const {
@@ -674,7 +837,7 @@ namespace NS_SWEETEDITOR {
     return m_logical_lines_[line].cached_text.size();
   }
 
-  TextPosition LineArrayDocument::getPositionFromCharIndex(size_t char_index) const {
+  TextPosition LineArrayDocument::getPositionFromCharIndex(size_t char_index) {
     if (m_logical_lines_.empty()) {
       return TextPosition{0, 0};
     }
