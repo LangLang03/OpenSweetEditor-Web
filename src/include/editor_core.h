@@ -674,8 +674,6 @@ namespace NS_SWEETEDITOR {
 #pragma endregion
 
   private:
-    friend class EditorInteraction;
-
     Ptr<TextMeasurer> m_measurer_;
     EditorOptions m_options_;
     EditorSettings m_settings_;
@@ -690,8 +688,8 @@ namespace NS_SWEETEDITOR {
     Viewport m_viewport_;
     ViewState m_view_state_;
 
-    /// Logical cursor position in text
-    TextPosition m_cursor_position_;
+    /// Unified caret state: cursor position + selection
+    CaretState m_caret_;
 
     /// IME composition state
     CompositionState m_composition_;
@@ -724,8 +722,6 @@ namespace NS_SWEETEDITOR {
     void selectWordAt(const PointF& screen_point);
     /// Update cursor movement (handle selection extension logic)
     void moveCursorTo(const TextPosition& new_pos, bool extend_selection);
-    /// Get normalized selection (start < end)
-    TextRange getNormalizedSelection() const;
     /// Calculate UTF16 column count for UTF8 text
     static size_t calcUtf16Columns(const U8String& text);
     /// Calculate new cursor position after inserting UTF8 text

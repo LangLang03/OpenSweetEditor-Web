@@ -59,6 +59,7 @@ namespace NS_SWEETEDITOR {
     interaction_context.view_state = &m_view_state_;
     interaction_context.viewport = &m_viewport_;
     interaction_context.text_layout = m_text_layout_.get();
+    interaction_context.caret = &m_caret_;
     m_interaction_ = makeUPtr<EditorInteraction>(interaction_context);
     m_render_composer_ = makeUPtr<RenderComposer>(m_text_layout_.get(), m_decorations_.get(), &m_settings_);
     m_undo_manager_ = makeUPtr<UndoManager>(options.max_undo_stack_size);
@@ -336,9 +337,15 @@ namespace NS_SWEETEDITOR {
 
     float line_height = m_text_layout_->getLineHeight();
     PERF_BEGIN(cursor_sel);
-    m_render_composer_->buildCursorModel(model, m_cursor_position_, hasSelection(), line_height);
+    m_render_composer_->buildCursorModel(model, m_caret_.cursor, m_caret_.has_selection, line_height);
     m_render_composer_->buildCompositionDecoration(model, m_composition_, line_height);
-    m_render_composer_->buildSelectionRects(model, m_document_.get(), *m_interaction_, line_height);
+    m_render_composer_->buildSelectionRects(model, m_document_.get(), m_caret_, line_height);
+    if (m_caret_.has_selection) {
+      m_interaction_->updateHandleCache(model.selection_start_handle.position,
+                                        model.selection_end_handle.position, line_height);
+    } else {
+      m_interaction_->clearHandleCache();
+    }
     PERF_END(cursor_sel, "buildRenderModel::cursorAndSelection");
 
     PERF_BEGIN(guides);
@@ -349,7 +356,7 @@ namespace NS_SWEETEDITOR {
     m_render_composer_->buildLinkedEditingRects(model, m_document_.get(), m_linked_editing_session_.get(), line_height);
     m_render_composer_->buildBracketHighlightRects(model,
                                                    m_document_.get(),
-                                                   m_cursor_position_,
+                                                   m_caret_.cursor,
                                                    m_bracket_pairs_,
                                                    m_external_bracket_open_,
                                                    m_external_bracket_close_,
@@ -391,19 +398,44 @@ namespace NS_SWEETEDITOR {
   }
 
   GestureResult EditorCore::handleGestureEvent(const GestureEvent& event) {
-    return m_interaction_->handleGestureEvent(*this, event);
+    GestureIntent intent;
+    GestureResult result = m_interaction_->handleGestureEvent(event, intent);
+
+    if (intent.cancel_linked_editing) {
+      if (m_linked_editing_session_ && m_linked_editing_session_->isActive()) {
+        TextPosition tap_pos = m_text_layout_->hitTest(result.tap_point);
+        bool in_tab_stop = false;
+        for (const auto& hl : m_linked_editing_session_->getAllHighlights()) {
+          if (hl.range.contains(tap_pos)) { in_tab_stop = true; break; }
+        }
+        if (!in_tab_stop) {
+          cancelLinkedEditing();
+        }
+      }
+    }
+    if (intent.place_cursor) {
+      placeCursorAt(result.tap_point);
+    }
+    if (intent.select_word) {
+      selectWordAt(result.tap_point);
+    }
+    if (intent.toggle_fold) {
+      toggleFoldAt(intent.fold_line);
+    }
+
+    return result;
   }
 
   GestureResult EditorCore::tickFling() {
-    return m_interaction_->tickFling(m_cursor_position_);
+    return m_interaction_->tickFling();
   }
 
   GestureResult EditorCore::tickEdgeScroll() {
-    return m_interaction_->tickEdgeScroll(m_cursor_position_);
+    return m_interaction_->tickEdgeScroll();
   }
 
   GestureResult EditorCore::tickAnimations() {
-    return m_interaction_->tickAnimations(m_cursor_position_);
+    return m_interaction_->tickAnimations();
   }
 
   void EditorCore::stopFling() {
@@ -692,7 +724,7 @@ namespace NS_SWEETEDITOR {
     // Auto-indent: when inserting a newline with KEEP_INDENT enabled, append previous line's leading whitespace
     U8String actual_text = text;
     if (text == "\n" && m_settings_.auto_indent_mode == AutoIndentMode::KEEP_INDENT) {
-      size_t current_line = hasSelection() ? getNormalizedSelection().start.line : m_cursor_position_.line;
+      size_t current_line = hasSelection() ? m_caret_.normalizedSelection().start.line : m_caret_.cursor.line;
       U16String line_text = m_document_->getLineU16Text(current_line);
       U8String indent;
       for (auto ch : line_text) {
@@ -713,19 +745,19 @@ namespace NS_SWEETEDITOR {
       U8String current_text = hasSelection() ? "" : m_document_->getU8Text(group->ranges[0]);
       U8String linked_text = current_text + actual_text;
       TextEditResult result = applyLinkedEditsWithResult(linked_text);
-      LOGD("EditorCore::insertText(linked), cursor = %s", m_cursor_position_.dump().c_str());
+      LOGD("EditorCore::insertText(linked), cursor = %s", m_caret_.cursor.dump().c_str());
       return result;
     }
 
     TextEditResult result;
     if (hasSelection()) {
-      TextRange range = getNormalizedSelection();
+      TextRange range = m_caret_.normalizedSelection();
       result = applyEdit(range, actual_text);
     } else {
-      TextRange range = {m_cursor_position_, m_cursor_position_};
+      TextRange range = {m_caret_.cursor, m_caret_.cursor};
       result = applyEdit(range, actual_text);
     }
-    LOGD("EditorCore::insertText, cursor = %s", m_cursor_position_.dump().c_str());
+    LOGD("EditorCore::insertText, cursor = %s", m_caret_.cursor.dump().c_str());
     return result;
   }
 
@@ -741,13 +773,13 @@ namespace NS_SWEETEDITOR {
       const TabStopGroup* group = m_linked_editing_session_->currentGroup();
       if (group && !group->ranges.empty() && range == group->ranges[0]) {
         TextEditResult result = applyLinkedEditsWithResult(new_text);
-        LOGD("EditorCore::replaceText(linked), cursor = %s", m_cursor_position_.dump().c_str());
+        LOGD("EditorCore::replaceText(linked), cursor = %s", m_caret_.cursor.dump().c_str());
         return result;
       }
     }
 
     TextEditResult result = applyEdit(range, new_text);
-    LOGD("EditorCore::replaceText, cursor = %s", m_cursor_position_.dump().c_str());
+    LOGD("EditorCore::replaceText, cursor = %s", m_caret_.cursor.dump().c_str());
     return result;
   }
 
@@ -769,7 +801,7 @@ namespace NS_SWEETEDITOR {
         const TextRange& primary = group->ranges[0];
         if (hasSelection()) {
           auto result = applyLinkedEditsWithResult("");
-          LOGD("EditorCore::backspace(linked), cursor = %s", m_cursor_position_.dump().c_str());
+          LOGD("EditorCore::backspace(linked), cursor = %s", m_caret_.cursor.dump().c_str());
           return result;
         }
         if (primary.start < primary.end) {
@@ -779,7 +811,7 @@ namespace NS_SWEETEDITOR {
             utf8::prior(end_it, current_text.begin());
             U8String new_text(current_text.begin(), end_it);
             auto result = applyLinkedEditsWithResult(new_text);
-            LOGD("EditorCore::backspace(linked), cursor = %s", m_cursor_position_.dump().c_str());
+            LOGD("EditorCore::backspace(linked), cursor = %s", m_caret_.cursor.dump().c_str());
             return result;
           }
         } else {
@@ -789,15 +821,15 @@ namespace NS_SWEETEDITOR {
     }
 
     if (hasSelection()) {
-      TextRange range = getNormalizedSelection();
+      TextRange range = m_caret_.normalizedSelection();
       auto result = applyEdit(range, "");
-      LOGD("EditorCore::backspace, cursor = %s", m_cursor_position_.dump().c_str());
+      LOGD("EditorCore::backspace, cursor = %s", m_caret_.cursor.dump().c_str());
       return result;
     }
 
-    if (m_cursor_position_.column > 0) {
-      U16String line_text = m_document_->getLineU16Text(m_cursor_position_.line);
-      size_t col = m_cursor_position_.column;
+    if (m_caret_.cursor.column > 0) {
+      U16String line_text = m_document_->getLineU16Text(m_caret_.cursor.line);
+      size_t col = m_caret_.cursor.column;
       size_t del_count = 1;
       if (col >= 2) {
         U16Char low = line_text[col - 1];
@@ -806,16 +838,16 @@ namespace NS_SWEETEDITOR {
           del_count = 2;
         }
       }
-      TextRange del_range = {{m_cursor_position_.line, col - del_count}, {m_cursor_position_.line, col}};
+      TextRange del_range = {{m_caret_.cursor.line, col - del_count}, {m_caret_.cursor.line, col}};
       auto result = applyEdit(del_range, "");
-      LOGD("EditorCore::backspace, cursor = %s", m_cursor_position_.dump().c_str());
+      LOGD("EditorCore::backspace, cursor = %s", m_caret_.cursor.dump().c_str());
       return result;
-    } else if (m_cursor_position_.line > 0) {
-      size_t prev_line = m_cursor_position_.line - 1;
+    } else if (m_caret_.cursor.line > 0) {
+      size_t prev_line = m_caret_.cursor.line - 1;
       uint32_t prev_cols = m_document_->getLineColumns(prev_line);
-      TextRange del_range = {{prev_line, prev_cols}, {m_cursor_position_.line, 0}};
+      TextRange del_range = {{prev_line, prev_cols}, {m_caret_.cursor.line, 0}};
       auto result = applyEdit(del_range, "");
-      LOGD("EditorCore::backspace, cursor = %s", m_cursor_position_.dump().c_str());
+      LOGD("EditorCore::backspace, cursor = %s", m_caret_.cursor.dump().c_str());
       return result;
     }
     return {};
@@ -831,21 +863,21 @@ namespace NS_SWEETEDITOR {
 
     if (isInLinkedEditing() && hasSelection()) {
       auto result = applyLinkedEditsWithResult("");
-      LOGD("EditorCore::deleteForward(linked), cursor = %s", m_cursor_position_.dump().c_str());
+      LOGD("EditorCore::deleteForward(linked), cursor = %s", m_caret_.cursor.dump().c_str());
       return result;
     }
 
     if (hasSelection()) {
-      TextRange range = getNormalizedSelection();
+      TextRange range = m_caret_.normalizedSelection();
       auto result = applyEdit(range, "");
-      LOGD("EditorCore::deleteForward, cursor = %s", m_cursor_position_.dump().c_str());
+      LOGD("EditorCore::deleteForward, cursor = %s", m_caret_.cursor.dump().c_str());
       return result;
     }
 
-    uint32_t line_cols = m_document_->getLineColumns(m_cursor_position_.line);
-    if (m_cursor_position_.column < line_cols) {
-      U16String line_text = m_document_->getLineU16Text(m_cursor_position_.line);
-      size_t col = m_cursor_position_.column;
+    uint32_t line_cols = m_document_->getLineColumns(m_caret_.cursor.line);
+    if (m_caret_.cursor.column < line_cols) {
+      U16String line_text = m_document_->getLineU16Text(m_caret_.cursor.line);
+      size_t col = m_caret_.cursor.column;
       size_t del_count = 1;
       if (col + 1 < line_text.length()) {
         U16Char high = line_text[col];
@@ -854,14 +886,14 @@ namespace NS_SWEETEDITOR {
           del_count = 2;
         }
       }
-      TextRange del_range = {{m_cursor_position_.line, col}, {m_cursor_position_.line, col + del_count}};
+      TextRange del_range = {{m_caret_.cursor.line, col}, {m_caret_.cursor.line, col + del_count}};
       auto result = applyEdit(del_range, "");
-      LOGD("EditorCore::deleteForward, cursor = %s", m_cursor_position_.dump().c_str());
+      LOGD("EditorCore::deleteForward, cursor = %s", m_caret_.cursor.dump().c_str());
       return result;
-    } else if (m_cursor_position_.line + 1 < m_document_->getLineCount()) {
-      TextRange del_range = {{m_cursor_position_.line, line_cols}, {m_cursor_position_.line + 1, 0}};
+    } else if (m_caret_.cursor.line + 1 < m_document_->getLineCount()) {
+      TextRange del_range = {{m_caret_.cursor.line, line_cols}, {m_caret_.cursor.line + 1, 0}};
       auto result = applyEdit(del_range, "");
-      LOGD("EditorCore::deleteForward, cursor = %s", m_cursor_position_.dump().c_str());
+      LOGD("EditorCore::deleteForward, cursor = %s", m_caret_.cursor.dump().c_str());
       return result;
     }
     return {};
@@ -869,13 +901,13 @@ namespace NS_SWEETEDITOR {
 
   void EditorCore::deleteSelection() {
     if (!hasSelection() || m_document_ == nullptr) return;
-    TextRange range = getNormalizedSelection();
+    TextRange range = m_caret_.normalizedSelection();
     // Internal call; do not record undo (used in composition flow)
     m_document_->deleteU8Text(range);
     // Adjust decoration offsets to avoid misalignment (especially after multi-line selection deletion)
     m_decorations_->adjustForEdit(range, range.start);
     m_text_layout_->invalidateContentMetrics(range.start.line);
-    m_cursor_position_ = range.start;
+    m_caret_.cursor = range.start;
     clearSelection();
   }
   TextEditResult EditorCore::moveLineUp() {
@@ -884,11 +916,11 @@ namespace NS_SWEETEDITOR {
 
     size_t first_line, last_line;
     if (hasSelection()) {
-      TextRange sel = getNormalizedSelection();
+      TextRange sel = m_caret_.normalizedSelection();
       first_line = sel.start.line;
       last_line = sel.end.column > 0 ? sel.end.line : (sel.end.line > sel.start.line ? sel.end.line - 1 : sel.end.line);
     } else {
-      first_line = last_line = m_cursor_position_.line;
+      first_line = last_line = m_caret_.cursor.line;
     }
 
     if (first_line == 0) return {};
@@ -903,10 +935,10 @@ namespace NS_SWEETEDITOR {
     TextRange full_range = {{first_line - 1, 0}, {last_line, m_document_->getLineColumns(last_line)}};
     U8String new_text = block_text + "\n" + prev_text;
 
-    m_undo_manager_->beginGroup(m_cursor_position_, hasSelection(), getSelection());
+    m_undo_manager_->beginGroup(m_caret_.cursor, hasSelection(), getSelection());
     auto result = applyEdit(full_range, new_text);
 
-    TextPosition new_cursor = {m_cursor_position_.line > 0 ? m_cursor_position_.line - 1 : 0, m_cursor_position_.column};
+    TextPosition new_cursor = {m_caret_.cursor.line > 0 ? m_caret_.cursor.line - 1 : 0, m_caret_.cursor.column};
     setCursorPosition(new_cursor);
     if (hasSelection()) {
       TextRange selection = getSelection();
@@ -914,7 +946,7 @@ namespace NS_SWEETEDITOR {
                      {selection.end.line > 0 ? selection.end.line - 1 : 0, selection.end.column}});
     }
 
-    m_undo_manager_->endGroup(m_cursor_position_);
+    m_undo_manager_->endGroup(m_caret_.cursor);
     ensureCursorVisible();
     return result;
   }
@@ -925,11 +957,11 @@ namespace NS_SWEETEDITOR {
 
     size_t first_line, last_line;
     if (hasSelection()) {
-      TextRange sel = getNormalizedSelection();
+      TextRange sel = m_caret_.normalizedSelection();
       first_line = sel.start.line;
       last_line = sel.end.column > 0 ? sel.end.line : (sel.end.line > sel.start.line ? sel.end.line - 1 : sel.end.line);
     } else {
-      first_line = last_line = m_cursor_position_.line;
+      first_line = last_line = m_caret_.cursor.line;
     }
 
     size_t line_count = m_document_->getLineCount();
@@ -945,17 +977,17 @@ namespace NS_SWEETEDITOR {
     TextRange full_range = {{first_line, 0}, {last_line + 1, m_document_->getLineColumns(last_line + 1)}};
     U8String new_text = next_text + "\n" + block_text;
 
-    m_undo_manager_->beginGroup(m_cursor_position_, hasSelection(), getSelection());
+    m_undo_manager_->beginGroup(m_caret_.cursor, hasSelection(), getSelection());
     auto result = applyEdit(full_range, new_text);
 
-    setCursorPosition({m_cursor_position_.line + 1, m_cursor_position_.column});
+    setCursorPosition({m_caret_.cursor.line + 1, m_caret_.cursor.column});
     if (hasSelection()) {
       TextRange selection = getSelection();
       setSelection({{selection.start.line + 1, selection.start.column},
                      {selection.end.line + 1, selection.end.column}});
     }
 
-    m_undo_manager_->endGroup(m_cursor_position_);
+    m_undo_manager_->endGroup(m_caret_.cursor);
     ensureCursorVisible();
     return result;
   }
@@ -966,11 +998,11 @@ namespace NS_SWEETEDITOR {
 
     size_t first_line, last_line;
     if (hasSelection()) {
-      TextRange sel = getNormalizedSelection();
+      TextRange sel = m_caret_.normalizedSelection();
       first_line = sel.start.line;
       last_line = sel.end.column > 0 ? sel.end.line : (sel.end.line > sel.start.line ? sel.end.line - 1 : sel.end.line);
     } else {
-      first_line = last_line = m_cursor_position_.line;
+      first_line = last_line = m_caret_.cursor.line;
     }
 
     U8String block_text;
@@ -983,11 +1015,11 @@ namespace NS_SWEETEDITOR {
     TextPosition insert_pos = {first_line, 0};
     U8String insert_text = block_text + "\n";
 
-    m_undo_manager_->beginGroup(m_cursor_position_, hasSelection(), getSelection());
+    m_undo_manager_->beginGroup(m_caret_.cursor, hasSelection(), getSelection());
     auto result = applyEdit({insert_pos, insert_pos}, insert_text);
 
     // Keep cursor at original logical position (inserted text already shifted it down correctly)
-    m_undo_manager_->endGroup(m_cursor_position_);
+    m_undo_manager_->endGroup(m_caret_.cursor);
     ensureCursorVisible();
     return result;
   }
@@ -998,11 +1030,11 @@ namespace NS_SWEETEDITOR {
 
     size_t first_line, last_line;
     if (hasSelection()) {
-      TextRange sel = getNormalizedSelection();
+      TextRange sel = m_caret_.normalizedSelection();
       first_line = sel.start.line;
       last_line = sel.end.column > 0 ? sel.end.line : (sel.end.line > sel.start.line ? sel.end.line - 1 : sel.end.line);
     } else {
-      first_line = last_line = m_cursor_position_.line;
+      first_line = last_line = m_caret_.cursor.line;
     }
 
     U8String block_text;
@@ -1016,11 +1048,11 @@ namespace NS_SWEETEDITOR {
     TextPosition insert_pos = {last_line, last_cols};
     U8String insert_text = "\n" + block_text;
 
-    m_undo_manager_->beginGroup(m_cursor_position_, hasSelection(), getSelection());
+    m_undo_manager_->beginGroup(m_caret_.cursor, hasSelection(), getSelection());
     auto result = applyEdit({insert_pos, insert_pos}, insert_text);
 
     // applyEdit moves cursor to the end of inserted text (end of copied block), which is what we want
-    m_undo_manager_->endGroup(m_cursor_position_);
+    m_undo_manager_->endGroup(m_caret_.cursor);
     ensureCursorVisible();
     return result;
   }
@@ -1031,11 +1063,11 @@ namespace NS_SWEETEDITOR {
 
     size_t first_line, last_line;
     if (hasSelection()) {
-      TextRange sel = getNormalizedSelection();
+      TextRange sel = m_caret_.normalizedSelection();
       first_line = sel.start.line;
       last_line = sel.end.column > 0 ? sel.end.line : (sel.end.line > sel.start.line ? sel.end.line - 1 : sel.end.line);
     } else {
-      first_line = last_line = m_cursor_position_.line;
+      first_line = last_line = m_caret_.cursor.line;
     }
 
     size_t line_count = m_document_->getLineCount();
@@ -1059,15 +1091,15 @@ namespace NS_SWEETEDITOR {
     if (m_document_ == nullptr || m_settings_.read_only) return {};
     if (m_composition_.is_composing) compositionCancel();
 
-    size_t line = m_cursor_position_.line;
+    size_t line = m_caret_.cursor.line;
     TextPosition insert_pos = {line, 0};
 
-    m_undo_manager_->beginGroup(m_cursor_position_, hasSelection(), getSelection());
+    m_undo_manager_->beginGroup(m_caret_.cursor, hasSelection(), getSelection());
     auto result = applyEdit({insert_pos, insert_pos}, "\n");
 
     // Keep cursor on the newly inserted empty line
     setCursorPosition({line, 0});
-    m_undo_manager_->endGroup(m_cursor_position_);
+    m_undo_manager_->endGroup(m_caret_.cursor);
     ensureCursorVisible();
     return result;
   }
@@ -1076,7 +1108,7 @@ namespace NS_SWEETEDITOR {
     if (m_document_ == nullptr || m_settings_.read_only) return {};
     if (m_composition_.is_composing) compositionCancel();
 
-    size_t line = m_cursor_position_.line;
+    size_t line = m_caret_.cursor.line;
     uint32_t line_cols = m_document_->getLineColumns(line);
     TextPosition insert_pos = {line, line_cols};
 
@@ -1185,7 +1217,7 @@ namespace NS_SWEETEDITOR {
 
     m_text_layout_->invalidateContentMetrics();
     ensureCursorVisible();
-    LOGD("EditorCore::undo, cursor = %s", m_cursor_position_.dump().c_str());
+    LOGD("EditorCore::undo, cursor = %s", m_caret_.cursor.dump().c_str());
     return edit_result;
   }
 
@@ -1266,7 +1298,7 @@ namespace NS_SWEETEDITOR {
 
     m_text_layout_->invalidateContentMetrics();
     ensureCursorVisible();
-    LOGD("EditorCore::redo, cursor = %s", m_cursor_position_.dump().c_str());
+    LOGD("EditorCore::redo, cursor = %s", m_caret_.cursor.dump().c_str());
     return edit_result;
   }
 
@@ -1278,48 +1310,46 @@ namespace NS_SWEETEDITOR {
     return m_undo_manager_->canRedo();
   }
   void EditorCore::setCursorPosition(const TextPosition& position) {
-    m_cursor_position_ = position;
+    m_caret_.cursor = position;
     if (m_document_ != nullptr) {
       size_t line_count = m_document_->getLineCount();
-      if (m_cursor_position_.line >= line_count) {
-        m_cursor_position_.line = line_count > 0 ? line_count - 1 : 0;
+      if (m_caret_.cursor.line >= line_count) {
+        m_caret_.cursor.line = line_count > 0 ? line_count - 1 : 0;
       }
-      // If cursor lands in a fold-hidden line, move it to end of the fold start line
       const auto& lines = m_document_->getLogicalLines();
-      if (m_cursor_position_.line < lines.size() && lines[m_cursor_position_.line].is_fold_hidden) {
-        const FoldRegion* fr = m_decorations_->getFoldRegionForLine(m_cursor_position_.line);
+      if (m_caret_.cursor.line < lines.size() && lines[m_caret_.cursor.line].is_fold_hidden) {
+        const FoldRegion* fr = m_decorations_->getFoldRegionForLine(m_caret_.cursor.line);
         if (fr != nullptr) {
-          m_cursor_position_.line = fr->start_line;
-          m_cursor_position_.column = m_document_->getLineColumns(fr->start_line);
+          m_caret_.cursor.line = fr->start_line;
+          m_caret_.cursor.column = m_document_->getLineColumns(fr->start_line);
           return;
         }
       }
-      uint32_t cols = m_document_->getLineColumns(m_cursor_position_.line);
-      if (m_cursor_position_.column > cols) {
-        m_cursor_position_.column = cols;
+      uint32_t cols = m_document_->getLineColumns(m_caret_.cursor.line);
+      if (m_caret_.cursor.column > cols) {
+        m_caret_.cursor.column = cols;
       }
     }
   }
 
   TextPosition EditorCore::getCursorPosition() const {
-    return m_cursor_position_;
+    return m_caret_.cursor;
   }
 
   void EditorCore::setSelection(const TextRange& range) {
-    m_interaction_->setSelection(range);
-    m_cursor_position_ = range.end;
+    m_caret_.setSelection(range);
   }
 
   TextRange EditorCore::getSelection() const {
-    return m_interaction_->selection();
+    return m_caret_.selection;
   }
 
   bool EditorCore::hasSelection() const {
-    return m_interaction_->hasSelection();
+    return m_caret_.has_selection;
   }
 
   void EditorCore::clearSelection() {
-    m_interaction_->clearSelection();
+    m_caret_.clearSelection();
   }
 
   void EditorCore::selectAll() {
@@ -1331,7 +1361,7 @@ namespace NS_SWEETEDITOR {
 
   U8String EditorCore::getSelectedText() const {
     if (!hasSelection() || m_document_ == nullptr) return "";
-    TextRange range = getNormalizedSelection();
+    TextRange range = m_caret_.normalizedSelection();
     U8String result;
     for (size_t line = range.start.line; line <= range.end.line && line < m_document_->getLineCount(); ++line) {
       U16String line_text = m_document_->getLineU16Text(line);
@@ -1353,10 +1383,10 @@ namespace NS_SWEETEDITOR {
   }
 
   TextRange EditorCore::getWordRangeAtCursor() const {
-    if (m_document_ == nullptr) return {m_cursor_position_, m_cursor_position_};
-    size_t line = m_cursor_position_.line;
+    if (m_document_ == nullptr) return {m_caret_.cursor, m_caret_.cursor};
+    size_t line = m_caret_.cursor.line;
     U16String line_text = m_document_->getLineU16Text(line);
-    size_t col = std::min(m_cursor_position_.column, line_text.length());
+    size_t col = std::min(m_caret_.cursor.column, line_text.length());
     size_t start = col;
     while (start > 0 && isWordChar(line_text[start - 1])) {
       --start;
@@ -1382,12 +1412,12 @@ namespace NS_SWEETEDITOR {
     if (m_document_ == nullptr) return;
 
     if (hasSelection() && !extend_selection) {
-      TextRange range = getNormalizedSelection();
+      TextRange range = m_caret_.normalizedSelection();
       moveCursorTo(range.start, false);
       return;
     }
 
-    TextPosition new_pos = m_cursor_position_;
+    TextPosition new_pos = m_caret_.cursor;
     if (new_pos.column > 0) {
       U16String line_text = m_document_->getLineU16Text(new_pos.line);
       size_t col = new_pos.column;
@@ -1413,12 +1443,12 @@ namespace NS_SWEETEDITOR {
     if (m_document_ == nullptr) return;
 
     if (hasSelection() && !extend_selection) {
-      TextRange range = getNormalizedSelection();
+      TextRange range = m_caret_.normalizedSelection();
       moveCursorTo(range.end, false);
       return;
     }
 
-    TextPosition new_pos = m_cursor_position_;
+    TextPosition new_pos = m_caret_.cursor;
     uint32_t line_cols = m_document_->getLineColumns(new_pos.line);
     if (new_pos.column < line_cols) {
       U16String line_text = m_document_->getLineU16Text(new_pos.line);
@@ -1444,13 +1474,13 @@ namespace NS_SWEETEDITOR {
   void EditorCore::moveCursorUp(bool extend_selection) {
     if (m_document_ == nullptr) return;
 
-    if (m_cursor_position_.line == 0) {
+    if (m_caret_.cursor.line == 0) {
       moveCursorTo({0, 0}, extend_selection);
       return;
     }
 
     // Find the nearest visible line above
-    size_t target_line = m_cursor_position_.line;
+    size_t target_line = m_caret_.cursor.line;
     const auto& lines = m_document_->getLogicalLines();
     do {
       if (target_line == 0) {
@@ -1460,7 +1490,7 @@ namespace NS_SWEETEDITOR {
       --target_line;
     } while (target_line < lines.size() && lines[target_line].is_fold_hidden);
 
-    PointF current_screen = m_text_layout_->getPositionScreenCoord(m_cursor_position_);
+    PointF current_screen = m_text_layout_->getPositionScreenCoord(m_caret_.cursor);
     PointF target_coord = m_text_layout_->getPositionScreenCoord({target_line, 0});
     float line_height = m_text_layout_->getLineHeight();
     PointF target_point = {current_screen.x, target_coord.y + line_height * 0.5f};
@@ -1472,14 +1502,14 @@ namespace NS_SWEETEDITOR {
     if (m_document_ == nullptr) return;
 
     size_t line_count = m_document_->getLineCount();
-    if (m_cursor_position_.line + 1 >= line_count) {
-      uint32_t cols = m_document_->getLineColumns(m_cursor_position_.line);
-      moveCursorTo({m_cursor_position_.line, cols}, extend_selection);
+    if (m_caret_.cursor.line + 1 >= line_count) {
+      uint32_t cols = m_document_->getLineColumns(m_caret_.cursor.line);
+      moveCursorTo({m_caret_.cursor.line, cols}, extend_selection);
       return;
     }
 
     // Find the nearest visible line below
-    size_t target_line = m_cursor_position_.line;
+    size_t target_line = m_caret_.cursor.line;
     const auto& lines = m_document_->getLogicalLines();
     do {
       ++target_line;
@@ -1490,7 +1520,7 @@ namespace NS_SWEETEDITOR {
       }
     } while (target_line < lines.size() && lines[target_line].is_fold_hidden);
 
-    PointF current_screen = m_text_layout_->getPositionScreenCoord(m_cursor_position_);
+    PointF current_screen = m_text_layout_->getPositionScreenCoord(m_caret_.cursor);
     PointF target_coord = m_text_layout_->getPositionScreenCoord({target_line, 0});
     float line_height = m_text_layout_->getLineHeight();
     PointF target_point = {current_screen.x, target_coord.y + line_height * 0.5f};
@@ -1500,13 +1530,13 @@ namespace NS_SWEETEDITOR {
 
   void EditorCore::moveCursorToLineStart(bool extend_selection) {
     if (m_document_ == nullptr) return;
-    moveCursorTo({m_cursor_position_.line, 0}, extend_selection);
+    moveCursorTo({m_caret_.cursor.line, 0}, extend_selection);
   }
 
   void EditorCore::moveCursorToLineEnd(bool extend_selection) {
     if (m_document_ == nullptr) return;
-    uint32_t cols = m_document_->getLineColumns(m_cursor_position_.line);
-    moveCursorTo({m_cursor_position_.line, cols}, extend_selection);
+    uint32_t cols = m_document_->getLineColumns(m_caret_.cursor.line);
+    moveCursorTo({m_caret_.cursor.line, cols}, extend_selection);
   }
 
   void EditorCore::moveCursorPageUp(bool extend_selection) {
@@ -1546,14 +1576,14 @@ namespace NS_SWEETEDITOR {
     }
 
     m_composition_.is_composing = true;
-    m_composition_.start_position = m_cursor_position_;
+    m_composition_.start_position = m_caret_.cursor;
     if (isInLinkedEditing() && hasSelection()) {
-      m_composition_.start_position = getNormalizedSelection().start;
+      m_composition_.start_position = m_caret_.normalizedSelection().start;
     }
     m_composition_.composing_text.clear();
     m_composition_.composing_columns = 0;
 
-    LOGD("EditorCore::compositionStart, pos = %s", m_cursor_position_.dump().c_str());
+    LOGD("EditorCore::compositionStart, pos = %s", m_caret_.cursor.dump().c_str());
   }
 
   void EditorCore::compositionUpdate(const U8String& text) {
@@ -1638,7 +1668,7 @@ namespace NS_SWEETEDITOR {
     }
 
     ensureCursorVisible();
-    LOGD("EditorCore::compositionEnd, cursor = %s", m_cursor_position_.dump().c_str());
+    LOGD("EditorCore::compositionEnd, cursor = %s", m_caret_.cursor.dump().c_str());
     return edit_result;
   }
 
@@ -1653,7 +1683,7 @@ namespace NS_SWEETEDITOR {
 
     m_text_layout_->invalidateContentMetrics(comp_start_line);
     ensureCursorVisible();
-    LOGD("EditorCore::compositionCancel, cursor = %s", m_cursor_position_.dump().c_str());
+    LOGD("EditorCore::compositionCancel, cursor = %s", m_caret_.cursor.dump().c_str());
   }
 
   const CompositionState& EditorCore::getCompositionState() const {
@@ -1709,10 +1739,10 @@ namespace NS_SWEETEDITOR {
     }
 
     // Determine insertion position
-    TextPosition insert_pos = m_cursor_position_;
+    TextPosition insert_pos = m_caret_.cursor;
     TextRange replace_range = {insert_pos, insert_pos};
     if (hasSelection()) {
-      replace_range = getNormalizedSelection();
+      replace_range = m_caret_.normalizedSelection();
       insert_pos = replace_range.start;
     }
 
@@ -1728,7 +1758,7 @@ namespace NS_SWEETEDITOR {
       activateCurrentTabStop();
     }
 
-    LOGD("EditorCore::insertSnippet, cursor = %s", m_cursor_position_.dump().c_str());
+    LOGD("EditorCore::insertSnippet, cursor = %s", m_caret_.cursor.dump().c_str());
     return edit_result;
   }
 
@@ -1750,7 +1780,7 @@ namespace NS_SWEETEDITOR {
     m_linked_editing_session_ = makeUPtr<LinkedEditingSession>(std::move(model));
     activateCurrentTabStop();
 
-    LOGD("EditorCore::startLinkedEditing, cursor = %s", m_cursor_position_.dump().c_str());
+    LOGD("EditorCore::startLinkedEditing, cursor = %s", m_caret_.cursor.dump().c_str());
   }
 
   bool EditorCore::isInLinkedEditing() const {
@@ -1807,13 +1837,13 @@ namespace NS_SWEETEDITOR {
     const U8String old_text = m_document_->getU8Text(primary_before);
     if (old_text == new_text) return result;
 
-    const TextPosition cursor_before = m_cursor_position_;
+    const TextPosition cursor_before = m_caret_.cursor;
     auto changes = performLinkedEdits(new_text);
 
     result.changed = true;
     result.changes = std::move(changes);
     result.cursor_before = cursor_before;
-    result.cursor_after = m_cursor_position_;
+    result.cursor_after = m_caret_.cursor;
     return result;
   }
 
@@ -1825,7 +1855,7 @@ namespace NS_SWEETEDITOR {
     if (edits.empty()) return changes;
 
     // Begin undo group
-    m_undo_manager_->beginGroup(m_cursor_position_, hasSelection(), getSelection());
+    m_undo_manager_->beginGroup(m_caret_.cursor, hasSelection(), getSelection());
 
     // Replace from back to front to avoid offset issues
     for (const auto& [range, text] : edits) {
@@ -1845,7 +1875,7 @@ namespace NS_SWEETEDITOR {
     }
 
     // End undo group
-    m_undo_manager_->endGroup(m_cursor_position_);
+    m_undo_manager_->endGroup(m_caret_.cursor);
 
     // Reverse to forward order (edits were back-to-front; now sorted by document position)
     std::reverse(changes.begin(), changes.end());
@@ -1925,7 +1955,7 @@ namespace NS_SWEETEDITOR {
     setCursorPosition({line, column});
     ensureCursorVisible();
     LOGD("EditorCore::gotoLine, line = %zu, column = %zu, cursor = %s",
-         line, column, m_cursor_position_.dump().c_str());
+         line, column, m_caret_.cursor.dump().c_str());
   }
 
   void EditorCore::setScroll(float scroll_x, float scroll_y) {
@@ -1946,7 +1976,7 @@ namespace NS_SWEETEDITOR {
   }
 
   CursorRect EditorCore::getCursorScreenRect() {
-    return getPositionScreenRect(m_cursor_position_);
+    return getPositionScreenRect(m_caret_.cursor);
   }
 
   void EditorCore::registerTextStyle(uint32_t style_id, TextStyle&& style) {
@@ -2272,7 +2302,7 @@ namespace NS_SWEETEDITOR {
   }
 
   void EditorCore::ensureCursorVisible() {
-    PointF cursor_screen = m_text_layout_->getPositionScreenCoord(m_cursor_position_);
+    PointF cursor_screen = m_text_layout_->getPositionScreenCoord(m_caret_.cursor);
     float line_height = m_text_layout_->getLineHeight();
 
     if (cursor_screen.y < 0) {
@@ -2293,7 +2323,7 @@ namespace NS_SWEETEDITOR {
 
   void EditorCore::moveCursorTo(const TextPosition& new_pos, bool extend_selection) {
     if (extend_selection) {
-      TextRange selection = hasSelection() ? getSelection() : TextRange {m_cursor_position_, m_cursor_position_};
+      TextRange selection = hasSelection() ? getSelection() : TextRange {m_caret_.cursor, m_caret_.cursor};
       selection.end = new_pos;
       setSelection(selection);
     } else {
@@ -2301,14 +2331,6 @@ namespace NS_SWEETEDITOR {
     }
     setCursorPosition(new_pos);
     ensureCursorVisible();
-  }
-
-  TextRange EditorCore::getNormalizedSelection() const {
-    TextRange range = m_interaction_->selection();
-    if (range.end < range.start) {
-      std::swap(range.start, range.end);
-    }
-    return range;
   }
 
   size_t EditorCore::calcUtf16Columns(const U8String& text) {
@@ -2372,7 +2394,7 @@ namespace NS_SWEETEDITOR {
       old_text = m_document_->getU8Text(range);
     }
 
-    TextPosition cursor_before = m_cursor_position_;
+    TextPosition cursor_before = m_caret_.cursor;
     edit_result.cursor_before = cursor_before;
     bool had_selection = hasSelection();
     TextRange selection_before = getSelection();
@@ -2434,7 +2456,7 @@ namespace NS_SWEETEDITOR {
     if (reset_heights) {
       for (auto& line : m_document_->getLogicalLines()) {
         line.is_layout_dirty = true;
-        line.height = -1;
+        line.height = line.is_fold_hidden ? 0 : -1;
       }
     } else {
       for (auto& line : m_document_->getLogicalLines()) {

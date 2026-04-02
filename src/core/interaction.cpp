@@ -33,22 +33,396 @@ namespace NS_SWEETEDITOR {
         m_fling_(makeUPtr<FlingAnimator>(context.touch_config)) {
   }
 
-  void EditorInteraction::setSelection(const TextRange& range) {
-    m_selection_ = range;
-    m_has_selection_ = !(range.start == range.end);
+  void EditorInteraction::fillGestureResult(GestureResult& result) const {
+    result.cursor_position = m_context_.caret->cursor;
+    result.has_selection = m_context_.caret->has_selection;
+    result.selection = m_context_.caret->selection;
+    result.view_scroll_x = m_context_.view_state->scroll_x;
+    result.view_scroll_y = m_context_.view_state->scroll_y;
+    result.view_scale = m_context_.view_state->scale;
+    result.is_handle_drag = (m_dragging_handle_ != HandleDragTarget::NONE);
   }
 
-  void EditorInteraction::clearSelection() {
-    m_selection_ = {};
-    m_has_selection_ = false;
+  PointF EditorInteraction::resolveScaleFocus(const GestureEvent& event) const {
+    if (event.points.size() >= 2) {
+      return {
+          (event.points[0].x + event.points[1].x) * 0.5f,
+          (event.points[0].y + event.points[1].y) * 0.5f
+      };
+    }
+    if (!event.points.empty()) {
+      return event.points[0];
+    }
+    return {m_context_.viewport->width * 0.5f, m_context_.viewport->height * 0.5f};
   }
 
-  const TextRange& EditorInteraction::selection() const {
-    return m_selection_;
+  EditorInteraction::HandleDragTarget EditorInteraction::hitTestHandle(const PointF& screen_point) const {
+    if (!m_cached_handles_valid_ || !m_context_.caret->has_selection) return HandleDragTarget::NONE;
+
+    const auto& start_rect = m_context_.settings->handle.start_hit_offset;
+    const auto& end_rect = m_context_.settings->handle.end_hit_offset;
+    const float h = m_cached_handle_height_;
+
+    auto hitTest = [&](const PointF& pos, const OffsetRect& rect) -> bool {
+      float dx = screen_point.x - pos.x;
+      float dy = screen_point.y - (pos.y + h);
+      return rect.contains(dx, dy);
+    };
+
+    float dist_start = screen_point.distance(m_cached_start_handle_pos_);
+    float dist_end = screen_point.distance(m_cached_end_handle_pos_);
+
+    if (dist_start <= dist_end) {
+      if (hitTest(m_cached_start_handle_pos_, start_rect)) return HandleDragTarget::START;
+      if (hitTest(m_cached_end_handle_pos_, end_rect)) return HandleDragTarget::END;
+    } else {
+      if (hitTest(m_cached_end_handle_pos_, end_rect)) return HandleDragTarget::END;
+      if (hitTest(m_cached_start_handle_pos_, start_rect)) return HandleDragTarget::START;
+    }
+    return HandleDragTarget::NONE;
   }
 
-  bool EditorInteraction::hasSelection() const {
-    return m_has_selection_;
+  void EditorInteraction::dragHandleTo(HandleDragTarget target, const PointF& screen_point) {
+    if (!m_context_.caret->has_selection || target == HandleDragTarget::NONE) return;
+
+    const auto& hit_rect = (target == HandleDragTarget::START)
+        ? m_context_.settings->handle.start_hit_offset
+        : m_context_.settings->handle.end_hit_offset;
+
+    PointF adjusted_point = screen_point;
+    adjusted_point.y -= hit_rect.bottom;
+
+    TextPosition pos = m_context_.text_layout->hitTest(adjusted_point);
+    TextRange selection = m_context_.caret->selection;
+    TextPosition sel_start = selection.start;
+    TextPosition sel_end = selection.end;
+    bool swapped = sel_end < sel_start;
+    if (swapped) std::swap(sel_start, sel_end);
+
+    if (target == HandleDragTarget::START) {
+      sel_start = pos;
+    } else {
+      sel_end = pos;
+    }
+
+    if (sel_end < sel_start) {
+      std::swap(sel_start, sel_end);
+      m_dragging_handle_ = (target == HandleDragTarget::START) ? HandleDragTarget::END : HandleDragTarget::START;
+    }
+
+    m_context_.caret->setSelection({sel_start, sel_end});
+    m_context_.caret->cursor = (m_dragging_handle_ == HandleDragTarget::END) ? sel_end : sel_start;
+
+    updateEdgeScrollState(screen_point, true, false);
+    LOGD("EditorInteraction::dragHandleTo, selection = %s", m_context_.caret->selection.dump().c_str());
+  }
+
+  void EditorInteraction::dragSelectTo(const PointF& screen_point, bool is_mouse) {
+    PointF adjusted_point = screen_point;
+    if (!is_mouse) {
+      const float hit_bottom = std::max(m_context_.settings->handle.start_hit_offset.bottom,
+                                        m_context_.settings->handle.end_hit_offset.bottom);
+      adjusted_point.y -= hit_bottom;
+    }
+
+    TextPosition pos = m_context_.text_layout->hitTest(adjusted_point);
+
+    if (!m_context_.caret->has_selection) {
+      m_context_.caret->setSelection({m_context_.caret->cursor, pos});
+    } else {
+      m_context_.caret->setSelection({m_context_.caret->selection.start, pos});
+    }
+
+    updateEdgeScrollState(screen_point, false, is_mouse);
+    LOGD("EditorInteraction::dragSelectTo, selection = %s", m_context_.caret->selection.dump().c_str());
+  }
+
+  void EditorInteraction::updateEdgeScrollState(const PointF& screen_point,
+                                                bool is_handle_drag,
+                                                bool is_mouse) {
+    if (!m_context_.viewport->valid() || m_context_.text_layout == nullptr) {
+      m_edge_scroll_.active = false;
+      return;
+    }
+
+    const float kEdgeZoneRatio = 0.15f;
+    const float kMinEdgeZone = 30.0f;
+    const float kMaxEdgeZone = 120.0f;
+    float edge_zone = std::clamp(m_context_.viewport->height * kEdgeZoneRatio, kMinEdgeZone, kMaxEdgeZone);
+
+    const float line_height = m_context_.text_layout->getLineHeight();
+    const float max_speed_per_sec = (line_height * 2.0f) / 0.016f;
+
+    float speed = 0.0f;
+    if (screen_point.y < edge_zone) {
+      float ratio = (edge_zone - screen_point.y) / edge_zone;
+      speed = -max_speed_per_sec * ratio;
+    } else if (screen_point.y > m_context_.viewport->height - edge_zone) {
+      float ratio = (screen_point.y - (m_context_.viewport->height - edge_zone)) / edge_zone;
+      speed = max_speed_per_sec * ratio;
+    }
+
+    if (speed != 0.0f) {
+      m_edge_scroll_.active = true;
+      m_edge_scroll_.speed = speed;
+      m_edge_scroll_.last_screen_point = screen_point;
+      m_edge_scroll_.is_handle_drag = is_handle_drag;
+      m_edge_scroll_.is_mouse = is_mouse;
+      if (m_edge_scroll_.last_tick_time == 0) {
+        m_edge_scroll_.last_tick_time = TimeUtil::milliTime();
+      }
+    } else {
+      m_edge_scroll_.active = false;
+      m_edge_scroll_.speed = 0.0f;
+      m_edge_scroll_.last_tick_time = 0;
+    }
+  }
+
+  GestureResult EditorInteraction::handleGestureEvent(const GestureEvent& event, GestureIntent& intent) {
+    PERF_TIMER("handleGestureEvent");
+    GestureResult gesture_result;
+
+    if (handleScrollbarGesture(event, gesture_result)) {
+      return gesture_result;
+    }
+
+    if (event.type == EventType::TOUCH_DOWN || event.type == EventType::MOUSE_DOWN) {
+      m_fling_->stop();
+      m_fling_->resetSamples();
+      if (!event.points.empty()) {
+        m_dragging_handle_ = hitTestHandle(event.points[0]);
+      }
+    }
+    if (m_dragging_handle_ != HandleDragTarget::NONE
+        && event.type == EventType::TOUCH_POINTER_DOWN) {
+      m_dragging_handle_ = HandleDragTarget::NONE;
+      m_edge_scroll_.active = false;
+    }
+
+    if (m_dragging_handle_ != HandleDragTarget::NONE) {
+      if (event.type == EventType::TOUCH_MOVE || event.type == EventType::MOUSE_MOVE) {
+        if (!event.points.empty()) {
+          dragHandleTo(m_dragging_handle_, event.points[0]);
+          m_context_.text_layout->setViewState(*m_context_.view_state);
+          gesture_result.type = GestureType::DRAG_SELECT;
+          gesture_result.is_handle_drag = true;
+          fillGestureResult(gesture_result);
+          gesture_result.needs_edge_scroll = m_edge_scroll_.active;
+          gesture_result.needs_animation = m_edge_scroll_.active;
+          return gesture_result;
+        }
+      }
+      if (event.type == EventType::TOUCH_UP || event.type == EventType::MOUSE_UP
+          || event.type == EventType::TOUCH_CANCEL) {
+        m_dragging_handle_ = HandleDragTarget::NONE;
+        m_edge_scroll_.active = false;
+        m_gesture_handler_->resetState();
+        m_context_.view_state->scroll_x = std::round(m_context_.view_state->scroll_x);
+        m_context_.view_state->scroll_y = std::round(m_context_.view_state->scroll_y);
+        m_context_.text_layout->normalizeViewState(*m_context_.view_state);
+        fillGestureResult(gesture_result);
+        return gesture_result;
+      }
+    }
+
+    GestureResult result = m_gesture_handler_->handleGestureEvent(event);
+
+    if (event.type == EventType::TOUCH_UP || event.type == EventType::MOUSE_UP
+        || event.type == EventType::TOUCH_CANCEL) {
+      m_edge_scroll_.active = false;
+      if (event.type == EventType::TOUCH_UP && result.type == GestureType::UNDEFINED && !m_edge_scroll_.active) {
+        m_fling_->start();
+      }
+    }
+
+    if (m_dragging_handle_ != HandleDragTarget::NONE) {
+      m_context_.text_layout->setViewState(*m_context_.view_state);
+      fillGestureResult(result);
+      return result;
+    }
+
+    switch (result.type) {
+    case GestureType::TAP:
+      if (static_cast<uint8_t>(result.modifiers & KeyModifier::SHIFT) && m_context_.caret->has_selection) {
+        bool is_mouse_tap = (event.type == EventType::MOUSE_DOWN);
+        dragSelectTo(result.tap_point, is_mouse_tap);
+      } else {
+        intent.cancel_linked_editing = true;
+        intent.place_cursor = true;
+      }
+      result.hit_target = m_context_.text_layout->hitTestDecoration(result.tap_point);
+      if (result.hit_target.type == HitTargetType::FOLD_PLACEHOLDER ||
+          result.hit_target.type == HitTargetType::FOLD_GUTTER) {
+        intent.toggle_fold = true;
+        intent.fold_line = result.hit_target.line;
+        intent.place_cursor = false;
+      }
+      break;
+    case GestureType::DOUBLE_TAP:
+      intent.select_word = true;
+      break;
+    case GestureType::LONG_PRESS:
+      intent.place_cursor = true;
+      break;
+    case GestureType::DRAG_SELECT: {
+      bool is_mouse = (event.type == EventType::MOUSE_MOVE);
+      dragSelectTo(result.tap_point, is_mouse);
+      break;
+    }
+    case GestureType::SCALE: {
+      const PointF focus_screen = resolveScaleFocus(event);
+      TextPosition anchor_position = m_context_.text_layout->hitTest(focus_screen);
+      PointF anchor_coord = m_context_.text_layout->getPositionScreenCoord(anchor_position);
+      m_pending_scale_anchor_.active = true;
+      m_pending_scale_anchor_.focus_screen = focus_screen;
+      m_pending_scale_anchor_.anchor_position = anchor_position;
+      m_pending_scale_anchor_.offset_x = focus_screen.x - anchor_coord.x;
+      m_pending_scale_anchor_.offset_y = focus_screen.y - anchor_coord.y;
+      m_scale_gesture_active_ = (event.type == EventType::TOUCH_MOVE && event.points.size() >= 2);
+      m_context_.view_state->scale = std::max(1.0f, std::min(m_context_.settings->max_scale, m_context_.view_state->scale * result.scale));
+      break;
+    }
+    case GestureType::SCROLL:
+      m_context_.view_state->scroll_x += result.scroll_x;
+      m_context_.view_state->scroll_y += result.scroll_y;
+      markScrollbarInteraction();
+      if (event.type == EventType::TOUCH_MOVE && !event.points.empty()) {
+        m_fling_->recordSample(event.points[0], TimeUtil::milliTime());
+      }
+      break;
+    case GestureType::FAST_SCROLL: {
+      constexpr float kFastScrollMultiplier = 3.0f;
+      m_context_.view_state->scroll_x += result.scroll_x * kFastScrollMultiplier;
+      m_context_.view_state->scroll_y += result.scroll_y * kFastScrollMultiplier;
+      markScrollbarInteraction();
+      break;
+    }
+    default:
+      break;
+    }
+
+    const bool scale_gesture_end =
+        m_scale_gesture_active_ &&
+        (event.type == EventType::TOUCH_POINTER_UP
+            || event.type == EventType::TOUCH_UP
+            || event.type == EventType::TOUCH_CANCEL);
+
+    if (scale_gesture_end || ((!m_scale_gesture_active_) &&
+        (event.type == EventType::TOUCH_UP || event.type == EventType::MOUSE_UP
+            || event.type == EventType::TOUCH_CANCEL))) {
+      m_context_.view_state->scroll_x = std::round(m_context_.view_state->scroll_x);
+      m_context_.view_state->scroll_y = std::round(m_context_.view_state->scroll_y);
+    }
+    if (scale_gesture_end) {
+      m_scale_gesture_active_ = false;
+    }
+    if (result.type == GestureType::SCALE) {
+      m_context_.text_layout->setViewState(*m_context_.view_state);
+    } else {
+      m_context_.text_layout->normalizeViewState(*m_context_.view_state);
+    }
+
+    fillGestureResult(result);
+    if (result.type == GestureType::DRAG_SELECT) {
+      result.needs_edge_scroll = m_edge_scroll_.active;
+    }
+    result.needs_fling = m_fling_->isActive();
+    result.needs_animation = result.needs_edge_scroll || result.needs_fling;
+
+    LOGD("EditorInteraction::handleGestureEvent, m_view_state_ = %s", m_context_.view_state->dump().c_str());
+    return result;
+  }
+
+  GestureResult EditorInteraction::tickEdgeScroll() {
+    GestureResult result;
+    result.type = GestureType::DRAG_SELECT;
+
+    if (!m_edge_scroll_.active) {
+      fillGestureResult(result);
+      result.needs_edge_scroll = false;
+      result.needs_animation = m_fling_->isActive();
+      return result;
+    }
+
+    int64_t now = TimeUtil::milliTime();
+    float dt_sec = static_cast<float>(now - m_edge_scroll_.last_tick_time) / 1000.0f;
+    if (dt_sec <= 0) dt_sec = 0.016f;
+    dt_sec = std::min(dt_sec, 0.1f);
+    m_edge_scroll_.last_tick_time = now;
+
+    m_context_.view_state->scroll_y += m_edge_scroll_.speed * dt_sec;
+    m_context_.text_layout->normalizeViewState(*m_context_.view_state);
+    markScrollbarInteraction();
+
+    if (m_edge_scroll_.is_handle_drag) {
+      dragHandleTo(m_dragging_handle_, m_edge_scroll_.last_screen_point);
+    } else {
+      dragSelectTo(m_edge_scroll_.last_screen_point, m_edge_scroll_.is_mouse);
+    }
+
+    fillGestureResult(result);
+    result.needs_edge_scroll = m_edge_scroll_.active;
+    result.needs_animation = m_edge_scroll_.active || m_fling_->isActive();
+    return result;
+  }
+
+  GestureResult EditorInteraction::tickFling() {
+    GestureResult result;
+    result.type = GestureType::SCROLL;
+
+    if (!m_fling_->isActive()) {
+      fillGestureResult(result);
+      result.needs_fling = false;
+      result.needs_animation = m_edge_scroll_.active;
+      return result;
+    }
+
+    float dx = 0, dy = 0;
+    bool still_active = m_fling_->advance(dx, dy);
+
+    m_context_.view_state->scroll_x -= dx;
+    m_context_.view_state->scroll_y -= dy;
+    m_context_.view_state->scroll_x = std::round(m_context_.view_state->scroll_x);
+    m_context_.view_state->scroll_y = std::round(m_context_.view_state->scroll_y);
+    m_context_.text_layout->normalizeViewState(*m_context_.view_state);
+    markScrollbarInteraction();
+
+    fillGestureResult(result);
+    result.needs_fling = still_active;
+    result.needs_animation = m_edge_scroll_.active || still_active;
+    return result;
+  }
+
+  GestureResult EditorInteraction::tickAnimations() {
+    GestureResult result;
+
+    bool did_edge_scroll = false;
+    if (m_edge_scroll_.active) {
+      result = tickEdgeScroll();
+      did_edge_scroll = true;
+    }
+
+    if (m_fling_->isActive()) {
+      GestureResult fling_result = tickFling();
+      if (!did_edge_scroll) {
+        result = fling_result;
+      } else {
+        result.needs_fling = fling_result.needs_fling;
+        result.view_scroll_x = fling_result.view_scroll_x;
+        result.view_scroll_y = fling_result.view_scroll_y;
+      }
+    }
+
+    if (!did_edge_scroll && !m_fling_->isActive()) {
+      fillGestureResult(result);
+    }
+
+    result.needs_animation = m_edge_scroll_.active || m_fling_->isActive();
+    return result;
+  }
+
+  void EditorInteraction::stopFling() {
+    m_fling_->stop();
   }
 
   void EditorInteraction::markScrollbarInteraction() {
@@ -169,31 +543,7 @@ namespace NS_SWEETEDITOR {
     }
   }
 
-  void EditorInteraction::fillGestureResult(const TextPosition& cursor_position, GestureResult& result) const {
-    result.cursor_position = cursor_position;
-    result.has_selection = m_has_selection_;
-    result.selection = m_selection_;
-    result.view_scroll_x = m_context_.view_state->scroll_x;
-    result.view_scroll_y = m_context_.view_state->scroll_y;
-    result.view_scale = m_context_.view_state->scale;
-    result.is_handle_drag = (m_dragging_handle_ != HandleDragTarget::NONE);
-  }
-
-  PointF EditorInteraction::resolveScaleFocus(const GestureEvent& event) const {
-    if (event.points.size() >= 2) {
-      return {
-          (event.points[0].x + event.points[1].x) * 0.5f,
-          (event.points[0].y + event.points[1].y) * 0.5f
-      };
-    }
-    if (!event.points.empty()) {
-      return event.points[0];
-    }
-    return {m_context_.viewport->width * 0.5f, m_context_.viewport->height * 0.5f};
-  }
-
-  bool EditorInteraction::handleScrollbarGesture(TextPosition& cursor_position,
-                                                 const GestureEvent& event,
+  bool EditorInteraction::handleScrollbarGesture(const GestureEvent& event,
                                                  GestureResult& result) {
     if (m_context_.text_layout == nullptr || !m_context_.viewport->valid()) {
       return false;
@@ -205,7 +555,7 @@ namespace NS_SWEETEDITOR {
 
     const auto consume = [&](GestureType type) {
       result.type = type;
-      fillGestureResult(cursor_position, result);
+      fillGestureResult(result);
       return true;
     };
 
@@ -352,389 +702,6 @@ namespace NS_SWEETEDITOR {
     }
   }
 
-  EditorInteraction::HandleDragTarget EditorInteraction::hitTestHandle(const PointF& screen_point) const {
-    if (!m_cached_handles_valid_ || !m_has_selection_) return HandleDragTarget::NONE;
-
-    const auto& start_rect = m_context_.settings->handle.start_hit_offset;
-    const auto& end_rect = m_context_.settings->handle.end_hit_offset;
-    const float h = m_cached_handle_height_;
-
-    auto hitTest = [&](const PointF& pos, const OffsetRect& rect) -> bool {
-      float dx = screen_point.x - pos.x;
-      float dy = screen_point.y - (pos.y + h);
-      return rect.contains(dx, dy);
-    };
-
-    float dist_start = screen_point.distance(m_cached_start_handle_pos_);
-    float dist_end = screen_point.distance(m_cached_end_handle_pos_);
-
-    if (dist_start <= dist_end) {
-      if (hitTest(m_cached_start_handle_pos_, start_rect)) return HandleDragTarget::START;
-      if (hitTest(m_cached_end_handle_pos_, end_rect)) return HandleDragTarget::END;
-    } else {
-      if (hitTest(m_cached_end_handle_pos_, end_rect)) return HandleDragTarget::END;
-      if (hitTest(m_cached_start_handle_pos_, start_rect)) return HandleDragTarget::START;
-    }
-    return HandleDragTarget::NONE;
-  }
-
-  void EditorInteraction::dragHandleTo(TextPosition& cursor_position,
-                                       HandleDragTarget target,
-                                       const PointF& screen_point) {
-    if (!m_has_selection_ || target == HandleDragTarget::NONE) return;
-
-    const auto& hit_rect = (target == HandleDragTarget::START)
-        ? m_context_.settings->handle.start_hit_offset
-        : m_context_.settings->handle.end_hit_offset;
-
-    PointF adjusted_point = screen_point;
-    adjusted_point.y -= hit_rect.bottom;
-
-    TextPosition pos = m_context_.text_layout->hitTest(adjusted_point);
-    TextRange selection = m_selection_;
-    TextPosition sel_start = selection.start;
-    TextPosition sel_end = selection.end;
-    bool swapped = sel_end < sel_start;
-    if (swapped) std::swap(sel_start, sel_end);
-
-    if (target == HandleDragTarget::START) {
-      sel_start = pos;
-    } else {
-      sel_end = pos;
-    }
-
-    if (sel_end < sel_start) {
-      std::swap(sel_start, sel_end);
-      m_dragging_handle_ = (target == HandleDragTarget::START) ? HandleDragTarget::END : HandleDragTarget::START;
-    }
-
-    setSelection({sel_start, sel_end});
-    cursor_position = (m_dragging_handle_ == HandleDragTarget::END) ? sel_end : sel_start;
-
-    updateEdgeScrollState(screen_point, /*is_handle_drag=*/true, /*is_mouse=*/false);
-
-    LOGD("EditorInteraction::dragHandleTo, selection = %s", m_selection_.dump().c_str());
-  }
-
-  void EditorInteraction::dragSelectTo(TextPosition& cursor_position, const PointF& screen_point, bool is_mouse) {
-    PointF adjusted_point = screen_point;
-    if (!is_mouse) {
-      const float hit_bottom = std::max(m_context_.settings->handle.start_hit_offset.bottom,
-                                        m_context_.settings->handle.end_hit_offset.bottom);
-      adjusted_point.y -= hit_bottom;
-    }
-
-    TextPosition pos = m_context_.text_layout->hitTest(adjusted_point);
-
-    if (!m_has_selection_) {
-      setSelection({cursor_position, pos});
-    } else {
-      setSelection({m_selection_.start, pos});
-    }
-    cursor_position = pos;
-
-    updateEdgeScrollState(screen_point, /*is_handle_drag=*/false, is_mouse);
-
-    LOGD("EditorInteraction::dragSelectTo, selection = %s", m_selection_.dump().c_str());
-  }
-
-  void EditorInteraction::updateEdgeScrollState(const PointF& screen_point,
-                                                bool is_handle_drag,
-                                                bool is_mouse) {
-    if (!m_context_.viewport->valid() || m_context_.text_layout == nullptr) {
-      m_edge_scroll_.active = false;
-      return;
-    }
-
-    const float kEdgeZoneRatio = 0.15f;
-    const float kMinEdgeZone = 30.0f;
-    const float kMaxEdgeZone = 120.0f;
-    float edge_zone = std::clamp(m_context_.viewport->height * kEdgeZoneRatio, kMinEdgeZone, kMaxEdgeZone);
-
-    const float line_height = m_context_.text_layout->getLineHeight();
-    const float max_speed_per_sec = (line_height * 2.0f) / 0.016f;
-
-    float speed = 0.0f;
-    if (screen_point.y < edge_zone) {
-      float ratio = (edge_zone - screen_point.y) / edge_zone;
-      speed = -max_speed_per_sec * ratio;
-    } else if (screen_point.y > m_context_.viewport->height - edge_zone) {
-      float ratio = (screen_point.y - (m_context_.viewport->height - edge_zone)) / edge_zone;
-      speed = max_speed_per_sec * ratio;
-    }
-
-    if (speed != 0.0f) {
-      m_edge_scroll_.active = true;
-      m_edge_scroll_.speed = speed;
-      m_edge_scroll_.last_screen_point = screen_point;
-      m_edge_scroll_.is_handle_drag = is_handle_drag;
-      m_edge_scroll_.is_mouse = is_mouse;
-      if (m_edge_scroll_.last_tick_time == 0) {
-        m_edge_scroll_.last_tick_time = TimeUtil::milliTime();
-      }
-    } else {
-      m_edge_scroll_.active = false;
-      m_edge_scroll_.speed = 0.0f;
-      m_edge_scroll_.last_tick_time = 0;
-    }
-  }
-
-  GestureResult EditorInteraction::handleGestureEvent(EditorCore& core, const GestureEvent& event) {
-    PERF_TIMER("handleGestureEvent");
-    GestureResult gesture_result;
-
-    if (handleScrollbarGesture(core.m_cursor_position_, event, gesture_result)) {
-      return gesture_result;
-    }
-
-    if (event.type == EventType::TOUCH_DOWN || event.type == EventType::MOUSE_DOWN) {
-      m_fling_->stop();
-      m_fling_->resetSamples();
-      if (!event.points.empty()) {
-        m_dragging_handle_ = hitTestHandle(event.points[0]);
-      }
-    }
-    if (m_dragging_handle_ != HandleDragTarget::NONE
-        && event.type == EventType::TOUCH_POINTER_DOWN) {
-      m_dragging_handle_ = HandleDragTarget::NONE;
-      m_edge_scroll_.active = false;
-    }
-
-    if (m_dragging_handle_ != HandleDragTarget::NONE) {
-      if (event.type == EventType::TOUCH_MOVE || event.type == EventType::MOUSE_MOVE) {
-        if (!event.points.empty()) {
-          dragHandleTo(core.m_cursor_position_, m_dragging_handle_, event.points[0]);
-          m_context_.text_layout->setViewState(*m_context_.view_state);
-          gesture_result.type = GestureType::DRAG_SELECT;
-          gesture_result.is_handle_drag = true;
-          fillGestureResult(core.m_cursor_position_, gesture_result);
-          gesture_result.needs_edge_scroll = m_edge_scroll_.active;
-          gesture_result.needs_animation = m_edge_scroll_.active;
-          return gesture_result;
-        }
-      }
-      if (event.type == EventType::TOUCH_UP || event.type == EventType::MOUSE_UP
-          || event.type == EventType::TOUCH_CANCEL) {
-        m_dragging_handle_ = HandleDragTarget::NONE;
-        m_edge_scroll_.active = false;
-        m_gesture_handler_->resetState();
-        m_context_.view_state->scroll_x = std::round(m_context_.view_state->scroll_x);
-        m_context_.view_state->scroll_y = std::round(m_context_.view_state->scroll_y);
-        m_context_.text_layout->normalizeViewState(*m_context_.view_state);
-        fillGestureResult(core.m_cursor_position_, gesture_result);
-        return gesture_result;
-      }
-    }
-    GestureResult result = m_gesture_handler_->handleGestureEvent(event);
-
-    if (event.type == EventType::TOUCH_UP || event.type == EventType::MOUSE_UP
-        || event.type == EventType::TOUCH_CANCEL) {
-      m_edge_scroll_.active = false;
-      if (event.type == EventType::TOUCH_UP && result.type == GestureType::UNDEFINED && !m_edge_scroll_.active) {
-        m_fling_->start();
-      }
-    }
-
-    if (m_dragging_handle_ != HandleDragTarget::NONE) {
-      m_context_.text_layout->setViewState(*m_context_.view_state);
-      fillGestureResult(core.m_cursor_position_, result);
-      return result;
-    }
-
-    switch (result.type) {
-    case GestureType::TAP:
-      if (static_cast<uint8_t>(result.modifiers & KeyModifier::SHIFT) && m_has_selection_) {
-        bool is_mouse_tap = (event.type == EventType::MOUSE_DOWN);
-        dragSelectTo(core.m_cursor_position_, result.tap_point, is_mouse_tap);
-      } else {
-        if (core.m_linked_editing_session_ && core.m_linked_editing_session_->isActive()) {
-          TextPosition tap_pos = m_context_.text_layout->hitTest(result.tap_point);
-          bool in_tab_stop = false;
-          auto highlights = core.m_linked_editing_session_->getAllHighlights();
-          for (const auto& hl : highlights) {
-            if (hl.range.contains(tap_pos)) {
-              in_tab_stop = true;
-              break;
-            }
-          }
-          if (!in_tab_stop) {
-            core.cancelLinkedEditing();
-          }
-        }
-        core.placeCursorAt(result.tap_point);
-      }
-      result.hit_target = m_context_.text_layout->hitTestDecoration(result.tap_point);
-      if (result.hit_target.type == HitTargetType::FOLD_PLACEHOLDER ||
-          result.hit_target.type == HitTargetType::FOLD_GUTTER) {
-        core.toggleFoldAt(result.hit_target.line);
-      }
-      break;
-    case GestureType::DOUBLE_TAP:
-      core.selectWordAt(result.tap_point);
-      break;
-    case GestureType::LONG_PRESS:
-      core.placeCursorAt(result.tap_point);
-      break;
-    case GestureType::DRAG_SELECT: {
-      bool is_mouse = (event.type == EventType::MOUSE_MOVE);
-      dragSelectTo(core.m_cursor_position_, result.tap_point, is_mouse);
-      break;
-    }
-    case GestureType::SCALE: {
-      const PointF focus_screen = resolveScaleFocus(event);
-      TextPosition anchor_position = m_context_.text_layout->hitTest(focus_screen);
-      CursorRect anchor_rect = core.getPositionScreenRect(anchor_position);
-      m_pending_scale_anchor_.active = true;
-      m_pending_scale_anchor_.focus_screen = focus_screen;
-      m_pending_scale_anchor_.anchor_position = anchor_position;
-      m_pending_scale_anchor_.offset_x = focus_screen.x - anchor_rect.x;
-      m_pending_scale_anchor_.offset_y = focus_screen.y - anchor_rect.y;
-      m_scale_gesture_active_ = (event.type == EventType::TOUCH_MOVE && event.points.size() >= 2);
-      m_context_.view_state->scale = std::max(1.0f, std::min(m_context_.settings->max_scale, m_context_.view_state->scale * result.scale));
-      break;
-    }
-    case GestureType::SCROLL:
-      m_context_.view_state->scroll_x += result.scroll_x;
-      m_context_.view_state->scroll_y += result.scroll_y;
-      markScrollbarInteraction();
-      if (event.type == EventType::TOUCH_MOVE && !event.points.empty()) {
-        m_fling_->recordSample(event.points[0], TimeUtil::milliTime());
-      }
-      break;
-    case GestureType::FAST_SCROLL: {
-      constexpr float kFastScrollMultiplier = 3.0f;
-      m_context_.view_state->scroll_x += result.scroll_x * kFastScrollMultiplier;
-      m_context_.view_state->scroll_y += result.scroll_y * kFastScrollMultiplier;
-      markScrollbarInteraction();
-      break;
-    }
-    default:
-      break;
-    }
-
-    const bool scale_gesture_end =
-        m_scale_gesture_active_ &&
-        (event.type == EventType::TOUCH_POINTER_UP
-            || event.type == EventType::TOUCH_UP
-            || event.type == EventType::TOUCH_CANCEL);
-
-    if (scale_gesture_end || ((!m_scale_gesture_active_) &&
-        (event.type == EventType::TOUCH_UP || event.type == EventType::MOUSE_UP
-            || event.type == EventType::TOUCH_CANCEL))) {
-      m_context_.view_state->scroll_x = std::round(m_context_.view_state->scroll_x);
-      m_context_.view_state->scroll_y = std::round(m_context_.view_state->scroll_y);
-    }
-    if (scale_gesture_end) {
-      m_scale_gesture_active_ = false;
-    }
-    if (result.type == GestureType::SCALE) {
-      m_context_.text_layout->setViewState(*m_context_.view_state);
-    } else {
-      m_context_.text_layout->normalizeViewState(*m_context_.view_state);
-    }
-    fillGestureResult(core.m_cursor_position_, result);
-    if (result.type == GestureType::DRAG_SELECT) {
-      result.needs_edge_scroll = m_edge_scroll_.active;
-    }
-    result.needs_fling = m_fling_->isActive();
-    result.needs_animation = result.needs_edge_scroll || result.needs_fling;
-
-    LOGD("EditorInteraction::handleGestureEvent, m_view_state_ = %s", m_context_.view_state->dump().c_str());
-    return result;
-  }
-
-  GestureResult EditorInteraction::tickEdgeScroll(TextPosition& cursor_position) {
-    GestureResult result;
-    result.type = GestureType::DRAG_SELECT;
-
-    if (!m_edge_scroll_.active) {
-      fillGestureResult(cursor_position, result);
-      result.needs_edge_scroll = false;
-      result.needs_animation = m_fling_->isActive();
-      return result;
-    }
-
-    int64_t now = TimeUtil::milliTime();
-    float dt_sec = static_cast<float>(now - m_edge_scroll_.last_tick_time) / 1000.0f;
-    if (dt_sec <= 0) dt_sec = 0.016f;
-    dt_sec = std::min(dt_sec, 0.1f);
-    m_edge_scroll_.last_tick_time = now;
-
-    m_context_.view_state->scroll_y += m_edge_scroll_.speed * dt_sec;
-    m_context_.text_layout->normalizeViewState(*m_context_.view_state);
-    markScrollbarInteraction();
-
-    if (m_edge_scroll_.is_handle_drag) {
-      dragHandleTo(cursor_position, m_dragging_handle_, m_edge_scroll_.last_screen_point);
-    } else {
-      dragSelectTo(cursor_position, m_edge_scroll_.last_screen_point, m_edge_scroll_.is_mouse);
-    }
-
-    fillGestureResult(cursor_position, result);
-    result.needs_edge_scroll = m_edge_scroll_.active;
-    result.needs_animation = m_edge_scroll_.active || m_fling_->isActive();
-    return result;
-  }
-
-  GestureResult EditorInteraction::tickFling(const TextPosition& cursor_position) {
-    GestureResult result;
-    result.type = GestureType::SCROLL;
-
-    if (!m_fling_->isActive()) {
-      fillGestureResult(cursor_position, result);
-      result.needs_fling = false;
-      result.needs_animation = m_edge_scroll_.active;
-      return result;
-    }
-
-    float dx = 0, dy = 0;
-    bool still_active = m_fling_->advance(dx, dy);
-
-    m_context_.view_state->scroll_x -= dx;
-    m_context_.view_state->scroll_y -= dy;
-    m_context_.view_state->scroll_x = std::round(m_context_.view_state->scroll_x);
-    m_context_.view_state->scroll_y = std::round(m_context_.view_state->scroll_y);
-    m_context_.text_layout->normalizeViewState(*m_context_.view_state);
-    markScrollbarInteraction();
-
-    fillGestureResult(cursor_position, result);
-    result.needs_fling = still_active;
-    result.needs_animation = m_edge_scroll_.active || still_active;
-    return result;
-  }
-
-  GestureResult EditorInteraction::tickAnimations(TextPosition& cursor_position) {
-    GestureResult result;
-
-    bool did_edge_scroll = false;
-    if (m_edge_scroll_.active) {
-      result = tickEdgeScroll(cursor_position);
-      did_edge_scroll = true;
-    }
-
-    if (m_fling_->isActive()) {
-      GestureResult fling_result = tickFling(cursor_position);
-      if (!did_edge_scroll) {
-        result = fling_result;
-      } else {
-        result.needs_fling = fling_result.needs_fling;
-        result.view_scroll_x = fling_result.view_scroll_x;
-        result.view_scroll_y = fling_result.view_scroll_y;
-      }
-    }
-
-    if (!did_edge_scroll && !m_fling_->isActive()) {
-      fillGestureResult(cursor_position, result);
-    }
-
-    result.needs_animation = m_edge_scroll_.active || m_fling_->isActive();
-    return result;
-  }
-
-  void EditorInteraction::stopFling() {
-    m_fling_->stop();
-  }
-
   EditorInteraction::PendingScaleAnchor EditorInteraction::takePendingScaleAnchor() {
     PendingScaleAnchor anchor = m_pending_scale_anchor_;
     m_pending_scale_anchor_.active = false;
@@ -760,4 +727,5 @@ namespace NS_SWEETEDITOR {
     m_cached_handle_height_ = line_height;
     m_cached_handles_valid_ = true;
   }
+
 }

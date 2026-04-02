@@ -11,6 +11,7 @@ namespace NS_SWEETEDITOR {
   struct EditorSettings;
   struct CompositionState;
   struct BracketPair;
+  struct CaretState;
 
   class RenderComposer {
   public:
@@ -27,7 +28,7 @@ namespace NS_SWEETEDITOR {
 
     void buildSelectionRects(EditorRenderModel& model,
                              Document* document,
-                             EditorInteraction& interaction,
+                             const CaretState& caret,
                              float line_height) const;
 
     void buildLinkedEditingRects(EditorRenderModel& model,

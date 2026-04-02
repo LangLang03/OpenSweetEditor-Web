@@ -53,14 +53,13 @@ namespace NS_SWEETEDITOR {
 
   void RenderComposer::buildSelectionRects(EditorRenderModel& model,
                                            Document* document,
-                                           EditorInteraction& interaction,
+                                           const CaretState& caret,
                                            float line_height) const {
-    if (!interaction.hasSelection() || document == nullptr) {
-      interaction.clearHandleCache();
+    if (!caret.has_selection || document == nullptr) {
       return;
     }
 
-    TextRange selection = interaction.selection();
+    TextRange selection = caret.selection;
     TextPosition sel_start = selection.start;
     TextPosition sel_end = selection.end;
     if (sel_end < sel_start) {
@@ -109,8 +108,6 @@ namespace NS_SWEETEDITOR {
     model.selection_end_handle.position = end_coord;
     model.selection_end_handle.height = line_height;
     model.selection_end_handle.visible = true;
-
-    interaction.updateHandleCache(start_coord, end_coord, line_height);
   }
 
   void RenderComposer::buildLinkedEditingRects(EditorRenderModel& model,

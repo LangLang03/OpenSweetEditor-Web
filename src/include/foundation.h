@@ -98,6 +98,36 @@ namespace NS_SWEETEDITOR {
     GOTO_BOTTOM,
   };
 
+  /// Unified caret state: cursor position + selection
+  struct CaretState {
+    /// Logical cursor position in text
+    TextPosition cursor;
+    /// Selection range (start is anchor, end is active end / cursor side)
+    TextRange selection;
+    /// Whether there is an active selection
+    bool has_selection {false};
+
+    /// Set selection range (also updates cursor to range.end)
+    void setSelection(const TextRange& range) {
+      selection = range;
+      has_selection = !(range.start == range.end);
+      cursor = range.end;
+    }
+
+    /// Clear selection (cursor unchanged)
+    void clearSelection() {
+      selection = {};
+      has_selection = false;
+    }
+
+    /// Get normalized selection (start < end)
+    TextRange normalizedSelection() const {
+      TextRange r = selection;
+      if (r.end < r.start) std::swap(r.start, r.end);
+      return r;
+    }
+  };
+
   /// Auto-indent modes
   enum struct AutoIndentMode {
     /// No auto-indent; new line starts at column 0
