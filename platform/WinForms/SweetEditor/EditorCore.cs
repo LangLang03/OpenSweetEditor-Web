@@ -1349,6 +1349,9 @@ namespace SweetEditor {
 		[DllImport(LibraryName, EntryPoint = "editor_set_tab_size", CallingConvention = CallingConvention.Cdecl)]
 		internal static extern void SetTabSize(IntPtr handle, int tabSize);
 
+		[DllImport(LibraryName, EntryPoint = "editor_set_insert_spaces", CallingConvention = CallingConvention.Cdecl)]
+		internal static extern void SetInsertSpaces(IntPtr handle, int enabled);
+
 		[DllImport(LibraryName, EntryPoint = "editor_set_scale", CallingConvention = CallingConvention.Cdecl)]
 		internal static extern void SetScale(IntPtr handle, float scale);
 
@@ -1815,6 +1818,11 @@ namespace SweetEditor {
 		/// <param name="tabSize">Tab size (default 4, minimum 1).</param>
 		public void SetTabSize(int tabSize) {
 			NativeMethods.SetTabSize(nativeHandle, tabSize);
+		}
+
+		/// <summary>Sets whether pressing Tab inserts spaces instead of a tab character.</summary>
+		public void SetInsertSpaces(bool enabled) {
+			NativeMethods.SetInsertSpaces(nativeHandle, enabled ? 1 : 0);
 		}
 
 		/// <summary>Sets editor scale factor.</summary>

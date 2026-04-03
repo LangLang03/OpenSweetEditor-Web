@@ -217,6 +217,7 @@ controller.applyTheme(EditorTheme.dark());
 | Fold arrow mode | `setFoldArrowMode(mode)` | — |
 | Wrap mode | `setWrapMode(mode)` | — |
 | Tab size | `setTabSize(size)` | — |
+| Insert spaces | `setInsertSpaces(enabled)` | — |
 | Scale | `setScale(scale)` | — |
 | Line spacing | `setLineSpacing(add, mult)` | — |
 | Content start padding | `setContentStartPadding(padding)` | — |
@@ -1404,8 +1405,8 @@ All platforms MUST support at least the following two construction methods:
 | `languageId` | String | **MUST** | Language identifier (e.g. `"java"`, `"cpp"`, `"swift"`) |
 | `brackets` | List\<BracketPair\>? | **MAY** | Bracket pair list (null = not configured; platform MUST NOT sync to Core when null) |
 | `autoClosingPairs` | List\<BracketPair\>? | **MAY** | Auto-closing bracket pair list (null = not configured; platform MUST NOT sync to Core when null) |
-| `tabSize` | int? | **MAY** | Tab width (null means use editor default) |
-| `insertSpaces` | bool? | **MAY** | Whether to use spaces instead of tabs (null means use editor default) |
+| `tabSize` | int? | **MAY** | Tab stop width (null means use editor default) |
+| `insertSpaces` | bool? | **MAY** | Whether pressing Tab inserts spaces instead of a hard tab character (null means use editor default) |
 
 **`BracketPair`** sub-type:
 
@@ -1418,7 +1419,9 @@ All platforms MUST support at least the following two construction methods:
 |---|---|---|
 | Construction | **SHOULD** | SHOULD provide Builder pattern construction (Java/Kotlin); MAY use direct constructors or named-parameter constructors (Swift/C#/Dart/ArkTS) |
 | Immutability | **SHOULD** | SHOULD be immutable after construction |
-| Runtime effect | **MUST** | When `setLanguageConfiguration()` is called, bracket matching and auto-closing behavior visible to the editor MUST be updated consistently with the new configuration |
+| Runtime effect | **MUST** | When `setLanguageConfiguration()` is called, bracket matching, auto-closing behavior, and Tab insertion behavior visible to the editor MUST be updated consistently with the new configuration |
+| `tabSize` semantics | **MUST** | `tabSize` and `insertSpaces` MUST be treated as independent dimensions: `tabSize` controls tab-stop width, while `insertSpaces` controls whether the Tab key inserts spaces or a hard tab character |
+| `insertSpaces=true` behavior | **MUST** | If `insertSpaces` is `true`, the Tab key / `INSERT_TAB` command MUST insert the number of spaces required to reach the next tab stop, rather than always inserting a fixed `tabSize` count |
 ## 20. Performance Guidance & Reference Targets (SHOULD)
 
 Based on the `perf/` module (`PerfOverlay`, `PerfStepRecorder`, `MeasurePerfStats`) and the C++ Core `PERF_TIMER` macros, this section defines cross-platform performance guidance and reference targets rather than hard conformance gates.

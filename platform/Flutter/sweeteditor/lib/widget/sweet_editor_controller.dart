@@ -10,6 +10,7 @@ class SweetEditorController {
   final EditorEventBus _eventBus = EditorEventBus();
   final EditorSettings settings = EditorSettings();
   String? _pendingText;
+  LanguageConfiguration? _languageConfiguration;
   bool _closed = false;
 
   void _attach(_SweetEditorWidgetState state) {
@@ -21,6 +22,9 @@ class SweetEditorController {
     if (pendingText != null) {
       _pendingText = null;
       state._loadText(pendingText);
+    }
+    if (_languageConfiguration != null) {
+      state._applyLanguageConfiguration(_languageConfiguration);
     }
   }
 
@@ -43,7 +47,13 @@ class SweetEditorController {
   int get lineCount => _state?._document?.lineCount ?? 0;
   String getLineText(int line) => _state?._document?.getLineText(line) ?? '';
 
-  LanguageConfiguration? languageConfiguration;
+  LanguageConfiguration? get languageConfiguration => _languageConfiguration;
+
+  set languageConfiguration(LanguageConfiguration? value) {
+    if (_closed) return;
+    _languageConfiguration = value;
+    _state?._applyLanguageConfiguration(value);
+  }
   EditorMetadata? metadata;
 
   core.TextPosition getCursorPosition() =>

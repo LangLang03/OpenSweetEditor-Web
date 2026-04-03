@@ -1147,6 +1147,13 @@ class SweetEditorCore {
         }
     }
 
+    /// Sets whether Tab inserts spaces instead of a tab character.
+    func setInsertSpaces(_ enabled: Bool) {
+        performCoreCall {
+            editor_set_insert_spaces(handle, enabled ? 1 : 0)
+        }
+    }
+
     struct ScrollbarConfig {
         enum ScrollbarMode: Int32 {
             case ALWAYS = 0
@@ -1853,6 +1860,13 @@ class SweetEditorCore {
         var closes = closeChars.map(UInt32.init(bitPattern:))
         performCoreCall {
             editor_set_auto_closing_pairs(handle, &opens, &closes, opens.count)
+        }
+    }
+
+    /// Sets tab size (number of spaces per tab stop).
+    func setTabSize(_ tabSize: Int) {
+        performCoreCall {
+            editor_set_tab_size(handle, Int32(tabSize))
         }
     }
 

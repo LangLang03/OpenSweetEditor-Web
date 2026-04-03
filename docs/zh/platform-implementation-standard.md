@@ -217,6 +217,7 @@ controller.applyTheme(EditorTheme.dark());
 | 折叠箭头模式 | `setFoldArrowMode(mode)` | — |
 | 自动换行模式 | `setWrapMode(mode)` | — |
 | Tab 大小 | `setTabSize(size)` | — |
+| 空格缩进 | `setInsertSpaces(enabled)` | — |
 | 缩放比例 | `setScale(scale)` | — |
 | 行间距 | `setLineSpacing(add, mult)` | — |
 | 内容起始内边距 | `setContentStartPadding(padding)` | — |
@@ -1409,8 +1410,8 @@ Core 层定义了大量装饰数据类型，各平台 MUST 实现完全一致的
 | `languageId` | String | **MUST** | 语言标识符（如 `"java"`、`"cpp"`、`"swift"`） |
 | `brackets` | List\<BracketPair\>? | **MAY** | 括号对列表（null 表示未配置；为 null 时平台 MUST NOT 同步到 Core） |
 | `autoClosingPairs` | List\<BracketPair\>? | **MAY** | 自动闭合括号对列表（null 表示未配置；为 null 时平台 MUST NOT 同步到 Core） |
-| `tabSize` | int? | **MAY** | Tab 宽度（null 表示使用编辑器默认值） |
-| `insertSpaces` | bool? | **MAY** | 是否用空格替代 Tab（null 表示使用编辑器默认值） |
+| `tabSize` | int? | **MAY** | 制表位宽度（null 表示使用编辑器默认值） |
+| `insertSpaces` | bool? | **MAY** | 按下 Tab 时是否插入空格而不是硬 Tab 字符（null 表示使用编辑器默认值） |
 
 **`BracketPair`** 子类型：
 
@@ -1423,7 +1424,9 @@ Core 层定义了大量装饰数据类型，各平台 MUST 实现完全一致的
 |---|---|---|
 | 构造方式 | **SHOULD** | SHOULD 提供 Builder 模式构造（Java/Kotlin），MAY 使用直接构造函数或命名参数构造函数（Swift/C#/Dart/ArkTS） |
 | 不可变性 | **SHOULD** | 构造完成后 SHOULD 为不可变对象 |
-| 运行时效果 | **MUST** | 调用 `setLanguageConfiguration()` 后，编辑器可见的括号匹配和自动闭合行为 MUST 与新配置保持一致 |
+| 运行时效果 | **MUST** | 调用 `setLanguageConfiguration()` 后，编辑器可见的括号匹配、自动闭合行为，以及 Tab 插入行为 MUST 与新配置保持一致 |
+| `tabSize` 语义 | **MUST** | `tabSize` 与 `insertSpaces` MUST 被视为两个独立维度：`tabSize` 控制制表位宽度，`insertSpaces` 控制 Tab 键插入空格还是硬 Tab 字符 |
+| `insertSpaces=true` 行为 | **MUST** | 当 `insertSpaces` 为 `true` 时，Tab 键 / `INSERT_TAB` 命令 MUST 插入到下一个制表位所需数量的空格，而不是始终插入固定 `tabSize` 个空格 |
 
 ---
 ## 20. 性能指导与参考目标（SHOULD）

@@ -779,6 +779,16 @@ public class EditorCore {
         nativeSetBackspaceUnindent(mNativeHandle, enabled);
     }
 
+    /**
+     * Sets whether Tab inserts spaces up to the next tab stop instead of a literal tab.
+     *
+     * @param enabled true=insert spaces, false=insert '\t'
+     */
+    public void setInsertSpaces(boolean enabled) {
+        if (mNativeHandle == 0) return;
+        nativeSetInsertSpaces(mNativeHandle, enabled);
+    }
+
     // ==================== Handle Config ==
 
     /**
@@ -2028,6 +2038,9 @@ public class EditorCore {
 
     @CriticalNative
     private static native void nativeSetBackspaceUnindent(long handle, boolean enabled);
+
+    @CriticalNative
+    private static native void nativeSetInsertSpaces(long handle, boolean enabled);
 
     @CriticalNative
     private static native void nativeSetHandleConfig(long handle,

@@ -1251,6 +1251,14 @@ void editor_set_backspace_unindent(intptr_t editor_handle, int enabled) {
   editor_core->setBackspaceUnindent(enabled != 0);
 }
 
+void editor_set_insert_spaces(intptr_t editor_handle, int enabled) {
+  Ptr<EditorCore> editor_core = getCPtrHolderValue<EditorCore>(editor_handle);
+  if (editor_core == nullptr) {
+    return;
+  }
+  editor_core->setInsertSpaces(enabled != 0);
+}
+
 #pragma endregion
 
 #pragma region [Navigation, Styles & Decorations]

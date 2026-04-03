@@ -558,6 +558,9 @@ namespace SweetEditor {
 			if (config.TabSize.HasValue && config.TabSize.Value > 0) {
 				editorCore.SetTabSize(config.TabSize.Value);
 			}
+			if (config.InsertSpaces.HasValue) {
+				editorCore.SetInsertSpaces(config.InsertSpaces.Value);
+			}
 		}
 
 		public LanguageConfiguration? GetLanguageConfiguration() => languageConfiguration;

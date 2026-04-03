@@ -101,6 +101,11 @@ external void editor_set_wrap_mode(int editor_handle, int mode);
 @ffi.Native<ffi.Void Function(ffi.IntPtr, ffi.Int)>(assetId: _sweeteditorAssetId)
 external void editor_set_tab_size(int editor_handle, int tab_size);
 
+/// Set whether Tab inserts spaces instead of a tab character
+/// @param enabled 1=enabled, 0=disabled
+@ffi.Native<ffi.Void Function(ffi.IntPtr, ffi.Int)>(assetId: _sweeteditorAssetId)
+external void editor_set_insert_spaces(int editor_handle, int enabled);
+
 /// Set editor scale factor
 /// @param scale Scale factor (1.0 = 100%)
 @ffi.Native<ffi.Void Function(ffi.IntPtr, ffi.Float)>(assetId: _sweeteditorAssetId)
@@ -1267,6 +1272,25 @@ external void editor_clear_guides(int editor_handle);
   )
 >(assetId: _sweeteditorAssetId)
 external void editor_set_bracket_pairs(
+  int editor_handle,
+  ffi.Pointer<ffi.Uint32> open_chars,
+  ffi.Pointer<ffi.Uint32> close_chars,
+  int count,
+);
+
+/// Set auto-closing bracket pair list used by automatic pair insertion/deletion
+/// @param open_chars Open bracket char array (UTF-32)
+/// @param close_chars Close bracket char array (UTF-32)
+/// @param count Bracket pair count
+@ffi.Native<
+  ffi.Void Function(
+    ffi.IntPtr,
+    ffi.Pointer<ffi.Uint32>,
+    ffi.Pointer<ffi.Uint32>,
+    ffi.Size,
+  )
+>(assetId: _sweeteditorAssetId)
+external void editor_set_auto_closing_pairs(
   int editor_handle,
   ffi.Pointer<ffi.Uint32> open_chars,
   ffi.Pointer<ffi.Uint32> close_chars,

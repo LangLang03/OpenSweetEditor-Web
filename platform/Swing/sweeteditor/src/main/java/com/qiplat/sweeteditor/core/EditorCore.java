@@ -106,6 +106,10 @@ public class EditorCore implements AutoCloseable {
         EditorNative.setTabSize(nativeHandle, tabSize);
     }
 
+    public void setInsertSpaces(boolean enabled) {
+        EditorNative.setInsertSpaces(nativeHandle, enabled ? 1 : 0);
+    }
+
     public void setScale(float scale) {
         EditorNative.setScale(nativeHandle, scale);
     }

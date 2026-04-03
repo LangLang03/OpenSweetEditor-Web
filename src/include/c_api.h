@@ -632,6 +632,10 @@ EDITOR_API int editor_get_auto_indent_mode(intptr_t editor_handle);
 /// @param enabled 1=enabled, 0=disabled
 EDITOR_API void editor_set_backspace_unindent(intptr_t editor_handle, int enabled);
 
+/// Set whether Tab inserts spaces up to the next tab stop instead of a literal '\t'
+/// @param enabled 1=insert spaces, 0=insert '\t'
+EDITOR_API void editor_set_insert_spaces(intptr_t editor_handle, int enabled);
+
 #pragma endregion
 
 #pragma region [Navigation, Styles & Decorations]

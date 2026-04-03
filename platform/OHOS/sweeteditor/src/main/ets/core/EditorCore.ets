@@ -285,6 +285,10 @@ export class EditorCore {
     native.editorSetTabSize(this.handle, tabSize);
   }
 
+  setInsertSpaces(enabled: boolean): void {
+    native.editorSetInsertSpaces(this.handle, enabled ? 1 : 0);
+  }
+
   setScale(scale: number): void {
     native.editorSetScale(this.handle, scale);
   }

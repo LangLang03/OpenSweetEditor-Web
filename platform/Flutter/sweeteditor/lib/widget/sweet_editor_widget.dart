@@ -238,6 +238,12 @@ class _SweetEditorWidgetState extends State<SweetEditorWidget>
     _flush();
   }
 
+  void _applyLanguageConfiguration(LanguageConfiguration? config) {
+    _session.applyLanguageConfiguration(config);
+    _decorationProviderManager.requestRefresh();
+    _flush();
+  }
+
   bool get _usesPlatformTextInput =>
       !kIsWeb &&
       (defaultTargetPlatform == TargetPlatform.android ||

@@ -43,6 +43,27 @@ TEST_CASE("EditorCore Enter keeps current line indent by default") {
   CHECK(editor.getCursorPosition() == (TextPosition{1, 2}));
 }
 
+TEST_CASE("EditorCore Tab inserts spaces to the next tab stop when insertSpaces is enabled") {
+  EditorOptions options;
+  EditorCore editor(makePtr<FixedWidthTextMeasurer>(), options);
+
+  Ptr<Document> document = makePtr<LineArrayDocument>("  foo");
+  editor.loadDocument(document);
+  editor.setViewport({800, 600});
+  editor.setTabSize(4);
+  editor.setInsertSpaces(true);
+  editor.setCursorPosition({0, 2});
+
+  KeyEvent event;
+  event.key_code = KeyCode::TAB;
+  KeyEventResult key_result = editor.handleKeyEvent(event);
+
+  REQUIRE(key_result.handled);
+  REQUIRE(key_result.content_changed);
+  CHECK(document->getU8Text() == "    foo");
+  CHECK(editor.getCursorPosition() == (TextPosition{0, 4}));
+}
+
 TEST_CASE("EditorCore backspace removes one surrogate pair as a single glyph") {
   EditorOptions options;
   EditorCore editor(makePtr<FixedWidthTextMeasurer>(), options);

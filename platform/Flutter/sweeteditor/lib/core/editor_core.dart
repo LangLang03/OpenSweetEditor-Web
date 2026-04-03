@@ -396,6 +396,11 @@ class EditorCore {
     bindings.editor_set_tab_size(_handle, tabSize);
   }
 
+  void setInsertSpaces(bool enabled) {
+    _ensureOpen();
+    bindings.editor_set_insert_spaces(_handle, enabled ? 1 : 0);
+  }
+
   void setScale(double scale) {
     _ensureOpen();
     bindings.editor_set_scale(_handle, scale);
@@ -1080,6 +1085,40 @@ class EditorCore {
   void clearGuides() {
     _ensureOpen();
     bindings.editor_clear_guides(_handle);
+  }
+
+  void setBracketPairs(List<int> openChars, List<int> closeChars) {
+    _ensureOpen();
+    assert(openChars.length == closeChars.length);
+    using((arena) {
+      final openPtr = arena.allocate<ffi.Uint32>(openChars.length);
+      final closePtr = arena.allocate<ffi.Uint32>(closeChars.length);
+      openPtr.asTypedList(openChars.length).setAll(0, openChars);
+      closePtr.asTypedList(closeChars.length).setAll(0, closeChars);
+      bindings.editor_set_bracket_pairs(
+        _handle,
+        openPtr,
+        closePtr,
+        openChars.length,
+      );
+    });
+  }
+
+  void setAutoClosingPairs(List<int> openChars, List<int> closeChars) {
+    _ensureOpen();
+    assert(openChars.length == closeChars.length);
+    using((arena) {
+      final openPtr = arena.allocate<ffi.Uint32>(openChars.length);
+      final closePtr = arena.allocate<ffi.Uint32>(closeChars.length);
+      openPtr.asTypedList(openChars.length).setAll(0, openChars);
+      closePtr.asTypedList(closeChars.length).setAll(0, closeChars);
+      bindings.editor_set_auto_closing_pairs(
+        _handle,
+        openPtr,
+        closePtr,
+        openChars.length,
+      );
+    });
   }
 
   // ---------------------------------------------------------------------------

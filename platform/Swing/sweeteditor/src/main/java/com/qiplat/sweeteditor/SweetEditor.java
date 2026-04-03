@@ -423,6 +423,9 @@ public class SweetEditor extends JPanel {
         if (config.getTabSize() != null && config.getTabSize() > 0) {
             editorCore.setTabSize(config.getTabSize());
         }
+        if (config.getInsertSpaces() != null) {
+            editorCore.setInsertSpaces(config.getInsertSpaces());
+        }
     }
     public LanguageConfiguration getLanguageConfiguration() { return languageConfiguration; }
 

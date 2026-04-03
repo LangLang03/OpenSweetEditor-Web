@@ -107,6 +107,7 @@ public class MainActivity extends AppCompatActivity {
         LanguageConfiguration configuration = new LanguageConfiguration.Builder("test")
                 .addAutoClosingPair("\"", "\"")
                 .addAutoClosingPair("(", ")")
+                .setInsertSpaces(true)
                 .build();
         mEditor.setLanguageConfiguration(configuration);
         registerColorStyleForCurrentTheme();

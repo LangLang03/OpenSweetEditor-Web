@@ -89,6 +89,8 @@ namespace NS_SWEETEDITOR {
     /// When true, backspace on leading whitespace unindents to the previous tab stop,
     /// or merges the line upward if the entire line is blank
     bool backspace_unindent {true};
+    /// When true, Tab inserts spaces up to the next tab stop instead of a literal '\t'
+    bool insert_spaces {false};
     /// Whether to enable IME composition; if off, compositionUpdate falls back to direct insertText
     bool enable_composition {false};
     /// Selection handle configuration

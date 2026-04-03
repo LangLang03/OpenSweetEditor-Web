@@ -1335,6 +1335,8 @@ public class SweetEditor extends View {
         if (config.getTabSize() > 0) {
             mEditorCore.setTabSize(config.getTabSize());
         }
+
+        mEditorCore.setInsertSpaces(config.getInsertSpaces());
     }
 
     /**
