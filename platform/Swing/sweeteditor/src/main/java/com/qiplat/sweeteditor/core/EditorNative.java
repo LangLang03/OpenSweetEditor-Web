@@ -886,27 +886,39 @@ public final class EditorNative {
     }
 
     public static void moveCursorLeft(long handle, boolean extendSelection) {
-        invokeVoid(() -> MOVE_CURSOR_LEFT.invokeExact(handle, extendSelection ? 1 : 0));
+        invokeVoid(() -> {
+            MOVE_CURSOR_LEFT.invokeExact(handle, extendSelection ? 1 : 0);
+        });
     }
 
     public static void moveCursorRight(long handle, boolean extendSelection) {
-        invokeVoid(() -> MOVE_CURSOR_RIGHT.invokeExact(handle, extendSelection ? 1 : 0));
+        invokeVoid(() -> {
+            MOVE_CURSOR_RIGHT.invokeExact(handle, extendSelection ? 1 : 0);
+        });
     }
 
     public static void moveCursorUp(long handle, boolean extendSelection) {
-        invokeVoid(() -> MOVE_CURSOR_UP.invokeExact(handle, extendSelection ? 1 : 0));
+        invokeVoid(() -> {
+            MOVE_CURSOR_UP.invokeExact(handle, extendSelection ? 1 : 0);
+        });
     }
 
     public static void moveCursorDown(long handle, boolean extendSelection) {
-        invokeVoid(() -> MOVE_CURSOR_DOWN.invokeExact(handle, extendSelection ? 1 : 0));
+        invokeVoid(() -> {
+            MOVE_CURSOR_DOWN.invokeExact(handle, extendSelection ? 1 : 0);
+        });
     }
 
     public static void moveCursorToLineStart(long handle, boolean extendSelection) {
-        invokeVoid(() -> MOVE_CURSOR_TO_LINE_START.invokeExact(handle, extendSelection ? 1 : 0));
+        invokeVoid(() -> {
+            MOVE_CURSOR_TO_LINE_START.invokeExact(handle, extendSelection ? 1 : 0);
+        });
     }
 
     public static void moveCursorToLineEnd(long handle, boolean extendSelection) {
-        invokeVoid(() -> MOVE_CURSOR_TO_LINE_END.invokeExact(handle, extendSelection ? 1 : 0));
+        invokeVoid(() -> {
+            MOVE_CURSOR_TO_LINE_END.invokeExact(handle, extendSelection ? 1 : 0);
+        });
     }
 
     public static int[] getCursorPosition(long handle, Arena arena) {
@@ -1569,11 +1581,15 @@ public final class EditorNative {
     }
 
     public static void setKeyMap(long handle, byte[] payload, Arena arena) {
-        invokeVoid(() -> SET_KEYMAP.invokeExact(handle, byteArraySegment(arena, payload), (long) payload.length));
+        invokeVoid(() -> {
+            SET_KEYMAP.invokeExact(handle, byteArraySegment(arena, payload), (long) payload.length);
+        });
     }
 
     public static void setKeyMap(long handle, MemorySegment payload, long size) {
-        invokeVoid(() -> SET_KEYMAP.invokeExact(handle, payload, size));
+        invokeVoid(() -> {
+            SET_KEYMAP.invokeExact(handle, payload, size);
+        });
     }
 
     public static void setIndentGuides(long handle, byte[] payload, Arena arena) {
