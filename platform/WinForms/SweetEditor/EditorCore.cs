@@ -606,7 +606,7 @@ namespace SweetEditor {
 	}
 
 	/// <summary>Immutable value object describing a diagnostic entry on a line.</summary>
-	public sealed class DiagnosticItem {
+	public sealed class Diagnostic {
 		/// <summary>Start column (0-based, UTF-16 offset)</summary>
 		public int Column { get; }
 		/// <summary>Character length</summary>
@@ -615,7 +615,7 @@ namespace SweetEditor {
 		public int Severity { get; }
 		/// <summary>Underline/marker color (ARGB)</summary>
 		public int Color { get; }
-		public DiagnosticItem(int column, int length, int severity, int color) { Column = column; Length = length; Severity = severity; Color = color; }
+		public Diagnostic(int column, int length, int severity, int color) { Column = column; Length = length; Severity = severity; Color = color; }
 	}
 
 	/// <summary>Immutable value object describing a foldable region.</summary>
@@ -936,42 +936,6 @@ namespace SweetEditor {
 	#region Editor event system
 
 	/// <summary>
-	/// Editor event type.
-	/// </summary>
-	public enum EditorEventType {
-		/// <summary>Content changed</summary>
-		TextChanged,
-		/// <summary>Caret position changed</summary>
-		CursorChanged,
-		/// <summary>Selection changed</summary>
-		SelectionChanged,
-		/// <summary>Scroll position changed</summary>
-		ScrollChanged,
-		/// <summary>Zoom changed</summary>
-		ScaleChanged,
-		/// <summary>Long press</summary>
-		LongPress,
-		/// <summary>Double-click select</summary>
-		DoubleTap,
-		/// <summary>Right click/context menu</summary>
-		ContextMenu,
-		/// <summary>GutterIcon Click</summary>
-		GutterIconClick,
-		/// <summary>InlayHint Click</summary>
-		InlayHintClick,
-		/// <summary>Fold region click.</summary>
-		FoldToggle,
-	}
-
-	/// <summary>
-	/// Base class for editor event args.
-	/// </summary>
-	public class EditorEventArgs : EventArgs {
-		public EditorEventType EventType { get; }
-		public EditorEventArgs(EditorEventType type) { EventType = type; }
-	}
-
-	/// <summary>
 	/// Text change operation type enum.
 	/// </summary>
 	public enum TextChangeAction {
@@ -1010,15 +974,14 @@ namespace SweetEditor {
 	/// <summary>
 	/// Text change event args.
 	/// </summary>
-	public class TextChangedEventArgs : EditorEventArgs {
+	public class TextChangedEventArgs : EventArgs {
 		/// <summary>Operation type</summary>
 		public TextChangeAction Action { get; }
 		/// <summary>Replaced/deleted text range (pre-operation coordinates); null means unavailable.</summary>
 		public TextRange? ChangeRange { get; }
 		/// <summary>New text after change (inserted/replaced content); null means unavailable, and empty string means pure deletion.</summary>
 		public string? Text { get; }
-		public TextChangedEventArgs(TextChangeAction action, TextRange? changeRange = null, string? text = null)
-			: base(EditorEventType.TextChanged) {
+		public TextChangedEventArgs(TextChangeAction action, TextRange? changeRange = null, string? text = null) {
 			Action = action;
 			ChangeRange = changeRange;
 			Text = text;
@@ -1028,105 +991,115 @@ namespace SweetEditor {
 	/// <summary>
 	/// Caret change event args.
 	/// </summary>
-	public class CursorChangedEventArgs : EditorEventArgs {
+	public class CursorChangedEventArgs : EventArgs {
 		public TextPosition CursorPosition { get; }
-		public CursorChangedEventArgs(TextPosition cursor) : base(EditorEventType.CursorChanged) { CursorPosition = cursor; }
+		public CursorChangedEventArgs(TextPosition cursor) { CursorPosition = cursor; }
 	}
 
 	/// <summary>
 	/// Selection changed event args.
 	/// </summary>
-	public class SelectionChangedEventArgs : EditorEventArgs {
+	public class SelectionChangedEventArgs : EventArgs {
 		public bool HasSelection { get; }
-		public TextRange Selection { get; }
+		public TextRange? Selection { get; }
 		public TextPosition CursorPosition { get; }
-		public SelectionChangedEventArgs(bool has, TextRange sel, TextPosition cursor)
-			: base(EditorEventType.SelectionChanged) { HasSelection = has; Selection = sel; CursorPosition = cursor; }
+		public SelectionChangedEventArgs(bool has, TextRange? sel, TextPosition cursor) {
+			HasSelection = has;
+			Selection = sel;
+			CursorPosition = cursor;
+		}
 	}
 
 	/// <summary>
 	/// Scroll change event args.
 	/// </summary>
-	public class ScrollChangedEventArgs : EditorEventArgs {
+	public class ScrollChangedEventArgs : EventArgs {
 		public float ScrollX { get; }
 		public float ScrollY { get; }
-		public ScrollChangedEventArgs(float x, float y) : base(EditorEventType.ScrollChanged) { ScrollX = x; ScrollY = y; }
+		public ScrollChangedEventArgs(float x, float y) { ScrollX = x; ScrollY = y; }
 	}
 
 	/// <summary>
 	/// Zoom changed event args.
 	/// </summary>
-	public class ScaleChangedEventArgs : EditorEventArgs {
+	public class ScaleChangedEventArgs : EventArgs {
 		public float Scale { get; }
-		public ScaleChangedEventArgs(float scale) : base(EditorEventType.ScaleChanged) { Scale = scale; }
+		public ScaleChangedEventArgs(float scale) { Scale = scale; }
 	}
+
+	/// <summary>
+	/// Document loaded event args.
+	/// </summary>
+	public class DocumentLoadedEventArgs : EventArgs { }
 
 	/// <summary>
 	/// Long-press event args.
 	/// </summary>
-	public class LongPressEventArgs : EditorEventArgs {
+	public class LongPressEventArgs : EventArgs {
 		public TextPosition CursorPosition { get; }
 		public PointF ScreenPoint { get; }
-		public LongPressEventArgs(TextPosition cursor, PointF point)
-			: base(EditorEventType.LongPress) { CursorPosition = cursor; ScreenPoint = point; }
+		public LongPressEventArgs(TextPosition cursor, PointF point) { CursorPosition = cursor; ScreenPoint = point; }
 	}
 
 	/// <summary>
 	/// Double-click selection event args.
 	/// </summary>
-	public class DoubleTapEventArgs : EditorEventArgs {
+	public class DoubleTapEventArgs : EventArgs {
 		public TextPosition CursorPosition { get; }
 		public bool HasSelection { get; }
-		public TextRange Selection { get; }
+		public TextRange? Selection { get; }
 		public PointF ScreenPoint { get; }
-		public DoubleTapEventArgs(TextPosition cursor, bool has, TextRange sel, PointF point)
-			: base(EditorEventType.DoubleTap) { CursorPosition = cursor; HasSelection = has; Selection = sel; ScreenPoint = point; }
+		public DoubleTapEventArgs(TextPosition cursor, bool has, TextRange? sel, PointF point) {
+			CursorPosition = cursor;
+			HasSelection = has;
+			Selection = sel;
+			ScreenPoint = point;
+		}
 	}
 
 	/// <summary>
 	/// Context-menu event args.
 	/// </summary>
-	public class ContextMenuEventArgs : EditorEventArgs {
+	public class ContextMenuEventArgs : EventArgs {
 		public TextPosition CursorPosition { get; }
 		public PointF ScreenPoint { get; }
-		public ContextMenuEventArgs(TextPosition cursor, PointF point)
-			: base(EditorEventType.ContextMenu) { CursorPosition = cursor; ScreenPoint = point; }
+		public ContextMenuEventArgs(TextPosition cursor, PointF point) { CursorPosition = cursor; ScreenPoint = point; }
 	}
 
 	/// <summary>
 	/// InlayHint click event args.
 	/// </summary>
-	public class InlayHintClickEventArgs : EditorEventArgs {
+	public class InlayHintClickEventArgs : EventArgs {
 		/// <summary>Hit logical line (0-based)</summary>
 		public int Line { get; }
 		/// <summary>Hit column (0-based)</summary>
 		public int Column { get; }
-		/// <summary>Icon ID (valid only for icon-type InlayHint).</summary>
-		public int IconId { get; }
-		/// <summary>Color value (valid only for color-block InlayHint).</summary>
-		public int ColorValue { get; }
-		/// <summary>Whether the hit InlayHint is icon type.</summary>
-		public bool IsIcon { get; }
+		/// <summary>Inlay type.</summary>
+		public InlayType Type { get; }
+		/// <summary>Type-specific integer payload. Icon uses icon id, color uses ARGB, text uses 0.</summary>
+		public int IntValue { get; }
 		/// <summary>Tap screen position</summary>
 		public PointF ScreenPoint { get; }
-		public InlayHintClickEventArgs(int line, int column, int iconId, int colorValue, bool isIcon, PointF point)
-			: base(EditorEventType.InlayHintClick) {
-			Line = line; Column = column; IconId = iconId; ColorValue = colorValue; IsIcon = isIcon; ScreenPoint = point;
+		public InlayHintClickEventArgs(int line, int column, InlayType type, int intValue, PointF point) {
+			Line = line;
+			Column = column;
+			Type = type;
+			IntValue = intValue;
+			ScreenPoint = point;
 		}
 	}
 
 	/// <summary>
 	/// GutterIcon click event args.
 	/// </summary>
-	public class GutterIconClickEventArgs : EditorEventArgs {
+	public class GutterIconClickEventArgs : EventArgs {
 		/// <summary>Hit logical line (0-based)</summary>
 		public int Line { get; }
 		/// <summary>Icon ID</summary>
 		public int IconId { get; }
 		/// <summary>Tap screen position</summary>
 		public PointF ScreenPoint { get; }
-		public GutterIconClickEventArgs(int line, int iconId, PointF point)
-			: base(EditorEventType.GutterIconClick) {
+		public GutterIconClickEventArgs(int line, int iconId, PointF point) {
 			Line = line; IconId = iconId; ScreenPoint = point;
 		}
 	}
@@ -1134,15 +1107,14 @@ namespace SweetEditor {
 	/// <summary>
 	/// Fold region click event args (toggleFold is already executed by the C++ layer).
 	/// </summary>
-	public class FoldToggleEventArgs : EditorEventArgs {
+	public class FoldToggleEventArgs : EventArgs {
 		/// <summary>Line index of the fold region (0-based).</summary>
 		public int Line { get; }
 		/// <summary>Whether the click hit the gutter fold arrow (false means the fold placeholder was clicked).</summary>
 		public bool IsGutter { get; }
 		/// <summary>Tap screen position</summary>
 		public PointF ScreenPoint { get; }
-		public FoldToggleEventArgs(int line, bool isGutter, PointF point)
-			: base(EditorEventType.FoldToggle) {
+		public FoldToggleEventArgs(int line, bool isGutter, PointF point) {
 			Line = line; IsGutter = isGutter; ScreenPoint = point;
 		}
 	}
@@ -2670,7 +2642,7 @@ namespace SweetEditor {
 		#region Diagnostic decorations
 
 		/// <summary>Sets diagnostic decorations for the specified line (model overload).</summary>
-		public void SetLineDiagnostics(int line, IList<DiagnosticItem> items) {
+		public void SetLineDiagnostics(int line, IList<Diagnostic> items) {
 			if (items == null) return;
 			byte[] payload = ProtocolEncoder.PackLineDiagnostics(line, items);
 			NativeMethods.SetLineDiagnostics(nativeHandle, payload, (nuint)payload.Length);
@@ -2683,7 +2655,7 @@ namespace SweetEditor {
 		}
 
 		/// <summary>Batch sets diagnostic decorations for multiple lines (model overload).</summary>
-		public void SetBatchLineDiagnostics(Dictionary<int, IList<DiagnosticItem>> diagsByLine) {
+		public void SetBatchLineDiagnostics(Dictionary<int, IList<Diagnostic>> diagsByLine) {
 			if (diagsByLine == null || diagsByLine.Count == 0) return;
 			byte[] payload = ProtocolEncoder.PackBatchLineDiagnostics(diagsByLine);
 			NativeMethods.SetBatchLineDiagnostics(nativeHandle, payload, (nuint)payload.Length);

@@ -212,7 +212,7 @@ namespace SweetEditor {
 
 		#region Diagnostics
 
-		internal static byte[] PackLineDiagnostics(int line, IList<DiagnosticItem> items) {
+		internal static byte[] PackLineDiagnostics(int line, IList<Diagnostic> items) {
 			int count = items.Count;
 			byte[] payload = new byte[8 + count * 16];
 			int offset = 0;
@@ -228,7 +228,7 @@ namespace SweetEditor {
 			return payload;
 		}
 
-		internal static byte[] PackBatchLineDiagnostics(Dictionary<int, IList<DiagnosticItem>> diagsByLine) {
+		internal static byte[] PackBatchLineDiagnostics(Dictionary<int, IList<Diagnostic>> diagsByLine) {
 			int totalDiags = 0;
 			foreach (var kv in diagsByLine) totalDiags += kv.Value.Count;
 			byte[] payload = new byte[4 + diagsByLine.Count * 8 + totalDiags * 16];

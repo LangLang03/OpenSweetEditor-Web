@@ -512,6 +512,8 @@ namespace SweetEditor {
 		public event EventHandler<ScrollChangedEventArgs> ScrollChanged;
 		/// <summary>Scale ratio changed event.</summary>
 		public event EventHandler<ScaleChangedEventArgs> ScaleChanged;
+		/// <summary>Document loaded event.</summary>
+		public event EventHandler<DocumentLoadedEventArgs> DocumentLoaded;
 		/// <summary>Long press event.</summary>
 		public event EventHandler<LongPressEventArgs> LongPress;
 		/// <summary>Double-tap selection event.</summary>
@@ -600,6 +602,7 @@ namespace SweetEditor {
 		public void LoadDocument(Document document) {
 			editorCore.LoadDocument(document);
 			decorationProviderManager?.OnDocumentLoaded();
+			DocumentLoaded?.Invoke(this, new DocumentLoadedEventArgs());
 			Flush();
 		}
 
@@ -1062,12 +1065,12 @@ namespace SweetEditor {
 		#region Public API - Diagnostic Decorations
 
 		/// <summary>Sets line diagnostics.</summary>
-		public void SetLineDiagnostics(int line, IList<DiagnosticItem> items) {
+		public void SetLineDiagnostics(int line, IList<Diagnostic> items) {
 			editorCore.SetLineDiagnostics(line, items);
 		}
 
 		/// <summary>Sets batch line diagnostics.</summary>
-		public void SetBatchLineDiagnostics(Dictionary<int, IList<DiagnosticItem>> diagsByLine) {
+		public void SetBatchLineDiagnostics(Dictionary<int, IList<Diagnostic>> diagsByLine) {
 			editorCore.SetBatchLineDiagnostics(diagsByLine);
 		}
 
@@ -1589,7 +1592,11 @@ namespace SweetEditor {
 					CursorChanged?.Invoke(this, new CursorChangedEventArgs(result.CursorPosition));
 					break;
 				case GestureType.DOUBLE_TAP:
-					DoubleTap?.Invoke(this, new DoubleTapEventArgs(result.CursorPosition, result.HasSelection, result.Selection, sp));
+					DoubleTap?.Invoke(this, new DoubleTapEventArgs(
+						result.CursorPosition,
+						result.HasSelection,
+						result.HasSelection ? result.Selection : (TextRange?)null,
+						sp));
 					CursorChanged?.Invoke(this, new CursorChangedEventArgs(result.CursorPosition));
 					if (result.HasSelection) {
 						SelectionChanged?.Invoke(this, new SelectionChangedEventArgs(true, result.Selection, result.CursorPosition));
@@ -1605,22 +1612,27 @@ namespace SweetEditor {
 					if (result.HitTarget.Type != HitTargetType.NONE) {
 						switch (result.HitTarget.Type) {
 							case HitTargetType.INLAY_HINT_TEXT:
+								InlayHintClick?.Invoke(this, new InlayHintClickEventArgs(
+									result.HitTarget.Line,
+									result.HitTarget.Column,
+									InlayType.Text,
+									0,
+									sp));
+								break;
 							case HitTargetType.INLAY_HINT_ICON:
 								InlayHintClick?.Invoke(this, new InlayHintClickEventArgs(
 									result.HitTarget.Line,
 									result.HitTarget.Column,
+									InlayType.Icon,
 									result.HitTarget.IconId,
-									0,
-									result.HitTarget.Type == HitTargetType.INLAY_HINT_ICON,
 									sp));
 								break;
 							case HitTargetType.INLAY_HINT_COLOR:
 								InlayHintClick?.Invoke(this, new InlayHintClickEventArgs(
 									result.HitTarget.Line,
 									result.HitTarget.Column,
-									0,
+									InlayType.Color,
 									result.HitTarget.ColorValue,
-									false,
 									sp));
 								break;
 							case HitTargetType.GUTTER_ICON:
@@ -1654,7 +1666,10 @@ namespace SweetEditor {
 					ScaleChanged?.Invoke(this, new ScaleChangedEventArgs(result.ViewScale));
 					break;
 				case GestureType.DRAG_SELECT:
-					SelectionChanged?.Invoke(this, new SelectionChangedEventArgs(result.HasSelection, result.Selection, result.CursorPosition));
+					SelectionChanged?.Invoke(this, new SelectionChangedEventArgs(
+						result.HasSelection,
+						result.HasSelection ? result.Selection : (TextRange?)null,
+						result.CursorPosition));
 					break;
 				case GestureType.CONTEXT_MENU:
 					ContextMenu?.Invoke(this, new ContextMenuEventArgs(result.CursorPosition, sp));
@@ -1723,7 +1738,7 @@ namespace SweetEditor {
 				CursorChanged?.Invoke(this, new CursorChangedEventArgs(editorCore.GetCursorPosition()));
 			}
 			if (result.SelectionChanged) {
-				SelectionChanged?.Invoke(this, new SelectionChangedEventArgs(false, default, editorCore.GetCursorPosition()));
+				SelectionChanged?.Invoke(this, new SelectionChangedEventArgs(false, null, editorCore.GetCursorPosition()));
 			}
 		}
 

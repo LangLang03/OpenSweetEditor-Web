@@ -60,17 +60,17 @@ namespace SweetEditor {
 	}
 
 	public sealed class DecorationResult {
-		public Dictionary<int, List<SpanItem>>? SyntaxSpans { get; set; }
-		public Dictionary<int, List<SpanItem>>? SemanticSpans { get; set; }
-		public Dictionary<int, List<InlayHintItem>>? InlayHints { get; set; }
-		public Dictionary<int, List<DiagnosticItem>>? Diagnostics { get; set; }
-		public List<IndentGuideItem>? IndentGuides { get; set; }
-		public List<BracketGuideItem>? BracketGuides { get; set; }
-		public List<FlowGuideItem>? FlowGuides { get; set; }
-		public List<SeparatorGuideItem>? SeparatorGuides { get; set; }
-		public List<FoldRegionItem>? FoldRegions { get; set; }
-		public Dictionary<int, List<int>>? GutterIcons { get; set; }
-		public Dictionary<int, List<PhantomTextItem>>? PhantomTexts { get; set; }
+		public Dictionary<int, List<StyleSpan>>? SyntaxSpans { get; set; }
+		public Dictionary<int, List<StyleSpan>>? SemanticSpans { get; set; }
+		public Dictionary<int, List<InlayHint>>? InlayHints { get; set; }
+		public Dictionary<int, List<Diagnostic>>? Diagnostics { get; set; }
+		public List<IndentGuide>? IndentGuides { get; set; }
+		public List<BracketGuide>? BracketGuides { get; set; }
+		public List<FlowGuide>? FlowGuides { get; set; }
+		public List<SeparatorGuide>? SeparatorGuides { get; set; }
+		public List<FoldRegion>? FoldRegions { get; set; }
+		public Dictionary<int, List<GutterIcon>>? GutterIcons { get; set; }
+		public Dictionary<int, List<PhantomText>>? PhantomTexts { get; set; }
 
 		public DecorationApplyMode SyntaxSpansMode { get; set; } = DecorationApplyMode.MERGE;
 		public DecorationApplyMode SemanticSpansMode { get; set; } = DecorationApplyMode.MERGE;
@@ -90,11 +90,11 @@ namespace SweetEditor {
 				SemanticSpans = CopyMap(SemanticSpans),
 				InlayHints = CopyMap(InlayHints),
 				Diagnostics = CopyMap(Diagnostics),
-				IndentGuides = IndentGuides == null ? null : new List<IndentGuideItem>(IndentGuides),
-				BracketGuides = BracketGuides == null ? null : new List<BracketGuideItem>(BracketGuides),
-				FlowGuides = FlowGuides == null ? null : new List<FlowGuideItem>(FlowGuides),
-				SeparatorGuides = SeparatorGuides == null ? null : new List<SeparatorGuideItem>(SeparatorGuides),
-				FoldRegions = FoldRegions == null ? null : new List<FoldRegionItem>(FoldRegions),
+				IndentGuides = IndentGuides == null ? null : new List<IndentGuide>(IndentGuides),
+				BracketGuides = BracketGuides == null ? null : new List<BracketGuide>(BracketGuides),
+				FlowGuides = FlowGuides == null ? null : new List<FlowGuide>(FlowGuides),
+				SeparatorGuides = SeparatorGuides == null ? null : new List<SeparatorGuide>(SeparatorGuides),
+				FoldRegions = FoldRegions == null ? null : new List<FoldRegion>(FoldRegions),
 				GutterIcons = CopyMap(GutterIcons),
 				PhantomTexts = CopyMap(PhantomTexts),
 				SyntaxSpansMode = SyntaxSpansMode,
@@ -118,27 +118,6 @@ namespace SweetEditor {
 				outMap[kv.Key] = kv.Value == null ? new List<T>() : new List<T>(kv.Value);
 			}
 			return outMap;
-		}
-
-		public sealed record SpanItem(int Column, int Length, int StyleId);
-		public sealed record DiagnosticItem(int Column, int Length, int Severity, int Color);
-		public sealed record FoldRegionItem(int StartLine, int EndLine);
-		public sealed record IndentGuideItem(TextPosition Start, TextPosition End);
-		public sealed record BracketGuideItem(TextPosition Parent, TextPosition End, TextPosition[]? Children);
-		public sealed record FlowGuideItem(TextPosition Start, TextPosition End);
-		public sealed record SeparatorGuideItem(int Line, int Style, int Count, int TextEndColumn);
-		public sealed record PhantomTextItem(int Column, string Text);
-
-		public sealed record InlayHintItem(int Column, InlayHintType Type, string? Text, int IntValue) {
-			public static InlayHintItem TextHint(int column, string text) => new(column, InlayHintType.Text, text, 0);
-			public static InlayHintItem IconHint(int column, int iconId) => new(column, InlayHintType.Icon, null, iconId);
-			public static InlayHintItem ColorHint(int column, int color) => new(column, InlayHintType.Color, null, color);
-		}
-
-		public enum InlayHintType {
-			Text = 0,
-			Icon = 1,
-			Color = 2,
 		}
 	}
 
@@ -290,17 +269,17 @@ namespace SweetEditor {
 		private void ApplyMerged() {
 			applyScheduled = false;
 
-			var syntaxSpans = new Dictionary<int, List<DecorationResult.SpanItem>>();
-			var semanticSpans = new Dictionary<int, List<DecorationResult.SpanItem>>();
-			var inlayHints = new Dictionary<int, List<DecorationResult.InlayHintItem>>();
-			var diagnostics = new Dictionary<int, List<DecorationResult.DiagnosticItem>>();
-			List<DecorationResult.IndentGuideItem>? indentGuides = null;
-			List<DecorationResult.BracketGuideItem>? bracketGuides = null;
-			List<DecorationResult.FlowGuideItem>? flowGuides = null;
-			List<DecorationResult.SeparatorGuideItem>? separatorGuides = null;
-			var foldRegions = new List<DecorationResult.FoldRegionItem>();
-			var gutterIcons = new Dictionary<int, List<int>>();
-			var phantomTexts = new Dictionary<int, List<DecorationResult.PhantomTextItem>>();
+			var syntaxSpans = new Dictionary<int, List<StyleSpan>>();
+			var semanticSpans = new Dictionary<int, List<StyleSpan>>();
+			var inlayHints = new Dictionary<int, List<InlayHint>>();
+			var diagnostics = new Dictionary<int, List<Diagnostic>>();
+			List<IndentGuide>? indentGuides = null;
+			List<BracketGuide>? bracketGuides = null;
+			List<FlowGuide>? flowGuides = null;
+			List<SeparatorGuide>? separatorGuides = null;
+			var foldRegions = new List<FoldRegion>();
+			var gutterIcons = new Dictionary<int, List<GutterIcon>>();
+			var phantomTexts = new Dictionary<int, List<PhantomText>>();
 			DecorationApplyMode syntaxMode = DecorationApplyMode.MERGE;
 			DecorationApplyMode semanticMode = DecorationApplyMode.MERGE;
 			DecorationApplyMode inlayMode = DecorationApplyMode.MERGE;
@@ -343,19 +322,19 @@ namespace SweetEditor {
 
 				indentMode = MergeMode(indentMode, r.IndentGuidesMode);
 				if (r.IndentGuides != null) {
-					indentGuides = new List<DecorationResult.IndentGuideItem>(r.IndentGuides);
+					indentGuides = new List<IndentGuide>(r.IndentGuides);
 				}
 				bracketMode = MergeMode(bracketMode, r.BracketGuidesMode);
 				if (r.BracketGuides != null) {
-					bracketGuides = new List<DecorationResult.BracketGuideItem>(r.BracketGuides);
+					bracketGuides = new List<BracketGuide>(r.BracketGuides);
 				}
 				flowMode = MergeMode(flowMode, r.FlowGuidesMode);
 				if (r.FlowGuides != null) {
-					flowGuides = new List<DecorationResult.FlowGuideItem>(r.FlowGuides);
+					flowGuides = new List<FlowGuide>(r.FlowGuides);
 				}
 				separatorMode = MergeMode(separatorMode, r.SeparatorGuidesMode);
 				if (r.SeparatorGuides != null) {
-					separatorGuides = new List<DecorationResult.SeparatorGuideItem>(r.SeparatorGuides);
+					separatorGuides = new List<SeparatorGuide>(r.SeparatorGuides);
 				}
 				foldMode = MergeMode(foldMode, r.FoldRegionsMode);
 				if (r.FoldRegions != null) {
@@ -370,120 +349,68 @@ namespace SweetEditor {
 
 			ApplyInlayMode(inlayMode);
 			foreach (var (line, items) in inlayHints) {
-				var hints = new List<InlayHint>(items.Count);
-				foreach (var item in items) {
-					switch (item.Type) {
-						case DecorationResult.InlayHintType.Text when item.Text != null:
-							hints.Add(InlayHint.TextHint(item.Column, item.Text));
-							break;
-						case DecorationResult.InlayHintType.Icon:
-							hints.Add(InlayHint.IconHint(item.Column, item.IntValue));
-							break;
-						case DecorationResult.InlayHintType.Color:
-							hints.Add(InlayHint.ColorHint(item.Column, item.IntValue));
-							break;
-					}
-				}
-				editor.SetLineInlayHints(line, hints);
+				editor.SetLineInlayHints(line, items);
 			}
 
 			ApplyDiagnosticMode(diagnosticMode);
 			foreach (var (line, items) in diagnostics) {
-				var diagItems = new List<DiagnosticItem>(items.Count);
-				for (int i = 0; i < items.Count; i++) {
-					diagItems.Add(new DiagnosticItem(items[i].Column, items[i].Length, items[i].Severity, items[i].Color));
-				}
-				editor.SetLineDiagnostics(line, diagItems);
+				editor.SetLineDiagnostics(line, items);
 			}
 
 			if (indentMode == DecorationApplyMode.REPLACE_ALL || indentMode == DecorationApplyMode.REPLACE_RANGE) {
 				if (indentGuides != null) {
-					var guides = new List<IndentGuide>(indentGuides.Count);
-					foreach (var item in indentGuides) guides.Add(new IndentGuide(item.Start, item.End));
-					editor.SetIndentGuides(guides);
+					editor.SetIndentGuides(indentGuides);
 				} else {
 					editor.SetIndentGuides(new List<IndentGuide>());
 				}
 			} else if (indentGuides != null) {
-				var guides = new List<IndentGuide>(indentGuides.Count);
-				foreach (var item in indentGuides) guides.Add(new IndentGuide(item.Start, item.End));
-				editor.SetIndentGuides(guides);
+				editor.SetIndentGuides(indentGuides);
 			}
 
 			if (bracketMode == DecorationApplyMode.REPLACE_ALL || bracketMode == DecorationApplyMode.REPLACE_RANGE) {
 				if (bracketGuides != null) {
-					var guides = new List<BracketGuide>(bracketGuides.Count);
-					foreach (var item in bracketGuides) guides.Add(new BracketGuide(item.Parent, item.End, item.Children));
-					editor.SetBracketGuides(guides);
+					editor.SetBracketGuides(bracketGuides);
 				} else {
 					editor.SetBracketGuides(new List<BracketGuide>());
 				}
 			} else if (bracketGuides != null) {
-				var guides = new List<BracketGuide>(bracketGuides.Count);
-				foreach (var item in bracketGuides) guides.Add(new BracketGuide(item.Parent, item.End, item.Children));
-				editor.SetBracketGuides(guides);
+				editor.SetBracketGuides(bracketGuides);
 			}
 
 			if (flowMode == DecorationApplyMode.REPLACE_ALL || flowMode == DecorationApplyMode.REPLACE_RANGE) {
 				if (flowGuides != null) {
-					var guides = new List<FlowGuide>(flowGuides.Count);
-					foreach (var item in flowGuides) guides.Add(new FlowGuide(item.Start, item.End));
-					editor.SetFlowGuides(guides);
+					editor.SetFlowGuides(flowGuides);
 				} else {
 					editor.SetFlowGuides(new List<FlowGuide>());
 				}
 			} else if (flowGuides != null) {
-				var guides = new List<FlowGuide>(flowGuides.Count);
-				foreach (var item in flowGuides) guides.Add(new FlowGuide(item.Start, item.End));
-				editor.SetFlowGuides(guides);
+				editor.SetFlowGuides(flowGuides);
 			}
 
 			if (separatorMode == DecorationApplyMode.REPLACE_ALL || separatorMode == DecorationApplyMode.REPLACE_RANGE) {
 				if (separatorGuides != null) {
-					var guides = new List<SeparatorGuide>(separatorGuides.Count);
-					foreach (var item in separatorGuides) {
-						guides.Add(new SeparatorGuide(item.Line, item.Style, item.Count, item.TextEndColumn));
-					}
-					editor.SetSeparatorGuides(guides);
+					editor.SetSeparatorGuides(separatorGuides);
 				} else {
 					editor.SetSeparatorGuides(new List<SeparatorGuide>());
 				}
 			} else if (separatorGuides != null) {
-				var guides = new List<SeparatorGuide>(separatorGuides.Count);
-				foreach (var item in separatorGuides) {
-					guides.Add(new SeparatorGuide(item.Line, item.Style, item.Count, item.TextEndColumn));
-				}
-				editor.SetSeparatorGuides(guides);
+				editor.SetSeparatorGuides(separatorGuides);
 			}
 
 			if (foldMode == DecorationApplyMode.REPLACE_ALL || foldMode == DecorationApplyMode.REPLACE_RANGE) {
-				var regions = new List<FoldRegion>(foldRegions.Count);
-				for (int i = 0; i < foldRegions.Count; i++) {
-					var r = foldRegions[i];
-					regions.Add(new FoldRegion(r.StartLine, r.EndLine));
-				}
-				editor.SetFoldRegions(regions);
+				editor.SetFoldRegions(foldRegions);
 			} else if (foldRegions.Count > 0) {
-				var regions = new List<FoldRegion>(foldRegions.Count);
-				for (int i = 0; i < foldRegions.Count; i++) {
-					var r = foldRegions[i];
-					regions.Add(new FoldRegion(r.StartLine, r.EndLine));
-				}
-				editor.SetFoldRegions(regions);
+				editor.SetFoldRegions(foldRegions);
 			}
 
 			ApplyGutterMode(gutterMode);
 			foreach (var (line, icons) in gutterIcons) {
-				var iconList = new List<GutterIcon>(icons.Count);
-				foreach (var icon in icons) iconList.Add(new GutterIcon(icon));
-				editor.SetLineGutterIcons(line, iconList);
+				editor.SetLineGutterIcons(line, icons);
 			}
 
 			ApplyPhantomMode(phantomMode);
 			foreach (var (line, items) in phantomTexts) {
-				var phantomList = new List<PhantomText>(items.Count);
-				foreach (var item in items) phantomList.Add(new PhantomText(item.Column, item.Text));
-				editor.SetLinePhantomTexts(line, phantomList);
+				editor.SetLinePhantomTexts(line, items);
 			}
 
 			editor.Flush();
@@ -542,7 +469,7 @@ namespace SweetEditor {
 		}
 
 		private void ClearDiagnosticRange(int startLine, int endLine) {
-			var empty = BuildEmptyRangeMap<DiagnosticItem>(startLine, endLine);
+			var empty = BuildEmptyRangeMap<Diagnostic>(startLine, endLine);
 			if (empty.Count == 0) return;
 			editor.SetBatchLineDiagnostics(empty);
 		}
@@ -593,13 +520,9 @@ namespace SweetEditor {
 			return Math.Max(0, (int)Math.Ceiling(viewportLineCount * multiplier));
 		}
 
-		private void ApplySpans(Dictionary<int, List<DecorationResult.SpanItem>> map, SpanLayer layer) {
+		private void ApplySpans(Dictionary<int, List<StyleSpan>> map, SpanLayer layer) {
 			foreach (var (line, spans) in map) {
-				var styleSpans = new List<StyleSpan>(spans.Count);
-				for (int i = 0; i < spans.Count; i++) {
-					styleSpans.Add(new StyleSpan(spans[i].Column, spans[i].Length, spans[i].StyleId));
-				}
-				editor.SetLineSpans(line, layer, styleSpans);
+				editor.SetLineSpans(line, layer, spans);
 			}
 		}
 
