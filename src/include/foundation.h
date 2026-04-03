@@ -41,6 +41,13 @@ namespace NS_SWEETEDITOR {
     U8String dump() const;
   };
 
+  /// Axis-aligned rectangle (origin + size)
+  struct Rect {
+    PointF origin;
+    float width {0};
+    float height {0};
+  };
+
   /// Offset rectangle relative to a reference point
   struct OffsetRect {
     float left {0};
@@ -48,9 +55,7 @@ namespace NS_SWEETEDITOR {
     float right {0};
     float bottom {0};
 
-    bool contains(float dx, float dy) const {
-      return dx >= left && dx <= right && dy >= top && dy <= bottom;
-    }
+    bool contains(float dx, float dy) const;
   };
 
   /// Editor viewport
@@ -86,7 +91,7 @@ namespace NS_SWEETEDITOR {
     KeyModifier modifiers {KeyModifier::NONE};
 
     /// Whether this is plain text input (no special key code, text only)
-    bool isTextInput() const { return key_code == KeyCode::NONE && !text.empty(); }
+    bool isTextInput() const;
   };
 
   enum struct ScrollBehavior {
@@ -98,12 +103,46 @@ namespace NS_SWEETEDITOR {
     GOTO_BOTTOM,
   };
 
+  /// Unified caret state: cursor position + selection
+  struct CaretState {
+    /// Logical cursor position in text
+    TextPosition cursor;
+    /// Selection range (start is anchor, end is active end / cursor side)
+    TextRange selection;
+    /// Whether there is an active selection
+    bool has_selection {false};
+
+    void setSelection(const TextRange& range);
+    void clearSelection();
+    TextRange normalizedSelection() const;
+  };
+
   /// Auto-indent modes
   enum struct AutoIndentMode {
     /// No auto-indent; new line starts at column 0
     NONE = 0,
     /// Keep previous line indent (copy leading whitespace)
     KEEP_INDENT = 1,
+  };
+
+  /// Auto-wrap modes
+  enum struct WrapMode {
+    /// No wrapping
+    NONE,
+    /// Character-level wrapping
+    CHAR_BREAK,
+    /// Word-level wrapping
+    WORD_BREAK,
+  };
+
+  /// Current line render modes
+  enum struct CurrentLineRenderMode {
+    /// Fill full line background
+    BACKGROUND = 0,
+    /// Draw line border only
+    BORDER = 1,
+    /// Disable current-line decoration
+    NONE = 2,
   };
 }
 

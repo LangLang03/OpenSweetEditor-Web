@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:sweeteditor/editor_core.dart' as core;
 import 'package:sweeteditor/sweeteditor.dart';
 
@@ -35,67 +36,14 @@ class EditorDemoPage extends StatefulWidget {
 }
 
 class _EditorDemoPageState extends State<EditorDemoPage> {
-  static const int _styleColor = EditorTheme.styleUserBase;
-
-  static const String _sampleCode = '''
-#include <stdio.h>
-#include <stdlib.h>
-
-// A simple linked list node
-typedef struct Node {
-    int data;
-    struct Node* next;
-} Node;
-
-// TODO: add error handling for edge cases
-Node* create_node(int data) {
-    Node* node = (Node*)malloc(sizeof(Node));
-    if (node == NULL) {
-        fprintf(stderr, "Memory allocation failed\\n");
-        return NULL;
-    }
-    node->data = data;
-    node->next = NULL;
-    return node;
-}
-
-void print_list(Node* head) {
-    Node* current = head;
-    while (current != NULL) {
-        printf("%d -> ", current->data);
-        current = current->next;
-    }
-    printf("NULL\\n");
-}
-
-// FIXME: potential memory leak if called twice
-void free_list(Node* head) {
-    Node* current = head;
-    while (current != NULL) {
-        Node* temp = current;
-        current = current->next;
-        free(temp);
-    }
-}
-
-class Color {
-    int value = 0xFF5E6778;
-    const int highlight = 0xFFE0AF68;
-};
-
-int main() {
-    Node* head = create_node(1);
-    head->next = create_node(2);
-    head->next->next = create_node(3);
-    head->next->next->next = create_node(4);
-
-    printf("Linked list: ");
-    print_list(head);
-
-    free_list(head);
-    return 0;
-}
-''';
+  static const int _styleColor = EditorTheme.styleUserBase + 1;
+  static const List<MapEntry<String, String>> _sampleAssets = [
+    MapEntry('example.java', 'assets/demo_shared/files/example.java'),
+    MapEntry('View.java', 'assets/demo_shared/files/View.java'),
+    MapEntry('example.kt', 'assets/demo_shared/files/example.kt'),
+    MapEntry('example.lua', 'assets/demo_shared/files/example.lua'),
+    MapEntry('nlohmann-json.hpp', 'assets/demo_shared/files/nlohmann-json.hpp'),
+  ];
 
   late final SweetEditorController _controller;
   StreamSubscription<TextChangedEvent>? _textChangedSub;
@@ -103,6 +51,9 @@ int main() {
   bool _isDarkTheme = true;
   core.WrapMode _wrapMode = core.WrapMode.none;
   String _statusText = 'Ready';
+  int _activeSampleIndex = 0;
+  bool _isLoadingSample = false;
+  int _loadRequestId = 0;
   Timer? _suggestionTimer;
 
   @override
@@ -110,7 +61,7 @@ int main() {
     super.initState();
     _controller = SweetEditorController();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _setupEditor();
+      unawaited(_setupEditor());
     });
   }
 
@@ -122,16 +73,19 @@ int main() {
     super.dispose();
   }
 
-  void _setupEditor() {
+  Future<void> _setupEditor() async {
     final settings = _controller.settings;
     settings.setFoldArrowMode(core.FoldArrowMode.auto_);
     settings.setCurrentLineRenderMode(core.CurrentLineRenderMode.border);
     settings.setMaxGutterIcons(1);
 
     _controller.addCompletionProvider(DemoCompletionProvider());
-    _controller.addDecorationProvider(
-      DemoDecorationProvider((line) => _controller.getLineText(line)),
-    );
+    try {
+      await DemoDecorationProvider.ensureSweetLineReady();
+      _controller.addDecorationProvider(DemoDecorationProvider(_controller));
+    } catch (_) {
+      _updateStatus('Failed to initialize SweetLine');
+    }
 
     _textChangedSub = _controller.onTextChanged.listen(_onTextChanged);
     _cursorChangedSub = _controller.onCursorChanged.listen(_onCursorChanged);
@@ -142,10 +96,7 @@ int main() {
         onDismissed: () => _updateStatus('Dismissed suggestion'),
       ),
     );
-
-    _controller.metadata = const DemoFileMetadata('sample.cpp');
-    _controller.loadText(_sampleCode);
-    _updateStatus('Loaded: sample.cpp');
+    await _loadSampleByIndex(_activeSampleIndex);
   }
 
   void _onTextChanged(TextChangedEvent e) {
@@ -209,6 +160,44 @@ int main() {
     if (mounted) setState(() => _statusText = message);
   }
 
+  Future<void> _loadSampleByIndex(int index) async {
+    if (index < 0 || index >= _sampleAssets.length) {
+      return;
+    }
+    final requestId = ++_loadRequestId;
+    final sample = _sampleAssets[index];
+    _suggestionTimer?.cancel();
+    _controller.dismissInlineSuggestion();
+    _controller.dismissCompletion();
+    if (mounted) {
+      setState(() {
+        _activeSampleIndex = index;
+        _isLoadingSample = true;
+      });
+    }
+
+    try {
+      final text = await rootBundle.loadString(sample.value);
+      if (!mounted || requestId != _loadRequestId) {
+        return;
+      }
+      _controller.metadata = DemoFileMetadata(sample.key);
+      _controller.loadText(text);
+      _updateStatus('Loaded: ${sample.key}');
+    } catch (e) {
+      if (!mounted || requestId != _loadRequestId) {
+        return;
+      }
+      _updateStatus('Failed to load ${sample.key}');
+    } finally {
+      if (mounted && requestId == _loadRequestId) {
+        setState(() {
+          _isLoadingSample = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = _isDarkTheme;
@@ -248,20 +237,16 @@ int main() {
   }
 
   Widget _buildToolbar(Color bgColor, Color fgColor) {
+    final secondaryColor = Color(_isDarkTheme ? 0xFF5E6778 : 0xFF8A94A6);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       color: bgColor,
       child: Row(
         children: [
-          Expanded(
-            child: Text(
-              'sample.cpp',
-              style: TextStyle(color: fgColor, fontSize: 13),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
+          Expanded(child: _buildSamplePicker(bgColor, fgColor, secondaryColor)),
           _iconButton(Icons.undo, fgColor, () {
+            if (_isLoadingSample) return;
             if (_controller.canUndo) {
               _controller.undo();
               _updateStatus('Undo');
@@ -270,6 +255,7 @@ int main() {
             }
           }),
           _iconButton(Icons.redo, fgColor, () {
+            if (_isLoadingSample) return;
             if (_controller.canRedo) {
               _controller.redo();
               _updateStatus('Redo');
@@ -284,6 +270,45 @@ int main() {
     );
   }
 
+  Widget _buildSamplePicker(
+    Color bgColor,
+    Color fgColor,
+    Color secondaryColor,
+  ) {
+    return Container(
+      height: 36,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      alignment: Alignment.centerLeft,
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<int>(
+          value: _activeSampleIndex,
+          isExpanded: true,
+          dropdownColor: bgColor,
+          iconEnabledColor: secondaryColor,
+          style: TextStyle(color: fgColor, fontSize: 13),
+          onChanged: _isLoadingSample
+              ? null
+              : (value) {
+                  if (value == null || value == _activeSampleIndex) {
+                    return;
+                  }
+                  unawaited(_loadSampleByIndex(value));
+                },
+          items: [
+            for (var i = 0; i < _sampleAssets.length; i++)
+              DropdownMenuItem<int>(
+                value: i,
+                child: Text(
+                  _sampleAssets[i].key,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _iconButton(IconData icon, Color color, VoidCallback onPressed) {
     return IconButton(
       icon: Icon(icon, size: 20, color: color),
@@ -294,12 +319,14 @@ int main() {
   }
 
   Widget _buildStatusBar(Color bgColor, Color textColor) {
+    final fileName = _sampleAssets[_activeSampleIndex].key;
+    final status = _isLoadingSample ? 'Loading $fileName...' : _statusText;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       color: bgColor,
       child: Text(
-        _statusText,
+        '$fileName  |  $status',
         style: TextStyle(color: textColor, fontSize: 11),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,

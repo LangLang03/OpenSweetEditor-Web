@@ -33,6 +33,7 @@ import com.qiplat.sweeteditor.LanguageConfiguration;
 import com.qiplat.sweeteditor.SweetEditor;
 import com.qiplat.sweeteditor.copilot.InlineSuggestion;
 import com.qiplat.sweeteditor.core.Document;
+import com.qiplat.sweeteditor.core.adornment.InlayType;
 import com.qiplat.sweeteditor.core.foundation.CurrentLineRenderMode;
 import com.qiplat.sweeteditor.core.foundation.FoldArrowMode;
 import com.qiplat.sweeteditor.core.foundation.WrapMode;
@@ -102,6 +103,12 @@ public class MainActivity extends AppCompatActivity {
         settings.setFoldArrowMode(FoldArrowMode.AUTO);
         settings.setMaxGutterIcons(1);
         settings.setCurrentLineRenderMode(CurrentLineRenderMode.BORDER);
+
+        LanguageConfiguration configuration = new LanguageConfiguration.Builder("test")
+                .addAutoClosingPair("\"", "\"")
+                .addAutoClosingPair("(", ")")
+                .build();
+        mEditor.setLanguageConfiguration(configuration);
         registerColorStyleForCurrentTheme();
 
         try {
@@ -234,9 +241,9 @@ public class MainActivity extends AppCompatActivity {
             Log.d("SweetEditor", "[TextChanged] action=" + e.action.name() + " range=" + rangeStr + " text=" + textPreview);
         });
         mEditor.subscribe(InlayHintClickEvent.class, e -> {
-            if (e.isColor) {
-                Toast.makeText(this, "Click color: " + String.format("0X%X", e.colorValue), Toast.LENGTH_SHORT).show();
-            } else if (!e.isIcon) {
+            if (e.type == InlayType.COLOR) {
+                Toast.makeText(this, "Click color: " + String.format("0X%X", e.intValue), Toast.LENGTH_SHORT).show();
+            } else if (e.type != InlayType.ICON) {
                 Toast.makeText(this, "Click inlay hint: (" + e.line + "," + e.column + ")", Toast.LENGTH_SHORT).show();
             }
         });

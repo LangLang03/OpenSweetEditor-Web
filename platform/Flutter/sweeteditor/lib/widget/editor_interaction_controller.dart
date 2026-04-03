@@ -31,7 +31,7 @@ class EditorInteractionController {
     _animationTicker?.dispose();
   }
 
-  void onPointerDown(PointerDownEvent event) {
+  core.GestureResult? onPointerDown(PointerDownEvent event) {
     final isTouch = event.kind == PointerDeviceKind.touch;
     final gestureEvent = core.GestureEvent(
       type: isTouch ? core.EventType.touchDown : core.EventType.mouseDown,
@@ -39,10 +39,12 @@ class EditorInteractionController {
         core.PointF(x: event.localPosition.dx, y: event.localPosition.dy),
       ],
     );
-    _processGestureResult(_session.editorCore?.handleGestureEvent(gestureEvent));
+    return _processGestureResult(
+      _session.editorCore?.handleGestureEvent(gestureEvent),
+    );
   }
 
-  void onPointerMove(PointerMoveEvent event) {
+  core.GestureResult? onPointerMove(PointerMoveEvent event) {
     final isTouch = event.kind == PointerDeviceKind.touch;
     final gestureEvent = core.GestureEvent(
       type: isTouch ? core.EventType.touchMove : core.EventType.mouseMove,
@@ -50,10 +52,12 @@ class EditorInteractionController {
         core.PointF(x: event.localPosition.dx, y: event.localPosition.dy),
       ],
     );
-    _processGestureResult(_session.editorCore?.handleGestureEvent(gestureEvent));
+    return _processGestureResult(
+      _session.editorCore?.handleGestureEvent(gestureEvent),
+    );
   }
 
-  void onPointerUp(PointerUpEvent event) {
+  core.GestureResult? onPointerUp(PointerUpEvent event) {
     final isTouch = event.kind == PointerDeviceKind.touch;
     final gestureEvent = core.GestureEvent(
       type: isTouch ? core.EventType.touchUp : core.EventType.mouseUp,
@@ -61,18 +65,22 @@ class EditorInteractionController {
         core.PointF(x: event.localPosition.dx, y: event.localPosition.dy),
       ],
     );
-    _processGestureResult(_session.editorCore?.handleGestureEvent(gestureEvent));
+    return _processGestureResult(
+      _session.editorCore?.handleGestureEvent(gestureEvent),
+    );
   }
 
-  void onPointerSignal(PointerSignalEvent event) {
-    if (event is! PointerScrollEvent) return;
+  core.GestureResult? onPointerSignal(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent) return null;
     final gestureEvent = core.GestureEvent(
       type: core.EventType.mouseWheel,
       points: [core.PointF(x: event.localPosition.dx, y: event.localPosition.dy)],
       wheelDeltaX: event.scrollDelta.dx,
       wheelDeltaY: event.scrollDelta.dy,
     );
-    _processGestureResult(_session.editorCore?.handleGestureEvent(gestureEvent));
+    return _processGestureResult(
+      _session.editorCore?.handleGestureEvent(gestureEvent),
+    );
   }
 
   KeyEventResult handleKeyEvent(FocusNode node, KeyEvent event) {
@@ -131,15 +139,11 @@ class EditorInteractionController {
 
     if (modifiers & (core.Modifier.ctrl | core.Modifier.meta) != 0) {
       if (_handleCtrlShortcut(keyCode, modifiers)) {
-        _resetCursorBlink();
-        _flush();
         return KeyEventResult.handled;
       }
     }
 
     if (keyCode == core.KeyCode.enter && _tryHandleNewLineAction()) {
-      _resetCursorBlink();
-      _flush();
       return KeyEventResult.handled;
     }
 
@@ -167,8 +171,7 @@ class EditorInteractionController {
         _pasteFromClipboard();
         _session.selectionMenuController.hide();
       case SelectionMenuItem.actionSelectAll:
-        _session.editorCore?.selectAll();
-        _flush();
+        selectAll();
       default:
         _session.eventBus.publish(
           SelectionMenuItemClickEvent(itemId: item.id, itemLabel: item.label),
@@ -180,28 +183,38 @@ class EditorInteractionController {
   void onCompletionItemConfirmed(CompletionItem item) {
     final editorCore = _session.editorCore;
     if (editorCore == null) return;
+    core.TextRange? replaceRange;
+    var text = item.insertText ?? item.label;
+    final isSnippet =
+        item.insertTextFormat == CompletionItem.insertTextFormatSnippet;
     if (item.textEdit != null) {
       final edit = item.textEdit!;
-      editorCore.replaceText(
-        edit.range.start.line,
-        edit.range.start.column,
-        edit.range.end.line,
-        edit.range.end.column,
-        edit.newText,
-      );
+      replaceRange = edit.range;
+      text = edit.newText;
     } else {
-      editorCore.insertText(item.insertText ?? item.label);
+      final wordRange = editorCore.getWordRangeAtCursor();
+      if (!_isCollapsedRange(wordRange)) {
+        replaceRange = wordRange;
+      }
     }
-    _flush();
+    if (replaceRange != null) {
+      deleteText(replaceRange, action: TextChangeAction.delete_);
+    }
+    if (isSnippet) {
+      insertSnippet(text);
+    } else {
+      insertText(text);
+    }
   }
 
-  void _processGestureResult(core.GestureResult? result) {
-    if (result == null) return;
+  core.GestureResult? _processGestureResult(core.GestureResult? result) {
+    if (result == null) return null;
     _fireGestureEvents(result);
     _flush();
     _session.selectionMenuController.onGestureResult(result, result.hasSelection);
     _updateAnimationState(result);
     _resetCursorBlink();
+    return result;
   }
 
   void _fireGestureEvents(core.GestureResult result) {
@@ -209,6 +222,7 @@ class EditorInteractionController {
     switch (result.type) {
       case core.GestureType.tap:
         _session.eventBus.publish(CursorChangedEvent(cursorPosition: pos));
+        _session.completionProviderManager.dismiss();
       case core.GestureType.doubleTap:
         _session.eventBus.publish(
           DoubleTapEvent(
@@ -234,6 +248,7 @@ class EditorInteractionController {
         );
         _session.eventBus.publish(CursorChangedEvent(cursorPosition: pos));
       case core.GestureType.scroll:
+      case core.GestureType.fastScroll:
         _session.eventBus.publish(
           ScrollChangedEvent(
             scrollX: result.viewScrollX,
@@ -241,6 +256,7 @@ class EditorInteractionController {
           ),
         );
         _session.decorationProviderManager.onScrollChanged();
+        _session.completionProviderManager.dismiss();
       case core.GestureType.scale:
         _session.eventBus.publish(ScaleChangedEvent(scale: result.viewScale));
       case core.GestureType.dragSelect:
@@ -259,21 +275,19 @@ class EditorInteractionController {
   }
 
   bool _handleCtrlShortcut(core.KeyCode keyCode, int modifiers) {
-    final editorCore = _session.editorCore;
-    if (editorCore == null) return false;
     switch (keyCode) {
       case core.KeyCode.z:
         if (modifiers & core.Modifier.shift != 0) {
-          editorCore.redo();
+          redo();
         } else {
-          editorCore.undo();
+          undo();
         }
         return true;
       case core.KeyCode.y:
-        editorCore.redo();
+        redo();
         return true;
       case core.KeyCode.a:
-        editorCore.selectAll();
+        selectAll();
         return true;
       case core.KeyCode.c:
         _copyToClipboard();
@@ -301,7 +315,12 @@ class EditorInteractionController {
     final text = editorCore?.getSelectedText() ?? '';
     if (text.isNotEmpty) {
       Clipboard.setData(ClipboardData(text: text));
-      editorCore?.backspace();
+      final result = editorCore?.backspace();
+      if (result != null) {
+        _dispatchTextChanged(TextChangeAction.delete_, result);
+        _resetCursorBlink();
+        _flush();
+      }
     }
   }
 
@@ -310,8 +329,7 @@ class EditorInteractionController {
       if (data?.text != null &&
           data!.text!.isNotEmpty &&
           _session.controller.isAttached) {
-        _session.editorCore?.insertText(data.text!);
-        _flush();
+        insertText(data.text!);
       }
     });
   }
@@ -329,33 +347,155 @@ class EditorInteractionController {
       _session.metadata,
     );
     if (action != null) {
-      editorCore?.insertText(action.text);
+      insertText(action.text, action: TextChangeAction.key);
       return true;
     }
     return false;
+  }
+
+  void insertText(String text, {TextChangeAction action = TextChangeAction.insert}) {
+    final editorCore = _session.editorCore;
+    if (editorCore == null) return;
+    final result = editorCore.insertText(text);
+    _dispatchTextChanged(action, result);
+    _resetCursorBlink();
+    _flush();
+  }
+
+  void replaceText(
+    core.TextRange range,
+    String text, {
+    TextChangeAction action = TextChangeAction.insert,
+  }) {
+    final editorCore = _session.editorCore;
+    if (editorCore == null) return;
+    final result = editorCore.replaceText(
+      range.start.line,
+      range.start.column,
+      range.end.line,
+      range.end.column,
+      text,
+    );
+    _dispatchTextChanged(action, result);
+    _resetCursorBlink();
+    _flush();
+  }
+
+  void deleteText(
+    core.TextRange range, {
+    TextChangeAction action = TextChangeAction.delete_,
+  }) {
+    final editorCore = _session.editorCore;
+    if (editorCore == null) return;
+    final result = editorCore.deleteText(
+      range.start.line,
+      range.start.column,
+      range.end.line,
+      range.end.column,
+    );
+    _dispatchTextChanged(action, result);
+    _resetCursorBlink();
+    _flush();
+  }
+
+  void insertSnippet(
+    String snippetTemplate, {
+    TextChangeAction action = TextChangeAction.insert,
+  }) {
+    final editorCore = _session.editorCore;
+    if (editorCore == null) return;
+    final result = editorCore.insertSnippet(snippetTemplate);
+    _dispatchTextChanged(action, result);
+    _resetCursorBlink();
+    _flush();
+  }
+
+  void undo() {
+    final editorCore = _session.editorCore;
+    if (editorCore == null) return;
+    final result = editorCore.undo();
+    _dispatchTextChanged(TextChangeAction.undo, result);
+    _resetCursorBlink();
+    _flush();
+  }
+
+  void redo() {
+    final editorCore = _session.editorCore;
+    if (editorCore == null) return;
+    final result = editorCore.redo();
+    _dispatchTextChanged(TextChangeAction.redo, result);
+    _resetCursorBlink();
+    _flush();
+  }
+
+  void selectAll() {
+    final editorCore = _session.editorCore;
+    if (editorCore == null) return;
+    editorCore.selectAll();
+    _session.selectionMenuController.onSelectAll();
+    _resetCursorBlink();
+    _flush();
+  }
+
+  void _dispatchTextChanged(TextChangeAction action, core.TextEditResult result) {
+    if (!result.changed || result.changes.isEmpty) return;
+    for (final change in result.changes) {
+      _session.eventBus.publish(
+        TextChangedEvent(
+          action: action,
+          changeRange: change.range,
+          text: change.newText,
+        ),
+      );
+    }
+    _session.decorationProviderManager.onTextChanged(result.changes);
+    _session.selectionMenuController.onTextChanged();
+
+    final editorCore = _session.editorCore;
+    if (editorCore == null || editorCore.isInLinkedEditing) {
+      return;
+    }
+
+    final primaryChange = result.changes.first;
+    if (primaryChange.newText.length == 1) {
+      final ch = primaryChange.newText;
+      if (_session.completionProviderManager.isTriggerCharacter(ch)) {
+        _session.completionProviderManager.triggerCompletion(
+          CompletionTriggerKind.character,
+          ch,
+        );
+      } else if (_session.completionPopupController.isShowing) {
+        _session.completionProviderManager.triggerCompletion(
+          CompletionTriggerKind.retrigger,
+          null,
+        );
+      } else if (_isCompletionIdentifier(ch)) {
+        _session.completionProviderManager.triggerCompletion(
+          CompletionTriggerKind.invoked,
+          null,
+        );
+      }
+    } else if (_session.completionPopupController.isShowing) {
+      _session.completionProviderManager.triggerCompletion(
+        CompletionTriggerKind.retrigger,
+        null,
+      );
+    }
   }
 
   void _dispatchKeyEventResult(core.KeyEventResult result, String? typedText) {
     final editorCore = _session.editorCore;
     if (result.contentChanged) {
       final changes = result.editResult?.changes ?? [];
-      for (final change in changes) {
-        _session.eventBus.publish(
-          TextChangedEvent(
-            action: TextChangeAction.key,
-            changeRange: change.range,
-            text: change.newText,
-          ),
-        );
-      }
       if (changes.isNotEmpty) {
-        _session.decorationProviderManager.onTextChanged(changes);
-      }
-      if (typedText != null &&
-          _session.completionProviderManager.isTriggerCharacter(typedText)) {
+        _dispatchTextChanged(
+          TextChangeAction.key,
+          result.editResult ?? core.TextEditResult.empty,
+        );
+      } else if (_session.completionPopupController.isShowing) {
         _session.completionProviderManager.triggerCompletion(
-          CompletionTriggerKind.character,
-          typedText,
+          CompletionTriggerKind.retrigger,
+          null,
         );
       }
     }
@@ -416,6 +556,20 @@ class EditorInteractionController {
       _animating = false;
       _animationTicker?.stop();
     }
+  }
+
+  static bool _isCollapsedRange(core.TextRange range) {
+    return range.start.line == range.end.line &&
+        range.start.column == range.end.column;
+  }
+
+  static bool _isCompletionIdentifier(String text) {
+    if (text.length != 1) return false;
+    final code = text.codeUnitAt(0);
+    return (code >= 48 && code <= 57) ||
+        (code >= 65 && code <= 90) ||
+        (code >= 97 && code <= 122) ||
+        code == 95;
   }
 
   static core.KeyCode _mapLogicalKey(LogicalKeyboardKey key) {

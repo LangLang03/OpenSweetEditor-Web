@@ -16,7 +16,9 @@ abstract class EditorSettingsHost {
   void applyGutterVisible(bool visible);
   void applyCurrentLineRenderMode(core.CurrentLineRenderMode mode);
   void applyAutoIndentMode(core.AutoIndentMode mode);
+  void applyBackspaceUnindent(bool enabled);
   void applyReadOnly(bool readOnly);
+  void applyCompositionEnabled(bool enabled);
   void applyMaxGutterIcons(int count);
   void requestDecorationRefresh();
   void flushEditor();
@@ -40,20 +42,30 @@ class EditorSettings {
   core.CurrentLineRenderMode _currentLineRenderMode =
       core.CurrentLineRenderMode.background;
   core.AutoIndentMode _autoIndentMode = core.AutoIndentMode.none;
+  bool _backspaceUnindent = true;
   bool _readOnly = false;
+  bool _compositionEnabled = false;
   int _maxGutterIcons = 0;
   int _decorationScrollRefreshMinIntervalMs = 16;
   double _decorationOverscanViewportMultiplier = 1.5;
   bool _textSizeCustomized = false;
   bool _fontFamilyCustomized = false;
+  bool _gutterStickyCustomized = false;
   EditorSettingsHost? _host;
 
-  void seedDefaults({required double textSize, required String fontFamily}) {
+  void seedDefaults({
+    required double textSize,
+    required String fontFamily,
+    bool? gutterSticky,
+  }) {
     if (!_textSizeCustomized) {
       _textSize = textSize;
     }
     if (!_fontFamilyCustomized) {
       _fontFamily = fontFamily;
+    }
+    if (!_gutterStickyCustomized && gutterSticky != null) {
+      _gutterSticky = gutterSticky;
     }
   }
 
@@ -150,6 +162,7 @@ class EditorSettings {
 
   void setGutterSticky(bool sticky) {
     _gutterSticky = sticky;
+    _gutterStickyCustomized = true;
     _host?.applyGutterSticky(sticky);
     _host?.flushEditor();
   }
@@ -180,12 +193,27 @@ class EditorSettings {
 
   core.AutoIndentMode getAutoIndentMode() => _autoIndentMode;
 
+  void setBackspaceUnindent(bool enabled) {
+    _backspaceUnindent = enabled;
+    _host?.applyBackspaceUnindent(enabled);
+  }
+
+  bool isBackspaceUnindent() => _backspaceUnindent;
+
   void setReadOnly(bool readOnly) {
     _readOnly = readOnly;
     _host?.applyReadOnly(readOnly);
   }
 
   bool isReadOnly() => _readOnly;
+
+  void setCompositionEnabled(bool enabled) {
+    _compositionEnabled = enabled;
+    _host?.applyCompositionEnabled(enabled);
+    _host?.flushEditor();
+  }
+
+  bool isCompositionEnabled() => _compositionEnabled;
 
   void setMaxGutterIcons(int count) {
     _maxGutterIcons = count;
@@ -228,7 +256,9 @@ class EditorSettings {
     host.applyGutterVisible(_gutterVisible);
     host.applyCurrentLineRenderMode(_currentLineRenderMode);
     host.applyAutoIndentMode(_autoIndentMode);
+    host.applyBackspaceUnindent(_backspaceUnindent);
     host.applyReadOnly(_readOnly);
+    host.applyCompositionEnabled(_compositionEnabled);
     host.applyMaxGutterIcons(_maxGutterIcons);
     host.requestDecorationRefresh();
     host.flushEditor();

@@ -110,6 +110,7 @@ public class SweetEditor extends JPanel {
         completionPopupController.setConfirmListener(this::applyCompletionItem);
 
         settings = new EditorSettings(this);
+        editorCore.setCompositionEnabled(settings.isCompositionEnabled());
         settings.setContentStartPadding(dpToPx(DEFAULT_CONTENT_START_PADDING_DP));
 
         inlineSuggestionController = new InlineSuggestionController(this);
@@ -393,21 +394,34 @@ public class SweetEditor extends JPanel {
 
     public void setLanguageConfiguration(LanguageConfiguration config) {
         this.languageConfiguration = config;
-        if (config != null) {
-            if (!config.getBrackets().isEmpty()) {
-                int size = config.getBrackets().size();
-                int[] opens = new int[size];
-                int[] closes = new int[size];
-                for (int i = 0; i < size; i++) {
-                    LanguageConfiguration.BracketPair pair = config.getBrackets().get(i);
-                    opens[i] = pair.open.isEmpty() ? 0 : pair.open.codePointAt(0);
-                    closes[i] = pair.close.isEmpty() ? 0 : pair.close.codePointAt(0);
-                }
-                editorCore.setBracketPairs(opens, closes);
+        if (config == null) return;
+
+        List<LanguageConfiguration.BracketPair> brackets = config.getBrackets();
+        if (brackets != null && !brackets.isEmpty()) {
+            int size = brackets.size();
+            int[] opens = new int[size];
+            int[] closes = new int[size];
+            for (int i = 0; i < size; i++) {
+                LanguageConfiguration.BracketPair pair = brackets.get(i);
+                opens[i] = pair.open.isEmpty() ? 0 : pair.open.codePointAt(0);
+                closes[i] = pair.close.isEmpty() ? 0 : pair.close.codePointAt(0);
             }
-            if (config.getTabSize() != null && config.getTabSize() > 0) {
-                editorCore.setTabSize(config.getTabSize());
+            editorCore.setBracketPairs(opens, closes);
+        }
+        List<LanguageConfiguration.BracketPair> acPairs = config.getAutoClosingPairs();
+        if (acPairs != null && !acPairs.isEmpty()) {
+            int acSize = acPairs.size();
+            int[] acOpens = new int[acSize];
+            int[] acCloses = new int[acSize];
+            for (int i = 0; i < acSize; i++) {
+                LanguageConfiguration.BracketPair pair = acPairs.get(i);
+                acOpens[i] = pair.open.isEmpty() ? 0 : pair.open.codePointAt(0);
+                acCloses[i] = pair.close.isEmpty() ? 0 : pair.close.codePointAt(0);
             }
+            editorCore.setAutoClosingPairs(acOpens, acCloses);
+        }
+        if (config.getTabSize() != null && config.getTabSize() > 0) {
+            editorCore.setTabSize(config.getTabSize());
         }
     }
     public LanguageConfiguration getLanguageConfiguration() { return languageConfiguration; }
@@ -696,7 +710,7 @@ public class SweetEditor extends JPanel {
 
                     if (committed.length() > 0) {
                         TextEditResult editResult;
-                        if (editorCore.isComposing()) {
+                        if (settings.isCompositionEnabled() && editorCore.isComposing()) {
                             editResult = editorCore.compositionEnd(committed.toString());
                             dispatchTextChanged(TextChangeAction.COMPOSITION, editResult);
                         } else {
@@ -707,12 +721,14 @@ public class SweetEditor extends JPanel {
                         flush();
                     }
                     if (composed.length() > 0) {
-                        if (!editorCore.isComposing()) {
+                        if (settings.isCompositionEnabled() && !editorCore.isComposing()) {
                             editorCore.compositionStart();
                         }
-                        editorCore.compositionUpdate(composed.toString());
-                        flush();
-                    } else if (editorCore.isComposing() && committed.length() == 0) {
+                        if (settings.isCompositionEnabled()) {
+                            editorCore.compositionUpdate(composed.toString());
+                            flush();
+                        }
+                    } else if (settings.isCompositionEnabled() && editorCore.isComposing() && committed.length() == 0) {
                         editorCore.compositionCancel();
                         flush();
                     }

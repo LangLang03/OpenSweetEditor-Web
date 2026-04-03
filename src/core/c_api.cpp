@@ -164,20 +164,22 @@ static void appendVisualLine(std::vector<uint8_t>& buffer, const VisualLine& lin
   }
 }
 
+static void appendRect(std::vector<uint8_t>& buffer, const Rect& rect) {
+  appendPoint(buffer, rect.origin);
+  appendF32(buffer, rect.width);
+  appendF32(buffer, rect.height);
+}
+
 static void appendGutterIconRenderItem(std::vector<uint8_t>& buffer, const GutterIconRenderItem& item) {
   appendI32(buffer, static_cast<int32_t>(item.logical_line));
   appendI32(buffer, item.icon_id);
-  appendPoint(buffer, item.origin);
-  appendF32(buffer, item.width);
-  appendF32(buffer, item.height);
+  appendRect(buffer, item.rect);
 }
 
 static void appendFoldMarkerRenderItem(std::vector<uint8_t>& buffer, const FoldMarkerRenderItem& item) {
   appendI32(buffer, static_cast<int32_t>(item.logical_line));
   appendI32(buffer, static_cast<int32_t>(item.fold_state));
-  appendPoint(buffer, item.origin);
-  appendF32(buffer, item.width);
-  appendF32(buffer, item.height);
+  appendRect(buffer, item.rect);
 }
 
 static void appendCursor(std::vector<uint8_t>& buffer, const Cursor& cursor) {
@@ -188,12 +190,6 @@ static void appendCursor(std::vector<uint8_t>& buffer, const Cursor& cursor) {
   appendBool(buffer, cursor.show_dragger);
 }
 
-static void appendSelectionRect(std::vector<uint8_t>& buffer, const SelectionRect& rect) {
-  appendPoint(buffer, rect.origin);
-  appendF32(buffer, rect.width);
-  appendF32(buffer, rect.height);
-}
-
 static void appendSelectionHandle(std::vector<uint8_t>& buffer, const SelectionHandle& handle) {
   appendPoint(buffer, handle.position);
   appendF32(buffer, handle.height);
@@ -202,9 +198,7 @@ static void appendSelectionHandle(std::vector<uint8_t>& buffer, const SelectionH
 
 static void appendCompositionDecoration(std::vector<uint8_t>& buffer, const CompositionDecoration& decoration) {
   appendBool(buffer, decoration.active);
-  appendPoint(buffer, decoration.origin);
-  appendF32(buffer, decoration.width);
-  appendF32(buffer, decoration.height);
+  appendRect(buffer, decoration.rect);
 }
 
 static void appendGuideSegment(std::vector<uint8_t>& buffer, const GuideSegment& segment) {
@@ -217,38 +211,22 @@ static void appendGuideSegment(std::vector<uint8_t>& buffer, const GuideSegment&
 }
 
 static void appendDiagnosticDecoration(std::vector<uint8_t>& buffer, const DiagnosticDecoration& decoration) {
-  appendPoint(buffer, decoration.origin);
-  appendF32(buffer, decoration.width);
-  appendF32(buffer, decoration.height);
+  appendRect(buffer, decoration.rect);
   appendI32(buffer, decoration.severity);
   appendI32(buffer, decoration.color);
 }
 
 static void appendLinkedEditingRect(std::vector<uint8_t>& buffer, const LinkedEditingRect& rect) {
-  appendPoint(buffer, rect.origin);
-  appendF32(buffer, rect.width);
-  appendF32(buffer, rect.height);
+  appendRect(buffer, rect.rect);
   appendBool(buffer, rect.is_active);
-}
-
-static void appendBracketHighlightRect(std::vector<uint8_t>& buffer, const BracketHighlightRect& rect) {
-  appendPoint(buffer, rect.origin);
-  appendF32(buffer, rect.width);
-  appendF32(buffer, rect.height);
-}
-
-static void appendScrollbarRect(std::vector<uint8_t>& buffer, const ScrollbarRect& rect) {
-  appendPoint(buffer, rect.origin);
-  appendF32(buffer, rect.width);
-  appendF32(buffer, rect.height);
 }
 
 static void appendScrollbarModel(std::vector<uint8_t>& buffer, const ScrollbarModel& scrollbar) {
   appendBool(buffer, scrollbar.visible);
   appendF32(buffer, scrollbar.alpha);
   appendBool(buffer, scrollbar.thumb_active);
-  appendScrollbarRect(buffer, scrollbar.track);
-  appendScrollbarRect(buffer, scrollbar.thumb);
+  appendRect(buffer, scrollbar.track);
+  appendRect(buffer, scrollbar.thumb);
 }
 
 static const uint8_t* editorRenderModelToBinary(const EditorRenderModel& model, size_t* out_size) {
@@ -282,7 +260,7 @@ static const uint8_t* editorRenderModelToBinary(const EditorRenderModel& model, 
 
   appendI32(buffer, static_cast<int32_t>(model.selection_rects.size()));
   for (const auto& rect : model.selection_rects) {
-    appendSelectionRect(buffer, rect);
+    appendRect(buffer, rect);
   }
 
   appendSelectionHandle(buffer, model.selection_start_handle);
@@ -308,7 +286,7 @@ static const uint8_t* editorRenderModelToBinary(const EditorRenderModel& model, 
 
   appendI32(buffer, static_cast<int32_t>(model.bracket_highlight_rects.size()));
   for (const auto& rect : model.bracket_highlight_rects) {
-    appendBracketHighlightRect(buffer, rect);
+    appendRect(buffer, rect);
   }
 
   // Optional payload tail (append-only): scrollbar render models.
@@ -1265,6 +1243,14 @@ int editor_get_auto_indent_mode(intptr_t editor_handle) {
   return static_cast<int>(editor_core->getAutoIndentMode());
 }
 
+void editor_set_backspace_unindent(intptr_t editor_handle, int enabled) {
+  Ptr<EditorCore> editor_core = getCPtrHolderValue<EditorCore>(editor_handle);
+  if (editor_core == nullptr) {
+    return;
+  }
+  editor_core->setBackspaceUnindent(enabled != 0);
+}
+
 #pragma endregion
 
 #pragma region [Navigation, Styles & Decorations]
@@ -1862,6 +1848,19 @@ void editor_set_bracket_pairs(intptr_t editor_handle, const uint32_t* open_chars
     pairs.push_back({static_cast<char32_t>(open_chars[i]), static_cast<char32_t>(close_chars[i])});
   }
   editor_core->setBracketPairs(std::move(pairs));
+}
+
+void editor_set_auto_closing_pairs(intptr_t editor_handle, const uint32_t* open_chars, const uint32_t* close_chars, size_t count) {
+  Ptr<EditorCore> editor_core = getCPtrHolderValue<EditorCore>(editor_handle);
+  if (editor_core == nullptr) return;
+  Vector<BracketPair> pairs;
+  if (open_chars != nullptr && close_chars != nullptr) {
+    pairs.reserve(count);
+    for (size_t i = 0; i < count; ++i) {
+      pairs.push_back({static_cast<char32_t>(open_chars[i]), static_cast<char32_t>(close_chars[i])});
+    }
+  }
+  editor_core->setAutoClosingPairs(std::move(pairs));
 }
 
 void editor_set_matched_brackets(intptr_t editor_handle, size_t open_line, size_t open_col, size_t close_line, size_t close_col) {

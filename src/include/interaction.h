@@ -2,15 +2,12 @@
 #define SWEETEDITOR_INTERACTION_H
 
 #include <macro.h>
+#include <editor_types.h>
 #include <visual.h>
 #include <gesture.h>
 
 namespace NS_SWEETEDITOR {
-  class EditorCore;
   class TextLayout;
-  struct EditorSettings;
-  struct ViewState;
-  struct Viewport;
 
   struct InteractionContext {
     TouchConfig touch_config;
@@ -18,6 +15,15 @@ namespace NS_SWEETEDITOR {
     ViewState* view_state {nullptr};
     Viewport* viewport {nullptr};
     TextLayout* text_layout {nullptr};
+    CaretState* caret {nullptr};
+  };
+
+  struct GestureIntent {
+    bool place_cursor {false};
+    bool select_word {false};
+    bool toggle_fold {false};
+    size_t fold_line {0};
+    bool cancel_linked_editing {false};
   };
 
   class EditorInteraction {
@@ -32,16 +38,11 @@ namespace NS_SWEETEDITOR {
 
     explicit EditorInteraction(const InteractionContext& context);
 
-    GestureResult handleGestureEvent(EditorCore& core, const GestureEvent& event);
-    GestureResult tickEdgeScroll(TextPosition& cursor_position);
-    GestureResult tickFling(const TextPosition& cursor_position);
-    GestureResult tickAnimations(TextPosition& cursor_position);
+    GestureResult handleGestureEvent(const GestureEvent& event, GestureIntent& intent);
+    GestureResult tickEdgeScroll();
+    GestureResult tickFling();
+    GestureResult tickAnimations();
     void stopFling();
-
-    void setSelection(const TextRange& range);
-    void clearSelection();
-    const TextRange& selection() const;
-    bool hasSelection() const;
 
     void markScrollbarInteraction();
     void computeScrollbarModels(ScrollbarModel& vertical, ScrollbarModel& horizontal) const;
@@ -66,12 +67,12 @@ namespace NS_SWEETEDITOR {
       int64_t last_tick_time {0};
     };
 
-    void fillGestureResult(const TextPosition& cursor_position, GestureResult& result) const;
+    void fillGestureResult(GestureResult& result) const;
     PointF resolveScaleFocus(const GestureEvent& event) const;
-    bool handleScrollbarGesture(TextPosition& cursor_position, const GestureEvent& event, GestureResult& result);
+    bool handleScrollbarGesture(const GestureEvent& event, GestureResult& result);
     HandleDragTarget hitTestHandle(const PointF& screen_point) const;
-    void dragHandleTo(TextPosition& cursor_position, HandleDragTarget target, const PointF& screen_point);
-    void dragSelectTo(TextPosition& cursor_position, const PointF& screen_point, bool is_mouse = false);
+    void dragHandleTo(HandleDragTarget target, const PointF& screen_point);
+    void dragSelectTo(const PointF& screen_point, bool is_mouse = false);
     void updateEdgeScrollState(const PointF& screen_point, bool is_handle_drag, bool is_mouse);
 
     InteractionContext m_context_;
@@ -99,8 +100,6 @@ namespace NS_SWEETEDITOR {
     bool m_cached_handles_valid_ {false};
 
     EdgeScrollState m_edge_scroll_;
-    TextRange m_selection_;
-    bool m_has_selection_ {false};
   };
 }
 

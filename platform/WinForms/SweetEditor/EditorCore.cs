@@ -1498,6 +1498,12 @@ namespace SweetEditor {
 		[DllImport(LibraryName, EntryPoint = "editor_is_composing", CallingConvention = CallingConvention.Cdecl)]
 		internal static extern int IsComposing(IntPtr handle);
 
+		[DllImport(LibraryName, EntryPoint = "editor_set_composition_enabled", CallingConvention = CallingConvention.Cdecl)]
+		internal static extern void SetCompositionEnabled(IntPtr handle, int enabled);
+
+		[DllImport(LibraryName, EntryPoint = "editor_is_composition_enabled", CallingConvention = CallingConvention.Cdecl)]
+		internal static extern int IsCompositionEnabled(IntPtr handle);
+
 		[DllImport(LibraryName, EntryPoint = "editor_set_read_only", CallingConvention = CallingConvention.Cdecl)]
 		internal static extern void SetReadOnly(IntPtr handle, int readOnly);
 
@@ -1509,6 +1515,9 @@ namespace SweetEditor {
 
 		[DllImport(LibraryName, EntryPoint = "editor_get_auto_indent_mode", CallingConvention = CallingConvention.Cdecl)]
 		internal static extern int GetAutoIndentMode(IntPtr handle);
+
+		[DllImport(LibraryName, EntryPoint = "editor_set_backspace_unindent", CallingConvention = CallingConvention.Cdecl)]
+		internal static extern void SetBackspaceUnindent(IntPtr handle, int enabled);
 
 		[DllImport(LibraryName, EntryPoint = "editor_set_handle_config", CallingConvention = CallingConvention.Cdecl)]
 		internal static extern void SetHandleConfig(IntPtr handle,
@@ -1644,6 +1653,9 @@ namespace SweetEditor {
 
 		[DllImport(LibraryName, EntryPoint = "editor_set_bracket_pairs", CallingConvention = CallingConvention.Cdecl)]
 		internal static extern void SetBracketPairs(IntPtr handle, int[] openChars, int[] closeChars, nuint count);
+
+		[DllImport(LibraryName, EntryPoint = "editor_set_auto_closing_pairs", CallingConvention = CallingConvention.Cdecl)]
+		internal static extern void SetAutoClosingPairs(IntPtr handle, int[] openChars, int[] closeChars, nuint count);
 
 		[DllImport(LibraryName, EntryPoint = "editor_set_matched_brackets", CallingConvention = CallingConvention.Cdecl)]
 		internal static extern void SetMatchedBrackets(IntPtr handle, nuint openLine, nuint openCol, nuint closeLine, nuint closeCol);
@@ -2167,6 +2179,16 @@ namespace SweetEditor {
 			return NativeMethods.IsComposing(nativeHandle) != 0;
 		}
 
+		/// <summary>Enables or disables IME composition.</summary>
+		public void SetCompositionEnabled(bool enabled) {
+			NativeMethods.SetCompositionEnabled(nativeHandle, enabled ? 1 : 0);
+		}
+
+		/// <summary>Returns whether IME composition is enabled.</summary>
+		public bool IsCompositionEnabled() {
+			return NativeMethods.IsCompositionEnabled(nativeHandle) != 0;
+		}
+
 		#endregion
 
 		#region Read-only mode
@@ -2197,6 +2219,11 @@ namespace SweetEditor {
 		/// <returns>Auto-indent mode value (0=NONE, 1=KEEP_INDENT).</returns>
 		public int GetAutoIndentMode() {
 			return NativeMethods.GetAutoIndentMode(nativeHandle);
+		}
+
+		/// <summary>Sets backspace unindent behavior.</summary>
+		public void SetBackspaceUnindent(bool enabled) {
+			NativeMethods.SetBackspaceUnindent(nativeHandle, enabled ? 1 : 0);
 		}
 
 		#endregion
@@ -2682,6 +2709,12 @@ namespace SweetEditor {
 		public void SetBracketPairs(int[] openChars, int[] closeChars) {
 			if (openChars.Length != closeChars.Length) throw new ArgumentException("open/close arrays must have same length");
 			NativeMethods.SetBracketPairs(nativeHandle, openChars, closeChars, (nuint)openChars.Length);
+		}
+
+		/// <summary>Sets auto-closing pairs for automatic bracket completion.</summary>
+		public void SetAutoClosingPairs(int[] openChars, int[] closeChars) {
+			if (openChars.Length != closeChars.Length) throw new ArgumentException("open/close arrays must have same length");
+			NativeMethods.SetAutoClosingPairs(nativeHandle, openChars, closeChars, (nuint)openChars.Length);
 		}
 
 		/// <summary>Sets externally computed exact bracket pair positions (takes priority over built-in scanning).</summary>

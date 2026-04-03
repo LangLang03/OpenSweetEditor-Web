@@ -1140,6 +1140,13 @@ class SweetEditorCore {
         }
     }
 
+    /// Sets backspace unindent behavior.
+    func setBackspaceUnindent(_ enabled: Bool) {
+        performCoreCall {
+            editor_set_backspace_unindent(handle, enabled ? 1 : 0)
+        }
+    }
+
     struct ScrollbarConfig {
         enum ScrollbarMode: Int32 {
             case ALWAYS = 0
@@ -1836,6 +1843,16 @@ class SweetEditorCore {
         var closes = closeChars.map(UInt32.init(bitPattern:))
         performCoreCall {
             editor_set_bracket_pairs(handle, &opens, &closes, opens.count)
+        }
+    }
+
+    /// Sets auto-closing pairs for automatic bracket completion.
+    func setAutoClosingPairs(openChars: [Int32], closeChars: [Int32]) {
+        assert(openChars.count == closeChars.count, "open/close arrays must have same length")
+        var opens = openChars.map(UInt32.init(bitPattern:))
+        var closes = closeChars.map(UInt32.init(bitPattern:))
+        performCoreCall {
+            editor_set_auto_closing_pairs(handle, &opens, &closes, opens.count)
         }
     }
 

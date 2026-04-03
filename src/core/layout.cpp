@@ -95,8 +95,7 @@ namespace NS_SWEETEDITOR {
       return;
     }
     logical_line.visual_lines.clear();
-    m_document_->updateDirtyLine(index, logical_line);
-    const U16String& line_text = logical_line.cached_text;
+    const U16String& line_text = m_document_->getLineU16TextRef(index);
     float single_line_height = getLineHeight();
 
     layoutLineIntoVisualLines(index, line_text, logical_line.start_y, logical_line.visual_lines);
@@ -612,7 +611,7 @@ namespace NS_SWEETEDITOR {
   }
 
   void TextLayout::getColumnSelectionRects(size_t line, size_t col_start, size_t col_end,
-                                            float rect_height, Vector<SelectionRect>& out_rects) {
+                                            float rect_height, Vector<Rect>& out_rects) {
     if (m_document_ == nullptr) return;
     Vector<LogicalLine>& logical_lines = m_document_->getLogicalLines();
     if (line >= logical_lines.size()) return;
@@ -704,7 +703,7 @@ namespace NS_SWEETEDITOR {
         if (!found_end) x_end = last_x;
       }
 
-      SelectionRect rect;
+      Rect rect;
       rect.origin = {text_area_x + x_start - scroll_offset,
                      vl.line_number_position.y - scroll_y};
       rect.width = x_end - x_start;
@@ -1628,8 +1627,7 @@ namespace NS_SWEETEDITOR {
     if (end_line_idx >= all_lines.size()) return;
 
     LogicalLine& end_ll = all_lines[end_line_idx];
-    m_document_->updateDirtyLine(end_line_idx, end_ll);
-    const U16String& end_text = end_ll.cached_text;
+    const U16String& end_text = m_document_->getLineU16TextRef(end_line_idx);
 
     // Count leading whitespace characters (skip spaces and tabs)
     size_t trim_pos = 0;
@@ -1718,9 +1716,7 @@ namespace NS_SWEETEDITOR {
       GutterIconRenderItem item;
       item.logical_line = logical_line;
       item.icon_id = gutter_icons[0].icon_id;
-      item.origin = {m_layout_metrics_.line_number_margin + gutter_offset, icon_top};
-      item.width = icon_size;
-      item.height = icon_size;
+      item.rect = {{m_layout_metrics_.line_number_margin + gutter_offset, icon_top}, icon_size, icon_size};
       out_items.push_back(std::move(item));
       return;
     }
@@ -1736,9 +1732,7 @@ namespace NS_SWEETEDITOR {
       GutterIconRenderItem item;
       item.logical_line = logical_line;
       item.icon_id = gutter_icons[icon_index].icon_id;
-      item.origin = {icon_right - icon_size, icon_top};
-      item.width = icon_size;
-      item.height = icon_size;
+      item.rect = {{icon_right - icon_size, icon_top}, icon_size, icon_size};
       out_items.push_back(std::move(item));
       icon_right -= icon_size;
     }
@@ -1759,9 +1753,7 @@ namespace NS_SWEETEDITOR {
     const float marker_top = line_top_screen + std::max(0.0f, (line_height - marker_height) * 0.5f);
     out_item.logical_line = logical_line;
     out_item.fold_state = static_cast<FoldState>(fs);
-    out_item.origin = {fold_left, marker_top};
-    out_item.width = fold_width;
-    out_item.height = marker_height;
+    out_item.rect = {{fold_left, marker_top}, fold_width, marker_height};
     return true;
   }
 

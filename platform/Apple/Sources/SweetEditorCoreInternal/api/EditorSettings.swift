@@ -50,7 +50,9 @@ public final class EditorSettings {
     public private(set) var showSplitLine = true
     public private(set) var currentLineRenderMode: CurrentLineRenderMode = .background
     public private(set) var autoIndentMode: AutoIndentMode = .keepIndent
+    public private(set) var backspaceUnindent = true
     public private(set) var readOnly = false
+    public private(set) var compositionEnabled = true
     public private(set) var maxGutterIcons: UInt32 = 0
     public private(set) var decorationScrollRefreshMinIntervalMs: Int64 = 16
     public private(set) var decorationOverscanViewportMultiplier: Float = 1.5
@@ -124,9 +126,20 @@ public final class EditorSettings {
         apply()
     }
 
+    /// Updates backspace unindent behavior and applies the change immediately.
+    public func setBackspaceUnindent(_ enabled: Bool) {
+        backspaceUnindent = enabled
+        apply()
+    }
+
     /// Updates read-only mode and applies the change immediately.
     public func setReadOnly(_ readOnly: Bool) {
         self.readOnly = readOnly
+        apply()
+    }
+
+    public func setCompositionEnabled(_ enabled: Bool) {
+        compositionEnabled = enabled
         apply()
     }
 

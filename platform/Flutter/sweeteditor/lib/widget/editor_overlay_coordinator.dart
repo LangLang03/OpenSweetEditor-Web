@@ -1,5 +1,11 @@
 part of '../sweeteditor.dart';
 
+const double _kSelectionMenuMeasureHeight = 36;
+const double _kSelectionMenuMeasureHorizontalInset = 4;
+const double _kSelectionMenuMeasureItemHorizontalPadding = 12;
+const double _kSelectionMenuMeasureFontSize = 12;
+const double _kSelectionMenuMeasureDividerWidth = 1;
+
 class EditorOverlayCoordinator {
   EditorOverlayCoordinator({required EditorSession session}) : _session = session {
     _session.completionPopupController.bindOverlay(
@@ -48,25 +54,26 @@ class EditorOverlayCoordinator {
   void onRenderModelUpdated(core.EditorRenderModel model) {
     if (_session.completionPopupController.isShowing && model.cursor.visible) {
       _session.completionPopupController.updateCursorPosition(
-        model.cursor.position.x - model.scrollX,
-        model.cursor.position.y - model.scrollY,
+        model.cursor.position.x,
+        model.cursor.position.y,
         model.cursor.height,
       );
     }
 
     if (_session.inlineSuggestionController.isShowing && model.cursor.visible) {
       _session.inlineSuggestionController.updatePosition(
-        model.cursor.position.x - model.scrollX,
-        model.cursor.position.y - model.scrollY,
+        model.cursor.position.x,
+        model.cursor.position.y,
         model.cursor.height,
       );
     }
   }
 
-  Offset computeSelectionMenuPosition(Size viewportSize) {
+  Offset computeSelectionMenuPosition(
+    Size viewportSize,
+    List<SelectionMenuItem> items,
+  ) {
     final model = _session.renderModel;
-    final sx = model.scrollX;
-    final sy = model.scrollY;
     final start = model.selectionStartHandle;
     final end = model.selectionEndHandle;
 
@@ -74,11 +81,11 @@ class EditorOverlayCoordinator {
     double topY;
     double bottomY;
     if (start.visible) {
-      final startX = start.position.x - sx;
-      final startY = start.position.y - sy;
+      final startX = start.position.x;
+      final startY = start.position.y;
       final startBottom = startY + start.height;
-      final endX = end.visible ? end.position.x - sx : startX;
-      final endY = end.visible ? end.position.y - sy : startY;
+      final endX = end.visible ? end.position.x : startX;
+      final endY = end.visible ? end.position.y : startY;
       final endBottom = end.visible ? endY + end.height : startBottom;
       anchorX = (startX + endX) * 0.5;
       topY = math.min(startY, endY);
@@ -89,8 +96,8 @@ class EditorOverlayCoordinator {
       bottomY = 0;
     }
 
-    const menuWidth = 240.0;
-    const menuHeight = 36.0;
+    final menuWidth = _measureSelectionMenuWidth(items);
+    const menuHeight = _kSelectionMenuMeasureHeight;
     const offsetY = 8.0;
     const handleClearance = 32.0;
 
@@ -140,5 +147,25 @@ class EditorOverlayCoordinator {
       update: (data) => updateOverlay(data),
       hide: () => updateOverlay(null),
     );
+  }
+
+  double _measureSelectionMenuWidth(List<SelectionMenuItem> items) {
+    if (items.isEmpty) return 0;
+    var width = _kSelectionMenuMeasureHorizontalInset * 2;
+    for (var i = 0; i < items.length; i++) {
+      if (i > 0) {
+        width += _kSelectionMenuMeasureDividerWidth;
+      }
+      final painter = TextPainter(
+        text: TextSpan(
+          text: items[i].label,
+          style: const TextStyle(fontSize: _kSelectionMenuMeasureFontSize),
+        ),
+        textDirection: TextDirection.ltr,
+        maxLines: 1,
+      )..layout();
+      width += painter.width + _kSelectionMenuMeasureItemHorizontalPadding * 2;
+    }
+    return width;
   }
 }

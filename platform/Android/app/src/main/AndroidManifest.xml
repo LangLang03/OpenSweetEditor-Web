@@ -25,6 +25,9 @@
             android:title="Markdown"
             android:name=".MarkwonActivity"
             android:exported="false" />
+        <activity
+            android:name=".EditorTestActivity"
+            android:exported="false" />
     </application>
 
 </manifest>

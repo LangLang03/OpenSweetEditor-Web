@@ -80,7 +80,7 @@ namespace NS_SWEETEDITOR {
 
     /// Convert whole-document character offset to line/column position
     /// @param char_index Character offset from document start (UTF-16 character count)
-    virtual TextPosition getPositionFromCharIndex(size_t char_index) const = 0;
+    virtual TextPosition getPositionFromCharIndex(size_t char_index) = 0;
 
     /// Convert line/column position to whole-document character offset
     virtual size_t getCharIndexFromPosition(const TextPosition& position) = 0;
@@ -105,6 +105,10 @@ namespace NS_SWEETEDITOR {
     /// Get all logical line data
     virtual Vector<LogicalLine>& getLogicalLines() = 0;
 
+    /// Get UTF-16 text reference of specified line, refreshing cache if dirty
+    virtual const U16String& getLineU16TextRef(size_t line) = 0;
+
+  protected:
     /// Refresh cached data for specified line (reload text from storage, update char offsets, etc.)
     /// @param index Line index
     /// @param logical_line Logical line to refresh (is_char_dirty flag will be cleared)
@@ -142,7 +146,7 @@ namespace NS_SWEETEDITOR {
     size_t getLineCount() const override;
     U16String getLineU16Text(size_t line) const override;
     uint32_t getLineColumns(size_t line) override;
-    TextPosition getPositionFromCharIndex(size_t char_index) const override;
+    TextPosition getPositionFromCharIndex(size_t char_index) override;
     size_t getCharIndexFromPosition(const TextPosition& position) override;
     void insertU8Text(const TextPosition& position, const U8String& text) override;
     void deleteU8Text(const TextRange& range) override;
@@ -150,8 +154,9 @@ namespace NS_SWEETEDITOR {
     U8String getU8Text(const TextRange& range) override;
     size_t countChars(size_t start_byte, size_t byte_length) const override;
     Vector<LogicalLine>& getLogicalLines() override;
-    void updateDirtyLine(size_t index, LogicalLine& logical_line) override;
+    const U16String& getLineU16TextRef(size_t line) override;
   protected:
+    void updateDirtyLine(size_t index, LogicalLine& logical_line) override;
     /// UTF-8 text content for each line (without line ending)
     Vector<U8String> m_lines_;
     /// Logical line data
@@ -179,7 +184,7 @@ namespace NS_SWEETEDITOR {
     size_t getLineCount() const override;
     U16String getLineU16Text(size_t line) const override;
     uint32_t getLineColumns(size_t line) override;
-    TextPosition getPositionFromCharIndex(size_t char_index) const override;
+    TextPosition getPositionFromCharIndex(size_t char_index) override;
     size_t getCharIndexFromPosition(const TextPosition& position) override;
     void insertU8Text(const TextPosition& position, const U8String& text) override;
     void deleteU8Text(const TextRange& range) override;
@@ -187,8 +192,9 @@ namespace NS_SWEETEDITOR {
     U8String getU8Text(const TextRange& range) override;
     size_t countChars(size_t start_byte, size_t byte_length) const override;
     Vector<LogicalLine>& getLogicalLines() override;
-    void updateDirtyLine(size_t index, LogicalLine& logical_line) override;
+    const U16String& getLineU16TextRef(size_t line) override;
   protected:
+    void updateDirtyLine(size_t index, LogicalLine& logical_line) override;
     /// Buffer for original content (read-only)
     UPtr<Buffer> m_original_buffer_;
     /// Buffer for user edits, append-only
@@ -209,7 +215,7 @@ namespace NS_SWEETEDITOR {
     void updateLogicalLinesByDeleteText(size_t start_byte, size_t byte_length);
     size_t getByteOffsetFromPosition(const TextPosition& position) const;
     size_t getLineFromByteOffset(size_t byte_offset) const;
-    size_t getLineFromCharIndex(size_t char_index) const;
+    size_t getLineFromCharIndex(size_t char_index);
     size_t getByteLengthOfLine(size_t line) const;
     const char* getSegmentData(const BufferSegment& segment) const;
   };

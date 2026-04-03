@@ -436,7 +436,7 @@ export struct SweetEditor {
   private editorGlobalY: number = 0;
   private controllerApi: SweetEditorExternalApi | null = null;
   private readonly onImeInsertText = (text: string): void => {
-    if (this.editorCore && this.editorCore.isComposing()) {
+    if (this.editorCore && this.isCompositionEnabled() && this.editorCore.isComposing()) {
       this.commitComposition(text);
       return;
     }
@@ -942,6 +942,7 @@ export struct SweetEditor {
     this.registerImeCallbacks();
 
     this.settings = new EditorSettings(this);
+    this.editorCore.setCompositionEnabled(this.settings.isCompositionEnabled());
     this.settings.setContentStartPadding(DEFAULT_CONTENT_START_PADDING_DP);
     this.settings.setGutterSticky(false);
 
@@ -1720,19 +1721,28 @@ export struct SweetEditor {
 
   setLanguageConfiguration(config: LanguageConfiguration | null): void {
     this.languageConfiguration = config;
-    if (config && this.editorCore) {
-      if (config.brackets.length > 0) {
-        const opens: number[] = [];
-        const closes: number[] = [];
-        for (const pair of config.brackets) {
-          opens.push(pair.open.length > 0 ? pair.open.codePointAt(0)! : 0);
-          closes.push(pair.close.length > 0 ? pair.close.codePointAt(0)! : 0);
-        }
-        this.editorCore.setBracketPairs(opens, closes);
+    if (!config || !this.editorCore) return;
+
+    if (config.brackets) {
+      const opens: number[] = [];
+      const closes: number[] = [];
+      for (const pair of config.brackets) {
+        opens.push(pair.open.length > 0 ? pair.open.codePointAt(0)! : 0);
+        closes.push(pair.close.length > 0 ? pair.close.codePointAt(0)! : 0);
       }
-      if (config.tabSize > 0) {
-        this.editorCore.setTabSize(config.tabSize);
+      this.editorCore.setBracketPairs(opens, closes);
+    }
+    if (config.autoClosingPairs) {
+      const acOpens: number[] = [];
+      const acCloses: number[] = [];
+      for (const pair of config.autoClosingPairs) {
+        acOpens.push(pair.open.length > 0 ? pair.open.codePointAt(0)! : 0);
+        acCloses.push(pair.close.length > 0 ? pair.close.codePointAt(0)! : 0);
       }
+      this.editorCore.setAutoClosingPairs(acOpens, acCloses);
+    }
+    if (config.tabSize > 0) {
+      this.editorCore.setTabSize(config.tabSize);
     }
   }
 
@@ -1880,6 +1890,10 @@ export struct SweetEditor {
     }
     this.editorCore.compositionUpdate(text);
     this.flush();
+  }
+
+  isCompositionEnabled(): boolean {
+    return this.settings ? this.settings.isCompositionEnabled() : this.editorCore?.isCompositionEnabled() ?? true;
   }
 
   commitComposition(text: string): void {
@@ -2751,7 +2765,7 @@ export struct SweetEditor {
   }
 
   private handleImePreviewText(text: string, range: inputMethod.Range): void {
-    if (!this.editorCore) {
+    if (!this.editorCore || !this.isCompositionEnabled()) {
       return;
     }
     this.selectRangeByIme(range);
@@ -2759,7 +2773,7 @@ export struct SweetEditor {
   }
 
   private finishImePreviewText(): void {
-    if (!this.editorCore || !this.editorCore.isComposing()) {
+    if (!this.editorCore || !this.isCompositionEnabled() || !this.editorCore.isComposing()) {
       return;
     }
     this.editorCore.compositionCancel();

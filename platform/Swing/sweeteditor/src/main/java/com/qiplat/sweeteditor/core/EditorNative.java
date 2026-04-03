@@ -350,6 +350,10 @@ public final class EditorNative {
 
     private static final MethodHandle IS_COMPOSING = downcall("editor_is_composing",
             FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG));
+    private static final MethodHandle SET_COMPOSITION_ENABLED = downcall("editor_set_composition_enabled",
+            FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT));
+    private static final MethodHandle IS_COMPOSITION_ENABLED = downcall("editor_is_composition_enabled",
+            FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG));
 
     private static final MethodHandle SET_READ_ONLY = downcall("editor_set_read_only",
             FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT));
@@ -358,6 +362,9 @@ public final class EditorNative {
             FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG));
 
     private static final MethodHandle SET_AUTO_INDENT_MODE = downcall("editor_set_auto_indent_mode",
+            FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT));
+
+    private static final MethodHandle SET_BACKSPACE_UNINDENT = downcall("editor_set_backspace_unindent",
             FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT));
 
     private static final MethodHandle GET_POSITION_RECT = downcall("editor_get_position_rect",
@@ -395,6 +402,9 @@ public final class EditorNative {
             FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG));
 
     private static final MethodHandle SET_BRACKET_PAIRS = downcall("editor_set_bracket_pairs",
+            FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG));
+
+    private static final MethodHandle SET_AUTO_CLOSING_PAIRS = downcall("editor_set_auto_closing_pairs",
             FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG));
 
     private static final MethodHandle CLEAR_MATCHED_BRACKETS = downcall("editor_clear_matched_brackets",
@@ -935,6 +945,16 @@ public final class EditorNative {
         return invokeBoolean(() -> (int) IS_COMPOSING.invokeExact(handle));
     }
 
+    public static void setCompositionEnabled(long handle, boolean enabled) {
+        invokeVoid(() -> {
+            SET_COMPOSITION_ENABLED.invokeExact(handle, enabled ? 1 : 0);
+        });
+    }
+
+    public static boolean isCompositionEnabled(long handle) {
+        return invokeValue(() -> (int) IS_COMPOSITION_ENABLED.invokeExact(handle)) != 0;
+    }
+
     // ===================== Read-only =====================
 
     public static void setReadOnly(long handle, boolean readOnly) {
@@ -957,6 +977,12 @@ public final class EditorNative {
 
     public static int getAutoIndentMode(long handle) {
         return invokeValue(() -> (int) GET_AUTO_INDENT_MODE.invokeExact(handle));
+    }
+
+    public static void setBackspaceUnindent(long handle, int enabled) {
+        invokeVoid(() -> {
+            SET_BACKSPACE_UNINDENT.invokeExact(handle, enabled);
+        });
     }
 
     // ===================== Handle Config =====================
@@ -1178,6 +1204,16 @@ public final class EditorNative {
             MemorySegment openSeg = arena.allocateFrom(ValueLayout.JAVA_INT, openChars);
             MemorySegment closeSeg = arena.allocateFrom(ValueLayout.JAVA_INT, closeChars);
             SET_BRACKET_PAIRS.invokeExact(handle, openSeg, closeSeg, (long) openChars.length);
+        } catch (Throwable t) {
+            throw new RuntimeException(t);
+        }
+    }
+
+    public static void setAutoClosingPairs(long handle, int[] openChars, int[] closeChars, Arena arena) {
+        try {
+            MemorySegment openSeg = arena.allocateFrom(ValueLayout.JAVA_INT, openChars);
+            MemorySegment closeSeg = arena.allocateFrom(ValueLayout.JAVA_INT, closeChars);
+            SET_AUTO_CLOSING_PAIRS.invokeExact(handle, openSeg, closeSeg, (long) openChars.length);
         } catch (Throwable t) {
             throw new RuntimeException(t);
         }

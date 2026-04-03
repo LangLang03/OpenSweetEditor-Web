@@ -134,10 +134,12 @@ class CompletionProviderManager {
     final cursor = editorCore?.getCursorPosition();
     if (cursor == null) return null;
     final lineText = session.document?.getLineText(cursor.line) ?? '';
-    final wordRange = core.TextRange(
-      core.TextPosition(cursor.line, cursor.column),
-      core.TextPosition(cursor.line, cursor.column),
-    );
+    final wordRange =
+        editorCore?.getWordRangeAtCursor() ??
+        core.TextRange(
+          core.TextPosition(cursor.line, cursor.column),
+          core.TextPosition(cursor.line, cursor.column),
+        );
     return CompletionContext(
       triggerKind: triggerKind,
       triggerCharacter: triggerCharacter,

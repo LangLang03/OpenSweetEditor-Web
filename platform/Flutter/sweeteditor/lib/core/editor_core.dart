@@ -454,6 +454,11 @@ class EditorCore {
     );
   }
 
+  void setBackspaceUnindent(bool enabled) {
+    _ensureOpen();
+    bindings.editor_set_backspace_unindent(_handle, enabled ? 1 : 0);
+  }
+
   void setHandleConfig(HandleConfig config) {
     _ensureOpen();
     bindings.editor_set_handle_config(
@@ -776,6 +781,21 @@ class EditorCore {
   String getSelectedText() {
     _ensureOpen();
     return _readNativeUtf8(bindings.editor_get_selected_text(_handle));
+  }
+
+  TextRange getWordRangeAtCursor() {
+    _ensureOpen();
+    return using((arena) {
+      final sl = arena.allocate<ffi.Size>(ffi.sizeOf<ffi.Size>());
+      final sc = arena.allocate<ffi.Size>(ffi.sizeOf<ffi.Size>());
+      final el = arena.allocate<ffi.Size>(ffi.sizeOf<ffi.Size>());
+      final ec = arena.allocate<ffi.Size>(ffi.sizeOf<ffi.Size>());
+      bindings.editor_get_word_range_at_cursor(_handle, sl, sc, el, ec);
+      return TextRange(
+        TextPosition(sl.value, sc.value),
+        TextPosition(el.value, ec.value),
+      );
+    });
   }
 
   String getWordAtCursor() {

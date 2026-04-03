@@ -36,7 +36,7 @@ import com.qiplat.sweeteditor.core.keymap.EditorCommand;
 import com.qiplat.sweeteditor.core.keymap.KeyBinding;
 import com.qiplat.sweeteditor.core.keymap.KeyCode;
 import com.qiplat.sweeteditor.core.keymap.KeyModifier;
-import com.qiplat.sweeteditor.core.adornment.DiagnosticItem;
+import com.qiplat.sweeteditor.core.adornment.Diagnostic;
 import com.qiplat.sweeteditor.core.adornment.FoldRegion;
 
 import com.qiplat.sweeteditor.core.adornment.BracketGuide;
@@ -45,6 +45,7 @@ import com.qiplat.sweeteditor.core.adornment.IndentGuide;
 import com.qiplat.sweeteditor.core.adornment.SeparatorGuide;
 import com.qiplat.sweeteditor.core.adornment.GutterIcon;
 import com.qiplat.sweeteditor.core.adornment.InlayHint;
+import com.qiplat.sweeteditor.core.adornment.InlayType;
 import com.qiplat.sweeteditor.core.adornment.PhantomText;
 import com.qiplat.sweeteditor.core.adornment.StyleSpan;
 import com.qiplat.sweeteditor.core.adornment.TextStyle;
@@ -104,7 +105,6 @@ public class SweetEditor extends View {
     private static final boolean ENABLE_PERF_LOG = true;
     private static final int PERF_LOG_INTERVAL = 60;
     private static final float DEFAULT_CONTENT_START_PADDING_DP = 3.0f;
-    private static final int DEFAULT_LANGUAGE_TAB_SIZE = 4;
 
     private EditorRenderer mRenderer;
     private int mPerfLogFrameCount = 0;
@@ -1006,7 +1006,7 @@ public class SweetEditor extends View {
      * @param line  Line number (0-based)
      * @param items Diagnostic item list
      */
-    public void setLineDiagnostics(int line, @NonNull List<? extends DiagnosticItem> items) {
+    public void setLineDiagnostics(int line, @NonNull List<? extends Diagnostic> items) {
         mEditorCore.setLineDiagnostics(line, items);
     }
 
@@ -1015,7 +1015,7 @@ public class SweetEditor extends View {
      *
      * @param diagsByLine Sparse array of line number 鈫?diagnostic list
      */
-    public void setBatchLineDiagnostics(@Nullable SparseArray<? extends List<? extends DiagnosticItem>> diagsByLine) {
+    public void setBatchLineDiagnostics(@Nullable SparseArray<? extends List<? extends Diagnostic>> diagsByLine) {
         mEditorCore.setBatchLineDiagnostics(diagsByLine);
     }
 
@@ -1304,27 +1304,37 @@ public class SweetEditor extends View {
     }
 
     private void syncLanguageConfigurationToCore(@Nullable LanguageConfiguration config) {
-        int[] opens = new int[0];
-        int[] closes = new int[0];
-        int tabSize = DEFAULT_LANGUAGE_TAB_SIZE;
+        if (config == null) return;
 
-        if (config != null) {
-            List<LanguageConfiguration.BracketPair> brackets = config.getBrackets();
+        List<LanguageConfiguration.BracketPair> brackets = config.getBrackets();
+        if (brackets != null) {
             int size = brackets.size();
-            opens = new int[size];
-            closes = new int[size];
+            int[] opens = new int[size];
+            int[] closes = new int[size];
             for (int i = 0; i < size; i++) {
                 LanguageConfiguration.BracketPair pair = brackets.get(i);
                 opens[i] = pair.open.isEmpty() ? 0 : pair.open.codePointAt(0);
                 closes[i] = pair.close.isEmpty() ? 0 : pair.close.codePointAt(0);
             }
-            if (config.getTabSize() > 0) {
-                tabSize = config.getTabSize();
-            }
+            mEditorCore.setBracketPairs(opens, closes);
         }
 
-        mEditorCore.setBracketPairs(opens, closes);
-        mEditorCore.setTabSize(tabSize);
+        List<LanguageConfiguration.BracketPair> acPairs = config.getAutoClosingPairs();
+        if (acPairs != null) {
+            int acSize = acPairs.size();
+            int[] acOpens = new int[acSize];
+            int[] acCloses = new int[acSize];
+            for (int i = 0; i < acSize; i++) {
+                LanguageConfiguration.BracketPair pair = acPairs.get(i);
+                acOpens[i] = pair.open.isEmpty() ? 0 : pair.open.codePointAt(0);
+                acCloses[i] = pair.close.isEmpty() ? 0 : pair.close.codePointAt(0);
+            }
+            mEditorCore.setAutoClosingPairs(acOpens, acCloses);
+        }
+
+        if (config.getTabSize() > 0) {
+            mEditorCore.setTabSize(config.getTabSize());
+        }
     }
 
     /**
@@ -1515,7 +1525,7 @@ public class SweetEditor extends View {
     // ==================== IME Internal Methods (package-private) ====================
 
     boolean isCompositionEnabled() {
-        return mEditorCore.isCompositionEnabled();
+        return mSettings != null ? mSettings.isCompositionEnabled() : mEditorCore.isCompositionEnabled();
     }
 
     boolean isComposing() {
@@ -1630,18 +1640,26 @@ public class SweetEditor extends View {
                 if (result.hitTarget != null && result.hitTarget.type != EditorCore.HitTargetType.NONE) {
                     switch (result.hitTarget.type) {
                         case INLAY_HINT_TEXT:
+                            mEventBus.publish(new InlayHintClickEvent(
+                                    result.hitTarget.line,
+                                    result.hitTarget.column,
+                                    InlayType.TEXT,
+                                    0,
+                                    screenPoint));
+                            break;
                         case INLAY_HINT_ICON:
                             mEventBus.publish(new InlayHintClickEvent(
                                     result.hitTarget.line,
                                     result.hitTarget.column,
+                                    InlayType.ICON,
                                     result.hitTarget.iconId,
-                                    result.hitTarget.type == EditorCore.HitTargetType.INLAY_HINT_ICON,
                                     screenPoint));
                             break;
                         case INLAY_HINT_COLOR:
                             mEventBus.publish(new InlayHintClickEvent(
                                     result.hitTarget.line,
                                     result.hitTarget.column,
+                                    InlayType.COLOR,
                                     result.hitTarget.colorValue,
                                     screenPoint));
                             break;
@@ -1842,6 +1860,7 @@ public class SweetEditor extends View {
         mEditorCore.registerBatchTextStyles(mTheme.textStyles);
 
         mSettings = new EditorSettings(this);
+        mEditorCore.setCompositionEnabled(mSettings.isCompositionEnabled());
         mKeyMap = createDefaultKeyMap();
         mSettings.setContentStartPadding(DEFAULT_CONTENT_START_PADDING_DP * density);
         mSettings.setTypeface(Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL));

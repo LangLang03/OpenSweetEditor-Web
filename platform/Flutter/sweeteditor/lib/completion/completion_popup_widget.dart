@@ -156,32 +156,25 @@ class _CompletionKindBadge extends StatelessWidget {
   }
 
   static String _kindLabel(int kind) {
-    // Common CompletionItemKind values
     switch (kind) {
-      case 1:
-        return 'T'; // Text
-      case 2:
-        return 'M'; // Method
-      case 3:
-        return 'F'; // Function
-      case 4:
-        return 'C'; // Constructor
-      case 5:
-        return 'F'; // Field
-      case 6:
-        return 'V'; // Variable
-      case 7:
-        return 'C'; // Class
-      case 8:
-        return 'I'; // Interface
-      case 9:
-        return 'M'; // Module
-      case 10:
-        return 'P'; // Property
-      case 14:
-        return 'K'; // Keyword
-      case 15:
-        return 'S'; // Snippet
+      case CompletionItem.kindKeyword:
+        return 'K';
+      case CompletionItem.kindFunction:
+        return 'F';
+      case CompletionItem.kindVariable:
+        return 'V';
+      case CompletionItem.kindClass:
+        return 'C';
+      case CompletionItem.kindInterface:
+        return 'I';
+      case CompletionItem.kindModule:
+        return 'M';
+      case CompletionItem.kindProperty:
+        return 'P';
+      case CompletionItem.kindSnippet:
+        return 'S';
+      case CompletionItem.kindText:
+        return 'T';
       default:
         return '?';
     }
@@ -189,22 +182,20 @@ class _CompletionKindBadge extends StatelessWidget {
 
   static Color _kindColor(int kind) {
     switch (kind) {
-      case 2:
-      case 3:
-        return const Color(0xFF73DACA); // Method/Function
-      case 4:
-        return const Color(0xFFE0AF68); // Constructor
-      case 5:
-      case 6:
-      case 10:
-        return const Color(0xFF7AA2F7); // Field/Variable/Property
-      case 7:
-      case 8:
-        return const Color(0xFFBB9AF7); // Class/Interface
-      case 14:
-        return const Color(0xFFF7768E); // Keyword
-      case 15:
-        return const Color(0xFF9ECE6A); // Snippet
+      case CompletionItem.kindFunction:
+        return const Color(0xFF73DACA);
+      case CompletionItem.kindVariable:
+      case CompletionItem.kindProperty:
+        return const Color(0xFF7AA2F7);
+      case CompletionItem.kindClass:
+      case CompletionItem.kindInterface:
+        return const Color(0xFFBB9AF7);
+      case CompletionItem.kindModule:
+        return const Color(0xFFE0AF68);
+      case CompletionItem.kindKeyword:
+        return const Color(0xFFF7768E);
+      case CompletionItem.kindSnippet:
+        return const Color(0xFF9ECE6A);
       default:
         return const Color(0xFF8FA3BF);
     }

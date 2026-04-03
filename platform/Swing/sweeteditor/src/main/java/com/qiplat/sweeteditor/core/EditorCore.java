@@ -401,6 +401,8 @@ public class EditorCore implements AutoCloseable {
 
     public void compositionCancel() { EditorNative.compositionCancel(nativeHandle); }
     public boolean isComposing() { return EditorNative.isComposing(nativeHandle); }
+    public void setCompositionEnabled(boolean enabled) { EditorNative.setCompositionEnabled(nativeHandle, enabled); }
+    public boolean isCompositionEnabled() { return EditorNative.isCompositionEnabled(nativeHandle); }
 
     // ===================== Read-only =====================
 
@@ -411,6 +413,8 @@ public class EditorCore implements AutoCloseable {
 
     public void setAutoIndentMode(int mode) { EditorNative.setAutoIndentMode(nativeHandle, mode); }
     public int getAutoIndentMode() { return EditorNative.getAutoIndentMode(nativeHandle); }
+
+    public void setBackspaceUnindent(boolean enabled) { EditorNative.setBackspaceUnindent(nativeHandle, enabled ? 1 : 0); }
 
     // ===================== Handle Config =====================
 
@@ -807,6 +811,12 @@ public class EditorCore implements AutoCloseable {
     public void setBracketPairs(int[] openChars, int[] closeChars) {
         try (Arena arena = Arena.ofConfined()) {
             EditorNative.setBracketPairs(nativeHandle, openChars, closeChars, arena);
+        }
+    }
+
+    public void setAutoClosingPairs(int[] openChars, int[] closeChars) {
+        try (Arena arena = Arena.ofConfined()) {
+            EditorNative.setAutoClosingPairs(nativeHandle, openChars, closeChars, arena);
         }
     }
 

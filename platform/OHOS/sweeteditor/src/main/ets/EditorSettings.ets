@@ -16,7 +16,9 @@ export class EditorSettings {
   private gutterVisible: boolean = true;
   private currentLineRenderMode: CurrentLineRenderMode = CurrentLineRenderMode.BACKGROUND;
   private autoIndentMode: AutoIndentMode = AutoIndentMode.NONE;
+  private backspaceUnindent: boolean = true;
   private readOnly: boolean = false;
+  private compositionEnabled: boolean = true;
   private maxGutterIcons: number = 0;
   private decorationScrollRefreshMinIntervalMs: number = 16;
   private decorationOverscanViewportMultiplier: number = 1.5;
@@ -181,6 +183,19 @@ export class EditorSettings {
     return this.autoIndentMode;
   }
 
+  setBackspaceUnindent(enabled: boolean): void {
+    this.backspaceUnindent = enabled;
+    const core = this.editor.getEditorCore();
+    if (!core) {
+      return;
+    }
+    core.setBackspaceUnindent(enabled);
+  }
+
+  isBackspaceUnindent(): boolean {
+    return this.backspaceUnindent;
+  }
+
   setReadOnly(readOnly: boolean): void {
     this.readOnly = readOnly;
     const core = this.editor.getEditorCore();
@@ -192,6 +207,20 @@ export class EditorSettings {
 
   isReadOnly(): boolean {
     return this.readOnly;
+  }
+
+  setCompositionEnabled(enabled: boolean): void {
+    this.compositionEnabled = enabled;
+    const core = this.editor.getEditorCore();
+    if (!core) {
+      return;
+    }
+    core.setCompositionEnabled(enabled);
+    this.editor.flush();
+  }
+
+  isCompositionEnabled(): boolean {
+    return this.compositionEnabled;
   }
 
   setMaxGutterIcons(count: number): void {

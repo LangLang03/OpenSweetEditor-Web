@@ -575,6 +575,10 @@ export class EditorCore {
     return native.editorGetAutoIndentMode(this.handle);
   }
 
+  setBackspaceUnindent(enabled: boolean): void {
+    native.editorSetBackspaceUnindent(this.handle, enabled ? 1 : 0);
+  }
+
   // ==================== Handle Config ====================
 
   setHandleConfig(config: HandleConfig): void {
@@ -829,6 +833,10 @@ export class EditorCore {
 
   setBracketPairs(openChars: number[], closeChars: number[]): void {
     native.editorSetBracketPairs(this.handle, openChars, closeChars);
+  }
+
+  setAutoClosingPairs(openChars: number[], closeChars: number[]): void {
+    native.editorSetAutoClosingPairs(this.handle, openChars, closeChars);
   }
 
   setMatchedBrackets(openLine: number, openCol: number, closeLine: number, closeCol: number): void {

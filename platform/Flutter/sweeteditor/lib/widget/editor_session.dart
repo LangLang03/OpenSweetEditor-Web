@@ -6,10 +6,15 @@ class EditorSession implements EditorSettingsHost {
     required EditorTheme theme,
     required String fontFamily,
     required double fontSize,
+    required bool gutterSticky,
     required this.completionPopupController,
     required this.selectionMenuController,
   }) : _theme = theme {
-    controller.settings.seedDefaults(textSize: fontSize, fontFamily: fontFamily);
+    controller.settings.seedDefaults(
+      textSize: fontSize,
+      fontFamily: fontFamily,
+      gutterSticky: gutterSticky,
+    );
     _measurer = EditorTextMeasurer(
       fontFamily: controller.settings.getFontFamily(),
       fontSize:
@@ -80,6 +85,10 @@ class EditorSession implements EditorSettingsHost {
 
   void setHandleConfig(core.HandleConfig config) {
     _editorCore?.setHandleConfig(config);
+  }
+
+  void setScrollbarConfig(core.ScrollbarConfig config) {
+    _editorCore?.setScrollbarConfig(config);
   }
 
   void setViewport(Size size) {
@@ -207,8 +216,18 @@ class EditorSession implements EditorSettingsHost {
   }
 
   @override
+  void applyBackspaceUnindent(bool enabled) {
+    _editorCore?.setBackspaceUnindent(enabled);
+  }
+
+  @override
   void applyReadOnly(bool readOnly) {
     _editorCore?.setReadOnly(readOnly);
+  }
+
+  @override
+  void applyCompositionEnabled(bool enabled) {
+    _editorCore?.setCompositionEnabled(enabled);
   }
 
   @override

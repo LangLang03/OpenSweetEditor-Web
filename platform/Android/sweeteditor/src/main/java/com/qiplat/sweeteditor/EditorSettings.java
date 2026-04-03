@@ -30,8 +30,10 @@ public class EditorSettings {
     private boolean mGutterSticky = true;
     private boolean mGutterVisible = true;
     private CurrentLineRenderMode mCurrentLineRenderMode = CurrentLineRenderMode.BACKGROUND;
-    private AutoIndentMode mAutoIndentMode = AutoIndentMode.NONE;
+    private AutoIndentMode mAutoIndentMode = AutoIndentMode.KEEP_INDENT;
+    private boolean mBackspaceUnindent = true;
     private boolean mReadOnly = false;
+    private boolean mCompositionEnabled = false;
     private int mMaxGutterIcons = 0;
     private long mDecorationScrollRefreshMinIntervalMs = 16L;
     private float mDecorationOverscanViewportMultiplier = 1.5f;
@@ -73,6 +75,7 @@ public class EditorSettings {
     public void setFoldArrowMode(@NonNull FoldArrowMode mode) {
         mFoldArrowMode = mode;
         mEditor.getEditorCore().setFoldArrowMode(mode.value);
+        mEditor.flush();
     }
 
     @NonNull
@@ -167,6 +170,15 @@ public class EditorSettings {
         return mAutoIndentMode;
     }
 
+    public void setBackspaceUnindent(boolean enabled) {
+        mBackspaceUnindent = enabled;
+        mEditor.getEditorCore().setBackspaceUnindent(enabled);
+    }
+
+    public boolean isBackspaceUnindent() {
+        return mBackspaceUnindent;
+    }
+
     public void setReadOnly(boolean readOnly) {
         mReadOnly = readOnly;
         mEditor.getEditorCore().setReadOnly(readOnly);
@@ -176,9 +188,20 @@ public class EditorSettings {
         return mReadOnly;
     }
 
+    public void setCompositionEnabled(boolean enabled) {
+        mCompositionEnabled = enabled;
+        mEditor.getEditorCore().setCompositionEnabled(enabled);
+        mEditor.flush();
+    }
+
+    public boolean isCompositionEnabled() {
+        return mCompositionEnabled;
+    }
+
     public void setMaxGutterIcons(int count) {
         mMaxGutterIcons = count;
         mEditor.getEditorCore().setMaxGutterIcons(count);
+        mEditor.flush();
     }
 
     public int getMaxGutterIcons() {

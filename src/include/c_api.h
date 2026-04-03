@@ -239,8 +239,8 @@ EDITOR_API void editor_set_scrollbar_config(intptr_t editor_handle,
 ///            - i32 visible
 ///            - i32 show_dragger
 ///         16. i32 selection_rect_count
-///         17. SelectionRect[selection_rect_count] selection_rects
-///             SelectionRect layout:
+///         17. Rect[selection_rect_count] selection_rects
+///             Rect layout:
 ///             - PointF origin
 ///             - f32 width
 ///             - f32 height
@@ -281,8 +281,8 @@ EDITOR_API void editor_set_scrollbar_config(intptr_t editor_handle,
 ///             - f32 height
 ///             - i32 is_active
 ///         28. i32 bracket_highlight_rect_count
-///         29. BracketHighlightRect[bracket_highlight_rect_count] bracket_highlight_rects
-///             BracketHighlightRect layout:
+///         29. Rect[bracket_highlight_rect_count] bracket_highlight_rects
+///             Rect layout:
 ///             - PointF origin
 ///             - f32 width
 ///             - f32 height
@@ -291,9 +291,9 @@ EDITOR_API void editor_set_scrollbar_config(intptr_t editor_handle,
 ///             ScrollbarModel layout:
 ///             - i32 visible
 ///             - f32 alpha (0~1)
-///             - ScrollbarRect track
-///             - ScrollbarRect thumb
-///             ScrollbarRect layout:
+///             - Rect track
+///             - Rect thumb
+///             Rect layout:
 ///             - PointF origin
 ///             - f32 width
 ///             - f32 height
@@ -628,6 +628,10 @@ EDITOR_API void editor_set_auto_indent_mode(intptr_t editor_handle, int mode);
 /// @return 0=NONE, 1=KEEP_INDENT
 EDITOR_API int editor_get_auto_indent_mode(intptr_t editor_handle);
 
+/// Set backspace unindent behavior
+/// @param enabled 1=enabled, 0=disabled
+EDITOR_API void editor_set_backspace_unindent(intptr_t editor_handle, int enabled);
+
 #pragma endregion
 
 #pragma region [Navigation, Styles & Decorations]
@@ -830,6 +834,12 @@ EDITOR_API void editor_clear_guides(intptr_t editor_handle);
 /// @param close_chars Close bracket char array (UTF-32)
 /// @param count Bracket pair count
 EDITOR_API void editor_set_bracket_pairs(intptr_t editor_handle, const uint32_t* open_chars, const uint32_t* close_chars, size_t count);
+
+/// Set auto-closing pair list (empty count = disable auto-closing)
+/// @param open_chars Open char array (UTF-32)
+/// @param close_chars Close char array (UTF-32)
+/// @param count Pair count
+EDITOR_API void editor_set_auto_closing_pairs(intptr_t editor_handle, const uint32_t* open_chars, const uint32_t* close_chars, size_t count);
 
 /// Externally set exact bracket match result (override built-in char scan)
 /// @param open_line open bracket line number(0-based)

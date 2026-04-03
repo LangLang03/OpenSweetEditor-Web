@@ -102,7 +102,7 @@ public class SweetEditorViewMacOS: NSView, NSTextInputClient, CompletionEditorAc
         layer?.backgroundColor = EditorRenderer.theme.backgroundColor
         editorCore = SweetEditorCore(fontSize: 14.0, fontName: "Menlo")
         editorCore.setScrollbarConfig(scrollbarPolicy.defaultConfig())
-        editorCore.setCompositionEnabled(true)
+        editorCore.setCompositionEnabled(settings.compositionEnabled)
         editorCore.setReadOnly(false)
         // Sync current theme to Core first so syntax styles are registered immediately.
         EditorRenderer.applyTheme(EditorRenderer.theme, core: editorCore)
@@ -503,12 +503,17 @@ public class SweetEditorViewMacOS: NSView, NSTextInputClient, CompletionEditorAc
     /// Sets language configuration and syncs bracket pairs to the Core layer.
     func setLanguageConfiguration(_ config: LanguageConfiguration?) {
         self.languageConfiguration = config
-        if let config = config {
-            let opens = config.brackets.map { Int32(($0.open.unicodeScalars.first?.value ?? 0)) }
-            let closes = config.brackets.map { Int32(($0.close.unicodeScalars.first?.value ?? 0)) }
-            if !opens.isEmpty {
-                editorCore.setBracketPairs(openChars: opens, closeChars: closes)
-            }
+        guard let config = config else { return }
+
+        if let brackets = config.brackets {
+            let opens = brackets.map { Int32(($0.open.unicodeScalars.first?.value ?? 0)) }
+            let closes = brackets.map { Int32(($0.close.unicodeScalars.first?.value ?? 0)) }
+            editorCore.setBracketPairs(openChars: opens, closeChars: closes)
+        }
+        if let acPairs = config.autoClosingPairs {
+            let acOpens = acPairs.map { Int32(($0.open.unicodeScalars.first?.value ?? 0)) }
+            let acCloses = acPairs.map { Int32(($0.close.unicodeScalars.first?.value ?? 0)) }
+            editorCore.setAutoClosingPairs(openChars: acOpens, closeChars: acCloses)
         }
     }
 
@@ -658,6 +663,7 @@ public class SweetEditorViewMacOS: NSView, NSTextInputClient, CompletionEditorAc
     public func applyEditorSettings(_ settings: EditorSettings) {
         editorCore.setScale(settings.scale)
         editorCore.syncPlatformScale(settings.scale)
+        editorCore.setCompositionEnabled(settings.compositionEnabled)
         editorCore.setFoldArrowMode(SweetEditorCore.FoldArrowMode(settings.foldArrowMode))
         editorCore.setWrapMode(SweetEditorCore.WrapMode(settings.wrapMode))
         editorCore.setLineSpacing(add: settings.lineSpacingAdd, mult: settings.lineSpacingMult)
@@ -665,6 +671,7 @@ public class SweetEditorViewMacOS: NSView, NSTextInputClient, CompletionEditorAc
         editorCore.setShowSplitLine(settings.showSplitLine)
         editorCore.setCurrentLineRenderMode(settings.currentLineRenderMode.rawValue)
         editorCore.setAutoIndentMode(SweetEditorCore.AutoIndentMode(settings.autoIndentMode))
+        editorCore.setBackspaceUnindent(settings.backspaceUnindent)
         editorCore.setReadOnly(settings.readOnly)
         editorCore.setMaxGutterIcons(settings.maxGutterIcons)
         rebuildAndRedraw()

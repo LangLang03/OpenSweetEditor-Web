@@ -22,6 +22,8 @@ TEST_CASE("EditorCore setScroll is clamped by computed scroll bounds") {
   Ptr<Document> document = makePtr<LineArrayDocument>(makeLines(30, "0123456789abcdefghij"));
   editor.loadDocument(document);
   editor.setViewport({120, 80});
+  EditorRenderModel model;
+  editor.buildRenderModel(model);
 
   editor.setScroll(10000, 10000);
   ScrollMetrics metrics = editor.getScrollMetrics();
@@ -40,6 +42,8 @@ TEST_CASE("EditorCore wrap mode disables horizontal scrolling and zeroes scroll_
   editor.loadDocument(document);
   editor.setViewport({120, 80});
 
+  EditorRenderModel model2;
+  editor.buildRenderModel(model2);
   editor.setScroll(200, 0);
   ScrollMetrics nowrap = editor.getScrollMetrics();
   REQUIRE(nowrap.max_scroll_x > 0);
@@ -60,6 +64,8 @@ TEST_CASE("EditorCore viewport change re-clamps existing scroll offset") {
   editor.loadDocument(document);
   editor.setViewport({140, 100});
 
+  EditorRenderModel model3;
+  editor.buildRenderModel(model3);
   editor.setScroll(0, 10000);
   ScrollMetrics before = editor.getScrollMetrics();
   REQUIRE(before.max_scroll_y > 0);

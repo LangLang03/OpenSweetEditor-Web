@@ -332,12 +332,14 @@ namespace SweetEditor {
 	/// When assigned to EditorCore, brackets are automatically synchronized to SetBracketPairs in the core layer.
 	/// </summary>
 	public sealed class LanguageConfiguration {
+		public const int DefaultTabSize = 4;
+
 		/// <summary>Language identifier (for example: "csharp", "java", "cpp").</summary>
 		public string LanguageId { get; }
-		/// <summary>Bracket pair list (synchronized to SetBracketPairs in the core layer).</summary>
-		public IReadOnlyList<BracketPair> Brackets { get; }
-		/// <summary>Auto-closing pair list.</summary>
-		public IReadOnlyList<BracketPair> AutoClosingPairs { get; }
+		/// <summary>Bracket pair list (synchronized to SetBracketPairs in the core layer). null means not configured.</summary>
+		public IReadOnlyList<BracketPair>? Brackets { get; }
+		/// <summary>Auto-closing pair list. null means not configured.</summary>
+		public IReadOnlyList<BracketPair>? AutoClosingPairs { get; }
 		/// <summary>Line comment prefix (for example: "//").</summary>
 		public string? LineComment { get; }
 		/// <summary>Block comment.</summary>
@@ -356,8 +358,8 @@ namespace SweetEditor {
 			int? tabSize = null,
 			bool? insertSpaces = null) {
 			LanguageId = languageId;
-			Brackets = brackets ?? new List<BracketPair>();
-			AutoClosingPairs = autoClosingPairs ?? new List<BracketPair>();
+			Brackets = brackets;
+			AutoClosingPairs = autoClosingPairs;
 			LineComment = lineComment;
 			BlockCommentValue = blockComment;
 			TabSize = tabSize;
@@ -533,19 +535,28 @@ namespace SweetEditor {
 		/// <summary>Sets language configuration.</summary>
 		public void SetLanguageConfiguration(LanguageConfiguration? config) {
 			languageConfiguration = config;
-			if (config != null) {
-				if (config.Brackets.Count > 0) {
-					int[] opens = new int[config.Brackets.Count];
-					int[] closes = new int[config.Brackets.Count];
-					for (int i = 0; i < config.Brackets.Count; i++) {
-						opens[i] = string.IsNullOrEmpty(config.Brackets[i].Open) ? 0 : char.ConvertToUtf32(config.Brackets[i].Open, 0);
-						closes[i] = string.IsNullOrEmpty(config.Brackets[i].Close) ? 0 : char.ConvertToUtf32(config.Brackets[i].Close, 0);
-					}
-					editorCore.SetBracketPairs(opens, closes);
+			if (config == null) return;
+
+			if (config.Brackets != null && config.Brackets.Count > 0) {
+				int[] opens = new int[config.Brackets.Count];
+				int[] closes = new int[config.Brackets.Count];
+				for (int i = 0; i < config.Brackets.Count; i++) {
+					opens[i] = string.IsNullOrEmpty(config.Brackets[i].Open) ? 0 : char.ConvertToUtf32(config.Brackets[i].Open, 0);
+					closes[i] = string.IsNullOrEmpty(config.Brackets[i].Close) ? 0 : char.ConvertToUtf32(config.Brackets[i].Close, 0);
 				}
-				if (config.TabSize.HasValue && config.TabSize.Value > 0) {
-					editorCore.SetTabSize(config.TabSize.Value);
+				editorCore.SetBracketPairs(opens, closes);
+			}
+			if (config.AutoClosingPairs != null && config.AutoClosingPairs.Count > 0) {
+				int[] acOpens = new int[config.AutoClosingPairs.Count];
+				int[] acCloses = new int[config.AutoClosingPairs.Count];
+				for (int i = 0; i < config.AutoClosingPairs.Count; i++) {
+					acOpens[i] = string.IsNullOrEmpty(config.AutoClosingPairs[i].Open) ? 0 : char.ConvertToUtf32(config.AutoClosingPairs[i].Open, 0);
+					acCloses[i] = string.IsNullOrEmpty(config.AutoClosingPairs[i].Close) ? 0 : char.ConvertToUtf32(config.AutoClosingPairs[i].Close, 0);
 				}
+				editorCore.SetAutoClosingPairs(acOpens, acCloses);
+			}
+			if (config.TabSize.HasValue && config.TabSize.Value > 0) {
+				editorCore.SetTabSize(config.TabSize.Value);
 			}
 		}
 
@@ -1064,6 +1075,7 @@ namespace SweetEditor {
 			editorCore.registerBatchTextStyles(currentTheme.TextStyles);
 
 			settings = new EditorSettings(this);
+			editorCore.SetCompositionEnabled(settings.IsCompositionEnabled());
 			settings.SetContentStartPadding(DpToPx(DefaultContentStartPaddingDp));
 		}
 
@@ -1212,23 +1224,28 @@ namespace SweetEditor {
 				case WM_IME_COMPOSITION: {
 					using var perf = StartInputPerf("WndProc(IME_COMPOSITION)");
 					int imeFlags = (int)m.LParam;
+					bool compositionEnabled = settings?.IsCompositionEnabled() ?? true;
 					IntPtr hIMC = ImmGetContext(this.Handle);
 					if (hIMC != IntPtr.Zero) {
 						// Final committed IME text.
 						if ((imeFlags & GCS_RESULTSTR) != 0) {
 							string resultStr = GetImmCompositionString(hIMC, GCS_RESULTSTR);
-							if (!string.IsNullOrEmpty(resultStr)) {
+							if (compositionEnabled && !string.IsNullOrEmpty(resultStr)) {
 								var editResult = editorCore.CompositionEnd(resultStr);
 								FireTextChanged(TextChangeAction.Composition, editResult);
 								Flush();
-							} else if (editorCore.IsComposing()) {
+							} else if (compositionEnabled && editorCore.IsComposing()) {
 								var editResult = editorCore.CompositionEnd("");
 								FireTextChanged(TextChangeAction.Composition, editResult);
+								Flush();
+							} else if (!string.IsNullOrEmpty(resultStr)) {
+								var editResult = editorCore.InsertText(resultStr);
+								FireTextChanged(TextChangeAction.Insert, editResult);
 								Flush();
 							}
 						}
 						// IME composition text update.
-						else if ((imeFlags & GCS_COMPSTR) != 0) {
+						else if (compositionEnabled && (imeFlags & GCS_COMPSTR) != 0) {
 							if (!editorCore.IsComposing()) {
 								editorCore.CompositionStart();
 							}
@@ -1244,7 +1261,7 @@ namespace SweetEditor {
 				case WM_IME_ENDCOMPOSITION: {
 					using var perf = StartInputPerf("WndProc(IME_END)");
 					// In some cases this arrives after GCS_RESULTSTR.
-					if (editorCore.IsComposing()) {
+					if ((settings?.IsCompositionEnabled() ?? true) && editorCore.IsComposing()) {
 						var editResult = editorCore.CompositionEnd("");
 						FireTextChanged(TextChangeAction.Composition, editResult);
 						Flush();

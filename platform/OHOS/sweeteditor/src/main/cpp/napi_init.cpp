@@ -102,6 +102,7 @@ static napi_value Init(napi_env env, napi_value exports)
         // Auto indent
         NAPI_METHOD("editorSetAutoIndentMode", EditorCoreNapi::setAutoIndentMode),
         NAPI_METHOD("editorGetAutoIndentMode", EditorCoreNapi::getAutoIndentMode),
+        NAPI_METHOD("editorSetBackspaceUnindent", EditorCoreNapi::setBackspaceUnindent),
 
         // Handle/scrollbar config
         NAPI_METHOD("editorSetHandleConfig", EditorCoreNapi::setHandleConfig),
@@ -155,6 +156,7 @@ static napi_value Init(napi_env env, napi_value exports)
 
         // Bracket pairs
         NAPI_METHOD("editorSetBracketPairs", EditorCoreNapi::setBracketPairs),
+        NAPI_METHOD("editorSetAutoClosingPairs", EditorCoreNapi::setAutoClosingPairs),
         NAPI_METHOD("editorSetMatchedBrackets", EditorCoreNapi::setMatchedBrackets),
         NAPI_METHOD("editorClearMatchedBrackets", EditorCoreNapi::clearMatchedBrackets),
 
