@@ -296,7 +296,6 @@ controller.applyTheme(EditorTheme.dark());
 | 设置自动缩进 | `setAutoIndentMode(mode)` | — |
 | 获取自动缩进 | `getAutoIndentMode()` | property: `autoIndentMode` / `AutoIndentMode { get; }` |
 | 设置退格反缩进 | `setBackspaceUnindent(enabled)` | — |
-| 是否退格反缩进 | `isBackspaceUnindent()` | property: `backspaceUnindent` / `IsBackspaceUnindent { get; }` |
 | **导航 / 滚动** | | |
 | 滚动到行 | `scrollToLine(line, behavior)` | — |
 | 跳转到位置 | `gotoPosition(line, col)` | — |
@@ -1592,5 +1591,7 @@ Core 层定义了大量装饰数据类型，各平台 MUST 实现完全一致的
 - 当 Core 发布新的主版本（如 `2.0.0`）时，所有平台包 MUST 在同一发布周期内升级主版本号。
 - 平台包 MAY 在 Core 版本不变的情况下独立发布修订版本（`c` 段递增），用于修复平台特定问题。
 - 次版本号（`b` 段）的建议上限是为了避免平台包版本号与 Core 版本号差距过大，造成版本对应关系混乱。
+
+
 
 
