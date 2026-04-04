@@ -23,9 +23,9 @@ The Core layer does not involve UI rendering. It contains only bridging, data mo
 | Category | Required Types | Description |
 |---|---|---|
 | **Core Bridge** | `EditorCore`, `Document`, `ProtocolEncoder`, `ProtocolDecoder`, `TextMeasurer`, `EditorOptions` | Native bridge + public core API wrapper |
-| **Foundation** | `TextPosition`, `TextRange`, `WrapMode`, `FoldArrowMode`, `AutoIndentMode`, `CurrentLineRenderMode`, `ScrollBehavior` | Fundamental value types and enums |
+| **Foundation** | `TextPosition`, `TextRange`, `TextChange`, `WrapMode`, `FoldArrowMode`, `AutoIndentMode`, `CurrentLineRenderMode`, `ScrollBehavior` | Fundamental value types and enums |
 | **Adornment** | `StyleSpan`, `SpanLayer`, `InlayHint`, `InlayType`, `PhantomText`, `FoldRegion`, `GutterIcon`, `Diagnostic`, `IndentGuide`, `BracketGuide`, `FlowGuide`, `SeparatorGuide`, `SeparatorStyle`, `TextStyle` | Decoration data types |
-| **Visual** | `EditorRenderModel`, `VisualLine`, `VisualRun`, `VisualRunType`, `Cursor`, `CursorRect`, `SelectionRect`, `SelectionHandle`, `ScrollMetrics`, `ScrollbarModel`, `ScrollbarRect`, `GuideSegment`, `GuideType`, `GuideDirection`, `GuideStyle`, `DiagnosticDecoration`, `CompositionDecoration`, `FoldMarkerRenderItem`, `FoldState`, `GutterIconRenderItem`, `LinkedEditingRect`, `BracketHighlightRect`, `PointF` | Render model types |
+| **Visual** | `EditorRenderModel`, `VisualLine`, `VisualRun`, `VisualRunType`, `Cursor`, `CursorRect`, `SelectionRect`, `SelectionHandle`, `ScrollMetrics`, `ScrollbarModel`, `ScrollbarRect`, `GuideSegment`, `GuideType`, `GuideDirection`, `GuideStyle`, `DiagnosticDecoration`, `CompositionDecoration`, `FoldMarkerRenderItem`, `FoldState`, `GutterIconRenderItem`, `LinkedEditingRect`, `BracketHighlightRect` | Render model types (geometry semantics follow Section 2.4) |
 | **Snippet** | `LinkedEditingModel`, `TabStopGroup` | Linked editing / tab stop groups |
 | **Keymap** | `KeyMap`, `KeyBinding`, `KeyChord`, `KeyCode`, `KeyModifier`, `EditorCommand` | Shortcut mapping data types and command identifiers |
 
@@ -44,6 +44,8 @@ The Widget layer handles platform-native rendering, user interaction, and extens
 | **Copilot** *(SHOULD)* | `InlineSuggestion`, `InlineSuggestionListener` or an equivalent host-visible accept/dismiss callback mechanism; MAY: `InlineSuggestionController` | Inline suggestion data + callback; listener shape is the primary path when exposed |
 | **Selection** *(MAY, mobile-only)* | `SelectionMenuController`, `SelectionMenuItem`, `SelectionMenuItemProvider`, a host-visible custom-item click callback mechanism; MAY: `SelectionMenuListener` | Selection menu (MAY omit on desktop) |
 | **Perf** *(SHOULD)* | `PerfOverlay`, `MeasurePerfStats`, `PerfStepRecorder` | Performance overlay |
+
+> `TextChangeAction` is a SHOULD-level auxiliary event enum. Platforms MAY expose it to classify a text-change cycle at a coarse level (for example: `INSERT`, `DELETE`, `UNDO`, `REDO`, `KEY`, `COMPOSITION`), but it MUST NOT replace `changes: List<TextChange>` as the primary incremental payload.
 
 ### 1.3 Recommended Internal Implementation Patterns (SHOULD)
 
@@ -133,6 +135,15 @@ Data model fields MUST use the same semantic names across platforms, adapted to 
 
 Public API methods MUST follow each language's casing convention. Canonical names use Java/ArkTS camelCase as the baseline; each language adapts per its own convention (e.g. C# PascalCase, Go capitalized exports). See Section 3 for the full method list and allowed variants.
 
+### 2.4 Geometry Carrier Types (MUST)
+
+For simple geometry carriers used in public APIs and event payloads, platforms MAY use either the canonical SweetEditor geometry names or platform-native equivalents when the semantics are identical.
+
+- Point types: `PointF` or a platform-native point type (e.g. Android `android.graphics.PointF`, Apple `CGPoint`)
+- Rect types: `RectF` or a platform-native rect type (e.g. Android `android.graphics.RectF`, Apple `CGRect`)
+
+If a platform-native geometry type is used, coordinate basis, axis direction, and field semantics MUST remain identical to the canonical SweetEditor model.
+
 ---
 
 ## 3. Public API Contract (MUST)
@@ -217,6 +228,7 @@ controller.applyTheme(EditorTheme.dark());
 | Fold arrow mode | `setFoldArrowMode(mode)` | — |
 | Wrap mode | `setWrapMode(mode)` | — |
 | Tab size | `setTabSize(size)` | — |
+| Insert spaces | `setInsertSpaces(enabled)` | — |
 | Scale | `setScale(scale)` | — |
 | Line spacing | `setLineSpacing(add, mult)` | — |
 | Content start padding | `setContentStartPadding(padding)` | — |
@@ -299,7 +311,7 @@ controller.applyTheme(EditorTheme.dark());
 | Set line spans | `setLineSpans(line, layer, spans)` | — |
 | Batch set line spans | `setBatchLineSpans(layer, entries)` | — |
 | Clear line spans | `clearLineSpans(line, layer)` | — |
-| Clear highlights layer | `clearHighlightsLayer(layer)` | — |
+| Clear highlights by layer | `clearHighlights(layer)` | — |
 | Clear all highlights | `clearHighlights()` | — |
 | **Inlay Hint** | | |
 | Set line inlay hints | `setLineInlayHints(line, hints)` | — |
@@ -347,7 +359,7 @@ controller.applyTheme(EditorTheme.dark());
 | Previous tab stop | `linkedEditingPrev()` | — |
 | Cancel linked editing | `cancelLinkedEditing()` | — |
 
-> Payload-level APIs (e.g. `setLineSpans`, `setBatchLineSpans`) — all platforms MUST also provide high-level wrappers (e.g. `setLineSpans(line, layer, spans: List<StyleSpan>)`). The high-level API parameter names and semantics MUST be consistent; internal encoding into payload calls to Core is an implementation detail.
+> Payload-level APIs (e.g. `setLineSpans`, `setBatchLineSpans`) — all platforms MUST provide high-level typed wrappers (e.g. `setLineSpans(line, layer, spans: List<StyleSpan>)`). Platforms SHOULD additionally expose raw/binary payload APIs when the host language has a natural public binary carrier (e.g. `ByteBuffer`, `NSData`, `byte[]`, `Uint8List`). If both typed and payload APIs are exposed, their parameter semantics and final Core behavior MUST be identical. Payload encoding format remains platform-defined.
 
 ### 3.2 `SweetEditor` Public API
 
@@ -710,15 +722,15 @@ The callback contract MUST satisfy all of the following:
 
 | Callback | Constraint | Trigger Condition |
 |---|---|---|
-| `onSuggestionAccepted` | **MUST** | When the user accepts the suggestion (Tab key or Accept button) |
-| `onSuggestionDismissed` | **MUST** | When the user dismisses the suggestion (Esc key or Dismiss button) |
+| `onSuggestionAccepted` | **MUST** | When the user accepts the currently visible suggestion |
+| `onSuggestionDismissed` | **MUST** | When the user dismisses the currently visible suggestion |
 
 ### 6.3 `SweetEditor` Copilot API
 
 | Method | Constraint | Description |
 |---|---|---|
-| `showInlineSuggestion(suggestion)` | **MUST** | Show inline suggestion: inject PhantomText and display Accept/Dismiss action bar |
-| `dismissInlineSuggestion()` | **MUST** | Dismiss current inline suggestion (clear PhantomText and hide action bar) |
+| `showInlineSuggestion(suggestion)` | **MUST** | Show the inline suggestion and make it available for accept / dismiss interaction |
+| `dismissInlineSuggestion()` | **MUST** | Dismiss the current inline suggestion and remove its visible presentation |
 | `isInlineSuggestionShowing()` | **MUST** | Query whether an inline suggestion is currently showing |
 | `setInlineSuggestionListener(listener)` | **MUST** | Register the host-visible accepted / dismissed listener; passing `null` clears it |
 
@@ -730,16 +742,16 @@ The callback contract MUST satisfy all of the following:
 |---|---|---|
 | Text change | **MUST** | MUST automatically dismiss the current inline suggestion when the user types text |
 | Cursor movement | **MUST** | MUST automatically dismiss the current inline suggestion when the cursor position changes |
-| Scrolling | **SHOULD** | SHOULD update the action bar position on scroll; SHOULD NOT auto-dismiss |
+| Scrolling | **SHOULD** | SHOULD update the visible suggestion affordance position on scroll when applicable; SHOULD NOT auto-dismiss |
 
 ### 6.5 `InlineSuggestionController` (MAY)
 
 `InlineSuggestionController` is the recommended internal implementation pattern (see Section 1.3), responsible for managing the complete lifecycle of inline suggestions:
 
-- PhantomText injection and removal
+- Suggestion presentation and removal
 - Event listener (TextChanged / CursorChanged / ScrollChanged) subscription and unsubscription
-- Accept/Dismiss action bar display, positioning, and hiding
-- Tab/Esc key interception
+- Accept / dismiss interaction and any associated visual affordance positioning
+- Accept / dismiss key handling where applicable
 
 Platforms MAY choose not to use the Controller pattern, but MUST implement equivalent functionality.
 
@@ -962,26 +974,33 @@ All platforms MUST expose the following settings through getter/setter pairs (or
 | `compositionEnabled` | boolean | Platform-dependent | `setCompositionEnabled(enabled)` | `isCompositionEnabled()` | `runtime-transition` | Whether IME composition mode is enabled |
 | `lineSpacingAdd` | float | 0 | `setLineSpacing(add, mult)` | `getLineSpacingAdd()` | `relayout` | Line spacing extra (pixels) |
 | `lineSpacingMult` | float | 1.0 | *(same as above)* | `getLineSpacingMult()` | `relayout` | Line spacing multiplier |
-| `contentStartPadding` | float | 0 | `setContentStartPadding(padding)` | `getContentStartPadding()` | `relayout` | Extra horizontal padding between gutter split and text rendering start (pixels) |
+| `contentStartPadding` | float | Platform-dependent | `setContentStartPadding(padding)` | `getContentStartPadding()` | `relayout` | Extra horizontal padding between gutter split and text rendering start (pixels) |
 | `showSplitLine` | boolean | true | `setShowSplitLine(show)` | `isShowSplitLine()` | `repaint` | Whether to render the gutter split line |
-| `gutterSticky` | boolean | true | `setGutterSticky(sticky)` | `isGutterSticky()` | `repaint` | Whether gutter stays fixed during horizontal scroll (true=fixed, false=scrolls with content) |
+| `gutterSticky` | boolean | Platform-dependent | `setGutterSticky(sticky)` | `isGutterSticky()` | `repaint` | Whether gutter stays fixed during horizontal scroll (true=fixed, false=scrolls with content) |
 | `gutterVisible` | boolean | true | `setGutterVisible(visible)` | `isGutterVisible()` | `relayout` | Whether gutter area is visible (false=hide line numbers, icons, fold arrows) |
 | `currentLineRenderMode` | CurrentLineRenderMode | BACKGROUND | `setCurrentLineRenderMode(mode)` | `getCurrentLineRenderMode()` | `repaint` | Current line render mode |
 | `autoIndentMode` | AutoIndentMode | KEEP_INDENT | `setAutoIndentMode(mode)` | `getAutoIndentMode()` | `runtime-transition` | Auto indent mode |
 | `backspaceUnindent` | boolean | true | `setBackspaceUnindent(enabled)` | `isBackspaceUnindent()` | `runtime-transition` | Whether backspace key unindents at line start |
 | `readOnly` | boolean | false | `setReadOnly(readOnly)` | `isReadOnly()` | `runtime-transition` | Read-only mode, blocks all edit operations |
 | `maxGutterIcons` | int | 0 | `setMaxGutterIcons(count)` | `getMaxGutterIcons()` | `relayout` | Maximum gutter icon count |
-| `decorationScrollRefreshMinIntervalMs` | long | 16 | `setDecorationScrollRefreshMinIntervalMs(ms)` | `getDecorationScrollRefreshMinIntervalMs()` | `runtime-transition` | Decoration scroll refresh minimum interval (ms) |
-| `decorationOverscanViewportMultiplier` | float | 1.5 | `setDecorationOverscanViewportMultiplier(mult)` | `getDecorationOverscanViewportMultiplier()` | `runtime-transition` | Decoration overscan viewport multiplier |
+| `decorationScrollRefreshMinIntervalMs` | long | 16 | `setDecorationScrollRefreshMinIntervalMs(ms)` | `getDecorationScrollRefreshMinIntervalMs()` | `provider-policy` | Decoration scroll refresh minimum interval (ms) |
+| `decorationOverscanViewportMultiplier` | float | 1.5 | `setDecorationOverscanViewportMultiplier(mult)` | `getDecorationOverscanViewportMultiplier()` | `provider-policy` | Decoration overscan viewport multiplier |
 
 > All setter calls MUST take effect immediately.
 >
 > Effect classification:
 > - `repaint`: MUST trigger an immediate repaint or equivalent visual refresh, without requiring text relayout.
 > - `relayout`: MUST trigger layout invalidation and rebuild the render model or an equivalent relayout path immediately.
-> - `runtime-transition`: MUST apply immediately and safely handle active runtime state transitions required by the setting.
+> - `runtime-transition`: MUST apply immediately and safely handle active runtime state transitions required by the setting. A `runtime-transition` setting does not require repaint or relayout unless the current visible state actually changes.
+> - `provider-policy`: MUST immediately affect subsequent provider scheduling / refresh behavior. It does not require repaint or relayout unless the implementation explicitly triggers a refresh as part of applying the new policy.
 >
 > `compositionEnabled` is the canonical example of `runtime-transition`: when switching from enabled to disabled while an IME composition is active, the platform MUST cancel or otherwise safely terminate the active composition before the new setting takes effect.
+>
+> `contentStartPadding` is platform-dependent by default. It MUST be `>= 0`. `0` is the neutral baseline, but platforms MAY choose a non-zero visual default.
+>
+> `gutterSticky` is platform-dependent by default. Desktop-style platforms SHOULD default to `true`; mobile / touch-first platforms SHOULD default to `false`.
+>
+> `autoIndentMode`, `backspaceUnindent`, and `readOnly` are also `runtime-transition` settings. They MUST affect subsequent editing behavior immediately, but they do not require `flush()`, repaint, or relayout if no visible state changes at the moment of the setter call.
 
 ---
 
@@ -1059,18 +1078,18 @@ Event payloads MUST be defined per-event. Platforms MUST NOT assume or require a
 
 | Event | Fields | Description |
 |---|---|---|
-| `TextChangedEvent` | `action: TextChangeAction`, `changeRange: TextRange?`, `text: String?` | Text change action, changed range before the operation, and inserted/replaced text |
+| `TextChangedEvent` | `changes: List<TextChange>`, `action: TextChangeAction?` *(SHOULD)* | Incremental text changes for the current edit cycle; `action` is an optional coarse-grained semantic hint |
 | `CursorChangedEvent` | `cursorPosition: TextPosition` | Current cursor position |
 | `SelectionChangedEvent` | `hasSelection: boolean`, `selection: TextRange?`, `cursorPosition: TextPosition` | Current selection state and cursor position |
 | `ScrollChangedEvent` | `scrollX: float`, `scrollY: float` | Current view scroll offset |
 | `ScaleChangedEvent` | `scale: float` | Current editor scale |
 | `DocumentLoadedEvent` | — | No payload fields are required |
-| `FoldToggleEvent` | `line: int`, `isGutter: boolean`, `screenPoint: PointF` | Toggled fold line, whether the click came from gutter, and screen position |
-| `GutterIconClickEvent` | `line: int`, `iconId: int`, `screenPoint: PointF` | Clicked gutter icon line, icon id, and screen position |
-| `InlayHintClickEvent` | `line: int`, `column: int`, `type: InlayType`, `intValue: int`, `screenPoint: PointF` | Clicked inlay hint position, inlay type, type-specific value, optional text payload, and screen position |
-| `LongPressEvent` | `cursorPosition: TextPosition`, `screenPoint: PointF` | Long-press target position and screen position |
-| `DoubleTapEvent` | `cursorPosition: TextPosition`, `hasSelection: boolean`, `selection: TextRange?`, `screenPoint: PointF` | Double-tap target position, resulting selection state, and screen position |
-| `ContextMenuEvent` | `cursorPosition: TextPosition`, `screenPoint: PointF` | Context-menu target position and screen position |
+| `FoldToggleEvent` | `line: int`, `isGutter: boolean`, `screenPoint: PointF or platform-native point type` | Toggled fold line, whether the click came from gutter, and screen position |
+| `GutterIconClickEvent` | `line: int`, `iconId: int`, `screenPoint: PointF or platform-native point type` | Clicked gutter icon line, icon id, and screen position |
+| `InlayHintClickEvent` | `line: int`, `column: int`, `type: InlayType`, `intValue: int`, `screenPoint: PointF or platform-native point type` | Clicked inlay hint position, inlay type, type-specific value, and screen position |
+| `LongPressEvent` | `cursorPosition: TextPosition`, `screenPoint: PointF or platform-native point type` | Long-press target position and screen position |
+| `DoubleTapEvent` | `cursorPosition: TextPosition`, `hasSelection: boolean`, `selection: TextRange?`, `screenPoint: PointF or platform-native point type` | Double-tap target position, resulting selection state, and screen position |
+| `ContextMenuEvent` | `cursorPosition: TextPosition`, `screenPoint: PointF or platform-native point type` | Context-menu target position and screen position |
 | `SelectionMenuItemClickEvent` *(platform-specific)* | `item: SelectionMenuItem` | Clicked custom selection-menu item |
 
 ---
@@ -1172,7 +1191,7 @@ Public APIs adopt defensive handling for invalid inputs without throwing excepti
 | Scenario | Constraint | Behavior |
 |---|---|---|
 | Line / column out of bounds | **MUST** | Automatically clamp to valid range `[0, max)`; MUST NOT throw exceptions |
-| null / empty parameters | **MUST** | For MUST-non-null parameters receiving null, MUST silently ignore (no-op) and log a warning; MUST NOT throw exceptions or crash |
+| null / empty parameters | **MUST** | For MUST-non-null parameters receiving null, MUST silently ignore (no-op); MUST NOT throw exceptions or crash. Platforms MAY log a warning, especially in debug builds |
 | Invalid enum values | **MUST** | Use default value (e.g. `WrapMode.NONE`); MUST NOT throw exceptions |
 | Calls when widget not mounted | **SHOULD** | Getters return null or default values; imperative methods SHOULD queue or silently ignore (consistent with Section 3.0.3) |
 
@@ -1202,16 +1221,18 @@ Resource creation and destruction follow explicit ordering constraints to preven
 | Phase | Constraint | Rule |
 |---|---|---|
 | Creation | **MUST** | `EditorCore` instance MUST be created during widget initialization (imperative frameworks: constructor or init; declarative frameworks: on first widget mount) |
-| Release path | **MUST** | The platform MUST provide a mechanism that can eventually release `EditorCore` and its native / C++ resources; the release timing MAY be tied to explicit `dispose()` / `close()`, host-managed lifecycle, an equivalent platform cleanup hook, or another platform-idiomatic mechanism. View detachment, widget unmount, or temporary removal from the view tree is NOT by itself required to be the release moment |
-| Post-release calls | **MUST** | After `EditorCore` resources are released, any method call MUST be a no-op or throw an explicit "already destroyed" exception; MUST NOT access freed C++ memory |
-| Repeated release | **MUST** | Multiple invocations of the release logic MUST be idempotent (no-op); MUST NOT cause double-free |
+| Release path | **MUST** | The platform MUST ensure that `EditorCore` and its native / C++ resources are eventually released; the mechanism MAY be an explicit `dispose()` / `close()`, a host-managed lifecycle, GC / finalizer / ARC-backed automatic reclamation, an equivalent platform cleanup hook, or another platform-idiomatic mechanism. View detachment, widget unmount, or temporary removal from the view tree is NOT by itself required to be the release moment |
+| Post-release calls | **MUST** | If the platform exposes an explicit release API, or otherwise keeps the object reachable after internal release, any method call after release MUST be a no-op or throw an explicit "already destroyed" exception; MUST NOT access freed C++ memory |
+| Repeated release | **MUST** | If the platform exposes explicit release logic, multiple invocations MUST be idempotent (no-op); MUST NOT cause double-free |
+
+> The standard requires eventual native-resource release, but does **not** require every managed-language `Document` / bridge wrapper to expose an additional explicit release API beyond the platform's own lifecycle model.
 
 ### 16.2 Provider Lifecycle
 
 | Rule | Constraint | Description |
 |---|---|---|
 | Registration timing | **SHOULD** | Providers SHOULD be registered after `loadDocument()` to ensure valid document data in the Context |
-| Cleanup during release | **MUST** | During the platform-defined editor release / dispose / close / teardown phase, MUST automatically unregister all registered Providers and cancel or mark stale all in-flight async requests so late results are ignored |
+| Cleanup during release | **MUST** | If the platform defines an explicit editor release / dispose / close / teardown phase, it MUST automatically unregister all registered Providers and cancel or mark stale all in-flight async requests so late results are ignored; platforms that rely solely on automatic reclamation SHOULD still ensure late async results cannot mutate freed native resources or host-visible editor state |
 | Provider references | **SHOULD** | Platform implementations SHOULD avoid Providers holding strong references to the widget instance to prevent circular references causing memory leaks (Java/Kotlin: WeakReference; Swift: weak/unowned; Dart: no special handling needed) |
 
 ### 16.3 `SweetEditorController` Lifecycle (Declarative Frameworks)
@@ -1223,19 +1244,19 @@ Resource creation and destruction follow explicit ordering constraints to preven
 | `dispose()` ordering | **MUST** | `dispose()` MUST first unbind the widget (if still bound), then release internal resources; any method call after `dispose()` MUST be a no-op |
 | Widget rebuild | **SHOULD** | In declarative frameworks, widgets may be rebuilt due to state changes; the Controller SHOULD seamlessly `bind()` to the new widget after the old one calls `unbind()`, without losing queued operations |
 
+> This section applies only to platforms that expose an independent controller object. It MUST NOT be interpreted as requiring every imperative `View` / `Control` / `Widget` / `Document` type to add a library-defined `dispose()` / `close()` method.
+
 ### 16.4 Resource Release Order
 
-When the platform performs editor release / dispose / close / final teardown, subsystems MUST be released in the following order:
+When the platform performs editor release / dispose / close / final teardown, it MUST satisfy the following safety constraints:
 
-```
-1. Cancel all in-flight async Provider requests
-2. Unregister all Providers (Decoration / Completion / NewLine)
-3. Clear all host-visible event subscriptions / listeners / observers
-4. Release EditorCore / native resources
-5. Release platform-specific resources (textures, canvases, timers, etc.)
-```
+- All in-flight async Provider requests MUST be cancelled or marked stale before their results can reach invalid native state
+- Provider registrations MUST be cleared before they can emit further callbacks into a destroyed editor
+- Host-visible event subscriptions / listeners / observers MUST be cleared before post-destruction callbacks can occur
+- `EditorCore` / native resources MUST be released exactly once and only after no further platform callbacks can legally use them
+- Platform-specific resources (textures, canvases, timers, etc.) MAY be released in platform-idiomatic order, as long as the constraints above are preserved
 
-> The internal order of steps 1-3 MAY be adjusted, but MUST complete before step 4. Step 4 MUST complete before step 5. The standard does not require step 4 to be tied to view detachment, widget unmount, or the specific moment when the widget is permanently removed from the view tree.
+> The standard defines dependency / safety ordering here, not a single mandatory cross-platform step sequence.
 
 ---
 
@@ -1252,7 +1273,16 @@ The Core layer defines numerous decoration data types. All platforms MUST implem
 | Field names | **MUST** | Field names MUST follow the cross-platform naming rules in Section 2.2 |
 | Coordinate basis | **MUST** | All line numbers (`line`) and column numbers (`column`) MUST be 0-based; columns are measured in UTF-16 character offsets |
 
-### 17.2 Adornment Data Types
+### 17.2 Shared Data Types
+
+**`TextChange`** — Incremental text change
+
+| Field | Type | MUST/MAY | Description |
+|---|---|---|---|
+| `range` | TextRange | **MUST** | Changed range in document coordinates |
+| `text` | String | **MUST** | Replacement text; empty string means pure deletion |
+
+### 17.3 Adornment Data Types
 
 **`StyleSpan`** — Inline highlight range
 
@@ -1302,6 +1332,8 @@ The Core layer defines numerous decoration data types. All platforms MUST implem
 | `length` | int | **MUST** | Character length |
 | `severity` | int | **MUST** | Severity level: ERROR=0, WARNING=1, INFO=2, HINT=3 |
 | `color` | int | **MUST** | Custom color (ARGB), 0 means use severity default color |
+
+> `Diagnostic` in this standard is a minimal diagnostic decoration model. It is intended for diagnostic rendering and lightweight interactions, not as a full IDE diagnostic object.
 
 **`FoldRegion`** — Foldable region
 
@@ -1371,7 +1403,7 @@ All platforms MUST support at least the following two construction methods:
 | Rule | Constraint | Description |
 |---|---|---|
 | Native document reference | **MUST** | `Document` MUST internally retain a bridge-layer reference to a C++ side document instance; whether this is represented as an opaque handle, pointer wrapper, object wrapper, or another mechanism is an implementation detail |
-| Resource release | **MUST** | When `Document` is destroyed / disposed according to the platform lifecycle, the bridge layer MUST eventually release the C++ side document memory; the exact cleanup mechanism is platform-specific |
+| Resource release | **MUST** | When `Document` reaches its terminal platform lifecycle state, the bridge layer MUST eventually release the C++ side document memory; the exact cleanup mechanism is platform-specific, and an explicit `dispose()` / `close()` API is optional |
 | Encoding model | **MUST** | Platform layers MUST NOT assume or expose a specific internal storage / layout encoding beyond the semantics guaranteed by the public APIs |
 | Line endings | **MUST** | C++ Core supports LF, CR, and CRLF line endings; text returned by `getLineText()` MUST NOT include line endings |
 
@@ -1404,8 +1436,8 @@ All platforms MUST support at least the following two construction methods:
 | `languageId` | String | **MUST** | Language identifier (e.g. `"java"`, `"cpp"`, `"swift"`) |
 | `brackets` | List\<BracketPair\>? | **MAY** | Bracket pair list (null = not configured; platform MUST NOT sync to Core when null) |
 | `autoClosingPairs` | List\<BracketPair\>? | **MAY** | Auto-closing bracket pair list (null = not configured; platform MUST NOT sync to Core when null) |
-| `tabSize` | int? | **MAY** | Tab width (null means use editor default) |
-| `insertSpaces` | bool? | **MAY** | Whether to use spaces instead of tabs (null means use editor default) |
+| `tabSize` | int / int? | **MAY** | Tab stop width |
+| `insertSpaces` | bool / bool? | **MAY** | Whether pressing Tab inserts spaces instead of a hard tab character |
 
 **`BracketPair`** sub-type:
 
@@ -1418,7 +1450,10 @@ All platforms MUST support at least the following two construction methods:
 |---|---|---|
 | Construction | **SHOULD** | SHOULD provide Builder pattern construction (Java/Kotlin); MAY use direct constructors or named-parameter constructors (Swift/C#/Dart/ArkTS) |
 | Immutability | **SHOULD** | SHOULD be immutable after construction |
-| Runtime effect | **MUST** | When `setLanguageConfiguration()` is called, bracket matching and auto-closing behavior visible to the editor MUST be updated consistently with the new configuration |
+| Optionality and defaults | **MUST** | Platforms MAY expose `tabSize` / `insertSpaces` as nullable or non-null fields. If nullable, `null` MAY mean "use editor default". If non-null, their default values MUST match the editor defaults |
+| Runtime effect | **MUST** | When `setLanguageConfiguration()` is called, bracket matching, auto-closing behavior, and Tab insertion behavior visible to the editor MUST be updated consistently with the new configuration |
+| `tabSize` semantics | **MUST** | `tabSize` and `insertSpaces` MUST be treated as independent dimensions: `tabSize` controls tab-stop width, while `insertSpaces` controls whether the Tab key inserts spaces or a hard tab character |
+| `insertSpaces=true` behavior | **MUST** | If `insertSpaces` is `true`, the Tab key / `INSERT_TAB` command MUST insert the number of spaces required to reach the next tab stop, rather than always inserting a fixed `tabSize` count |
 ## 20. Performance Guidance & Reference Targets (SHOULD)
 
 Based on the `perf/` module (`PerfOverlay`, `PerfStepRecorder`, `MeasurePerfStats`) and the C++ Core `PERF_TIMER` macros, this section defines cross-platform performance guidance and reference targets rather than hard conformance gates.

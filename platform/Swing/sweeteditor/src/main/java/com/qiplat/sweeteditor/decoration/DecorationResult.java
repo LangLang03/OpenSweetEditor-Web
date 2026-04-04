@@ -1,6 +1,6 @@
 package com.qiplat.sweeteditor.decoration;
 
-import com.qiplat.sweeteditor.core.adornment.DiagnosticItem;
+import com.qiplat.sweeteditor.core.adornment.Diagnostic;
 import com.qiplat.sweeteditor.core.adornment.FoldRegion;
 import com.qiplat.sweeteditor.core.adornment.GutterIcon;
 import com.qiplat.sweeteditor.core.adornment.BracketGuide;
@@ -26,7 +26,7 @@ public class DecorationResult {
     private Map<Integer, List<StyleSpan>> syntaxSpans;
     private Map<Integer, List<StyleSpan>> semanticSpans;
     private Map<Integer, List<InlayHint>> inlayHints;
-    private Map<Integer, List<DiagnosticItem>> diagnostics;
+    private Map<Integer, List<Diagnostic>> diagnostics;
     private List<IndentGuide> indentGuides;
     private List<BracketGuide> bracketGuides;
     private List<FlowGuide> flowGuides;
@@ -50,7 +50,7 @@ public class DecorationResult {
     public Map<Integer, List<StyleSpan>> getSyntaxSpans() { return syntaxSpans; }
     public Map<Integer, List<StyleSpan>> getSemanticSpans() { return semanticSpans; }
     public Map<Integer, List<InlayHint>> getInlayHints() { return inlayHints; }
-    public Map<Integer, List<DiagnosticItem>> getDiagnostics() { return diagnostics; }
+    public Map<Integer, List<Diagnostic>> getDiagnostics() { return diagnostics; }
     public List<IndentGuide> getIndentGuides() { return indentGuides; }
     public List<BracketGuide> getBracketGuides() { return bracketGuides; }
     public List<FlowGuide> getFlowGuides() { return flowGuides; }
@@ -73,7 +73,7 @@ public class DecorationResult {
     void setSyntaxSpans(Map<Integer, List<StyleSpan>> v) { this.syntaxSpans = v; }
     void setSemanticSpans(Map<Integer, List<StyleSpan>> v) { this.semanticSpans = v; }
     void setInlayHints(Map<Integer, List<InlayHint>> v) { this.inlayHints = v; }
-    void setDiagnostics(Map<Integer, List<DiagnosticItem>> v) { this.diagnostics = v; }
+    void setDiagnostics(Map<Integer, List<Diagnostic>> v) { this.diagnostics = v; }
     void setIndentGuides(List<IndentGuide> v) { this.indentGuides = v; }
     void setBracketGuides(List<BracketGuide> v) { this.bracketGuides = v; }
     void setFlowGuides(List<FlowGuide> v) { this.flowGuides = v; }
@@ -140,7 +140,7 @@ public class DecorationResult {
         public Builder syntaxSpans(Map<Integer, List<StyleSpan>> value, ApplyMode mode) { result.syntaxSpans = value; result.syntaxSpansMode = mode; return this; }
         public Builder semanticSpans(Map<Integer, List<StyleSpan>> value, ApplyMode mode) { result.semanticSpans = value; result.semanticSpansMode = mode; return this; }
         public Builder inlayHints(Map<Integer, List<InlayHint>> value, ApplyMode mode) { result.inlayHints = value; result.inlayHintsMode = mode; return this; }
-        public Builder diagnostics(Map<Integer, List<DiagnosticItem>> value, ApplyMode mode) { result.diagnostics = value; result.diagnosticsMode = mode; return this; }
+        public Builder diagnostics(Map<Integer, List<Diagnostic>> value, ApplyMode mode) { result.diagnostics = value; result.diagnosticsMode = mode; return this; }
         public Builder indentGuides(List<IndentGuide> value, ApplyMode mode) { result.indentGuides = value; result.indentGuidesMode = mode; return this; }
         public Builder bracketGuides(List<BracketGuide> value, ApplyMode mode) { result.bracketGuides = value; result.bracketGuidesMode = mode; return this; }
         public Builder flowGuides(List<FlowGuide> value, ApplyMode mode) { result.flowGuides = value; result.flowGuidesMode = mode; return this; }

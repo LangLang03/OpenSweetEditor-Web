@@ -126,20 +126,14 @@ public class CompletionProviderManager {
     }
 
     private CompletionContext buildContext(CompletionContext.TriggerKind triggerKind, String triggerCharacter) {
-        int[] pos = editor.getCursorPosition();
-        if (pos == null) return null;
-        TextPosition cursor = new TextPosition();
-        cursor.line = pos[0];
-        cursor.column = pos[1];
+        TextPosition cursor = editor.getCursorPosition();
+        if (cursor == null) return null;
 
         Document doc = editor.getDocument();
         String lineText = (doc != null) ? doc.getLineText(cursor.line) : "";
         if (lineText == null) lineText = "";
 
-        TextRange wordRange = new TextRange();
-        int[] wr = editor.getWordRangeAtCursor();
-        wordRange.start = new TextPosition(wr[0], wr[1]);
-        wordRange.end = new TextPosition(wr[2], wr[3]);
+        TextRange wordRange = editor.getWordRangeAtCursor();
         return new CompletionContext(
                 triggerKind,
                 triggerCharacter,

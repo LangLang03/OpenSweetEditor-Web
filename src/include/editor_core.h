@@ -315,6 +315,10 @@ namespace NS_SWEETEDITOR {
     /// @param enabled true = backspace on leading whitespace unindents or merges blank line
     void setBackspaceUnindent(bool enabled);
 
+    /// Set whether Tab inserts spaces up to the next tab stop instead of a literal '\t'
+    /// @param enabled true = insert spaces, false = insert '\t'
+    void setInsertSpaces(bool enabled);
+
     /// Insert VSCode snippet template and enter linked editing mode (helper method)
     /// @param snippet_template VSCode snippet syntax template
     /// @return Exact change info (changes from inserting template text)

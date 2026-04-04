@@ -515,6 +515,12 @@ public class SweetEditorViewMacOS: NSView, NSTextInputClient, CompletionEditorAc
             let acCloses = acPairs.map { Int32(($0.close.unicodeScalars.first?.value ?? 0)) }
             editorCore.setAutoClosingPairs(openChars: acOpens, closeChars: acCloses)
         }
+        if let tabSize = config.tabSize, tabSize > 0 {
+            editorCore.setTabSize(tabSize)
+        }
+        if let insertSpaces = config.insertSpaces {
+            editorCore.setInsertSpaces(insertSpaces)
+        }
     }
 
     // MARK: - EditorMetadata

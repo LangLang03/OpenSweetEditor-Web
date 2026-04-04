@@ -21,9 +21,16 @@ class EditorSession implements EditorSettingsHost {
           controller.settings.getEditorTextSize() *
           controller.settings.getScale(),
     );
-    _painter = EditorCanvasPainter(theme: _theme, measurer: _measurer);
+    _iconProvider = controller._iconProvider;
+    _painter = EditorCanvasPainter(
+      theme: _theme,
+      measurer: _measurer,
+      iconProvider: _iconProvider,
+    );
     final nativeMeasurer = _measurer.buildNativeMeasurer();
     _editorCore = core.EditorCore(measurer: nativeMeasurer);
+    _keyMap = controller.getKeyMap();
+    _editorCore!.setKeyMap(_keyMap);
     completionProviderManager = CompletionProviderManager(session: this);
     decorationProviderManager = DecorationProviderManager(session: this);
     inlineSuggestionController = InlineSuggestionController(session: this);
@@ -43,8 +50,11 @@ class EditorSession implements EditorSettingsHost {
   late final EditorCanvasPainter _painter;
   core.EditorCore? _editorCore;
   core.Document? _document;
+  bool _ownsDocument = false;
   core.EditorRenderModel _renderModel = core.EditorRenderModel.empty;
   EditorTheme _theme;
+  late EditorKeyMap _keyMap;
+  EditorIconProvider? _iconProvider;
   Size _viewportSize = Size.zero;
   bool _viewportReady = false;
   bool _cursorVisible = true;
@@ -61,6 +71,8 @@ class EditorSession implements EditorSettingsHost {
   core.Document? get document => _document;
   core.EditorRenderModel get renderModel => _renderModel;
   EditorTheme get theme => _theme;
+  EditorKeyMap get keyMap => _keyMap;
+  EditorIconProvider? get iconProvider => _iconProvider;
   EditorTextMeasurer get measurer => _measurer;
   EditorCanvasPainter get painter => _painter;
   Size get viewportSize => _viewportSize;
@@ -78,7 +90,7 @@ class EditorSession implements EditorSettingsHost {
     controller.settings.unbind(this);
     inlineSuggestionController.dispose();
     _editorCore?.close();
-    _document?.close();
+    _releaseDocument();
     _measurer.dispose();
     _painter.dispose();
   }
@@ -89,6 +101,50 @@ class EditorSession implements EditorSettingsHost {
 
   void setScrollbarConfig(core.ScrollbarConfig config) {
     _editorCore?.setScrollbarConfig(config);
+  }
+
+  void applyLanguageConfiguration(LanguageConfiguration? config) {
+    final ec = _editorCore;
+    if (ec == null) return;
+
+    final brackets = config?.brackets;
+    if (brackets != null) {
+      final opens = brackets
+          .map((pair) => pair.open.runes.isEmpty ? 0 : pair.open.runes.first)
+          .toList(growable: false);
+      final closes = brackets
+          .map((pair) => pair.close.runes.isEmpty ? 0 : pair.close.runes.first)
+          .toList(growable: false);
+      ec.setBracketPairs(opens, closes);
+    }
+
+    final autoClosingPairs = config?.autoClosingPairs;
+    if (autoClosingPairs != null) {
+      final opens = autoClosingPairs
+          .map((pair) => pair.open.runes.isEmpty ? 0 : pair.open.runes.first)
+          .toList(growable: false);
+      final closes = autoClosingPairs
+          .map((pair) => pair.close.runes.isEmpty ? 0 : pair.close.runes.first)
+          .toList(growable: false);
+      ec.setAutoClosingPairs(opens, closes);
+    }
+
+    if (config != null) {
+      if (config.tabSize > 0) {
+        ec.setTabSize(config.tabSize);
+      }
+      ec.setInsertSpaces(config.insertSpaces);
+    }
+  }
+
+  void applyKeyMap(EditorKeyMap keyMap) {
+    _keyMap = keyMap;
+    _editorCore?.setKeyMap(keyMap);
+  }
+
+  void applyIconProvider(EditorIconProvider? provider) {
+    _iconProvider = provider;
+    _painter.updateIconProvider(provider);
   }
 
   void setViewport(Size size) {
@@ -104,9 +160,16 @@ class EditorSession implements EditorSettingsHost {
   }
 
   void loadText(String text) {
-    _document?.close();
-    _document = core.Document.fromString(text);
-    _editorCore?.setDocument(_document!);
+    loadDocument(core.Document.fromString(text), takeOwnership: true);
+  }
+
+  void loadDocument(core.Document document, {required bool takeOwnership}) {
+    if (!identical(_document, document)) {
+      _releaseDocument();
+    }
+    _document = document;
+    _ownsDocument = takeOwnership;
+    _editorCore?.setDocument(document);
   }
 
   String getContent() => _document?.text ?? '';
@@ -155,6 +218,14 @@ class EditorSession implements EditorSettingsHost {
         fontStyle: entry.value.fontStyle,
       );
     }
+  }
+
+  void _releaseDocument() {
+    if (_ownsDocument) {
+      _document?.close();
+    }
+    _document = null;
+    _ownsDocument = false;
   }
 
   @override

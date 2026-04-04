@@ -20,36 +20,23 @@ namespace NS_SWEETEDITOR {
            ch > 0x7F; // Treat non-ASCII characters as word characters (supports CJK, etc.)
   }
 
+  static uint32_t advanceVisualColumn(U16Char ch, uint32_t visual_col, uint32_t tab_size) {
+    if (ch == u'\t') {
+      return (visual_col / tab_size + 1) * tab_size;
+    }
+    return visual_col + 1;
+  }
+
+  static uint32_t computeVisualColumn(const U16String& line_text, size_t col, uint32_t tab_size) {
+    uint32_t visual_col = 0;
+    size_t safe_col = std::min(col, line_text.size());
+    for (size_t i = 0; i < safe_col; ++i) {
+      visual_col = advanceVisualColumn(line_text[i], visual_col, tab_size);
+    }
+    return visual_col;
+  }
+
 #pragma region [Setup & View State]
-
-  TouchConfig EditorOptions::simpleAsTouchConfig() const {
-    return TouchConfig {touch_slop, double_tap_timeout, long_press_ms, fling_friction, fling_min_velocity, fling_max_velocity};
-  }
-
-  U8String EditorOptions::dump() const {
-    return "EditorOptions {touch_slop = " + std::to_string(touch_slop) + ", double_tap_timeout = " + std::to_string(double_tap_timeout) + ", long_press_ms = " + std::to_string(long_press_ms) + ", fling_friction = " + std::to_string(fling_friction) + ", fling_min_velocity = " + std::to_string(fling_min_velocity) + ", fling_max_velocity = " + std::to_string(fling_max_velocity) + ", max_undo_stack_size = " + std::to_string(max_undo_stack_size) + ", key_chord_timeout_ms = " + std::to_string(key_chord_timeout_ms) + "}";
-  }
-
-  U8String EditorSettings::dump() const {
-    return "EditorSettings {max_scale = " + std::to_string(max_scale)
-        + ", read_only = " + (read_only ? "true" : "false")
-        + ", enable_composition = " + (enable_composition ? "true" : "false")
-        + ", content_start_padding = " + std::to_string(content_start_padding)
-        + ", show_split_line = " + (show_split_line ? "true" : "false")
-        + ", current_line_render_mode = " + std::to_string(static_cast<int>(current_line_render_mode))
-        + ", scrollbar.thickness = " + std::to_string(scrollbar.thickness)
-        + ", scrollbar.min_thumb = " + std::to_string(scrollbar.min_thumb)
-        + ", scrollbar.thumb_hit_padding = " + std::to_string(scrollbar.thumb_hit_padding)
-        + ", scrollbar.mode = " + std::to_string(static_cast<int>(scrollbar.mode))
-        + ", scrollbar.thumb_draggable = " + (scrollbar.thumb_draggable ? "true" : "false")
-        + ", scrollbar.track_tap_mode = " + std::to_string(static_cast<int>(scrollbar.track_tap_mode))
-        + ", scrollbar.fade_delay_ms = " + std::to_string(scrollbar.fade_delay_ms)
-        + ", scrollbar.fade_duration_ms = " + std::to_string(scrollbar.fade_duration_ms)
-        + ", gutter_sticky = " + (gutter_sticky ? "true" : "false")
-        + ", gutter_visible = " + (gutter_visible ? "true" : "false")
-        + ", wrap_mode = " + std::to_string(static_cast<int>(wrap_mode))
-        + "}";
-  }
   EditorCore::EditorCore(const Ptr<TextMeasurer>& measurer, const EditorOptions& options): m_measurer_(measurer), m_options_(options), m_key_resolver_(options.key_chord_timeout_ms) {
     m_decorations_ = makePtr<DecorationManager>();
     m_text_layout_ = makeUPtr<TextLayout>(measurer, m_decorations_);
@@ -99,11 +86,25 @@ namespace NS_SWEETEDITOR {
   }
 
   void EditorCore::loadDocument(const Ptr<Document>& document) {
+    cancelLinkedEditing();
+    removeComposingText();
+    resetCompositionState();
+    m_undo_manager_->clear();
+    m_interaction_->resetForDocumentLoad();
+    clearMatchedBrackets();
+    m_decorations_->clearAll();
+
     m_document_ = document;
     m_text_layout_->loadDocument(document);
+    syncFoldState();
+    m_caret_ = {};
+    setCursorPosition({});
+    m_view_state_.scroll_x = 0.0f;
+    m_view_state_.scroll_y = 0.0f;
     normalizeScrollState();
     LOGD("EditorCore::loadDocument()");
   }
+
   void EditorCore::setViewport(const Viewport& viewport) {
     PERF_TIMER("setViewport");
     bool width_changed = (m_viewport_.width != viewport.width);
@@ -624,7 +625,18 @@ namespace NS_SWEETEDITOR {
         result.content_changed = result.edit_result.changed;
         break;
       case EditorCommand::INSERT_TAB:
-        result.edit_result = insertText("\t");
+        if (m_settings_.insert_spaces && m_document_ != nullptr) {
+          uint32_t tab_size = std::max<uint32_t>(1, m_text_layout_->getTabSize());
+          U16String line_text = m_document_->getLineU16Text(m_caret_.cursor.line);
+          uint32_t visual_col = computeVisualColumn(line_text, m_caret_.cursor.column, tab_size);
+          uint32_t spaces_to_insert = tab_size - (visual_col % tab_size);
+          if (spaces_to_insert == 0) {
+            spaces_to_insert = tab_size;
+          }
+          result.edit_result = insertText(U8String(spaces_to_insert, ' '));
+        } else {
+          result.edit_result = insertText("\t");
+        }
         result.handled = true;
         result.cursor_changed = true;
         result.content_changed = result.edit_result.changed;
@@ -958,15 +970,8 @@ namespace NS_SWEETEDITOR {
             LOGD("EditorCore::backspace, cursor = %s", m_caret_.cursor.dump().c_str());
             return result;
           }
-          uint32_t tab_size = m_text_layout_->getTabSize();
-          uint32_t visual_col = 0;
-          for (size_t i = 0; i < col; ++i) {
-            if (line_text[i] == u'\t') {
-              visual_col = (visual_col / tab_size + 1) * tab_size;
-            } else {
-              visual_col++;
-            }
-          }
+          uint32_t tab_size = std::max<uint32_t>(1, m_text_layout_->getTabSize());
+          uint32_t visual_col = computeVisualColumn(line_text, col, tab_size);
           uint32_t target_visual = (visual_col > 0) ? ((visual_col - 1) / tab_size) * tab_size : 0;
           uint32_t cur_visual = 0;
           size_t target_col = 0;
@@ -975,11 +980,7 @@ namespace NS_SWEETEDITOR {
               target_col = i;
               break;
             }
-            if (line_text[i] == u'\t') {
-              cur_visual = (cur_visual / tab_size + 1) * tab_size;
-            } else {
-              cur_visual++;
-            }
+            cur_visual = advanceVisualColumn(line_text[i], cur_visual, tab_size);
             target_col = i + 1;
           }
           if (target_col < col) {
@@ -1890,6 +1891,11 @@ namespace NS_SWEETEDITOR {
   void EditorCore::setBackspaceUnindent(bool enabled) {
     m_settings_.backspace_unindent = enabled;
     LOGD("EditorCore::setBackspaceUnindent, enabled = %s", enabled ? "true" : "false");
+  }
+
+  void EditorCore::setInsertSpaces(bool enabled) {
+    m_settings_.insert_spaces = enabled;
+    LOGD("EditorCore::setInsertSpaces, enabled = %s", enabled ? "true" : "false");
   }
   TextEditResult EditorCore::insertSnippet(const U8String& snippet_template) {
     if (m_document_ == nullptr || snippet_template.empty() || m_settings_.read_only) return {};

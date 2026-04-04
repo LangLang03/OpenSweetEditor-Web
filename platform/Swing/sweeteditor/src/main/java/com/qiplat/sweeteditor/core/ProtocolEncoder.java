@@ -4,6 +4,8 @@ import com.qiplat.sweeteditor.core.adornment.*;
 import com.qiplat.sweeteditor.core.snippet.LinkedEditingModel;
 import com.qiplat.sweeteditor.core.foundation.TextPosition;
 import com.qiplat.sweeteditor.core.foundation.TextRange;
+import com.qiplat.sweeteditor.core.keymap.KeyBinding;
+import com.qiplat.sweeteditor.core.keymap.KeyMap;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
@@ -96,13 +98,13 @@ final class ProtocolEncoder {
 
     // ==================== Diagnostics ====================
 
-    static byte[] packLineDiagnostics(int line, List<? extends DiagnosticItem> items) {
+    static byte[] packLineDiagnostics(int line, List<? extends Diagnostic> items) {
         int count = items.size();
         ByteBuffer payload = ByteBuffer.allocate(8 + count * 16).order(ByteOrder.LITTLE_ENDIAN);
         payload.putInt(line);
         payload.putInt(count);
         for (int i = 0; i < count; i++) {
-            DiagnosticItem item = items.get(i);
+            Diagnostic item = items.get(i);
             payload.putInt(item.column);
             payload.putInt(item.length);
             payload.putInt(item.severity);
@@ -111,7 +113,7 @@ final class ProtocolEncoder {
         return payload.array();
     }
 
-    static byte[] packBatchLineDiagnostics(Map<Integer, ? extends List<? extends DiagnosticItem>> diagsByLine) {
+    static byte[] packBatchLineDiagnostics(Map<Integer, ? extends List<? extends Diagnostic>> diagsByLine) {
         if (diagsByLine == null || diagsByLine.isEmpty()) return null;
         int entryCount = diagsByLine.size();
         int totalDiagCount = 0;
@@ -125,17 +127,32 @@ final class ProtocolEncoder {
                 .sorted(Map.Entry.comparingByKey()).toList();
         for (var entry : sortedEntries) {
             int line = entry.getKey();
-            List<? extends DiagnosticItem> diags = entry.getValue();
+            List<? extends Diagnostic> diags = entry.getValue();
             int diagCount = (diags != null) ? diags.size() : 0;
             payload.putInt(line);
             payload.putInt(diagCount);
             for (int j = 0; j < diagCount; j++) {
-                DiagnosticItem item = diags.get(j);
+                Diagnostic item = diags.get(j);
                 payload.putInt(item.column);
                 payload.putInt(item.length);
                 payload.putInt(item.severity);
                 payload.putInt(item.color);
             }
+        }
+        return payload.array();
+    }
+
+    static byte[] packKeyMap(KeyMap keyMap) {
+        Map<KeyBinding, Integer> bindings = keyMap.getBindings();
+        ByteBuffer payload = ByteBuffer.allocate(4 + bindings.size() * 10).order(ByteOrder.LITTLE_ENDIAN);
+        payload.putInt(bindings.size());
+        for (var entry : bindings.entrySet()) {
+            KeyBinding binding = entry.getKey();
+            payload.put((byte) binding.first.modifiers);
+            payload.putShort((short) binding.first.keyCode);
+            payload.put((byte) (binding.second != null ? binding.second.modifiers : 0));
+            payload.putShort((short) (binding.second != null ? binding.second.keyCode : 0));
+            payload.putInt(entry.getValue());
         }
         return payload.array();
     }

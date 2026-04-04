@@ -465,6 +465,10 @@ public:
     editor_set_backspace_unindent(static_cast<intptr_t>(handle), enabled ? 1 : 0);
   }
 
+  static void setInsertSpaces(jlong handle, jboolean enabled) {
+    editor_set_insert_spaces(static_cast<intptr_t>(handle), enabled ? 1 : 0);
+  }
+
   static void setHandleConfig(jlong handle,
       jfloat startLeft, jfloat startTop, jfloat startRight, jfloat startBottom,
       jfloat endLeft, jfloat endTop, jfloat endRight, jfloat endBottom) {
@@ -985,6 +989,7 @@ public:
       {"nativeSetAutoIndentMode", "(JI)V", (void*) setAutoIndentMode},
       {"nativeGetAutoIndentMode", "(J)I", (void*) getAutoIndentMode},
       {"nativeSetBackspaceUnindent", "(JZ)V", (void*) setBackspaceUnindent},
+      {"nativeSetInsertSpaces", "(JZ)V", (void*) setInsertSpaces},
       {"nativeSetHandleConfig", "(JFFFFFFFF)V", (void*) setHandleConfig},
       {"nativeSetScrollbarConfig", "(JFFFIZIII)V", (void*) setScrollbarConfig},
       {"nativeGetPositionRect", "(JII)[F", (void*) getPositionRect},

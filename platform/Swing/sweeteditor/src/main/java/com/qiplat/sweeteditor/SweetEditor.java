@@ -9,6 +9,10 @@ import com.qiplat.sweeteditor.core.EditorCore;
 import com.qiplat.sweeteditor.core.EditorOptions;
 import com.qiplat.sweeteditor.core.adornment.*;
 import com.qiplat.sweeteditor.core.foundation.*;
+import com.qiplat.sweeteditor.core.keymap.EditorCommand;
+import com.qiplat.sweeteditor.core.keymap.KeyBinding;
+import com.qiplat.sweeteditor.core.keymap.KeyCode;
+import com.qiplat.sweeteditor.core.keymap.KeyModifier;
 import com.qiplat.sweeteditor.core.visual.*;
 import com.qiplat.sweeteditor.core.snippet.*;
 import com.qiplat.sweeteditor.decoration.DecorationProvider;
@@ -21,6 +25,8 @@ import com.qiplat.sweeteditor.event.*;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.datatransfer.DataFlavor;
+import java.awt.datatransfer.StringSelection;
 import java.awt.event.*;
 import java.awt.im.InputMethodRequests;
 import java.text.AttributedCharacterIterator;
@@ -34,8 +40,6 @@ import java.util.Map;
  * Based on {@link EditorCore} C++ engine providing code editing, syntax highlighting, code folding, InlayHint, etc.
  */
 public class SweetEditor extends JPanel {
-    private static final float DEFAULT_CONTENT_START_PADDING_DP = 3.0f;
-
     // Event type constants (aligned with C++ EventType)
     private static final int MOUSE_DOWN = 7;
     private static final int MOUSE_MOVE = 8;
@@ -50,6 +54,7 @@ public class SweetEditor extends JPanel {
     private static final int MOD_META = 8;
 
     private EditorCore editorCore;
+    private EditorKeyMap keyMap;
     private EditorTheme currentTheme;
     private EditorRenderModel renderModel;
     private boolean renderModelDirty = true;
@@ -90,6 +95,8 @@ public class SweetEditor extends JPanel {
         renderer = new EditorRenderer(theme);
 
         editorCore = new EditorCore(renderer.getTextMeasureCallback(), new EditorOptions(20.0f, 300));
+        keyMap = createDefaultKeyMap();
+        editorCore.setKeyMap(keyMap);
 
         // Completion manager and popup controller
         completionProviderManager = new CompletionProviderManager(this);
@@ -111,7 +118,6 @@ public class SweetEditor extends JPanel {
 
         settings = new EditorSettings(this);
         editorCore.setCompositionEnabled(settings.isCompositionEnabled());
-        settings.setContentStartPadding(dpToPx(DEFAULT_CONTENT_START_PADDING_DP));
 
         inlineSuggestionController = new InlineSuggestionController(this);
 
@@ -125,21 +131,6 @@ public class SweetEditor extends JPanel {
         setupCursorBlink();
         setupAnimationTimer();
         enableInputMethods(true);
-    }
-
-    private static float dpToPx(float dp) {
-        return dp * getUiScale();
-    }
-
-    private static float getUiScale() {
-        try {
-            int dpi = Toolkit.getDefaultToolkit().getScreenResolution();
-            if (dpi > 0) {
-                return dpi / 96.0f;
-            }
-        } catch (HeadlessException ignored) {
-        }
-        return 1.0f;
     }
 
     // ==================== Document Loading ====================
@@ -156,11 +147,17 @@ public class SweetEditor extends JPanel {
 
     public Document getDocument() { return editorCore.getDocument(); }
 
-    // ==================== Viewport/Font/Appearance Configuration ====================
-
-    public EditorTheme getTheme() { return currentTheme; }
+    // ==================== Settings / Theme / Core Access ====================
 
     public EditorSettings getSettings() { return settings; }
+    public EditorCore getEditorCore() { return editorCore; }
+    public EditorKeyMap getKeyMap() { return keyMap; }
+    public void setKeyMap(EditorKeyMap keyMap) {
+        this.keyMap = keyMap;
+        editorCore.setKeyMap(keyMap);
+    }
+
+    public EditorTheme getTheme() { return currentTheme; }
 
     public void applyTheme(EditorTheme theme) {
         this.currentTheme = theme;
@@ -177,19 +174,6 @@ public class SweetEditor extends JPanel {
         }
         flush();
     }
-
-    public void setPerfOverlayEnabled(boolean enabled) {
-        renderer.setPerfOverlayEnabled(enabled);
-        repaint();
-    }
-
-    public boolean isPerfOverlayEnabled() {
-        return renderer.isPerfOverlayEnabled();
-    }
-
-
-
-    public EditorCore getEditorCore() { return editorCore; }
 
     public int[] getVisibleLineRange() {
         if ((renderModel == null || cachedVisibleEndLine < 0) && renderModelDirty) {
@@ -210,12 +194,14 @@ public class SweetEditor extends JPanel {
         dispatchTextChanged(TextChangeAction.INSERT, result);
         flush();
     }
+
     public TextEditResult replaceText(TextRange range, String newText) {
         TextEditResult result = editorCore.replaceText(range, newText);
         dispatchTextChanged(TextChangeAction.INSERT, result);
         flush();
         return result;
     }
+
     public TextEditResult deleteText(TextRange range) {
         TextEditResult result = editorCore.deleteText(range);
         dispatchTextChanged(TextChangeAction.INSERT, result);
@@ -231,36 +217,42 @@ public class SweetEditor extends JPanel {
         flush();
         return result;
     }
+
     public TextEditResult moveLineDown() {
         TextEditResult result = editorCore.moveLineDown();
         dispatchTextChanged(TextChangeAction.INSERT, result);
         flush();
         return result;
     }
+
     public TextEditResult copyLineUp() {
         TextEditResult result = editorCore.copyLineUp();
         dispatchTextChanged(TextChangeAction.INSERT, result);
         flush();
         return result;
     }
+
     public TextEditResult copyLineDown() {
         TextEditResult result = editorCore.copyLineDown();
         dispatchTextChanged(TextChangeAction.INSERT, result);
         flush();
         return result;
     }
+
     public TextEditResult deleteLine() {
         TextEditResult result = editorCore.deleteLine();
         dispatchTextChanged(TextChangeAction.INSERT, result);
         flush();
         return result;
     }
+
     public TextEditResult insertLineAbove() {
         TextEditResult result = editorCore.insertLineAbove();
         dispatchTextChanged(TextChangeAction.INSERT, result);
         flush();
         return result;
     }
+
     public TextEditResult insertLineBelow() {
         TextEditResult result = editorCore.insertLineBelow();
         dispatchTextChanged(TextChangeAction.INSERT, result);
@@ -272,14 +264,24 @@ public class SweetEditor extends JPanel {
 
     public boolean undo() {
         TextEditResult result = editorCore.undo();
-        if (result.changes != null && !result.changes.isEmpty()) { dispatchTextChanged(TextChangeAction.UNDO, result); flush(); return true; }
+        if (result.changes != null && !result.changes.isEmpty()) {
+            dispatchTextChanged(TextChangeAction.UNDO, result);
+            flush();
+            return true;
+        }
         return false;
     }
+
     public boolean redo() {
         TextEditResult result = editorCore.redo();
-        if (result.changes != null && !result.changes.isEmpty()) { dispatchTextChanged(TextChangeAction.REDO, result); flush(); return true; }
+        if (result.changes != null && !result.changes.isEmpty()) {
+            dispatchTextChanged(TextChangeAction.REDO, result);
+            flush();
+            return true;
+        }
         return false;
     }
+
     public boolean canUndo() { return editorCore.canUndo(); }
     public boolean canRedo() { return editorCore.canRedo(); }
 
@@ -287,24 +289,49 @@ public class SweetEditor extends JPanel {
 
     public void selectAll() { editorCore.selectAll(); flush(); }
     public String getSelectedText() { return editorCore.getSelectedText(); }
-    public void setCursorPosition(TextPosition position) {
-        editorCore.setCursorPosition(position.line, position.column);
-        flush();
-    }
-    public int[] getCursorPosition() { return editorCore.getCursorPosition(); }
+
     public void setSelection(int startLine, int startColumn, int endLine, int endColumn) {
         editorCore.setSelection(startLine, startColumn, endLine, endColumn);
         flush();
     }
+
     public TextRange getSelection() {
-        int[] sel = editorCore.getSelection();
-        if (sel == null) return null;
-        return new TextRange(new TextPosition(sel[0], sel[1]), new TextPosition(sel[2], sel[3]));
+        return editorCore.getSelection();
     }
-    public int[] getWordRangeAtCursor() { return editorCore.getWordRangeAtCursor(); }
+
+    public void setCursorPosition(TextPosition position) {
+        editorCore.setCursorPosition(position.line, position.column);
+        flush();
+    }
+
+    public TextPosition getCursorPosition() { return editorCore.getCursorPosition(); }
+    public TextRange getWordRangeAtCursor() { return editorCore.getWordRangeAtCursor(); }
     public String getWordAtCursor() { return editorCore.getWordAtCursor(); }
 
+    // ==================== Clipboard ====================
 
+    public void copyToClipboard() {
+        String selectedText = getSelectedText();
+        if (selectedText == null || selectedText.isEmpty()) return;
+        Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(selectedText), null);
+    }
+
+    public void pasteFromClipboard() {
+        try {
+            Object value = Toolkit.getDefaultToolkit().getSystemClipboard().getData(DataFlavor.stringFlavor);
+            if (value instanceof String text && !text.isEmpty()) {
+                insertText(text);
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    public void cutToClipboard() {
+        TextRange selection = getSelection();
+        if (selection == null) return;
+        copyToClipboard();
+        deleteText(selection);
+    }
 
     // ==================== Position/Coordinate Query ====================
 
@@ -313,59 +340,52 @@ public class SweetEditor extends JPanel {
 
     // ==================== Scroll/Navigation ====================
 
-    public void scrollToLine(int line, ScrollBehavior behavior) { editorCore.scrollToLine(line, behavior.value); flush(); }
     public void gotoPosition(int line, int column) { editorCore.gotoPosition(line, column); flush(); }
+    public void scrollToLine(int line, ScrollBehavior behavior) { editorCore.scrollToLine(line, behavior.value); flush(); }
     public void setScroll(float scrollX, float scrollY) { editorCore.setScroll(scrollX, scrollY); flush(); }
     public ScrollMetrics getScrollMetrics() { return editorCore.getScrollMetrics(); }
 
     // ==================== Decoration System ====================
 
-    // -------------------- Style Registration + Highlight Spans --------------------
-
     public void registerTextStyle(int styleId, int color, int bgColor, int fontStyle) {
         editorCore.registerTextStyle(styleId, color, bgColor, fontStyle);
     }
+
     public void registerTextStyle(int styleId, int color, int fontStyle) {
         editorCore.registerTextStyle(styleId, color, fontStyle);
     }
+
     public void registerBatchTextStyles(Map<Integer, ? extends TextStyle> textStyles) { editorCore.registerBatchTextStyles(textStyles); }
     public void setLineSpans(int line, int layer, List<? extends StyleSpan> spans) { editorCore.setLineSpans(line, layer, spans); }
     public void setBatchLineSpans(int layer, Map<Integer, ? extends List<? extends StyleSpan>> spansByLine) { editorCore.setBatchLineSpans(layer, spansByLine); }
-
-    // -------------------- InlayHint / PhantomText --------------------
 
     public void setLineInlayHints(int line, List<? extends InlayHint> hints) { editorCore.setLineInlayHints(line, hints); }
     public void setBatchLineInlayHints(Map<Integer, ? extends List<? extends InlayHint>> hintsByLine) { editorCore.setBatchLineInlayHints(hintsByLine); }
     public void setLinePhantomTexts(int line, List<? extends PhantomText> phantoms) { editorCore.setLinePhantomTexts(line, phantoms); }
     public void setBatchLinePhantomTexts(Map<Integer, ? extends List<? extends PhantomText>> phantomsByLine) { editorCore.setBatchLinePhantomTexts(phantomsByLine); }
 
-    // -------------------- Gutter Icons --------------------
-
     public void setLineGutterIcons(int line, List<? extends GutterIcon> icons) { editorCore.setLineGutterIcons(line, icons); }
     public void setBatchLineGutterIcons(Map<Integer, ? extends List<? extends GutterIcon>> iconsByLine) { editorCore.setBatchLineGutterIcons(iconsByLine); }
-    // -------------------- Diagnostic Decorations --------------------
 
-    public void setLineDiagnostics(int line, List<? extends DiagnosticItem> items) { editorCore.setLineDiagnostics(line, items); }
-    public void setBatchLineDiagnostics(Map<Integer, ? extends List<? extends DiagnosticItem>> diagsByLine) { editorCore.setBatchLineDiagnostics(diagsByLine); }
-
-    // -------------------- Guide (Code Structure Lines) --------------------
+    public void setLineDiagnostics(int line, List<? extends Diagnostic> items) { editorCore.setLineDiagnostics(line, items); }
+    public void setBatchLineDiagnostics(Map<Integer, ? extends List<? extends Diagnostic>> diagsByLine) { editorCore.setBatchLineDiagnostics(diagsByLine); }
 
     public void setIndentGuides(List<? extends IndentGuide> guides) { editorCore.setIndentGuides(guides); }
     public void setBracketGuides(List<? extends BracketGuide> guides) { editorCore.setBracketGuides(guides); }
     public void setFlowGuides(List<? extends FlowGuide> guides) { editorCore.setFlowGuides(guides); }
     public void setSeparatorGuides(List<? extends SeparatorGuide> guides) { editorCore.setSeparatorGuides(guides); }
 
-    // -------------------- Fold (Code Folding) --------------------
+    // ==================== Folding ====================
 
     public void setFoldRegions(List<? extends FoldRegion> regions) { editorCore.setFoldRegions(regions); }
-    public boolean toggleFold(int line) { boolean r = editorCore.toggleFold(line); if (r) flush(); return r; }
+    public boolean toggleFoldAt(int line) { boolean r = editorCore.toggleFoldAt(line); if (r) flush(); return r; }
     public boolean foldAt(int line) { boolean r = editorCore.foldAt(line); if (r) flush(); return r; }
     public boolean unfoldAt(int line) { boolean r = editorCore.unfoldAt(line); if (r) flush(); return r; }
-    public boolean isLineVisible(int line) { return editorCore.isLineVisible(line); }
     public void foldAll() { editorCore.foldAll(); flush(); }
     public void unfoldAll() { editorCore.unfoldAll(); flush(); }
+    public boolean isLineVisible(int line) { return editorCore.isLineVisible(line); }
 
-    // -------------------- Linked Editing --------------------
+    // ==================== Snippet / Linked Editing ====================
 
     public TextEditResult insertSnippet(String snippetTemplate) {
         TextEditResult result = editorCore.insertSnippet(snippetTemplate);
@@ -373,13 +393,14 @@ public class SweetEditor extends JPanel {
         flush();
         return result;
     }
+
     public void startLinkedEditing(LinkedEditingModel model) { editorCore.startLinkedEditing(model); flush(); }
     public boolean isInLinkedEditing() { return editorCore.isInLinkedEditing(); }
     public boolean linkedEditingNext() { boolean r = editorCore.linkedEditingNext(); flush(); return r; }
     public boolean linkedEditingPrev() { boolean r = editorCore.linkedEditingPrev(); flush(); return r; }
     public void cancelLinkedEditing() { editorCore.cancelLinkedEditing(); flush(); }
 
-    // -------------------- Clear Decorations --------------------
+    // ==================== Clear Decorations ====================
 
     public void clearHighlights() { editorCore.clearHighlights(); }
     public void clearHighlights(com.qiplat.sweeteditor.core.adornment.SpanLayer layer) { editorCore.clearHighlights(layer.value); }
@@ -389,6 +410,19 @@ public class SweetEditor extends JPanel {
     public void clearGuides() { editorCore.clearGuides(); }
     public void clearDiagnostics() { editorCore.clearDiagnostics(); }
     public void clearAllDecorations() { editorCore.clearAllDecorations(); }
+
+    /**
+     * Flush all pending changes (decoration / layout / scroll / selection) and trigger a redraw.
+     * <p>
+     * Decoration setters (setLineSpans, clearHighlights, setFoldRegions, etc.) no longer
+     * trigger a redraw automatically. Call this method once after a batch of decoration
+     * updates to make them take effect.
+     */
+    public void flush() {
+        renderModelDirty = true;
+        repaint();
+    }
+
 
     // ==================== View Layer Extension Configuration ====================
 
@@ -423,9 +457,12 @@ public class SweetEditor extends JPanel {
         if (config.getTabSize() != null && config.getTabSize() > 0) {
             editorCore.setTabSize(config.getTabSize());
         }
+        if (config.getInsertSpaces() != null) {
+            editorCore.setInsertSpaces(config.getInsertSpaces());
+        }
     }
-    public LanguageConfiguration getLanguageConfiguration() { return languageConfiguration; }
 
+    public LanguageConfiguration getLanguageConfiguration() { return languageConfiguration; }
     public <T extends EditorMetadata> void setMetadata(T metadata) { this.metadata = metadata; }
 
     @SuppressWarnings("unchecked")
@@ -462,8 +499,9 @@ public class SweetEditor extends JPanel {
     }
 
     public void triggerCompletion() {
-        if (completionProviderManager != null)
+        if (completionProviderManager != null) {
             completionProviderManager.triggerCompletion(CompletionContext.TriggerKind.INVOKED, null);
+        }
     }
 
     public void showCompletionItems(java.util.List<CompletionItem> items) {
@@ -476,19 +514,6 @@ public class SweetEditor extends JPanel {
 
     public void setCompletionCellRenderer(CompletionCellRenderer renderer) {
         if (completionPopupController != null) completionPopupController.setCellRenderer(renderer);
-    }
-
-    public void addNewLineActionProvider(NewLineActionProvider provider) {
-        if (newLineActionProviderManager == null) {
-            newLineActionProviderManager = new NewLineActionProviderManager(this);
-        }
-        newLineActionProviderManager.addProvider(provider);
-    }
-
-    public void removeNewLineActionProvider(NewLineActionProvider provider) {
-        if (newLineActionProviderManager != null) {
-            newLineActionProviderManager.removeProvider(provider);
-        }
     }
 
     // ==================== Inline Suggestion (Copilot) API ====================
@@ -515,6 +540,19 @@ public class SweetEditor extends JPanel {
         }
     }
 
+    public void addNewLineActionProvider(NewLineActionProvider provider) {
+        if (newLineActionProviderManager == null) {
+            newLineActionProviderManager = new NewLineActionProviderManager(this);
+        }
+        newLineActionProviderManager.addProvider(provider);
+    }
+
+    public void removeNewLineActionProvider(NewLineActionProvider provider) {
+        if (newLineActionProviderManager != null) {
+            newLineActionProviderManager.removeProvider(provider);
+        }
+    }
+
     // ==================== Event Subscription ====================
 
     public <T extends EditorEvent> void subscribe(Class<T> eventType, EditorEventListener<T> listener) {
@@ -525,7 +563,16 @@ public class SweetEditor extends JPanel {
         eventBus.unsubscribe(eventType, listener);
     }
 
+    // ==================== Performance Overlay ====================
 
+    public void setPerfOverlayEnabled(boolean enabled) {
+        renderer.setPerfOverlayEnabled(enabled);
+        repaint();
+    }
+
+    public boolean isPerfOverlayEnabled() {
+        return renderer.isPerfOverlayEnabled();
+    }
 
     // ===================== Painting =====================
 
@@ -603,13 +650,6 @@ public class SweetEditor extends JPanel {
                         }
                     }
 
-                    // Ctrl+Space / Meta+Space manually trigger completion
-                    if ((e.isControlDown() || e.isMetaDown()) && e.getKeyCode() == KeyEvent.VK_SPACE) {
-                        triggerCompletion();
-                        e.consume();
-                        return;
-                    }
-
                     int mods = 0;
                     if (e.isShiftDown()) mods |= MOD_SHIFT;
                     if (e.isControlDown()) mods |= MOD_CTRL;
@@ -617,7 +657,9 @@ public class SweetEditor extends JPanel {
                     if (e.isMetaDown()) mods |= MOD_META;
 
                     int keyCode = mapKeyCode(e.getKeyCode());
-                    boolean isCtrlShortcut = (e.isControlDown() || e.isMetaDown()) && isCtrlKey(e.getKeyCode());
+                    if (keyCode == 0 && (e.isControlDown() || e.isMetaDown() || e.isAltDown())) {
+                        keyCode = mapShortcutKeyCode(e.getKeyCode());
+                    }
 
                     // Prioritize letting NewLineActionProvider handle Enter (Provider decides indentation),
                     // if no Provider or returns null then fallback to Core layer default behavior
@@ -633,11 +675,15 @@ public class SweetEditor extends JPanel {
                         }
                     }
 
-                    if (keyCode != 0 || isCtrlShortcut) {
-                        if (keyCode == 0 && isCtrlShortcut) keyCode = e.getKeyCode();
+                    if (keyCode != 0) {
                         KeyEventResult result = editorCore.handleKeyEvent(keyCode, null, mods);
                         if (result != null && result.handled) {
                             e.consume();
+                            if (dispatchKeyMapCommand(result.command, keyCode, mods)) {
+                                resetCursorBlink();
+                                flush();
+                                return;
+                            }
                             dispatchKeyEventResult(result);
                             // When content changes, if completion panel is visible and not in linked editing, retrigger to refresh candidates
                             if (result.contentChanged && !editorCore.isInLinkedEditing()
@@ -791,7 +837,7 @@ public class SweetEditor extends JPanel {
             resetCursorBlink();
             flush();
             if (result != null) {
-                fireGestureEvents(result, new Point((int) x, (int) y));
+                fireGestureEvents(result, new PointF(x, y));
                 updateAnimationTimer(result.needsAnimation);
             }
         } finally {
@@ -801,7 +847,7 @@ public class SweetEditor extends JPanel {
 
     // ===================== Event Dispatching =====================
 
-    private void fireGestureEvents(GestureResult result, Point screenPoint) {
+    private void fireGestureEvents(GestureResult result, PointF screenPoint) {
         if (result.type == null) return;
         switch (result.type) {
             case LONG_PRESS:
@@ -828,13 +874,14 @@ public class SweetEditor extends JPanel {
                         case INLAY_HINT_ICON:
                             eventBus.publish(new InlayHintClickEvent(
                                     result.hitTarget.line, result.hitTarget.column,
+                                    hitType == HitTargetType.INLAY_HINT_ICON ? InlayType.ICON : InlayType.TEXT,
                                     result.hitTarget.iconId,
-                                    hitType == HitTargetType.INLAY_HINT_ICON,
                                     screenPoint));
                             break;
                         case INLAY_HINT_COLOR:
                             eventBus.publish(new InlayHintClickEvent(
                                     result.hitTarget.line, result.hitTarget.column,
+                                    InlayType.COLOR,
                                     result.hitTarget.colorValue,
                                     screenPoint));
                             break;
@@ -886,11 +933,11 @@ public class SweetEditor extends JPanel {
             replaceRange = textEdit.range;
             text = textEdit.newText;
         } else {
-            int[] wr = getWordRangeAtCursor();
-            if (wr[0] != wr[2] || wr[1] != wr[3]) {
+            TextRange wr = getWordRangeAtCursor();
+            if (wr.start.line != wr.end.line || wr.start.column != wr.end.column) {
                 replaceRange = new TextRange(
-                        new TextPosition(wr[0], wr[1]),
-                        new TextPosition(wr[2], wr[3]));
+                        new TextPosition(wr.start.line, wr.start.column),
+                        new TextPosition(wr.end.line, wr.end.column));
             }
         }
 
@@ -908,12 +955,10 @@ public class SweetEditor extends JPanel {
 
     private void dispatchTextChanged(TextChangeAction action, TextEditResult editResult) {
         if (editResult != null && editResult.changes != null && !editResult.changes.isEmpty()) {
-            for (TextChange change : editResult.changes) {
-                eventBus.publish(new TextChangedEvent(action, change.range, change.newText));
-            }
+            eventBus.publish(new TextChangedEvent(editResult.changes, action));
             decorationProviderManager.onTextChanged(editResult.changes);
         } else {
-            eventBus.publish(new TextChangedEvent(action, null, null));
+            eventBus.publish(new TextChangedEvent(List.of(), action));
             decorationProviderManager.onTextChanged(null);
         }
     }
@@ -921,29 +966,30 @@ public class SweetEditor extends JPanel {
     private void dispatchKeyEventResult(KeyEventResult result) {
         if (result.contentChanged) {
             if (result.editResult != null && result.editResult.changes != null && !result.editResult.changes.isEmpty()) {
-                for (TextChange change : result.editResult.changes) {
-                    eventBus.publish(new TextChangedEvent(TextChangeAction.KEY, change.range, change.newText));
-                }
+                eventBus.publish(new TextChangedEvent(result.editResult.changes, TextChangeAction.KEY));
                 decorationProviderManager.onTextChanged(result.editResult.changes);
             } else {
-                eventBus.publish(new TextChangedEvent(TextChangeAction.KEY, null, null));
+                eventBus.publish(new TextChangedEvent(List.of(), TextChangeAction.KEY));
+                decorationProviderManager.onTextChanged(null);
             }
         }
         if (result.cursorChanged) {
-            int[] pos = editorCore.getCursorPosition();
-            TextPosition cursor = new TextPosition();
-            cursor.line = pos[0];
-            cursor.column = pos[1];
+            TextPosition cursor = editorCore.getCursorPosition();
             eventBus.publish(new CursorChangedEvent(cursor));
         }
         if (result.selectionChanged) {
             // Selection details not available from KeyEventResult; publish with current cursor
-            int[] pos = editorCore.getCursorPosition();
-            TextPosition cursor = new TextPosition();
-            cursor.line = pos[0];
-            cursor.column = pos[1];
+            TextPosition cursor = editorCore.getCursorPosition();
             eventBus.publish(new SelectionChangedEvent(false, null, cursor));
         }
+    }
+
+    private boolean dispatchKeyMapCommand(int command, int keyCode, int modifiers) {
+        if (keyMap == null) return false;
+        EditorCommand<SweetEditor> handler = keyMap.getCommand(command);
+        if (handler == null) return false;
+        handler.onShortCut(new KeyBinding(modifiers, keyCode, command), this);
+        return true;
     }
 
     private int getModifiers(MouseEvent e) {
@@ -957,26 +1003,40 @@ public class SweetEditor extends JPanel {
 
     private static int mapKeyCode(int keyCode) {
         return switch (keyCode) {
-            case KeyEvent.VK_BACK_SPACE -> 8;
-            case KeyEvent.VK_TAB -> 9;
-            case KeyEvent.VK_ENTER -> 13;
-            case KeyEvent.VK_ESCAPE -> 27;
-            case KeyEvent.VK_DELETE -> 46;
-            case KeyEvent.VK_LEFT -> 37;
-            case KeyEvent.VK_UP -> 38;
-            case KeyEvent.VK_RIGHT -> 39;
-            case KeyEvent.VK_DOWN -> 40;
-            case KeyEvent.VK_HOME -> 36;
-            case KeyEvent.VK_END -> 35;
-            case KeyEvent.VK_PAGE_UP -> 33;
-            case KeyEvent.VK_PAGE_DOWN -> 34;
+            case KeyEvent.VK_BACK_SPACE -> KeyCode.BACKSPACE;
+            case KeyEvent.VK_TAB -> KeyCode.TAB;
+            case KeyEvent.VK_ENTER -> KeyCode.ENTER;
+            case KeyEvent.VK_ESCAPE -> KeyCode.ESCAPE;
+            case KeyEvent.VK_DELETE -> KeyCode.DELETE_KEY;
+            case KeyEvent.VK_LEFT -> KeyCode.LEFT;
+            case KeyEvent.VK_UP -> KeyCode.UP;
+            case KeyEvent.VK_RIGHT -> KeyCode.RIGHT;
+            case KeyEvent.VK_DOWN -> KeyCode.DOWN;
+            case KeyEvent.VK_HOME -> KeyCode.HOME;
+            case KeyEvent.VK_END -> KeyCode.END;
+            case KeyEvent.VK_PAGE_UP -> KeyCode.PAGE_UP;
+            case KeyEvent.VK_PAGE_DOWN -> KeyCode.PAGE_DOWN;
             default -> 0;
         };
     }
 
-    private static boolean isCtrlKey(int keyCode) {
-        return keyCode == KeyEvent.VK_A || keyCode == KeyEvent.VK_C || keyCode == KeyEvent.VK_V
-                || keyCode == KeyEvent.VK_X || keyCode == KeyEvent.VK_Z || keyCode == KeyEvent.VK_Y;
+    private static int mapShortcutKeyCode(int keyCode) {
+        return switch (keyCode) {
+            case KeyEvent.VK_A -> KeyCode.A;
+            case KeyEvent.VK_C -> KeyCode.C;
+            case KeyEvent.VK_D -> KeyCode.D;
+            case KeyEvent.VK_K -> KeyCode.K;
+            case KeyEvent.VK_SPACE -> KeyCode.SPACE;
+            case KeyEvent.VK_V -> KeyCode.V;
+            case KeyEvent.VK_X -> KeyCode.X;
+            case KeyEvent.VK_Y -> KeyCode.Y;
+            case KeyEvent.VK_Z -> KeyCode.Z;
+            default -> 0;
+        };
+    }
+
+    private EditorKeyMap createDefaultKeyMap() {
+        return EditorKeyMap.defaultKeyMap();
     }
 
     // ===================== Cursor Blink =====================
@@ -1038,17 +1098,6 @@ public class SweetEditor extends JPanel {
         renderModelDirty = true;
     }
 
-    /**
-     * Flush all pending changes (decoration / layout / scroll / selection) and trigger a redraw.
-     * <p>
-     * Decoration setters (setLineSpans, clearHighlights, setFoldRegions, etc.) no longer
-     * trigger a redraw automatically. Call this method once after a batch of decoration
-     * updates to make them take effect.
-     */
-    public void flush() {
-        renderModelDirty = true;
-        repaint();
-    }
 
     private void ensureRenderModelUpToDate() {
         if (!renderModelDirty) {

@@ -1744,6 +1744,7 @@ export struct SweetEditor {
     if (config.tabSize > 0) {
       this.editorCore.setTabSize(config.tabSize);
     }
+    this.editorCore.setInsertSpaces(config.insertSpaces);
   }
 
   getLanguageConfiguration(): LanguageConfiguration | null {

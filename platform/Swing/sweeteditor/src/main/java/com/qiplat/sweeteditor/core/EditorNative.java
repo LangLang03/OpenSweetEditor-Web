@@ -252,8 +252,10 @@ public final class EditorNative {
 
     private static final MethodHandle CREATE_DOCUMENT = downcall("create_document_from_utf16",
             FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
+    private static final MethodHandle CREATE_DOCUMENT_FROM_FILE = downcall("create_document_from_file",
+            FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
 
-    private static final MethodHandle GET_DOCUMENT_LINE_TEXT = downcall("get_document_line_text",
+    private static final MethodHandle GET_DOCUMENT_LINE_TEXT = downcall("get_document_line_utf16",
             FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG));
 
     private static final MethodHandle GET_DOCUMENT_LINE_COUNT = downcall("get_document_line_count",
@@ -292,7 +294,13 @@ public final class EditorNative {
     private static final MethodHandle BUILD_RENDER_MODEL = downcall("build_editor_render_model",
             FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
 
+    private static final MethodHandle GET_LAYOUT_METRICS = downcall("get_layout_metrics",
+            FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
+
     private static final MethodHandle TICK_EDGE_SCROLL = downcall("editor_tick_edge_scroll",
+            FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
+
+    private static final MethodHandle TICK_FLING = downcall("editor_tick_fling",
             FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
 
     private static final MethodHandle TICK_ANIMATIONS = downcall("editor_tick_animations",
@@ -330,6 +338,24 @@ public final class EditorNative {
 
     private static final MethodHandle SET_CURSOR = downcall("editor_set_cursor_position",
             FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG));
+
+    private static final MethodHandle MOVE_CURSOR_LEFT = downcall("editor_move_cursor_left",
+            FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT));
+
+    private static final MethodHandle MOVE_CURSOR_RIGHT = downcall("editor_move_cursor_right",
+            FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT));
+
+    private static final MethodHandle MOVE_CURSOR_UP = downcall("editor_move_cursor_up",
+            FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT));
+
+    private static final MethodHandle MOVE_CURSOR_DOWN = downcall("editor_move_cursor_down",
+            FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT));
+
+    private static final MethodHandle MOVE_CURSOR_TO_LINE_START = downcall("editor_move_cursor_to_line_start",
+            FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT));
+
+    private static final MethodHandle MOVE_CURSOR_TO_LINE_END = downcall("editor_move_cursor_to_line_end",
+            FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT));
 
     private static final MethodHandle SELECT_ALL = downcall("editor_select_all",
             FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG));
@@ -424,6 +450,9 @@ public final class EditorNative {
 
     private static final MethodHandle CLEAR_HIGHLIGHTS = downcall("editor_clear_highlights",
             FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG));
+
+    private static final MethodHandle CLEAR_LINE_SPANS = downcall("editor_clear_line_spans",
+            FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_BYTE));
 
     private static final MethodHandle CLEAR_INLAY_HINTS = downcall("editor_clear_inlay_hints",
             FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG));
@@ -533,6 +562,9 @@ public final class EditorNative {
     private static final MethodHandle SET_TAB_SIZE = downcall("editor_set_tab_size",
             FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT));
 
+    private static final MethodHandle SET_INSERT_SPACES = downcall("editor_set_insert_spaces",
+            FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT));
+
     private static final MethodHandle SET_SCALE = downcall("editor_set_scale",
             FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.JAVA_FLOAT));
 
@@ -590,6 +622,7 @@ public final class EditorNative {
     private static final MethodHandle SET_BRACKET_GUIDES = downcall("editor_set_bracket_guides", BINARY_PAYLOAD_DESC);
     private static final MethodHandle SET_FLOW_GUIDES = downcall("editor_set_flow_guides", BINARY_PAYLOAD_DESC);
     private static final MethodHandle SET_SEPARATOR_GUIDES = downcall("editor_set_separator_guides", BINARY_PAYLOAD_DESC);
+    private static final MethodHandle SET_KEYMAP = downcall("editor_set_keymap", BINARY_PAYLOAD_DESC);
 
     // ===================== Document API =====================
 
@@ -597,6 +630,15 @@ public final class EditorNative {
         try {
             MemorySegment utf16 = arena.allocateFrom(text, StandardCharsets.UTF_16LE);
             return (long) CREATE_DOCUMENT.invokeExact(utf16);
+        } catch (Throwable t) {
+            throw new RuntimeException(t);
+        }
+    }
+
+    public static long createDocumentFromFile(Arena arena, String path) {
+        try {
+            MemorySegment utf8 = path != null ? arena.allocateFrom(path) : MemorySegment.NULL;
+            return (long) CREATE_DOCUMENT_FROM_FILE.invokeExact(utf8);
         } catch (Throwable t) {
             throw new RuntimeException(t);
         }
@@ -684,6 +726,12 @@ public final class EditorNative {
         });
     }
 
+    public static void setInsertSpaces(long handle, int enabled) {
+        invokeVoid(() -> {
+            SET_INSERT_SPACES.invokeExact(handle, enabled);
+        });
+    }
+
     public static void setScale(long handle, float scale) {
         invokeVoid(() -> {
             SET_SCALE.invokeExact(handle, scale);
@@ -732,8 +780,16 @@ public final class EditorNative {
         return invokeBinaryResult(outSize -> (MemorySegment) BUILD_RENDER_MODEL.invokeExact(handle, outSize));
     }
 
+    public static NativeBinaryResult getLayoutMetrics(long handle) {
+        return invokeBinaryResult(outSize -> (MemorySegment) GET_LAYOUT_METRICS.invokeExact(handle, outSize));
+    }
+
     public static NativeBinaryResult tickEdgeScroll(long handle) {
         return invokeBinaryResult(outSize -> (MemorySegment) TICK_EDGE_SCROLL.invokeExact(handle, outSize));
+    }
+
+    public static NativeBinaryResult tickFling(long handle) {
+        return invokeBinaryResult(outSize -> (MemorySegment) TICK_FLING.invokeExact(handle, outSize));
     }
 
     public static NativeBinaryResult tickAnimations(long handle) {
@@ -837,6 +893,42 @@ public final class EditorNative {
     public static void setCursorPosition(long handle, int line, int column) {
         invokeVoid(() -> {
             SET_CURSOR.invokeExact(handle, (long) line, (long) column);
+        });
+    }
+
+    public static void moveCursorLeft(long handle, boolean extendSelection) {
+        invokeVoid(() -> {
+            MOVE_CURSOR_LEFT.invokeExact(handle, extendSelection ? 1 : 0);
+        });
+    }
+
+    public static void moveCursorRight(long handle, boolean extendSelection) {
+        invokeVoid(() -> {
+            MOVE_CURSOR_RIGHT.invokeExact(handle, extendSelection ? 1 : 0);
+        });
+    }
+
+    public static void moveCursorUp(long handle, boolean extendSelection) {
+        invokeVoid(() -> {
+            MOVE_CURSOR_UP.invokeExact(handle, extendSelection ? 1 : 0);
+        });
+    }
+
+    public static void moveCursorDown(long handle, boolean extendSelection) {
+        invokeVoid(() -> {
+            MOVE_CURSOR_DOWN.invokeExact(handle, extendSelection ? 1 : 0);
+        });
+    }
+
+    public static void moveCursorToLineStart(long handle, boolean extendSelection) {
+        invokeVoid(() -> {
+            MOVE_CURSOR_TO_LINE_START.invokeExact(handle, extendSelection ? 1 : 0);
+        });
+    }
+
+    public static void moveCursorToLineEnd(long handle, boolean extendSelection) {
+        invokeVoid(() -> {
+            MOVE_CURSOR_TO_LINE_END.invokeExact(handle, extendSelection ? 1 : 0);
         });
     }
 
@@ -1313,6 +1405,14 @@ public final class EditorNative {
         }
     }
 
+    public static void clearLineSpans(long handle, int line, int layer) {
+        try {
+            CLEAR_LINE_SPANS.invokeExact(handle, (long) line, (byte) layer);
+        } catch (Throwable t) {
+            throw new RuntimeException(t);
+        }
+    }
+
     public static void clearHighlightsLayer(long handle, int layer) {
         try {
             CLEAR_HIGHLIGHTS_LAYER.invokeExact(handle, (byte) layer);
@@ -1488,6 +1588,18 @@ public final class EditorNative {
     public static void setBatchLineDiagnostics(long handle, MemorySegment payload, long size) {
         invokeVoid(() -> {
             SET_BATCH_LINE_DIAGNOSTICS.invokeExact(handle, payload, size);
+        });
+    }
+
+    public static void setKeyMap(long handle, byte[] payload, Arena arena) {
+        invokeVoid(() -> {
+            SET_KEYMAP.invokeExact(handle, byteArraySegment(arena, payload), (long) payload.length);
+        });
+    }
+
+    public static void setKeyMap(long handle, MemorySegment payload, long size) {
+        invokeVoid(() -> {
+            SET_KEYMAP.invokeExact(handle, payload, size);
         });
     }
 

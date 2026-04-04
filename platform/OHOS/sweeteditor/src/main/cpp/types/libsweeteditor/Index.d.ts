@@ -29,6 +29,7 @@ export const editorOnFontMetricsChanged: (handle: number) => void;
 export const editorSetFoldArrowMode: (handle: number, mode: number) => void;
 export const editorSetWrapMode: (handle: number, mode: number) => void;
 export const editorSetTabSize: (handle: number, tabSize: number) => void;
+export const editorSetInsertSpaces: (handle: number, enabled: number) => void;
 export const editorSetScale: (handle: number, scale: number) => void;
 export const editorSetLineSpacing: (handle: number, add: number, mult: number) => void;
 export const editorSetContentStartPadding: (handle: number, padding: number) => void;

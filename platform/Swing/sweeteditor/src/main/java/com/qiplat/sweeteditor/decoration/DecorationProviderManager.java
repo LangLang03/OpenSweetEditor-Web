@@ -1,7 +1,7 @@
 package com.qiplat.sweeteditor.decoration;
 
 import com.qiplat.sweeteditor.SweetEditor;
-import com.qiplat.sweeteditor.core.adornment.DiagnosticItem;
+import com.qiplat.sweeteditor.core.adornment.Diagnostic;
 import com.qiplat.sweeteditor.core.adornment.FoldRegion;
 import com.qiplat.sweeteditor.core.adornment.GutterIcon;
 import com.qiplat.sweeteditor.core.adornment.BracketGuide;
@@ -196,7 +196,7 @@ public final class DecorationProviderManager {
         Map<Integer, List<StyleSpan>> syntaxSpans = new HashMap<>();
         Map<Integer, List<StyleSpan>> semanticSpans = new HashMap<>();
         Map<Integer, List<InlayHint>> inlayHints = new HashMap<>();
-        Map<Integer, List<DiagnosticItem>> diagnostics = new HashMap<>();
+        Map<Integer, List<Diagnostic>> diagnostics = new HashMap<>();
         List<IndentGuide> indentGuides = null;
         List<BracketGuide> bracketGuides = null;
         List<FlowGuide> flowGuides = null;
@@ -393,7 +393,7 @@ public final class DecorationProviderManager {
     }
 
     private void clearDiagnosticRange(int startLine, int endLine) {
-        Map<Integer, List<DiagnosticItem>> empty = buildEmptyRangeMap(startLine, endLine);
+        Map<Integer, List<Diagnostic>> empty = buildEmptyRangeMap(startLine, endLine);
         if (empty.isEmpty()) return;
         editor.setBatchLineDiagnostics(empty);
     }

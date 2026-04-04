@@ -2,7 +2,7 @@ package com.qiplat.sweeteditor.demo;
 
 import com.qiplat.sweeteditor.EditorTheme;
 import com.qiplat.sweeteditor.EditorMetadata;
-import com.qiplat.sweeteditor.core.adornment.DiagnosticItem;
+import com.qiplat.sweeteditor.core.adornment.Diagnostic;
 import com.qiplat.sweeteditor.core.adornment.FoldRegion;
 import com.qiplat.sweeteditor.core.adornment.GutterIcon;
 import com.qiplat.sweeteditor.core.adornment.IndentGuide;
@@ -90,7 +90,7 @@ public class DemoDecorationProvider implements DecorationProvider {
 
     @Override
     public void provideDecorations(DecorationContext context, DecorationReceiver receiver) {
-        Map<Integer, List<DiagnosticItem>> diagnostics = new HashMap<>();
+        Map<Integer, List<Diagnostic>> diagnostics = new HashMap<>();
 
         DecorationResult sweetLineResult = buildSweetLineDecorationResult(context, diagnostics);
         receiver.accept(sweetLineResult);
@@ -112,7 +112,7 @@ public class DemoDecorationProvider implements DecorationProvider {
     }
 
     private DecorationResult buildSweetLineDecorationResult(DecorationContext context,
-                                                            Map<Integer, List<DiagnosticItem>> dynamicDiagnostics) {
+                                                            Map<Integer, List<Diagnostic>> dynamicDiagnostics) {
         Map<Integer, List<PhantomText>> dynamicPhantoms = new HashMap<>();
         Map<Integer, List<StyleSpan>> syntaxSpans = new HashMap<>();
         Map<Integer, List<InlayHint>> colorInlayHints = new HashMap<>();
@@ -246,7 +246,7 @@ public class DemoDecorationProvider implements DecorationProvider {
 
     private static TokenRangeInfo appendDynamicDemoDecorations(Map<Integer, List<PhantomText>> phantoms,
                                                                Set<Integer> phantomLines,
-                                                               Map<Integer, List<DiagnosticItem>> diagnostics,
+                                                               Map<Integer, List<Diagnostic>> diagnostics,
                                                                Set<String> seenDiagnostics,
                                                                int[] diagnosticCount,
                                                                TokenRangeInfo firstKeywordRange,
@@ -303,7 +303,7 @@ public class DemoDecorationProvider implements DecorationProvider {
         return firstKeywordRange;
     }
 
-    private static void appendDiagnostic(Map<Integer, List<DiagnosticItem>> diagnostics,
+    private static void appendDiagnostic(Map<Integer, List<Diagnostic>> diagnostics,
                                          Set<String> seenDiagnostics,
                                          int[] diagnosticCount,
                                          int line,
@@ -322,11 +322,11 @@ public class DemoDecorationProvider implements DecorationProvider {
             return;
         }
         diagnostics.computeIfAbsent(line, ignored -> new ArrayList<>())
-                .add(new DiagnosticItem(column, length, severity, color));
+                .add(new Diagnostic(column, length, severity, color));
         diagnosticCount[0]++;
     }
 
-    private static void appendDiagnosticFallbackIfNeeded(Map<Integer, List<DiagnosticItem>> diagnostics,
+    private static void appendDiagnosticFallbackIfNeeded(Map<Integer, List<Diagnostic>> diagnostics,
                                                          Set<String> seenDiagnostics,
                                                          int[] diagnosticCount,
                                                          TokenRangeInfo firstKeywordRange) {

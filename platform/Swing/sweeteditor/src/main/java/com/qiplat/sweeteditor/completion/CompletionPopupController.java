@@ -401,7 +401,7 @@ public class CompletionPopupController implements CompletionProviderManager.Comp
 
         private static String truncateText(FontMetrics fm, String text, int maxWidth) {
             if (fm.stringWidth(text) <= maxWidth) return text;
-            String ellipsis = "…";
+            String ellipsis = "...";
             int ellipsisW = fm.stringWidth(ellipsis);
             for (int i = text.length() - 1; i > 0; i--) {
                 if (fm.stringWidth(text.substring(0, i)) + ellipsisW <= maxWidth) {

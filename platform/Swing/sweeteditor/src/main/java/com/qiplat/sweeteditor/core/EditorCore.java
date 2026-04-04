@@ -2,6 +2,7 @@ package com.qiplat.sweeteditor.core;
 
 import com.qiplat.sweeteditor.core.adornment.*;
 import com.qiplat.sweeteditor.core.foundation.*;
+import com.qiplat.sweeteditor.core.keymap.KeyMap;
 import com.qiplat.sweeteditor.core.visual.*;
 import com.qiplat.sweeteditor.core.snippet.*;
 
@@ -106,6 +107,10 @@ public class EditorCore implements AutoCloseable {
         EditorNative.setTabSize(nativeHandle, tabSize);
     }
 
+    public void setInsertSpaces(boolean enabled) {
+        EditorNative.setInsertSpaces(nativeHandle, enabled ? 1 : 0);
+    }
+
     public void setScale(float scale) {
         EditorNative.setScale(nativeHandle, scale);
     }
@@ -147,10 +152,24 @@ public class EditorCore implements AutoCloseable {
         }
     }
 
+    public LayoutMetrics getLayoutMetrics() {
+        EditorNative.NativeBinaryResult result = EditorNative.getLayoutMetrics(nativeHandle);
+        try {
+            return ProtocolDecoder.decodeLayoutMetrics(result.asByteBuffer());
+        } finally {
+            result.free();
+        }
+    }
+
     // ===================== Gesture/Keyboard =====================
 
     public GestureResult handleGestureEvent(int type, float[] points, int modifiers,
                                             float wheelDeltaX, float wheelDeltaY, float directScale) {
+        return handleGestureEventEx(type, points, modifiers, wheelDeltaX, wheelDeltaY, directScale);
+    }
+
+    public GestureResult handleGestureEventEx(int type, float[] points, int modifiers,
+                                              float wheelDeltaX, float wheelDeltaY, float directScale) {
         try (Arena tempArena = Arena.ofConfined()) {
             int pointerCount = (points != null) ? points.length / 2 : 0;
             if (points == null) points = new float[0];
@@ -167,6 +186,15 @@ public class EditorCore implements AutoCloseable {
     /** Advances edge-scroll by one tick and returns an updated gesture result. */
     public GestureResult tickEdgeScroll() {
         EditorNative.NativeBinaryResult result = EditorNative.tickEdgeScroll(nativeHandle);
+        try {
+            return ProtocolDecoder.decodeGestureResult(result.asByteBuffer());
+        } finally {
+            result.free();
+        }
+    }
+
+    public GestureResult tickFling() {
+        EditorNative.NativeBinaryResult result = EditorNative.tickFling(nativeHandle);
         try {
             return ProtocolDecoder.decodeGestureResult(result.asByteBuffer());
         } finally {
@@ -192,6 +220,14 @@ public class EditorCore implements AutoCloseable {
             } finally {
                 result.free();
             }
+        }
+    }
+
+    public void setKeyMap(KeyMap keyMap) {
+        if (keyMap == null) return;
+        byte[] payload = ProtocolEncoder.packKeyMap(keyMap);
+        try (Arena tempArena = Arena.ofConfined()) {
+            EditorNative.setKeyMap(nativeHandle, payload, tempArena);
         }
     }
 
@@ -348,15 +384,43 @@ public class EditorCore implements AutoCloseable {
         EditorNative.setCursorPosition(nativeHandle, line, column);
     }
 
-    public int[] getCursorPosition() {
+    public void moveCursorLeft(boolean extendSelection) {
+        EditorNative.moveCursorLeft(nativeHandle, extendSelection);
+    }
+
+    public void moveCursorRight(boolean extendSelection) {
+        EditorNative.moveCursorRight(nativeHandle, extendSelection);
+    }
+
+    public void moveCursorUp(boolean extendSelection) {
+        EditorNative.moveCursorUp(nativeHandle, extendSelection);
+    }
+
+    public void moveCursorDown(boolean extendSelection) {
+        EditorNative.moveCursorDown(nativeHandle, extendSelection);
+    }
+
+    public void moveCursorToLineStart(boolean extendSelection) {
+        EditorNative.moveCursorToLineStart(nativeHandle, extendSelection);
+    }
+
+    public void moveCursorToLineEnd(boolean extendSelection) {
+        EditorNative.moveCursorToLineEnd(nativeHandle, extendSelection);
+    }
+
+    public TextPosition getCursorPosition() {
         try (Arena tempArena = Arena.ofConfined()) {
-            return EditorNative.getCursorPosition(nativeHandle, tempArena);
+            int[] pos = EditorNative.getCursorPosition(nativeHandle, tempArena);
+            return new TextPosition(pos[0], pos[1]);
         }
     }
 
-    public int[] getWordRangeAtCursor() {
+    public TextRange getWordRangeAtCursor() {
         try (Arena tempArena = Arena.ofConfined()) {
-            return EditorNative.getWordRangeAtCursor(nativeHandle, tempArena);
+            int[] range = EditorNative.getWordRangeAtCursor(nativeHandle, tempArena);
+            return new TextRange(
+                    new TextPosition(range[0], range[1]),
+                    new TextPosition(range[2], range[3]));
         }
     }
 
@@ -372,9 +436,12 @@ public class EditorCore implements AutoCloseable {
         EditorNative.setSelection(nativeHandle, startLine, startColumn, endLine, endColumn);
     }
 
-    public int[] getSelection() {
+    public TextRange getSelection() {
         try (Arena tempArena = Arena.ofConfined()) {
-            return EditorNative.getSelection(nativeHandle, tempArena);
+            int[] sel = EditorNative.getSelection(nativeHandle, tempArena);
+            return new TextRange(
+                    new TextPosition(sel[0], sel[1]),
+                    new TextPosition(sel[2], sel[3]));
         }
     }
 
@@ -720,7 +787,7 @@ public class EditorCore implements AutoCloseable {
     // ===================== Diagnostics =====================
 
     /** Set diagnostic decorations for a specific line (model overload) */
-    public void setLineDiagnostics(int line, List<? extends DiagnosticItem> items) {
+    public void setLineDiagnostics(int line, List<? extends Diagnostic> items) {
         if (items == null) return;
         try (Arena tempArena = Arena.ofConfined()) {
             byte[] payload = ProtocolEncoder.packLineDiagnostics(line, items);
@@ -734,7 +801,7 @@ public class EditorCore implements AutoCloseable {
     }
 
     /** Batch set diagnostic decorations for multiple lines */
-    public void setBatchLineDiagnostics(Map<Integer, ? extends List<? extends DiagnosticItem>> diagsByLine) {
+    public void setBatchLineDiagnostics(Map<Integer, ? extends List<? extends Diagnostic>> diagsByLine) {
         if (diagsByLine == null || diagsByLine.isEmpty()) return;
         byte[] payload = ProtocolEncoder.packBatchLineDiagnostics(diagsByLine);
         if (payload == null) return;
@@ -839,7 +906,7 @@ public class EditorCore implements AutoCloseable {
         EditorNative.setFoldRegions(nativeHandle, payload, size);
     }
 
-    public boolean toggleFold(int line) { return EditorNative.toggleFold(nativeHandle, line); }
+    public boolean toggleFoldAt(int line) { return EditorNative.toggleFold(nativeHandle, line); }
     public boolean foldAt(int line) { return EditorNative.foldAt(nativeHandle, line); }
     public boolean unfoldAt(int line) { return EditorNative.unfoldAt(nativeHandle, line); }
     public void foldAll() { EditorNative.foldAll(nativeHandle); }
@@ -873,6 +940,8 @@ public class EditorCore implements AutoCloseable {
     // ===================== Clear =====================
 
     public void clearHighlights() { EditorNative.clearHighlights(nativeHandle); }
+    public void clearHighlightsLayer(int layer) { EditorNative.clearHighlightsLayer(nativeHandle, layer); }
+    public void clearLineSpans(int line, int layer) { EditorNative.clearLineSpans(nativeHandle, line, layer); }
     public void clearHighlights(int layer) { EditorNative.clearHighlightsLayer(nativeHandle, layer); }
     public void clearInlayHints() { EditorNative.clearInlayHints(nativeHandle); }
     public void clearPhantomTexts() { EditorNative.clearPhantomTexts(nativeHandle); }
