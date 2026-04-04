@@ -90,6 +90,7 @@ editor.ApplyTheme(theme);
 From repository root:
 
 ```powershell
+.\scripts\build-shared.ps1 -Platform windows
 dotnet build .\platform\WinForms\SweetEditor\SweetEditor.csproj -c Release
 dotnet pack .\platform\WinForms\SweetEditor\SweetEditor.csproj -c Release
 ```
