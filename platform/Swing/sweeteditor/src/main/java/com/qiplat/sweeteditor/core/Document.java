@@ -1,6 +1,8 @@
 package com.qiplat.sweeteditor.core;
 
 import java.lang.foreign.Arena;
+import java.io.File;
+import java.nio.file.Path;
 
 /**
  * Document object, encapsulating the native document handle from the C++ layer.
@@ -12,6 +14,15 @@ public class Document implements AutoCloseable {
     public Document(String text) {
         this.arena = Arena.ofConfined();
         this.nativeHandle = EditorNative.createDocument(arena, text);
+    }
+
+    public Document(Path path) {
+        this.arena = Arena.ofConfined();
+        this.nativeHandle = EditorNative.createDocumentFromFile(arena, path != null ? path.toString() : null);
+    }
+
+    public Document(File file) {
+        this(file == null ? null : file.toPath());
     }
 
     public long getHandle() {

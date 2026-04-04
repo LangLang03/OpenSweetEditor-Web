@@ -252,6 +252,8 @@ public final class EditorNative {
 
     private static final MethodHandle CREATE_DOCUMENT = downcall("create_document_from_utf16",
             FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
+    private static final MethodHandle CREATE_DOCUMENT_FROM_FILE = downcall("create_document_from_file",
+            FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
 
     private static final MethodHandle GET_DOCUMENT_LINE_TEXT = downcall("get_document_line_text",
             FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG));
@@ -628,6 +630,15 @@ public final class EditorNative {
         try {
             MemorySegment utf16 = arena.allocateFrom(text, StandardCharsets.UTF_16LE);
             return (long) CREATE_DOCUMENT.invokeExact(utf16);
+        } catch (Throwable t) {
+            throw new RuntimeException(t);
+        }
+    }
+
+    public static long createDocumentFromFile(Arena arena, String path) {
+        try {
+            MemorySegment utf8 = path != null ? arena.allocateFrom(path) : MemorySegment.NULL;
+            return (long) CREATE_DOCUMENT_FROM_FILE.invokeExact(utf8);
         } catch (Throwable t) {
             throw new RuntimeException(t);
         }
