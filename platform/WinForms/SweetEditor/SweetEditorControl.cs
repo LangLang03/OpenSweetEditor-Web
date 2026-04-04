@@ -496,6 +496,51 @@ namespace SweetEditor {
 
 			return keyMap;
 		}
+
+		public static EditorKeyMap JetBrains() {
+			var keyMap = new EditorKeyMap();
+			AddCommonBindings(keyMap);
+
+			Bind(keyMap, KeyModifier.CTRL | KeyModifier.SHIFT, KeyCode.Z, EditorCommand.REDO);
+			Bind(keyMap, KeyModifier.META | KeyModifier.SHIFT, KeyCode.Z, EditorCommand.REDO);
+
+			Bind(keyMap, KeyModifier.SHIFT, KeyCode.ENTER, EditorCommand.INSERT_LINE_BELOW);
+			Bind(keyMap, KeyModifier.CTRL | KeyModifier.ALT, KeyCode.ENTER, EditorCommand.INSERT_LINE_ABOVE);
+			Bind(keyMap, KeyModifier.META | KeyModifier.ALT, KeyCode.ENTER, EditorCommand.INSERT_LINE_ABOVE);
+
+			Bind(keyMap, KeyModifier.ALT | KeyModifier.SHIFT, KeyCode.UP, EditorCommand.MOVE_LINE_UP);
+			Bind(keyMap, KeyModifier.ALT | KeyModifier.SHIFT, KeyCode.DOWN, EditorCommand.MOVE_LINE_DOWN);
+
+			Bind(keyMap, KeyModifier.CTRL, KeyCode.D, EditorCommand.COPY_LINE_DOWN);
+			Bind(keyMap, KeyModifier.META, KeyCode.D, EditorCommand.COPY_LINE_DOWN);
+
+			Bind(keyMap, KeyModifier.CTRL, KeyCode.Y, EditorCommand.DELETE_LINE);
+			Bind(keyMap, KeyModifier.META, KeyCode.BACKSPACE, EditorCommand.DELETE_LINE);
+
+			return keyMap;
+		}
+
+		public static EditorKeyMap Sublime() {
+			var keyMap = new EditorKeyMap();
+			AddCommonBindings(keyMap);
+
+			Bind(keyMap, KeyModifier.CTRL, KeyCode.Y, EditorCommand.REDO);
+			Bind(keyMap, KeyModifier.META | KeyModifier.SHIFT, KeyCode.Z, EditorCommand.REDO);
+			Bind(keyMap, KeyModifier.CTRL | KeyModifier.SHIFT, KeyCode.Z, EditorCommand.REDO);
+
+			Bind(keyMap, KeyModifier.CTRL | KeyModifier.SHIFT, KeyCode.D, EditorCommand.COPY_LINE_DOWN);
+			Bind(keyMap, KeyModifier.META | KeyModifier.SHIFT, KeyCode.D, EditorCommand.COPY_LINE_DOWN);
+
+			Bind(keyMap, KeyModifier.CTRL | KeyModifier.SHIFT, KeyCode.UP, EditorCommand.MOVE_LINE_UP);
+			Bind(keyMap, KeyModifier.CTRL | KeyModifier.SHIFT, KeyCode.DOWN, EditorCommand.MOVE_LINE_DOWN);
+			Bind(keyMap, KeyModifier.META | KeyModifier.CTRL, KeyCode.UP, EditorCommand.MOVE_LINE_UP);
+			Bind(keyMap, KeyModifier.META | KeyModifier.CTRL, KeyCode.DOWN, EditorCommand.MOVE_LINE_DOWN);
+
+			Bind(keyMap, KeyModifier.CTRL | KeyModifier.SHIFT, KeyCode.K, EditorCommand.DELETE_LINE);
+			Bind(keyMap, KeyModifier.META | KeyModifier.SHIFT, KeyCode.K, EditorCommand.DELETE_LINE);
+
+			return keyMap;
+		}
 	}
 
 
@@ -622,7 +667,7 @@ namespace SweetEditor {
 		}
 
 		/// <summary>Gets the current editor theme.</summary>
-		public EditorTheme GetTheme() => currentTheme;
+		public EditorTheme? GetTheme() => IsReleased ? null : currentTheme;
 
 		/// <summary>
 		/// Applies an editor theme.
@@ -662,7 +707,7 @@ namespace SweetEditor {
 		public EditorSettings Settings => settings;
 
 		/// <summary>Gets the current editor keymap.</summary>
-		public EditorKeyMap GetKeyMap() => keyMap;
+		public EditorKeyMap? GetKeyMap() => IsReleased ? null : keyMap;
 
 		/// <summary>Replaces the current keymap and syncs bindings to the C++ core.</summary>
 		public void SetKeyMap(EditorKeyMap editorKeyMap) {
@@ -712,7 +757,7 @@ namespace SweetEditor {
 			}
 		}
 
-		public LanguageConfiguration? GetLanguageConfiguration() => languageConfiguration;
+		public LanguageConfiguration? GetLanguageConfiguration() => IsReleased ? null : languageConfiguration;
 
 		// ==================== EditorMetadata API ====================
 
@@ -896,16 +941,16 @@ namespace SweetEditor {
 		public bool CanRedo() => editorCore.CanRedo();
 
 		/// <summary>Gets cursor position.</summary>
-		public TextPosition GetCursorPosition() => editorCore.GetCursorPosition();
+		public TextPosition GetCursorPosition() => IsReleased ? default : editorCore.GetCursorPosition();
 
 		/// <summary>Gets document.</summary>
-		public Document? GetDocument() => editorCore.GetDocument();
+		public Document? GetDocument() => IsReleased ? null : editorCore.GetDocument();
 
 		/// <summary>Gets word range at cursor.</summary>
-		public TextRange? GetWordRangeAtCursor() => editorCore.GetWordRangeAtCursor();
+		public TextRange? GetWordRangeAtCursor() => IsReleased ? null : editorCore.GetWordRangeAtCursor();
 
 		/// <summary>Gets word at cursor.</summary>
-		public string GetWordAtCursor() => editorCore.GetWordAtCursor();
+		public string GetWordAtCursor() => IsReleased ? string.Empty : editorCore.GetWordAtCursor();
 
 		/// <summary>Sets cursor position.</summary>
 		public void SetCursorPosition(TextPosition position) {
@@ -1071,11 +1116,12 @@ namespace SweetEditor {
 		public void SetCompletionItemRenderer(ICompletionItemRenderer? renderer) => completionPopupController?.SetRenderer(renderer);
 
 		public (int start, int end) GetVisibleLineRange() {
+			if (IsReleased) return default;
 			EnsureRenderModelUpToDate();
 			return (cachedVisibleStartLine, cachedVisibleEndLine);
 		}
 
-		public int GetTotalLineCount() => editorCore.GetDocument()?.GetLineCount() ?? -1;
+		public int GetTotalLineCount() => IsReleased ? 0 : (editorCore.GetDocument()?.GetLineCount() ?? 0);
 
 		/// <summary>Sets line diagnostics.</summary>
 		public void SetLineDiagnostics(int line, IList<Diagnostic> items) {

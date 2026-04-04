@@ -2009,7 +2009,7 @@ namespace SweetEditor {
 		}
 
 		/// <summary>Gets the currently loaded document instance.</summary>
-		public Document? GetDocument() => currentDocument;
+		public Document? GetDocument() => IsReleased ? null : currentDocument;
 
 		/// <summary>Releases unmanaged resources.</summary>
 		~EditorCore() {
@@ -2562,7 +2562,7 @@ namespace SweetEditor {
 
 		/// <summary>Returns whether backspace unindent is enabled.</summary>
 		public bool IsBackspaceUnindent() {
-			return _backspaceUnindent;
+			return IsReleased ? false : _backspaceUnindent;
 		}
 
 		/// <summary>Sets the selection handle hit-test configuration.</summary>
@@ -2581,7 +2581,7 @@ namespace SweetEditor {
 
 		/// <summary>Gets the current handle configuration.</summary>
 		public HandleConfig GetHandleConfig() {
-			return _handleConfig;
+			return IsReleased ? new HandleConfig() : _handleConfig;
 		}
 
 		/// <summary>Sets scrollbar geometry configuration.</summary>
@@ -2607,7 +2607,7 @@ namespace SweetEditor {
 
 		/// <summary>Gets the current scrollbar geometry configuration.</summary>
 		public ScrollbarConfig GetScrollbarConfig() {
-			return _scrollbarConfig;
+			return IsReleased ? new ScrollbarConfig() : _scrollbarConfig;
 		}
 
 		/// <summary>Gets the screen-space rectangle for any text position (for floating panel positioning).</summary>
