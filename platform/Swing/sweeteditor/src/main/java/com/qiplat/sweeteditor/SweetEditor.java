@@ -955,12 +955,10 @@ public class SweetEditor extends JPanel {
 
     private void dispatchTextChanged(TextChangeAction action, TextEditResult editResult) {
         if (editResult != null && editResult.changes != null && !editResult.changes.isEmpty()) {
-            for (TextChange change : editResult.changes) {
-                eventBus.publish(new TextChangedEvent(action, change.range, change.newText));
-            }
+            eventBus.publish(new TextChangedEvent(editResult.changes, action));
             decorationProviderManager.onTextChanged(editResult.changes);
         } else {
-            eventBus.publish(new TextChangedEvent(action, null, null));
+            eventBus.publish(new TextChangedEvent(List.of(), action));
             decorationProviderManager.onTextChanged(null);
         }
     }
@@ -968,12 +966,11 @@ public class SweetEditor extends JPanel {
     private void dispatchKeyEventResult(KeyEventResult result) {
         if (result.contentChanged) {
             if (result.editResult != null && result.editResult.changes != null && !result.editResult.changes.isEmpty()) {
-                for (TextChange change : result.editResult.changes) {
-                    eventBus.publish(new TextChangedEvent(TextChangeAction.KEY, change.range, change.newText));
-                }
+                eventBus.publish(new TextChangedEvent(result.editResult.changes, TextChangeAction.KEY));
                 decorationProviderManager.onTextChanged(result.editResult.changes);
             } else {
-                eventBus.publish(new TextChangedEvent(TextChangeAction.KEY, null, null));
+                eventBus.publish(new TextChangedEvent(List.of(), TextChangeAction.KEY));
+                decorationProviderManager.onTextChanged(null);
             }
         }
         if (result.cursorChanged) {
