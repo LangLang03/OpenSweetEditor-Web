@@ -20,19 +20,6 @@ public final class EditorNative {
     private static final Linker LINKER = Linker.nativeLinker();
     private static final SymbolLookup LIB;
     private static final String LIB_PATH_KEY = "sweeteditor.lib.path";
-    private static final String[] LIB_SEARCH_PATHS = {
-            "../../cmake-build-release-visual-studio/bin/Release",
-            "../../cmake-build-release-visual-studio/bin/Debug",
-            "../../cmake-build-release-visual-studio/bin",
-            "../../cmake-build-release/bin",
-            "../../cmake-build-debug-visual-studio/bin/Debug",
-            "../../cmake-build-debug-visual-studio/bin",
-            "../../cmake-build-debug/bin",
-            "../../cmake-build-debug/lib",
-            "../../build/bin",
-            "../../build/lib",
-            "../../build/mac/lib",
-    };
     private static final String LOAD_LIBRARY_ERROR =
             "Cannot load native library 'sweeteditor'. " +
                     "Set -Dsweeteditor.lib.path=<dir> or add the library to java.library.path. ";
@@ -45,11 +32,6 @@ public final class EditorNative {
         String libName = System.mapLibraryName("sweeteditor");
         // -Dsweeteditor.lib.path explicitly specified (including the scenario auto-set by NativeLibraryExtractor.extract)
         SymbolLookup lookup = tryExplicitLibrary(libName);
-        if (lookup != null) {
-            return lookup;
-        }
-        // Auto-detect from source-relative paths during development
-        lookup = tryLoadFromCandidates(libName, LIB_SEARCH_PATHS);
         if (lookup != null) {
             return lookup;
         }
@@ -85,16 +67,6 @@ public final class EditorNative {
             return null;
         }
         return lookupLibrary(Path.of(libPath, libName));
-    }
-
-    private static SymbolLookup tryLoadFromCandidates(String libName, String[] searchPaths) {
-        for (String searchPath : searchPaths) {
-            SymbolLookup lookup = lookupLibrary(Path.of(searchPath, libName).toAbsolutePath().normalize());
-            if (lookup != null) {
-                return lookup;
-            }
-        }
-        return null;
     }
 
     private static SymbolLookup lookupLibrary(Path path) {

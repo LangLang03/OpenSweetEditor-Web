@@ -24,18 +24,42 @@ dependencies {
 application {
     mainClass = 'com.qiplat.sweeteditor.demo.Main'
     def osName = System.getProperty('os.name').toLowerCase()
+    def osArch = System.getProperty('os.arch').toLowerCase()
     def nativeLibSubDir
     if (osName.contains('windows')) {
-        nativeLibSubDir = '../../cmake-build-debug-visual-studio/bin/Debug'
+        nativeLibSubDir = '../../../prebuilt/windows/x64'
     } else if (osName.contains('mac')) {
-        nativeLibSubDir = '../../build/lib'
+        if (osArch.contains('aarch64') || osArch.contains('arm64')) {
+            nativeLibSubDir = '../../../prebuilt/osx/arm64'
+        } else {
+            nativeLibSubDir = '../../../prebuilt/osx/x86_64'
+        }
     } else if (osName.contains('linux')) {
-        nativeLibSubDir = '../../cmake-build-debug/lib'
+        nativeLibSubDir = '../../../prebuilt/linux/x86_64'
     } else {
         throw new GradleException("Unsupported OS for Swing demo nativeLibDir: ${System.getProperty('os.name')}")
     }
     def nativeLibDir = rootProject.projectDir.toPath().resolve(nativeLibSubDir).toAbsolutePath().normalize().toString()
     def demoResDir = rootProject.projectDir.toPath().resolve('../_res').toAbsolutePath().normalize().toString()
+
+    def expectedLibName
+    if (osName.contains('windows')) {
+        expectedLibName = 'sweeteditor.dll'
+    } else if (osName.contains('mac')) {
+        expectedLibName = 'libsweeteditor.dylib'
+    } else {
+        expectedLibName = 'libsweeteditor.so'
+    }
+
+    tasks.named('run') {
+        doFirst {
+            def expectedLib = new File(nativeLibDir, expectedLibName)
+            if (!expectedLib.exists()) {
+                throw new GradleException("Native library not found: ${expectedLib}. Run scripts/build-shared.ps1 -Platform windows or the matching build-shared.sh target first.")
+            }
+        }
+    }
+
     applicationDefaultJvmArgs = [
             '--enable-preview',
             '--enable-native-access=ALL-UNNAMED',

@@ -11,6 +11,15 @@ java {
     }
 }
 
+def repoRoot = rootProject.projectDir.toPath().resolve('../..').normalize().toFile()
+def generatedNativeResourcesDir = layout.buildDirectory.dir('generated/resources/main')
+
+sourceSets {
+    main {
+        resources.srcDir(generatedNativeResourcesDir)
+    }
+}
+
 repositories {
     mavenCentral()
     google()
@@ -20,6 +29,31 @@ dependencies {
     api 'com.google.code.gson:gson:2.11.0'
     testImplementation platform('org.junit:junit-bom:5.10.0')
     testImplementation 'org.junit.jupiter:junit-jupiter'
+}
+
+tasks.register('syncNativeResources', Sync) {
+    into(generatedNativeResourcesDir)
+
+    from(new File(repoRoot, 'prebuilt/windows/x64')) {
+        include 'sweeteditor.dll'
+        into 'native/windows-x86_64'
+    }
+    from(new File(repoRoot, 'prebuilt/linux/x86_64')) {
+        include 'libsweeteditor.so'
+        into 'native/linux-x86_64'
+    }
+    from(new File(repoRoot, 'prebuilt/osx/x86_64')) {
+        include 'libsweeteditor.dylib'
+        into 'native/macos-x86_64'
+    }
+    from(new File(repoRoot, 'prebuilt/osx/arm64')) {
+        include 'libsweeteditor.dylib'
+        into 'native/macos-aarch64'
+    }
+}
+
+tasks.named('processResources') {
+    dependsOn(tasks.named('syncNativeResources'))
 }
 
 tasks.withType(JavaCompile).configureEach {
