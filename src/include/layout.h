@@ -222,7 +222,7 @@ namespace NS_SWEETEDITOR {
     /// Auto-wrap: split one line's runs into multiple VisualLines by available width
     void wrapLineRuns(size_t line_index, float start_y, float line_height,
                       Vector<VisualRun>& runs, Vector<VisualLine>& out_lines);
-    /// Append fold placeholder and tail-line runs to collapsed first line (first line + â€?+ tail content)
+    /// Append fold placeholder and tail-line runs to collapsed first line (first line + placeholder + tail content)
     void appendFoldTailRuns(size_t index, const U16String& line_text, LogicalLine& logical_line);
     float computeLineNumberWidth() const;
     static bool isWordBreakChar(U16Char ch);
