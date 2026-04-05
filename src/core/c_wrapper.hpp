@@ -2,6 +2,8 @@
 #include <c_api.h>
 #include <macro.h>
 
+using NS_SWEETEDITOR::SharedPtr;
+
 template<typename T>
 class CPtrHolder {
 public:
