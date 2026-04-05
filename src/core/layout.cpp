@@ -11,12 +11,12 @@
 
 namespace NS_SWEETEDITOR {
 #pragma region [Class: TextLayout]
-  TextLayout::TextLayout(const Ptr<TextMeasurer>& measurer, const Ptr<DecorationManager>& decoration_manager)
+  TextLayout::TextLayout(const SharedPtr<TextMeasurer>& measurer, const SharedPtr<DecorationManager>& decoration_manager)
     : m_measurer_(measurer), m_decoration_manager_(decoration_manager) {
     resetMeasurer();
   }
 
-  void TextLayout::loadDocument(const Ptr<Document>& document) {
+  void TextLayout::loadDocument(const SharedPtr<Document>& document) {
     m_document_ = document;
     m_content_metrics_dirty_ = true;
     m_prefix_dirty_from_ = 0;
@@ -630,7 +630,7 @@ namespace NS_SWEETEDITOR {
     const float scroll_offset = (m_wrap_mode_ == WrapMode::NONE) ? scroll_x : 0.0f;
 
     for (const VisualLine& vl : ll.visual_lines) {
-      // 计算该视觉行中 TEXT runs 覆盖的逻辑列范围
+      // 计算该视觉行�?TEXT runs 覆盖的逻辑列范�?
       size_t vl_col_min = SIZE_MAX;
       size_t vl_col_max = 0;
       for (const VisualRun& run : vl.runs) {
@@ -692,7 +692,7 @@ namespace NS_SWEETEDITOR {
         vl_x += run.width;
       }
 
-      // 未找到则使用视觉行末尾
+      // 未找到则使用视觉行末�?
       if (!found_start || !found_end) {
         float last_x = 0;
         for (const VisualRun& run : vl.runs) {
@@ -1595,7 +1595,7 @@ namespace NS_SWEETEDITOR {
       fold_x += run.width;
     }
 
-    // Append fold placeholder " … "
+    // Append fold placeholder " �?"
     VisualRun fold_run;
     fold_run.type = VisualRunType::FOLD_PLACEHOLDER;
     fold_run.column = line_text.length();
@@ -1610,7 +1610,7 @@ namespace NS_SWEETEDITOR {
     fold_run.width += fold_run.padding * 2 + fold_run.margin * 2;
     last_vl.runs.push_back(std::move(fold_run));
 
-    // Append tail-line VisualRuns (JetBrains style: first line + … + tail content, preserving highlights)
+    // Append tail-line VisualRuns (JetBrains style: first line + �?+ tail content, preserving highlights)
     const FoldRegion* fold_region = m_decoration_manager_->getFoldRegionForLine(index);
     if (!fold_region || fold_region->end_line <= fold_region->start_line) return;
 

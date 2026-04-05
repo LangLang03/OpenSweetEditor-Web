@@ -14,21 +14,21 @@
 #define NS_SWEETEDITOR sweeteditor
 
 template<typename T>
-using Ptr = std::shared_ptr<T>;
+using SharedPtr = std::shared_ptr<T>;
 template<typename T, typename... Args>
-constexpr Ptr<T> makePtr(Args&&... args) {
+constexpr SharedPtr<T> makeShared(Args&&... args) {
   return std::make_shared<T>(std::forward<Args>(args)...);
 }
 
 template<typename T>
-using UPtr = std::unique_ptr<T>;
+using UniquePtr = std::unique_ptr<T>;
 template<typename T, typename... Args>
-constexpr UPtr<T> makeUPtr(Args&&... args) {
+constexpr UniquePtr<T> makeUnique(Args&&... args) {
   return std::make_unique<T>(std::forward<Args>(args)...);
 }
 
 template<typename T>
-using WPtr = std::weak_ptr<T>;
+using WeakPtr = std::weak_ptr<T>;
 
 template<typename T>
 using Vector = std::vector<T>;
