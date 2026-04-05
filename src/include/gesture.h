@@ -7,7 +7,7 @@
 
 #include <cstdint>
 #include <limits>
-#include <foundation.h>
+#include "foundation.h"
 
 namespace NS_SWEETEDITOR {
 

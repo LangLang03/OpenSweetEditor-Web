@@ -6,9 +6,9 @@
 #define SWEETEDITOR_DOCUMENT_H
 
 #include <cstdint>
-#include <foundation.h>
-#include <buffer.h>
-#include <visual.h>
+#include "foundation.h"
+#include "buffer.h"
+#include "visual.h"
 
 namespace NS_SWEETEDITOR {
   /// Line ending type

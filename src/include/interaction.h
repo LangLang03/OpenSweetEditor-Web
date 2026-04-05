@@ -1,10 +1,10 @@
 #ifndef SWEETEDITOR_INTERACTION_H
 #define SWEETEDITOR_INTERACTION_H
 
-#include <macro.h>
-#include <editor_types.h>
-#include <visual.h>
-#include <gesture.h>
+#include "macro.h"
+#include "editor_types.h"
+#include "visual.h"
+#include "gesture.h"
 
 namespace NS_SWEETEDITOR {
   class TextLayout;

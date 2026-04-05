@@ -5,10 +5,10 @@
 #ifndef SWEETEDITOR_LAYOUT_H
 #define SWEETEDITOR_LAYOUT_H
 
-#include <document.h>
-#include <decoration.h>
-#include <visual.h>
-#include <gesture.h>
+#include "document.h"
+#include "decoration.h"
+#include "visual.h"
+#include "gesture.h"
 
 namespace NS_SWEETEDITOR {
 

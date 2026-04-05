@@ -1,8 +1,8 @@
 #ifndef SWEETEDITOR_EDITOR_TYPES_H
 #define SWEETEDITOR_EDITOR_TYPES_H
 
-#include <foundation.h>
-#include <gesture.h>
+#include "foundation.h"
+#include "gesture.h"
 
 namespace NS_SWEETEDITOR {
   /// Bracket pair definition (open/close character pair)

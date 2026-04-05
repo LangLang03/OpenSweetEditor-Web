@@ -7,8 +7,8 @@
 
 #include <cstdint>
 #include <array>
-#include <macro.h>
-#include <foundation.h>
+#include "macro.h"
+#include "foundation.h"
 
 namespace NS_SWEETEDITOR {
   /// Highlight layer enum (priority from low to high, higher layers cover lower layers)

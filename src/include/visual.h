@@ -6,9 +6,9 @@
 #define SWEETEDITOR_VISUAL_H
 
 #include <cstdint>
-#include <foundation.h>
-#include <decoration.h>
-#include <utility.h>
+#include "foundation.h"
+#include "decoration.h"
+#include "utility.h"
 
 namespace NS_SWEETEDITOR {
   /// Enum for visual render run types

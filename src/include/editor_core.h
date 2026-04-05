@@ -4,15 +4,15 @@
 #ifndef SWEETEDITOR_EDITOR_CORE_H
 #define SWEETEDITOR_EDITOR_CORE_H
 
-#include <editor_types.h>
-#include <document.h>
-#include <visual.h>
-#include <gesture.h>
-#include <layout.h>
-#include <interaction.h>
-#include <render_composer.h>
-#include <undo.h>
-#include <linked_editing.h>
+#include "editor_types.h"
+#include "document.h"
+#include "visual.h"
+#include "gesture.h"
+#include "layout.h"
+#include "interaction.h"
+#include "render_composer.h"
+#include "undo.h"
+#include "linked_editing.h"
 
 namespace NS_SWEETEDITOR {
 
