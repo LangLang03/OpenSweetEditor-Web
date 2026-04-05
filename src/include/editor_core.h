@@ -4,22 +4,22 @@
 #ifndef SWEETEDITOR_EDITOR_CORE_H
 #define SWEETEDITOR_EDITOR_CORE_H
 
-#include <editor_types.h>
-#include <document.h>
-#include <visual.h>
-#include <gesture.h>
-#include <layout.h>
-#include <interaction.h>
-#include <render_composer.h>
-#include <undo.h>
-#include <linked_editing.h>
+#include "editor_types.h"
+#include "document.h"
+#include "visual.h"
+#include "gesture.h"
+#include "layout.h"
+#include "interaction.h"
+#include "render_composer.h"
+#include "undo.h"
+#include "linked_editing.h"
 
 namespace NS_SWEETEDITOR {
 
   /// Editor core class
   class EditorCore {
   public:
-    explicit EditorCore(const Ptr<TextMeasurer>& measurer, const EditorOptions& options);
+    explicit EditorCore(const SharedPtr<TextMeasurer>& measurer, const EditorOptions& options);
 
 #pragma region [Setup & View State]
 
@@ -33,7 +33,7 @@ namespace NS_SWEETEDITOR {
 
     /// Load text content
     /// @param document Document instance
-    void loadDocument(const Ptr<Document>& document);
+    void loadDocument(const SharedPtr<Document>& document);
     /// Set editor viewport size
     /// @param viewport Viewport area
     void setViewport(const Viewport& viewport);
@@ -88,7 +88,7 @@ namespace NS_SWEETEDITOR {
 
     /// Get editor text-style registry
     /// @return Text-style registry
-    Ptr<TextStyleRegistry> getTextStyleRegistry() const;
+    SharedPtr<TextStyleRegistry> getTextStyleRegistry() const;
 
     /// Build editor render model
     /// @param model Input EditorRenderModel
@@ -315,6 +315,10 @@ namespace NS_SWEETEDITOR {
     /// @param enabled true = backspace on leading whitespace unindents or merges blank line
     void setBackspaceUnindent(bool enabled);
 
+    /// Set whether Tab inserts spaces up to the next tab stop instead of a literal '\t'
+    /// @param enabled true = insert spaces, false = insert '\t'
+    void setInsertSpaces(bool enabled);
+
     /// Insert VSCode snippet template and enter linked editing mode (helper method)
     /// @param snippet_template VSCode snippet syntax template
     /// @return Exact change info (changes from inserting template text)
@@ -509,15 +513,15 @@ namespace NS_SWEETEDITOR {
 #pragma endregion
 
   private:
-    Ptr<TextMeasurer> m_measurer_;
+    SharedPtr<TextMeasurer> m_measurer_;
     EditorOptions m_options_;
     EditorSettings m_settings_;
-    Ptr<Document> m_document_;
-    Ptr<DecorationManager> m_decorations_;
-    UPtr<TextLayout> m_text_layout_;
-    UPtr<EditorInteraction> m_interaction_;
-    UPtr<RenderComposer> m_render_composer_;
-    UPtr<UndoManager> m_undo_manager_;
+    SharedPtr<Document> m_document_;
+    SharedPtr<DecorationManager> m_decorations_;
+    UniquePtr<TextLayout> m_text_layout_;
+    UniquePtr<EditorInteraction> m_interaction_;
+    UniquePtr<RenderComposer> m_render_composer_;
+    UniquePtr<UndoManager> m_undo_manager_;
     KeyResolver m_key_resolver_;
 
     Viewport m_viewport_;
@@ -532,7 +536,7 @@ namespace NS_SWEETEDITOR {
     bool m_composition_text_in_document_ {false};
 
     /// Linked editing session (nullptr means not in linked editing mode)
-    UPtr<LinkedEditingSession> m_linked_editing_session_;
+    UniquePtr<LinkedEditingSession> m_linked_editing_session_;
 
     /// Bracket pair list (default (){}[])
     Vector<BracketPair> m_bracket_pairs_ {

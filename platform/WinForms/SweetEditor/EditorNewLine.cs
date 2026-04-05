@@ -39,6 +39,7 @@ namespace SweetEditor {
 	/// <summary>
 	/// Smart new-line provider interface.
 	/// Implement this interface to customize new-line behavior (smart indentation, comment continuation, bracket expansion, etc.).
+	/// ProvideNewLineAction is invoked synchronously on the UI thread during Enter handling and must return immediately.
 	/// Returning null means this provider does not handle the request and it falls through to the next provider in the chain.
 	/// </summary>
 	public interface INewLineActionProvider {
@@ -46,11 +47,11 @@ namespace SweetEditor {
 	}
 
 	/// <summary>Manages new-line providers as a chain and uses the first provider that returns a non-null result.</summary>
-	internal sealed class NewLineActionProviderManager {
-		private readonly EditorControl editor;
+	internal sealed class NewLineActionProviderManager : IDisposable {
+		private readonly SweetEditorControl editor;
 		private readonly List<INewLineActionProvider> providers = new();
 
-		public NewLineActionProviderManager(EditorControl editor) {
+		public NewLineActionProviderManager(SweetEditorControl editor) {
 			this.editor = editor;
 		}
 
@@ -78,6 +79,10 @@ namespace SweetEditor {
 				if (action != null) return action;
 			}
 			return null;
+		}
+
+		public void Dispose() {
+			providers.Clear();
 		}
 	}
 

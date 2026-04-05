@@ -212,7 +212,7 @@ namespace SweetEditor {
 
 		#region Diagnostics
 
-		internal static byte[] PackLineDiagnostics(int line, IList<DiagnosticItem> items) {
+		internal static byte[] PackLineDiagnostics(int line, IList<Diagnostic> items) {
 			int count = items.Count;
 			byte[] payload = new byte[8 + count * 16];
 			int offset = 0;
@@ -228,7 +228,7 @@ namespace SweetEditor {
 			return payload;
 		}
 
-		internal static byte[] PackBatchLineDiagnostics(Dictionary<int, IList<DiagnosticItem>> diagsByLine) {
+		internal static byte[] PackBatchLineDiagnostics(Dictionary<int, IList<Diagnostic>> diagsByLine) {
 			int totalDiags = 0;
 			foreach (var kv in diagsByLine) totalDiags += kv.Value.Count;
 			byte[] payload = new byte[4 + diagsByLine.Count * 8 + totalDiags * 16];
@@ -1039,6 +1039,9 @@ namespace SweetEditor {
 						result.EditResult = new TextEditResult { Changes = changes };
 					}
 				}
+				if (TryReadInt32(data, ref offset, out int command)) {
+					result.Command = command;
+				}
 				return result;
 			} finally {
 				NativeMethods.FreeBinaryData(payloadPtr);
@@ -1161,6 +1164,48 @@ namespace SweetEditor {
 				result.TextAreaWidth = textAreaWidth;
 				result.CanScrollXInt = canScrollXInt;
 				result.CanScrollYInt = canScrollYInt;
+				return result;
+			} finally {
+				NativeMethods.FreeBinaryData(payloadPtr);
+			}
+		}
+
+		internal static unsafe LayoutMetrics ParseLayoutMetrics(IntPtr payloadPtr, UIntPtr payloadSize) {
+			LayoutMetrics result = default;
+			int payloadLength = GetPayloadLength(payloadPtr, payloadSize);
+			if (payloadLength == 0) {
+				return result;
+			}
+			try {
+				ReadOnlySpan<byte> data = new(payloadPtr.ToPointer(), payloadLength);
+				int offset = 0;
+				if (!TryReadFloat(data, ref offset, out float fontHeight) ||
+					!TryReadFloat(data, ref offset, out float fontAscent) ||
+					!TryReadFloat(data, ref offset, out float lineSpacingAdd) ||
+					!TryReadFloat(data, ref offset, out float lineSpacingMult) ||
+					!TryReadFloat(data, ref offset, out float lineNumberMargin) ||
+					!TryReadFloat(data, ref offset, out float lineNumberWidth) ||
+					!TryReadInt32(data, ref offset, out int maxGutterIcons) ||
+					!TryReadFloat(data, ref offset, out float inlayHintPadding) ||
+					!TryReadFloat(data, ref offset, out float inlayHintMargin) ||
+					!TryReadInt32(data, ref offset, out int foldArrowModeValue) ||
+					!TryReadInt32(data, ref offset, out int hasFoldRegionsInt)) {
+					return result;
+				}
+
+				result.FontHeight = fontHeight;
+				result.FontAscent = fontAscent;
+				result.LineSpacingAdd = lineSpacingAdd;
+				result.LineSpacingMult = lineSpacingMult;
+				result.LineNumberMargin = lineNumberMargin;
+				result.LineNumberWidth = lineNumberWidth;
+				result.MaxGutterIcons = maxGutterIcons;
+				result.InlayHintPadding = inlayHintPadding;
+				result.InlayHintMargin = inlayHintMargin;
+				result.FoldArrowMode = Enum.IsDefined(typeof(FoldArrowMode), foldArrowModeValue)
+					? (FoldArrowMode)foldArrowModeValue
+					: FoldArrowMode.AUTO;
+				result.HasFoldRegions = hasFoldRegionsInt != 0;
 				return result;
 			} finally {
 				NativeMethods.FreeBinaryData(payloadPtr);

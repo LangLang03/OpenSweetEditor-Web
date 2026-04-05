@@ -6,9 +6,9 @@
 #define SWEETEDITOR_DOCUMENT_H
 
 #include <cstdint>
-#include <foundation.h>
-#include <buffer.h>
-#include <visual.h>
+#include "foundation.h"
+#include "buffer.h"
+#include "visual.h"
 
 namespace NS_SWEETEDITOR {
   /// Line ending type
@@ -38,12 +38,12 @@ namespace NS_SWEETEDITOR {
   struct LogicalLine {
     /// Start byte offset of this line in whole document, updated when text changes
     size_t start_byte {0};
-    /// Start character offset of this line in whole document, updated when dirty
-    size_t start_char {0};
+    /// Start UTF-16 offset of this line in whole document, updated when dirty
+    size_t start_utf16 {0};
     /// Cached text of this line (without line ending), updated when dirty
-    U16String cached_text;
+    U16String cached_u16_text;
     /// Whether current line text data is marked dirty and needs refresh
-    bool is_char_dirty {false};
+    bool is_u16_dirty {false};
     /// Line ending type of current line
     LineEnding line_ending {LineEnding::NONE};
     /// Start y coordinate of current line
@@ -111,7 +111,7 @@ namespace NS_SWEETEDITOR {
   protected:
     /// Refresh cached data for specified line (reload text from storage, update char offsets, etc.)
     /// @param index Line index
-    /// @param logical_line Logical line to refresh (is_char_dirty flag will be cleared)
+    /// @param logical_line Logical line to refresh (is_u16_dirty flag will be cleared)
     virtual void updateDirtyLine(size_t index, LogicalLine& logical_line) = 0;
   };
 
@@ -137,7 +137,7 @@ namespace NS_SWEETEDITOR {
     explicit LineArrayDocument(U8String&& original_string);
     explicit LineArrayDocument(const U8String& original_string);
     explicit LineArrayDocument(const U16String& original_string);
-    explicit LineArrayDocument(UPtr<Buffer>&& original_buffer);
+    explicit LineArrayDocument(UniquePtr<Buffer>&& original_buffer);
 
     ~LineArrayDocument() override;
 
@@ -175,7 +175,7 @@ namespace NS_SWEETEDITOR {
     explicit PieceTableDocument(U8String&& original_string);
     explicit PieceTableDocument(const U8String& original_string);
     explicit PieceTableDocument(const U16String& original_string);
-    explicit PieceTableDocument(UPtr<Buffer>&& original_buffer);
+    explicit PieceTableDocument(UniquePtr<Buffer>&& original_buffer);
 
     ~PieceTableDocument() override;
 
@@ -196,9 +196,9 @@ namespace NS_SWEETEDITOR {
   protected:
     void updateDirtyLine(size_t index, LogicalLine& logical_line) override;
     /// Buffer for original content (read-only)
-    UPtr<Buffer> m_original_buffer_;
+    UniquePtr<Buffer> m_original_buffer_;
     /// Buffer for user edits, append-only
-    UPtr<U8StringBuffer> m_edit_buffer_;
+    UniquePtr<U8StringBuffer> m_edit_buffer_;
     /// All text segments
     Vector<BufferSegment> m_buffer_segments_;
     /// Logical line data
@@ -222,3 +222,4 @@ namespace NS_SWEETEDITOR {
 }
 
 #endif //SWEETEDITOR_DOCUMENT_H
+

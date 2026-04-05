@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<OutputType>Library</OutputType>
@@ -21,13 +21,21 @@
 		<RepositoryType>git</RepositoryType>
 		<PackageTags>editor;code-editor;winforms;syntax-highlighting;cpp;ide-editor</PackageTags>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<RepoRoot>$(MSBuildThisFileDirectory)..\..\..\</RepoRoot>
+		<SweetEditorNativeDir>$(RepoRoot)prebuilt\windows\x64\</SweetEditorNativeDir>
+		<SweetEditorNativeDll>$(SweetEditorNativeDir)sweeteditor.dll</SweetEditorNativeDll>
 	</PropertyGroup>
 	
 	<ItemGroup>
 		<None Include="README.md" Pack="true" PackagePath="\" />
-		<Content Include="..\..\..\cmake-build-release-visual-studio\bin\sweeteditor.dll" Pack="true" PackagePath="runtimes\win-x64\native\">
+		<Content Include="$(SweetEditorNativeDll)" Pack="true" PackagePath="runtimes\win-x64\native\">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Content>
 	</ItemGroup>
+
+	<Target Name="ValidateSweetEditorNative" BeforeTargets="Build;Pack">
+		<Error Condition="!Exists('$(SweetEditorNativeDll)')"
+			   Text="Missing native library: $(SweetEditorNativeDll). Run scripts/build-shared.ps1 -Platform windows first." />
+	</Target>
 
 </Project>

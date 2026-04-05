@@ -6,9 +6,9 @@
 > This document describes the current repository code state (2026-03). If the document and source code are different, use the source code.
 >
 > Constraint levels:
-> - **MUST** — all platforms must comply; violation is a bug.
-> - **SHOULD** — recommended; deviation requires documented justification.
-> - **MAY** — optional; platform decides based on its own needs.
+> - **MUST** 鈥?all platforms must comply; violation is a bug.
+> - **SHOULD** 鈥?recommended; deviation requires documented justification.
+> - **MAY** 鈥?optional; platform decides based on its own needs.
 
 ---
 
@@ -23,9 +23,9 @@ The Core layer does not involve UI rendering. It contains only bridging, data mo
 | Category | Required Types | Description |
 |---|---|---|
 | **Core Bridge** | `EditorCore`, `Document`, `ProtocolEncoder`, `ProtocolDecoder`, `TextMeasurer`, `EditorOptions` | Native bridge + public core API wrapper |
-| **Foundation** | `TextPosition`, `TextRange`, `WrapMode`, `FoldArrowMode`, `AutoIndentMode`, `CurrentLineRenderMode`, `ScrollBehavior` | Fundamental value types and enums |
+| **Foundation** | `TextPosition`, `TextRange`, `TextChange`, `WrapMode`, `FoldArrowMode`, `AutoIndentMode`, `CurrentLineRenderMode`, `ScrollBehavior` | Fundamental value types and enums |
 | **Adornment** | `StyleSpan`, `SpanLayer`, `InlayHint`, `InlayType`, `PhantomText`, `FoldRegion`, `GutterIcon`, `Diagnostic`, `IndentGuide`, `BracketGuide`, `FlowGuide`, `SeparatorGuide`, `SeparatorStyle`, `TextStyle` | Decoration data types |
-| **Visual** | `EditorRenderModel`, `VisualLine`, `VisualRun`, `VisualRunType`, `Cursor`, `CursorRect`, `SelectionRect`, `SelectionHandle`, `ScrollMetrics`, `ScrollbarModel`, `ScrollbarRect`, `GuideSegment`, `GuideType`, `GuideDirection`, `GuideStyle`, `DiagnosticDecoration`, `CompositionDecoration`, `FoldMarkerRenderItem`, `FoldState`, `GutterIconRenderItem`, `LinkedEditingRect`, `BracketHighlightRect`, `PointF` | Render model types |
+| **Visual** | `EditorRenderModel`, `VisualLine`, `VisualRun`, `VisualRunType`, `Cursor`, `CursorRect`, `SelectionRect`, `SelectionHandle`, `ScrollMetrics`, `ScrollbarModel`, `ScrollbarRect`, `GuideSegment`, `GuideType`, `GuideDirection`, `GuideStyle`, `DiagnosticDecoration`, `CompositionDecoration`, `FoldMarkerRenderItem`, `FoldState`, `GutterIconRenderItem`, `LinkedEditingRect`, `BracketHighlightRect` | Render model types (geometry semantics follow Section 2.4) |
 | **Snippet** | `LinkedEditingModel`, `TabStopGroup` | Linked editing / tab stop groups |
 | **Keymap** | `KeyMap`, `KeyBinding`, `KeyChord`, `KeyCode`, `KeyModifier`, `EditorCommand` | Shortcut mapping data types and command identifiers |
 
@@ -44,6 +44,8 @@ The Widget layer handles platform-native rendering, user interaction, and extens
 | **Copilot** *(SHOULD)* | `InlineSuggestion`, `InlineSuggestionListener` or an equivalent host-visible accept/dismiss callback mechanism; MAY: `InlineSuggestionController` | Inline suggestion data + callback; listener shape is the primary path when exposed |
 | **Selection** *(MAY, mobile-only)* | `SelectionMenuController`, `SelectionMenuItem`, `SelectionMenuItemProvider`, a host-visible custom-item click callback mechanism; MAY: `SelectionMenuListener` | Selection menu (MAY omit on desktop) |
 | **Perf** *(SHOULD)* | `PerfOverlay`, `MeasurePerfStats`, `PerfStepRecorder` | Performance overlay |
+
+> `TextChangeAction` is a SHOULD-level auxiliary event enum. Platforms MAY expose it to classify a text-change cycle at a coarse level (for example: `INSERT`, `DELETE`, `UNDO`, `REDO`, `KEY`, `COMPOSITION`), but it MUST NOT replace `changes: List<TextChange>` as the primary incremental payload.
 
 ### 1.3 Recommended Internal Implementation Patterns (SHOULD)
 
@@ -133,6 +135,23 @@ Data model fields MUST use the same semantic names across platforms, adapted to 
 
 Public API methods MUST follow each language's casing convention. Canonical names use Java/ArkTS camelCase as the baseline; each language adapts per its own convention (e.g. C# PascalCase, Go capitalized exports). See Section 3 for the full method list and allowed variants.
 
+### 2.4 Host-Facing Public API Enum Types (MUST)
+
+For host-facing public APIs (such as `SweetEditor`, `SweetEditorController`, `EditorSettings`, event payloads, and provider / context / result types consumed directly by host code), platforms MUST use enums or equivalent strong types for discrete value sets when the target language supports them.
+
+- Host-facing public APIs MUST NOT prefer raw `int` values when the language already supports enums / strong typed constants
+- If platform or framework constraints force a host-facing public API to expose integer constants, that layer MUST handle invalid values explicitly (see Section 15)
+- `EditorCore`, bridge layers, FFI layers, and other internal numeric transport layers are not considered host-facing public APIs for this rule
+
+### 2.5 Geometry Carrier Types (MUST)
+
+For simple geometry carriers used in public APIs and event payloads, platforms MAY use either the canonical SweetEditor geometry names or platform-native equivalents when the semantics are identical.
+
+- Point types: `PointF` or a platform-native point type (e.g. Android `android.graphics.PointF`, Apple `CGPoint`)
+- Rect types: `RectF` or a platform-native rect type (e.g. Android `android.graphics.RectF`, Apple `CGRect`)
+
+If a platform-native geometry type is used, coordinate basis, axis direction, and field semantics MUST remain identical to the canonical SweetEditor model.
+
 ---
 
 ## 3. Public API Contract (MUST)
@@ -143,9 +162,9 @@ The following lists all public methods that `EditorCore` and `SweetEditor` MUST 
 
 **General naming variant rules:**
 - Canonical names use Java/ArkTS camelCase as the baseline
-- PascalCase languages (e.g. C#, Go): all method names use PascalCase (e.g. `setDocument` → `SetDocument`); this rule applies to all methods and is not repeated per row
+- PascalCase languages (e.g. C#, Go): all method names use PascalCase (e.g. `setDocument` 鈫?`SetDocument`); this rule applies to all methods and is not repeated per row
 - Each language MAY adapt parameter naming and calling style per its own conventions (e.g. Swift argument labels, Go export rules, Dart named parameters)
-- The "Allowed Variants" column below only lists variants with **substantive differences** from the canonical name (e.g. getter as property, different method name semantics); `—` means no substantive difference
+- The "Allowed Variants" column below only lists variants with **substantive differences** from the canonical name (e.g. getter as property, different method name semantics); `鈥擿 means no substantive difference
 
 ### 3.0 API Carrier Rules (MUST)
 
@@ -192,7 +211,8 @@ controller.applyTheme(EditorTheme.dark());
 | Multiple bindings | **MUST** | The same Controller instance MAY be bound to a new widget after the previous one unbinds; MUST NOT be bound to multiple widgets simultaneously |
 | API consistency | **MUST** | Method signatures exposed on the Controller MUST match the Public API table in Section 3.2 and any implemented module-specific public API tables in later sections (method name, parameters, return type) |
 | Getter methods | **SHOULD** | When the widget is not mounted, getter methods (e.g. `getDocument()`, `getCursorPosition()`) SHOULD return null or default values; MUST NOT throw exceptions |
-| Resource disposal | **MUST** | Provide a `dispose()` method (naming MAY vary by platform, e.g. `close()`, `release()`) that releases internal resources and unbinds the widget |
+| Explicit teardown (if provided) | **MAY** | Platforms MAY provide an explicit controller teardown method such as `dispose()`, `close()`, or `release()`. For GC-managed languages, an extra explicit teardown API is not required when the controller can become inactive and collectible after `unbind()` |
+| Explicit teardown semantics | **MUST** | If the platform provides an explicit controller teardown method, it MUST release only controller-owned resources, unbind the widget, stop timers / listeners / receivers, and break reference chains. It MUST NOT assume ownership of the bound control and MUST NOT directly destroy the `View` / `Control` / `Widget` itself |
 
 #### 3.0.4 Platform Classification Reference
 
@@ -211,249 +231,249 @@ controller.applyTheme(EditorTheme.dark());
 | Function | Canonical Name | Allowed Variants |
 |---|---|---|
 | **Configuration** | | |
-| Load document | `loadDocument(doc)` | — |
-| Set viewport | `setViewport(w, h)` | — |
-| Font metrics changed | `onFontMetricsChanged()` | — |
-| Fold arrow mode | `setFoldArrowMode(mode)` | — |
-| Wrap mode | `setWrapMode(mode)` | — |
-| Tab size | `setTabSize(size)` | — |
-| Scale | `setScale(scale)` | — |
-| Line spacing | `setLineSpacing(add, mult)` | — |
-| Content start padding | `setContentStartPadding(padding)` | — |
-| Show split line | `setShowSplitLine(show)` | — |
-| Current line render mode | `setCurrentLineRenderMode(mode)` | — |
-| Gutter sticky | `setGutterSticky(sticky)` | — |
-| Gutter visible | `setGutterVisible(visible)` | — |
-| Handle config | `setHandleConfig(...)` | — |
-| Scrollbar config | `setScrollbarConfig(...)` | — |
+| Load document | `loadDocument(doc)` | 鈥?|
+| Set viewport | `setViewport(w, h)` | 鈥?|
+| Font metrics changed | `onFontMetricsChanged()` | 鈥?|
+| Fold arrow mode | `setFoldArrowMode(mode)` | 鈥?|
+| Wrap mode | `setWrapMode(mode)` | 鈥?|
+| Tab size | `setTabSize(size)` | 鈥?|
+| Insert spaces | `setInsertSpaces(enabled)` | 鈥?|
+| Scale | `setScale(scale)` | 鈥?|
+| Line spacing | `setLineSpacing(add, mult)` | 鈥?|
+| Content start padding | `setContentStartPadding(padding)` | 鈥?|
+| Show split line | `setShowSplitLine(show)` | 鈥?|
+| Current line render mode | `setCurrentLineRenderMode(mode)` | 鈥?|
+| Gutter sticky | `setGutterSticky(sticky)` | 鈥?|
+| Gutter visible | `setGutterVisible(visible)` | 鈥?|
+| Handle config | `setHandleConfig(...)` | 鈥?|
+| Scrollbar config | `setScrollbarConfig(...)` | 鈥?|
 | **Render Model** | | |
-| Build render model | `buildRenderModel()` | — |
+| Build render model | `buildRenderModel()` | 鈥?|
 | Get layout metrics | `getLayoutMetrics()` | property: `layoutMetrics` / `LayoutMetrics { get; }` |
 | **Gesture / Keyboard** | | |
-| Handle gesture event | `handleGestureEvent(...)` | — |
-| Handle gesture event (extended) | `handleGestureEventEx(...)` | — |
-| Edge scroll tick | `tickEdgeScroll()` | — |
-| Fling tick | `tickFling()` | — |
-| Animation tick | `tickAnimations()` | — |
-| Handle key event | `handleKeyEvent(...)` | — |
-| Set key map | `setKeyMap(keyMap)` | — |
+| Handle gesture event | `handleGestureEvent(...)` | 鈥?|
+| Handle gesture event (extended) | `handleGestureEventEx(...)` | 鈥?|
+| Edge scroll tick | `tickEdgeScroll()` | 鈥?|
+| Fling tick | `tickFling()` | 鈥?|
+| Animation tick | `tickAnimations()` | 鈥?|
+| Handle key event | `handleKeyEvent(...)` | 鈥?|
+| Set key map | `setKeyMap(keyMap)` | 鈥?|
 | **Text Editing** | | |
-| Insert text | `insertText(text)` | — |
-| Replace text | `replaceText(range, text)` | — |
-| Delete text | `deleteText(range)` | — |
-| Backspace | `backspace()` | — |
-| Delete forward | `deleteForward()` | — |
-| Move line up | `moveLineUp()` | — |
-| Move line down | `moveLineDown()` | — |
-| Copy line up | `copyLineUp()` | — |
-| Copy line down | `copyLineDown()` | — |
-| Delete line | `deleteLine()` | — |
-| Insert line above | `insertLineAbove()` | — |
-| Insert line below | `insertLineBelow()` | — |
+| Insert text | `insertText(text)` | 鈥?|
+| Replace text | `replaceText(range, text)` | 鈥?|
+| Delete text | `deleteText(range)` | 鈥?|
+| Backspace | `backspace()` | 鈥?|
+| Delete forward | `deleteForward()` | 鈥?|
+| Move line up | `moveLineUp()` | 鈥?|
+| Move line down | `moveLineDown()` | 鈥?|
+| Copy line up | `copyLineUp()` | 鈥?|
+| Copy line down | `copyLineDown()` | 鈥?|
+| Delete line | `deleteLine()` | 鈥?|
+| Insert line above | `insertLineAbove()` | 鈥?|
+| Insert line below | `insertLineBelow()` | 鈥?|
 | **Undo / Redo** | | |
-| Undo | `undo()` | — |
-| Redo | `redo()` | — |
-| Can undo | `canUndo()` | — |
-| Can redo | `canRedo()` | — |
+| Undo | `undo()` | 鈥?|
+| Redo | `redo()` | 鈥?|
+| Can undo | `canUndo()` | 鈥?|
+| Can redo | `canRedo()` | 鈥?|
 | **Cursor / Selection** | | |
-| Set cursor position | `setCursorPosition(line, col)` | — |
+| Set cursor position | `setCursorPosition(line, col)` | 鈥?|
 | Get cursor position | `getCursorPosition()` | property: `cursorPosition` / `CursorPosition { get; }` |
-| Select all | `selectAll()` | — |
-| Set selection | `setSelection(sL, sC, eL, eC)` | — |
+| Select all | `selectAll()` | 鈥?|
+| Set selection | `setSelection(sL, sC, eL, eC)` | 鈥?|
 | Get selection | `getSelection()` | property: `selection` / `Selection { get; }` |
 | Get selected text | `getSelectedText()` | property: `selectedText` / `SelectedText { get; }` |
 | Word range at cursor | `getWordRangeAtCursor()` | property: `wordRangeAtCursor` / `WordRangeAtCursor { get; }` |
 | Word at cursor | `getWordAtCursor()` | property: `wordAtCursor` / `WordAtCursor { get; }` |
-| Move cursor left | `moveCursorLeft(extend)` | — |
-| Move cursor right | `moveCursorRight(extend)` | — |
-| Move cursor up | `moveCursorUp(extend)` | — |
-| Move cursor down | `moveCursorDown(extend)` | — |
-| Move cursor to line start | `moveCursorToLineStart(extend)` | — |
-| Move cursor to line end | `moveCursorToLineEnd(extend)` | — |
+| Move cursor left | `moveCursorLeft(extend)` | 鈥?|
+| Move cursor right | `moveCursorRight(extend)` | 鈥?|
+| Move cursor up | `moveCursorUp(extend)` | 鈥?|
+| Move cursor down | `moveCursorDown(extend)` | 鈥?|
+| Move cursor to line start | `moveCursorToLineStart(extend)` | 鈥?|
+| Move cursor to line end | `moveCursorToLineEnd(extend)` | 鈥?|
 | **IME** | | |
-| Composition start | `compositionStart()` | — |
-| Composition update | `compositionUpdate(text)` | — |
-| Composition end | `compositionEnd(committed)` | — |
-| Composition cancel | `compositionCancel()` | — |
+| Composition start | `compositionStart()` | 鈥?|
+| Composition update | `compositionUpdate(text)` | 鈥?|
+| Composition end | `compositionEnd(committed)` | 鈥?|
+| Composition cancel | `compositionCancel()` | 鈥?|
 | Is composing | `isComposing()` | property: `isComposing` / `IsComposing { get; }` |
-| Set composition enabled | `setCompositionEnabled(enabled)` | — |
+| Set composition enabled | `setCompositionEnabled(enabled)` | 鈥?|
 | Is composition enabled | `isCompositionEnabled()` | property: `isCompositionEnabled` / `IsCompositionEnabled { get; }` |
 | **Read-only / Indent** | | |
-| Set read-only | `setReadOnly(readOnly)` | — |
+| Set read-only | `setReadOnly(readOnly)` | 鈥?|
 | Is read-only | `isReadOnly()` | property: `isReadOnly` / `IsReadOnly { get; }` |
-| Set auto indent mode | `setAutoIndentMode(mode)` | — |
+| Set auto indent mode | `setAutoIndentMode(mode)` | 鈥?|
 | Get auto indent mode | `getAutoIndentMode()` | property: `autoIndentMode` / `AutoIndentMode { get; }` |
-| Set backspace unindent | `setBackspaceUnindent(enabled)` | — |
-| Is backspace unindent | `isBackspaceUnindent()` | property: `backspaceUnindent` / `IsBackspaceUnindent { get; }` |
+| Set backspace unindent | `setBackspaceUnindent(enabled)` | 鈥?|
 | **Navigation / Scroll** | | |
-| Scroll to line | `scrollToLine(line, behavior)` | — |
-| Go to position | `gotoPosition(line, col)` | — |
-| Ensure cursor visible | `ensureCursorVisible()` | — |
-| Set scroll | `setScroll(x, y)` | — |
+| Scroll to line | `scrollToLine(line, behavior)` | 鈥?|
+| Go to position | `gotoPosition(line, col)` | 鈥?|
+| Ensure cursor visible | `ensureCursorVisible()` | 鈥?|
+| Set scroll | `setScroll(x, y)` | 鈥?|
 | Get scroll metrics | `getScrollMetrics()` | property: `scrollMetrics` / `ScrollMetrics { get; }` |
-| Get position rect | `getPositionRect(line, col)` | — |
+| Get position rect | `getPositionRect(line, col)` | 鈥?|
 | Get cursor rect | `getCursorRect()` | property: `cursorRect` / `CursorRect { get; }` |
 | **Style / Highlight** | | |
-| Register text style | `registerTextStyle(id, color, bg, fontStyle)` | — |
-| Batch register styles | `registerBatchTextStyles(data)` | — |
-| Set line spans | `setLineSpans(line, layer, spans)` | — |
-| Batch set line spans | `setBatchLineSpans(layer, entries)` | — |
-| Clear line spans | `clearLineSpans(line, layer)` | — |
-| Clear highlights layer | `clearHighlightsLayer(layer)` | — |
-| Clear all highlights | `clearHighlights()` | — |
+| Register text style | `registerTextStyle(id, color, bg, fontStyle)` | 鈥?|
+| Batch register styles | `registerBatchTextStyles(data)` | 鈥?|
+| Set line spans | `setLineSpans(line, layer, spans)` | 鈥?|
+| Batch set line spans | `setBatchLineSpans(layer, entries)` | 鈥?|
+| Clear line spans | `clearLineSpans(line, layer)` | 鈥?|
+| Clear highlights by layer | `clearHighlights(layer)` | 鈥?|
+| Clear all highlights | `clearHighlights()` | 鈥?|
 | **Inlay Hint** | | |
-| Set line inlay hints | `setLineInlayHints(line, hints)` | — |
-| Batch set inlay hints | `setBatchLineInlayHints(entries)` | — |
-| Clear inlay hints | `clearInlayHints()` | — |
+| Set line inlay hints | `setLineInlayHints(line, hints)` | 鈥?|
+| Batch set inlay hints | `setBatchLineInlayHints(entries)` | 鈥?|
+| Clear inlay hints | `clearInlayHints()` | 鈥?|
 | **Phantom Text** | | |
-| Set line phantom texts | `setLinePhantomTexts(line, phantoms)` | — |
-| Batch set phantom texts | `setBatchLinePhantomTexts(entries)` | — |
-| Clear phantom texts | `clearPhantomTexts()` | — |
+| Set line phantom texts | `setLinePhantomTexts(line, phantoms)` | 鈥?|
+| Batch set phantom texts | `setBatchLinePhantomTexts(entries)` | 鈥?|
+| Clear phantom texts | `clearPhantomTexts()` | 鈥?|
 | **Gutter Icon** | | |
-| Set line gutter icons | `setLineGutterIcons(line, icons)` | — |
-| Batch set gutter icons | `setBatchLineGutterIcons(entries)` | — |
-| Set max gutter icons | `setMaxGutterIcons(count)` | — |
-| Clear gutter icons | `clearGutterIcons()` | — |
+| Set line gutter icons | `setLineGutterIcons(line, icons)` | 鈥?|
+| Batch set gutter icons | `setBatchLineGutterIcons(entries)` | 鈥?|
+| Set max gutter icons | `setMaxGutterIcons(count)` | 鈥?|
+| Clear gutter icons | `clearGutterIcons()` | 鈥?|
 | **Diagnostic** | | |
-| Set line diagnostics | `setLineDiagnostics(line, items)` | — |
-| Batch set diagnostics | `setBatchLineDiagnostics(entries)` | — |
-| Clear diagnostics | `clearDiagnostics()` | — |
+| Set line diagnostics | `setLineDiagnostics(line, items)` | 鈥?|
+| Batch set diagnostics | `setBatchLineDiagnostics(entries)` | 鈥?|
+| Clear diagnostics | `clearDiagnostics()` | 鈥?|
 | **Guide** | | |
-| Set indent guides | `setIndentGuides(guides)` | — |
-| Set bracket guides | `setBracketGuides(guides)` | — |
-| Set flow guides | `setFlowGuides(guides)` | — |
-| Set separator guides | `setSeparatorGuides(guides)` | — |
-| Clear guides | `clearGuides()` | — |
+| Set indent guides | `setIndentGuides(guides)` | 鈥?|
+| Set bracket guides | `setBracketGuides(guides)` | 鈥?|
+| Set flow guides | `setFlowGuides(guides)` | 鈥?|
+| Set separator guides | `setSeparatorGuides(guides)` | 鈥?|
+| Clear guides | `clearGuides()` | 鈥?|
 | **Bracket** | | |
-| Set bracket pairs | `setBracketPairs(open, close)` | — |
-| Set auto-closing pairs | `setAutoClosingPairs(open, close)` | — |
-| Set matched brackets | `setMatchedBrackets(oL, oC, cL, cC)` | — |
-| Clear matched brackets | `clearMatchedBrackets()` | — |
+| Set bracket pairs | `setBracketPairs(open, close)` | 鈥?|
+| Set auto-closing pairs | `setAutoClosingPairs(open, close)` | 鈥?|
+| Set matched brackets | `setMatchedBrackets(oL, oC, cL, cC)` | 鈥?|
+| Clear matched brackets | `clearMatchedBrackets()` | 鈥?|
 | **Folding** | | |
-| Set fold regions | `setFoldRegions(regions)` | — |
+| Set fold regions | `setFoldRegions(regions)` | 鈥?|
 | Toggle fold | `toggleFoldAt(line)` | Swift: `toggleFold(at:)` |
 | Fold | `foldAt(line)` | Swift: `fold(at:)` |
 | Unfold | `unfoldAt(line)` | Swift: `unfold(at:)` |
-| Fold all | `foldAll()` | — |
-| Unfold all | `unfoldAll()` | — |
-| Is line visible | `isLineVisible(line)` | — |
+| Fold all | `foldAll()` | 鈥?|
+| Unfold all | `unfoldAll()` | 鈥?|
+| Is line visible | `isLineVisible(line)` | 鈥?|
 | **Clear** | | |
-| Clear all decorations | `clearAllDecorations()` | — |
+| Clear all decorations | `clearAllDecorations()` | 鈥?|
 | **Linked Editing** | | |
-| Insert snippet | `insertSnippet(template)` | — |
-| Start linked editing | `startLinkedEditing(model)` | — |
+| Insert snippet | `insertSnippet(template)` | 鈥?|
+| Start linked editing | `startLinkedEditing(model)` | 鈥?|
 | Is in linked editing | `isInLinkedEditing()` | property: `isInLinkedEditing` / `IsInLinkedEditing { get; }` |
-| Next tab stop | `linkedEditingNext()` | — |
-| Previous tab stop | `linkedEditingPrev()` | — |
-| Cancel linked editing | `cancelLinkedEditing()` | — |
+| Next tab stop | `linkedEditingNext()` | 鈥?|
+| Previous tab stop | `linkedEditingPrev()` | 鈥?|
+| Cancel linked editing | `cancelLinkedEditing()` | 鈥?|
 
-> Payload-level APIs (e.g. `setLineSpans`, `setBatchLineSpans`) — all platforms MUST also provide high-level wrappers (e.g. `setLineSpans(line, layer, spans: List<StyleSpan>)`). The high-level API parameter names and semantics MUST be consistent; internal encoding into payload calls to Core is an implementation detail.
+> Payload-level APIs (e.g. `setLineSpans`, `setBatchLineSpans`) 鈥?all platforms MUST provide high-level typed wrappers (e.g. `setLineSpans(line, layer, spans: List<StyleSpan>)`). Platforms SHOULD additionally expose raw/binary payload APIs when the host language has a natural public binary carrier (e.g. `ByteBuffer`, `NSData`, `byte[]`, `Uint8List`). If both typed and payload APIs are exposed, their parameter semantics and final Core behavior MUST be identical. Payload encoding format remains platform-defined.
 
 ### 3.2 `SweetEditor` Public API
 
 | Function | Canonical Name | Allowed Variants |
 |---|---|---|
 | **Document / Theme** | | |
-| Load document | `loadDocument(doc)` | — |
+| Load document | `loadDocument(doc)` | 鈥?|
 | Get document | `getDocument()` | property: `document` / `Document { get; }` |
-| Apply theme | `applyTheme(theme)` | — |
+| Apply theme | `applyTheme(theme)` | 鈥?|
 | Get theme | `getTheme()` | property: `theme` / `Theme { get; }` |
 | **Configuration** | | |
 | Get settings | `getSettings()` | property: `settings` / `Settings { get; }` |
 | Get key map *(SHOULD)* | `getKeyMap()` | property: `keyMap` / `KeyMap { get; }` |
-| Set key map | `setKeyMap(keyMap)` | — |
-| Icon provider | `setEditorIconProvider(provider)` | — |
+| Set key map | `setKeyMap(keyMap)` | 鈥?|
+| Icon provider | `setEditorIconProvider(provider)` | 鈥?|
 | **Text Editing** | | |
-| Insert text | `insertText(text)` | — |
-| Replace text | `replaceText(range, text)` | — |
-| Delete text | `deleteText(range)` | — |
-| Move line up | `moveLineUp()` | — |
-| Move line down | `moveLineDown()` | — |
-| Copy line up | `copyLineUp()` | — |
-| Copy line down | `copyLineDown()` | — |
-| Delete line | `deleteLine()` | — |
-| Insert line above | `insertLineAbove()` | — |
-| Insert line below | `insertLineBelow()` | — |
+| Insert text | `insertText(text)` | 鈥?|
+| Replace text | `replaceText(range, text)` | 鈥?|
+| Delete text | `deleteText(range)` | 鈥?|
+| Move line up | `moveLineUp()` | 鈥?|
+| Move line down | `moveLineDown()` | 鈥?|
+| Copy line up | `copyLineUp()` | 鈥?|
+| Copy line down | `copyLineDown()` | 鈥?|
+| Delete line | `deleteLine()` | 鈥?|
+| Insert line above | `insertLineAbove()` | 鈥?|
+| Insert line below | `insertLineBelow()` | 鈥?|
 | **Undo / Redo** | | |
-| Undo | `undo()` | — |
-| Redo | `redo()` | — |
-| Can undo | `canUndo()` | — |
-| Can redo | `canRedo()` | — |
+| Undo | `undo()` | 鈥?|
+| Redo | `redo()` | 鈥?|
+| Can undo | `canUndo()` | 鈥?|
+| Can redo | `canRedo()` | 鈥?|
 | **Clipboard (MAY)** | | |
-| Copy | `copyToClipboard()` | — |
-| Paste | `pasteFromClipboard()` | — |
-| Cut | `cutToClipboard()` | — |
+| Copy | `copyToClipboard()` | 鈥?|
+| Paste | `pasteFromClipboard()` | 鈥?|
+| Cut | `cutToClipboard()` | 鈥?|
 | **Cursor / Selection** | | |
-| Select all | `selectAll()` | — |
+| Select all | `selectAll()` | 鈥?|
 | Get selected text | `getSelectedText()` | property: `selectedText` / `SelectedText { get; }` |
-| Set selection | `setSelection(sL, sC, eL, eC)` | — |
+| Set selection | `setSelection(sL, sC, eL, eC)` | 鈥?|
 | Get selection | `getSelection()` | property: `selection` / `Selection { get; }` |
-| Set cursor | `setCursorPosition(pos)` | — |
+| Set cursor | `setCursorPosition(pos)` | 鈥?|
 | Get cursor | `getCursorPosition()` | property: `cursorPosition` / `CursorPosition { get; }` |
 | Word range at cursor | `getWordRangeAtCursor()` | property: `wordRangeAtCursor` / `WordRangeAtCursor { get; }` |
 | Word at cursor | `getWordAtCursor()` | property: `wordAtCursor` / `WordAtCursor { get; }` |
 | **Navigation / Scroll** | | |
-| Go to position | `gotoPosition(line, col)` | — |
-| Scroll to line | `scrollToLine(line, behavior)` | — |
-| Set scroll | `setScroll(x, y)` | — |
+| Go to position | `gotoPosition(line, col)` | 鈥?|
+| Scroll to line | `scrollToLine(line, behavior)` | 鈥?|
+| Set scroll | `setScroll(x, y)` | 鈥?|
 | Get scroll metrics | `getScrollMetrics()` | property: `scrollMetrics` / `ScrollMetrics { get; }` |
-| Get position rect | `getPositionRect(line, col)` | — |
+| Get position rect | `getPositionRect(line, col)` | 鈥?|
 | Get cursor rect | `getCursorRect()` | property: `cursorRect` / `CursorRect { get; }` |
 | **Folding** | | |
 | Toggle fold | `toggleFoldAt(line)` | Swift: `toggleFold(at:)` |
-| Fold line | `foldAt(line)` | — |
-| Unfold line | `unfoldAt(line)` | — |
-| Is line visible | `isLineVisible(line)` | — |
-| Fold all | `foldAll()` | — |
-| Unfold all | `unfoldAll()` | — |
+| Fold line | `foldAt(line)` | 鈥?|
+| Unfold line | `unfoldAt(line)` | 鈥?|
+| Is line visible | `isLineVisible(line)` | 鈥?|
+| Fold all | `foldAll()` | 鈥?|
+| Unfold all | `unfoldAll()` | 鈥?|
 | **Language / Metadata** | | |
-| Set language config | `setLanguageConfiguration(config)` | — |
+| Set language config | `setLanguageConfiguration(config)` | 鈥?|
 | Get language config | `getLanguageConfiguration()` | property: `languageConfiguration` / `LanguageConfiguration { get; }` |
-| Set metadata | `setMetadata(metadata)` | — |
+| Set metadata | `setMetadata(metadata)` | 鈥?|
 | Get metadata | `getMetadata()` | property: `metadata` / `Metadata { get; }` |
 | **Provider Management** | | |
 | Add decoration provider | `addDecorationProvider(provider)` | `attachDecorationProvider(provider)` |
 | Remove decoration provider | `removeDecorationProvider(provider)` | `detachDecorationProvider(provider)` |
-| Request decoration refresh | `requestDecorationRefresh()` | — |
+| Request decoration refresh | `requestDecorationRefresh()` | 鈥?|
 | Add completion provider | `addCompletionProvider(provider)` | `attachCompletionProvider(provider)` |
 | Remove completion provider | `removeCompletionProvider(provider)` | `detachCompletionProvider(provider)` |
 | Add newline provider | `addNewLineActionProvider(provider)` | `attachNewLineActionProvider(provider)` |
 | Remove newline provider | `removeNewLineActionProvider(provider)` | `detachNewLineActionProvider(provider)` |
 | **Completion** | | |
-| Trigger completion | `triggerCompletion()` | — |
-| Show completion items | `showCompletionItems(items)` | — |
-| Dismiss completion | `dismissCompletion()` | — |
+| Trigger completion | `triggerCompletion()` | 鈥?|
+| Show completion items | `showCompletionItems(items)` | 鈥?|
+| Dismiss completion | `dismissCompletion()` | 鈥?|
 | Configure completion item rendering | `setCompletionItemRenderer(renderer)` | `setCompletionItemViewFactory(factory)`, `setCompletionCellRenderer(renderer)`, or other platform-idiomatic rendering customization APIs |
 | **Style** | | |
-| Register text style | `registerTextStyle(id, ...)` | — |
-| Register batch text styles | `registerBatchTextStyles(stylesById)` | — |
+| Register text style | `registerTextStyle(id, ...)` | 鈥?|
+| Register batch text styles | `registerBatchTextStyles(stylesById)` | 鈥?|
 | **Decoration / Adornment Write** | | |
-| Set line spans | `setLineSpans(line, layer, spans)` | — |
-| Set batch line spans | `setBatchLineSpans(layer, spansByLine)` | — |
-| Set line inlay hints | `setLineInlayHints(line, hints)` | — |
-| Set batch line inlay hints | `setBatchLineInlayHints(hintsByLine)` | — |
-| Set line phantom texts | `setLinePhantomTexts(line, phantoms)` | — |
-| Set batch line phantom texts | `setBatchLinePhantomTexts(phantomsByLine)` | — |
-| Set line gutter icons | `setLineGutterIcons(line, icons)` | — |
-| Set batch line gutter icons | `setBatchLineGutterIcons(iconsByLine)` | — |
-| Set line diagnostics | `setLineDiagnostics(line, items)` | — |
-| Set batch line diagnostics | `setBatchLineDiagnostics(diagsByLine)` | — |
-| Set indent guides | `setIndentGuides(guides)` | — |
-| Set bracket guides | `setBracketGuides(guides)` | — |
-| Set flow guides | `setFlowGuides(guides)` | — |
-| Set separator guides | `setSeparatorGuides(guides)` | — |
-| Set fold regions | `setFoldRegions(regions)` | — |
+| Set line spans | `setLineSpans(line, layer, spans)` | 鈥?|
+| Set batch line spans | `setBatchLineSpans(layer, spansByLine)` | 鈥?|
+| Set line inlay hints | `setLineInlayHints(line, hints)` | 鈥?|
+| Set batch line inlay hints | `setBatchLineInlayHints(hintsByLine)` | 鈥?|
+| Set line phantom texts | `setLinePhantomTexts(line, phantoms)` | 鈥?|
+| Set batch line phantom texts | `setBatchLinePhantomTexts(phantomsByLine)` | 鈥?|
+| Set line gutter icons | `setLineGutterIcons(line, icons)` | 鈥?|
+| Set batch line gutter icons | `setBatchLineGutterIcons(iconsByLine)` | 鈥?|
+| Set line diagnostics | `setLineDiagnostics(line, items)` | 鈥?|
+| Set batch line diagnostics | `setBatchLineDiagnostics(diagsByLine)` | 鈥?|
+| Set indent guides | `setIndentGuides(guides)` | 鈥?|
+| Set bracket guides | `setBracketGuides(guides)` | 鈥?|
+| Set flow guides | `setFlowGuides(guides)` | 鈥?|
+| Set separator guides | `setSeparatorGuides(guides)` | 鈥?|
+| Set fold regions | `setFoldRegions(regions)` | 鈥?|
 | **Decoration / Adornment Clear** | | |
-| Clear highlights | `clearHighlights()` | — |
-| Clear highlights by layer | `clearHighlights(layer)` | — |
-| Clear inlay hints | `clearInlayHints()` | — |
-| Clear phantom texts | `clearPhantomTexts()` | — |
-| Clear gutter icons | `clearGutterIcons()` | — |
-| Clear guides | `clearGuides()` | — |
-| Clear diagnostics | `clearDiagnostics()` | — |
-| Clear all decorations | `clearAllDecorations()` | — |
+| Clear highlights | `clearHighlights()` | 鈥?|
+| Clear highlights by layer | `clearHighlights(layer)` | 鈥?|
+| Clear inlay hints | `clearInlayHints()` | 鈥?|
+| Clear phantom texts | `clearPhantomTexts()` | 鈥?|
+| Clear gutter icons | `clearGutterIcons()` | 鈥?|
+| Clear guides | `clearGuides()` | 鈥?|
+| Clear diagnostics | `clearDiagnostics()` | 鈥?|
+| Clear all decorations | `clearAllDecorations()` | 鈥?|
 | **Flush** | | |
-| Flush | `flush()` | — |
+| Flush | `flush()` | 鈥?|
 | **Query** | | |
 | Visible line range | `getVisibleLineRange()` | property: `visibleLineRange` / `VisibleLineRange { get; }` |
 | Total line count | `getTotalLineCount()` | property: `totalLineCount` / `TotalLineCount { get; }` |
@@ -631,7 +651,7 @@ interface NewLineActionProvider {
 The Manager iterates all Providers in registration order and returns the first non-null `NewLineAction`. If all Providers return null, the default newline behavior is used.
 ## 5. `CompletionItem` Field Definitions (MUST)
 
-`CompletionItem` is the core data type of the completion system. Application priority on commit: `textEdit` → `insertText` → `label`.
+`CompletionItem` is the core data type of the completion system. Application priority on commit: `textEdit` 鈫?`insertText` 鈫?`label`.
 
 | Field | Type | MUST/MAY | Description |
 |---|---|---|---|
@@ -710,15 +730,15 @@ The callback contract MUST satisfy all of the following:
 
 | Callback | Constraint | Trigger Condition |
 |---|---|---|
-| `onSuggestionAccepted` | **MUST** | When the user accepts the suggestion (Tab key or Accept button) |
-| `onSuggestionDismissed` | **MUST** | When the user dismisses the suggestion (Esc key or Dismiss button) |
+| `onSuggestionAccepted` | **MUST** | When the user accepts the currently visible suggestion |
+| `onSuggestionDismissed` | **MUST** | When the user dismisses the currently visible suggestion |
 
 ### 6.3 `SweetEditor` Copilot API
 
 | Method | Constraint | Description |
 |---|---|---|
-| `showInlineSuggestion(suggestion)` | **MUST** | Show inline suggestion: inject PhantomText and display Accept/Dismiss action bar |
-| `dismissInlineSuggestion()` | **MUST** | Dismiss current inline suggestion (clear PhantomText and hide action bar) |
+| `showInlineSuggestion(suggestion)` | **MUST** | Show the inline suggestion and make it available for accept / dismiss interaction |
+| `dismissInlineSuggestion()` | **MUST** | Dismiss the current inline suggestion and remove its visible presentation |
 | `isInlineSuggestionShowing()` | **MUST** | Query whether an inline suggestion is currently showing |
 | `setInlineSuggestionListener(listener)` | **MUST** | Register the host-visible accepted / dismissed listener; passing `null` clears it |
 
@@ -730,16 +750,16 @@ The callback contract MUST satisfy all of the following:
 |---|---|---|
 | Text change | **MUST** | MUST automatically dismiss the current inline suggestion when the user types text |
 | Cursor movement | **MUST** | MUST automatically dismiss the current inline suggestion when the cursor position changes |
-| Scrolling | **SHOULD** | SHOULD update the action bar position on scroll; SHOULD NOT auto-dismiss |
+| Scrolling | **SHOULD** | SHOULD update the visible suggestion affordance position on scroll when applicable; SHOULD NOT auto-dismiss |
 
 ### 6.5 `InlineSuggestionController` (MAY)
 
 `InlineSuggestionController` is the recommended internal implementation pattern (see Section 1.3), responsible for managing the complete lifecycle of inline suggestions:
 
-- PhantomText injection and removal
+- Suggestion presentation and removal
 - Event listener (TextChanged / CursorChanged / ScrollChanged) subscription and unsubscription
-- Accept/Dismiss action bar display, positioning, and hiding
-- Tab/Esc key interception
+- Accept / dismiss interaction and any associated visual affordance positioning
+- Accept / dismiss key handling where applicable
 
 Platforms MAY choose not to use the Controller pattern, but MUST implement equivalent functionality.
 
@@ -962,26 +982,33 @@ All platforms MUST expose the following settings through getter/setter pairs (or
 | `compositionEnabled` | boolean | Platform-dependent | `setCompositionEnabled(enabled)` | `isCompositionEnabled()` | `runtime-transition` | Whether IME composition mode is enabled |
 | `lineSpacingAdd` | float | 0 | `setLineSpacing(add, mult)` | `getLineSpacingAdd()` | `relayout` | Line spacing extra (pixels) |
 | `lineSpacingMult` | float | 1.0 | *(same as above)* | `getLineSpacingMult()` | `relayout` | Line spacing multiplier |
-| `contentStartPadding` | float | 0 | `setContentStartPadding(padding)` | `getContentStartPadding()` | `relayout` | Extra horizontal padding between gutter split and text rendering start (pixels) |
+| `contentStartPadding` | float | Platform-dependent | `setContentStartPadding(padding)` | `getContentStartPadding()` | `relayout` | Extra horizontal padding between gutter split and text rendering start (pixels) |
 | `showSplitLine` | boolean | true | `setShowSplitLine(show)` | `isShowSplitLine()` | `repaint` | Whether to render the gutter split line |
-| `gutterSticky` | boolean | true | `setGutterSticky(sticky)` | `isGutterSticky()` | `repaint` | Whether gutter stays fixed during horizontal scroll (true=fixed, false=scrolls with content) |
+| `gutterSticky` | boolean | Platform-dependent | `setGutterSticky(sticky)` | `isGutterSticky()` | `repaint` | Whether gutter stays fixed during horizontal scroll (true=fixed, false=scrolls with content) |
 | `gutterVisible` | boolean | true | `setGutterVisible(visible)` | `isGutterVisible()` | `relayout` | Whether gutter area is visible (false=hide line numbers, icons, fold arrows) |
 | `currentLineRenderMode` | CurrentLineRenderMode | BACKGROUND | `setCurrentLineRenderMode(mode)` | `getCurrentLineRenderMode()` | `repaint` | Current line render mode |
 | `autoIndentMode` | AutoIndentMode | KEEP_INDENT | `setAutoIndentMode(mode)` | `getAutoIndentMode()` | `runtime-transition` | Auto indent mode |
 | `backspaceUnindent` | boolean | true | `setBackspaceUnindent(enabled)` | `isBackspaceUnindent()` | `runtime-transition` | Whether backspace key unindents at line start |
 | `readOnly` | boolean | false | `setReadOnly(readOnly)` | `isReadOnly()` | `runtime-transition` | Read-only mode, blocks all edit operations |
 | `maxGutterIcons` | int | 0 | `setMaxGutterIcons(count)` | `getMaxGutterIcons()` | `relayout` | Maximum gutter icon count |
-| `decorationScrollRefreshMinIntervalMs` | long | 16 | `setDecorationScrollRefreshMinIntervalMs(ms)` | `getDecorationScrollRefreshMinIntervalMs()` | `runtime-transition` | Decoration scroll refresh minimum interval (ms) |
-| `decorationOverscanViewportMultiplier` | float | 1.5 | `setDecorationOverscanViewportMultiplier(mult)` | `getDecorationOverscanViewportMultiplier()` | `runtime-transition` | Decoration overscan viewport multiplier |
+| `decorationScrollRefreshMinIntervalMs` | long | 16 | `setDecorationScrollRefreshMinIntervalMs(ms)` | `getDecorationScrollRefreshMinIntervalMs()` | `provider-policy` | Decoration scroll refresh minimum interval (ms) |
+| `decorationOverscanViewportMultiplier` | float | 1.5 | `setDecorationOverscanViewportMultiplier(mult)` | `getDecorationOverscanViewportMultiplier()` | `provider-policy` | Decoration overscan viewport multiplier |
 
 > All setter calls MUST take effect immediately.
 >
 > Effect classification:
 > - `repaint`: MUST trigger an immediate repaint or equivalent visual refresh, without requiring text relayout.
 > - `relayout`: MUST trigger layout invalidation and rebuild the render model or an equivalent relayout path immediately.
-> - `runtime-transition`: MUST apply immediately and safely handle active runtime state transitions required by the setting.
+> - `runtime-transition`: MUST apply immediately and safely handle active runtime state transitions required by the setting. A `runtime-transition` setting does not require repaint or relayout unless the current visible state actually changes.
+> - `provider-policy`: MUST immediately affect subsequent provider scheduling / refresh behavior. It does not require repaint or relayout unless the implementation explicitly triggers a refresh as part of applying the new policy.
 >
 > `compositionEnabled` is the canonical example of `runtime-transition`: when switching from enabled to disabled while an IME composition is active, the platform MUST cancel or otherwise safely terminate the active composition before the new setting takes effect.
+>
+> `contentStartPadding` is platform-dependent by default. It MUST be `>= 0`. `0` is the neutral baseline, but platforms MAY choose a non-zero visual default.
+>
+> `gutterSticky` is platform-dependent by default. Desktop-style platforms SHOULD default to `true`; mobile / touch-first platforms SHOULD default to `false`.
+>
+> `autoIndentMode`, `backspaceUnindent`, and `readOnly` are also `runtime-transition` settings. They MUST affect subsequent editing behavior immediately, but they do not require `flush()`, repaint, or relayout if no visible state changes at the moment of the setter call.
 
 ---
 
@@ -1003,6 +1030,8 @@ If the platform exposes `KeyCode`, `KeyModifier`, or built-in `EditorCommand` co
 
 - `KeyModifier` MUST use bit flags so combined modifiers can be represented by bitwise OR
 - `KeyCode.NONE`, the empty second chord, and `EditorCommand.NONE` MUST preserve the same semantics as the C++ core
+- `EditorCore`, bridge layers, or FFI layers MAY continue using raw integer enum values aligned with the C++ core as internal transport representations
+- For such bridge-layer integer enums, platforms are not required to repeat host-facing business-level enum validation, but MUST ensure invalid input cannot cause native / C++ crashes or undefined behavior
 
 ### 10.3 Widget-Layer Extension
 
@@ -1059,18 +1088,18 @@ Event payloads MUST be defined per-event. Platforms MUST NOT assume or require a
 
 | Event | Fields | Description |
 |---|---|---|
-| `TextChangedEvent` | `action: TextChangeAction`, `changeRange: TextRange?`, `text: String?` | Text change action, changed range before the operation, and inserted/replaced text |
+| `TextChangedEvent` | `changes: List<TextChange>`, `action: TextChangeAction?` *(SHOULD)* | Incremental text changes for the current edit cycle; `action` is an optional coarse-grained semantic hint |
 | `CursorChangedEvent` | `cursorPosition: TextPosition` | Current cursor position |
 | `SelectionChangedEvent` | `hasSelection: boolean`, `selection: TextRange?`, `cursorPosition: TextPosition` | Current selection state and cursor position |
 | `ScrollChangedEvent` | `scrollX: float`, `scrollY: float` | Current view scroll offset |
 | `ScaleChangedEvent` | `scale: float` | Current editor scale |
-| `DocumentLoadedEvent` | — | No payload fields are required |
-| `FoldToggleEvent` | `line: int`, `isGutter: boolean`, `screenPoint: PointF` | Toggled fold line, whether the click came from gutter, and screen position |
-| `GutterIconClickEvent` | `line: int`, `iconId: int`, `screenPoint: PointF` | Clicked gutter icon line, icon id, and screen position |
-| `InlayHintClickEvent` | `line: int`, `column: int`, `type: InlayType`, `intValue: int`, `screenPoint: PointF` | Clicked inlay hint position, inlay type, type-specific value, optional text payload, and screen position |
-| `LongPressEvent` | `cursorPosition: TextPosition`, `screenPoint: PointF` | Long-press target position and screen position |
-| `DoubleTapEvent` | `cursorPosition: TextPosition`, `hasSelection: boolean`, `selection: TextRange?`, `screenPoint: PointF` | Double-tap target position, resulting selection state, and screen position |
-| `ContextMenuEvent` | `cursorPosition: TextPosition`, `screenPoint: PointF` | Context-menu target position and screen position |
+| `DocumentLoadedEvent` | 鈥?| No payload fields are required |
+| `FoldToggleEvent` | `line: int`, `isGutter: boolean`, `screenPoint: PointF or platform-native point type` | Toggled fold line, whether the click came from gutter, and screen position |
+| `GutterIconClickEvent` | `line: int`, `iconId: int`, `screenPoint: PointF or platform-native point type` | Clicked gutter icon line, icon id, and screen position |
+| `InlayHintClickEvent` | `line: int`, `column: int`, `type: InlayType`, `intValue: int`, `screenPoint: PointF or platform-native point type` | Clicked inlay hint position, inlay type, type-specific value, and screen position |
+| `LongPressEvent` | `cursorPosition: TextPosition`, `screenPoint: PointF or platform-native point type` | Long-press target position and screen position |
+| `DoubleTapEvent` | `cursorPosition: TextPosition`, `hasSelection: boolean`, `selection: TextRange?`, `screenPoint: PointF or platform-native point type` | Double-tap target position, resulting selection state, and screen position |
+| `ContextMenuEvent` | `cursorPosition: TextPosition`, `screenPoint: PointF or platform-native point type` | Context-menu target position and screen position |
 | `SelectionMenuItemClickEvent` *(platform-specific)* | `item: SelectionMenuItem` | Clicked custom selection-menu item |
 
 ---
@@ -1150,30 +1179,30 @@ Minor visual differences are acceptable:
 
 ## 14. Threading and Concurrency Model (MUST)
 
-State-mutating editor operations and host-visible callbacks are UI-thread-affine by default. Platforms MAY expose additional thread-safe query surfaces, but MUST choose a concrete threading model and document it explicitly.
+State-mutating editor operations and host-visible callbacks are UI-thread-affine by default. Platforms MAY expose additional thread-safe query surfaces, but MUST choose a concrete threading model; platforms SHOULD explain that model through code comments, type annotations, or a README.
 
 | Rule | Constraint | Description |
 |---|---|---|
 | State-mutating API thread | **MUST** | Public methods that mutate editor state or trigger visible UI updates MUST be called on the UI thread unless the platform explicitly documents an equivalent serialized threading model |
-| API thread contract documentation | **MUST** | Platform documentation MUST explicitly identify which public APIs are UI-thread-only and which pure query / snapshot APIs, if any, are safe to call from background threads |
+| API thread contract documentation | **SHOULD** | Platforms SHOULD use code comments, type annotations, or a README to identify which public APIs are UI-thread-only and which pure query / snapshot APIs, if any, are safe to call from background threads |
 | Pure query API thread | **SHOULD** | Pure query / snapshot APIs SHOULD either remain UI-thread-only or be explicitly documented as background-safe; platforms MAY allow background reads only when implemented safely |
 | Event callback thread | **MUST** | All event callbacks / delegate invocations / stream emissions that are visible to host code MUST execute on the UI thread |
-| Provider call thread | **MUST** | Platforms MUST choose a stable invocation model for `provideDecorations()` and `provideCompletions()` (UI thread, worker thread, or another documented serialized executor) and MUST document that model for host code |
+| Provider call thread | **MUST** | Platforms MUST choose a stable invocation model for `provideDecorations()` and `provideCompletions()` (UI thread, worker thread, or another serialized executor); platforms SHOULD explain that model to host code through code comments, type annotations, or a README |
 | Provider async callback thread | **MUST** | Provider result delivery may happen from any thread, but the Manager MUST switch back to the UI thread when applying results to Core or mutating host-visible editor state |
 | `buildRenderModel()` | **MUST** | `buildRenderModel()` MUST observe a stable editor snapshot. Platforms MAY require UI-thread calls or provide a stronger thread-safe snapshot contract, but the returned `EditorRenderModel` SHOULD be treated as immutable and MAY be safely read on the render thread |
 | `NewLineActionProvider` | **MUST** | `provideNewLineAction()` MUST complete synchronously on the input path so Enter handling does not depend on a later async callback |
 | Thread safety annotations | **SHOULD** | Platforms SHOULD annotate thread constraints in public API documentation (e.g. Java `@MainThread`, Swift `@MainActor`) |
 ## 15. Error Handling (MUST)
 
-Public APIs adopt defensive handling for invalid inputs without throwing exceptions; exceptions in Provider callbacks are isolated by the Manager.
+Public APIs use defensive handling for invalid inputs; managed-language host-facing public APIs MAY fail fast using language-idiomatic errors, but bridge / FFI boundaries MUST ensure invalid input cannot cause native / C++ crashes or undefined behavior; exceptions in Provider callbacks are isolated by the Manager.
 
 ### 15.1 Public API Parameter Validation
 
 | Scenario | Constraint | Behavior |
 |---|---|---|
 | Line / column out of bounds | **MUST** | Automatically clamp to valid range `[0, max)`; MUST NOT throw exceptions |
-| null / empty parameters | **MUST** | For MUST-non-null parameters receiving null, MUST silently ignore (no-op) and log a warning; MUST NOT throw exceptions or crash |
-| Invalid enum values | **MUST** | Use default value (e.g. `WrapMode.NONE`); MUST NOT throw exceptions |
+| null / empty parameters | **MUST** | Platforms MUST honor the nullable semantics of parameters that are defined as nullable. For MUST-non-null parameters, managed-language public APIs SHOULD fail fast using platform-idiomatic errors (for example Java `NullPointerException` / `IllegalArgumentException`, C# `ArgumentNullException`) and MUST NOT cause native / C++ crashes or undefined behavior; bridge / FFI boundaries MUST handle invalid input safely |
+| Invalid enum values | **MUST** | For host-facing public APIs that are forced to expose integer enum values, platforms MUST handle invalid values explicitly; managed-language public APIs SHOULD fail fast using platform-idiomatic errors (for example `IllegalArgumentException`), and MAY instead fall back to a default value. For raw integer enum values used by `EditorCore`, bridge layers, or FFI layers, platforms are not required to repeat host-level business validation, but MUST NOT allow invalid input to cause native / C++ crashes or undefined behavior |
 | Calls when widget not mounted | **SHOULD** | Getters return null or default values; imperative methods SHOULD queue or silently ignore (consistent with Section 3.0.3) |
 
 ### 15.2 Provider Exception Handling
@@ -1202,16 +1231,18 @@ Resource creation and destruction follow explicit ordering constraints to preven
 | Phase | Constraint | Rule |
 |---|---|---|
 | Creation | **MUST** | `EditorCore` instance MUST be created during widget initialization (imperative frameworks: constructor or init; declarative frameworks: on first widget mount) |
-| Release path | **MUST** | The platform MUST provide a mechanism that can eventually release `EditorCore` and its native / C++ resources; the release timing MAY be tied to explicit `dispose()` / `close()`, host-managed lifecycle, an equivalent platform cleanup hook, or another platform-idiomatic mechanism. View detachment, widget unmount, or temporary removal from the view tree is NOT by itself required to be the release moment |
-| Post-release calls | **MUST** | After `EditorCore` resources are released, any method call MUST be a no-op or throw an explicit "already destroyed" exception; MUST NOT access freed C++ memory |
-| Repeated release | **MUST** | Multiple invocations of the release logic MUST be idempotent (no-op); MUST NOT cause double-free |
+| Release path | **MUST** | The platform MUST ensure that `EditorCore` and its native / C++ resources are eventually released. For GC-managed languages, the primary conformance target is logical teardown plus eventual native reclamation, not a mandatory explicit release method. The mechanism MAY be an explicit `dispose()` / `close()`, a host-managed lifecycle, GC / finalizer / ARC-backed automatic reclamation, an equivalent platform cleanup hook, or another platform-idiomatic strategy. View detachment, widget unmount, or temporary removal from the view tree is NOT by itself required to be the final reclamation moment |
+| Post-teardown calls | **MUST** | If the platform exposes an explicit release API, or otherwise keeps the object reachable after logical teardown or internal release, subsequent calls MUST NOT access freed native / C++ resources and MUST NOT trigger further editor side effects or callbacks. Mutating calls MUST be a no-op or throw an explicit "already destroyed" exception. Getter calls MAY return `null`, default values, or last-known managed snapshots, as long as they do not require released native state or trigger lazy recomputation against destroyed resources |
+| Repeated release | **MUST** | If the platform exposes explicit release logic, multiple invocations MUST be idempotent (no-op); MUST NOT cause double-free |
+
+> The standard requires eventual native-resource release, but does **not** require every managed-language `Document` / bridge wrapper to expose an additional explicit release API beyond the platform's own lifecycle model. For GC-managed languages, platforms SHOULD prioritize logical teardown: stop timers, detach listeners, cancel or stale-mark async receivers, and break reference chains that would otherwise keep the editor object graph alive. If a platform chooses to keep returning last-known managed snapshots after teardown, it SHOULD document that those values are stale snapshots rather than live editor state.
 
 ### 16.2 Provider Lifecycle
 
 | Rule | Constraint | Description |
 |---|---|---|
 | Registration timing | **SHOULD** | Providers SHOULD be registered after `loadDocument()` to ensure valid document data in the Context |
-| Cleanup during release | **MUST** | During the platform-defined editor release / dispose / close / teardown phase, MUST automatically unregister all registered Providers and cancel or mark stale all in-flight async requests so late results are ignored |
+| Cleanup during release | **MUST** | If the platform defines an explicit editor release / dispose / close / teardown phase, it MUST automatically unregister all registered Providers and cancel or mark stale all in-flight async requests so late results are ignored. On GC-managed platforms, an equivalent logical teardown MUST still detach listeners, stop timers, and cancel or stale-mark async receivers so late results cannot keep the editor object graph alive or mutate freed native resources / host-visible editor state |
 | Provider references | **SHOULD** | Platform implementations SHOULD avoid Providers holding strong references to the widget instance to prevent circular references causing memory leaks (Java/Kotlin: WeakReference; Swift: weak/unowned; Dart: no special handling needed) |
 
 ### 16.3 `SweetEditorController` Lifecycle (Declarative Frameworks)
@@ -1220,22 +1251,23 @@ Resource creation and destruction follow explicit ordering constraints to preven
 |---|---|---|
 | Creation | **MUST** | Controller MUST be created by host code; lifecycle is managed by the host |
 | Binding | **MUST** | MUST call `bind()` on widget mount and `unbind()` on widget unmount (consistent with Section 3.0.3) |
-| `dispose()` ordering | **MUST** | `dispose()` MUST first unbind the widget (if still bound), then release internal resources; any method call after `dispose()` MUST be a no-op |
+| Explicit teardown (if provided) | **MAY** | Platforms MAY provide an explicit controller teardown method such as `dispose()`, `close()`, or `release()`; for GC-managed languages this is not required when the controller no longer retains active resources or reference chains after `unbind()` |
+| Teardown ordering and boundary | **MUST** | If the platform provides an explicit controller teardown method, it MUST first unbind the widget (if still bound), then release controller-owned internal resources; any method call after teardown MUST be a no-op. The controller MUST NOT assume ownership of the bound widget and MUST NOT directly destroy the `View` / `Control` / `Widget` itself |
 | Widget rebuild | **SHOULD** | In declarative frameworks, widgets may be rebuilt due to state changes; the Controller SHOULD seamlessly `bind()` to the new widget after the old one calls `unbind()`, without losing queued operations |
+
+> This section applies only to platforms that expose an independent controller object. It MUST NOT be interpreted as requiring every imperative `View` / `Control` / `Widget` / `Document` type to add a library-defined `dispose()` / `close()` method. Controller teardown means detachment and logical deactivation; it does not transfer ownership of, or destroy, the bound widget.
 
 ### 16.4 Resource Release Order
 
-When the platform performs editor release / dispose / close / final teardown, subsystems MUST be released in the following order:
+When the platform performs editor release / dispose / close / final teardown, it MUST satisfy the following safety constraints. For GC-managed platforms, these constraints primarily apply to logical teardown and reference-chain cleanup; final native reclamation MAY happen later, as long as the torn-down object graph can no longer produce user-visible effects or touch invalid native state.
 
-```
-1. Cancel all in-flight async Provider requests
-2. Unregister all Providers (Decoration / Completion / NewLine)
-3. Clear all host-visible event subscriptions / listeners / observers
-4. Release EditorCore / native resources
-5. Release platform-specific resources (textures, canvases, timers, etc.)
-```
+- All in-flight async Provider requests MUST be cancelled or marked stale before their results can reach invalid native state
+- Provider registrations MUST be cleared before they can emit further callbacks into a destroyed editor
+- Host-visible event subscriptions / listeners / observers MUST be cleared before post-destruction callbacks can occur
+- `EditorCore` / native resources MUST be released exactly once and only after no further platform callbacks can legally use them
+- Platform-specific resources (textures, canvases, timers, etc.) MAY be released in platform-idiomatic order, as long as the constraints above are preserved
 
-> The internal order of steps 1-3 MAY be adjusted, but MUST complete before step 4. Step 4 MUST complete before step 5. The standard does not require step 4 to be tied to view detachment, widget unmount, or the specific moment when the widget is permanently removed from the view tree.
+> The standard defines dependency / safety ordering here, not a single mandatory cross-platform step sequence.
 
 ---
 
@@ -1252,9 +1284,18 @@ The Core layer defines numerous decoration data types. All platforms MUST implem
 | Field names | **MUST** | Field names MUST follow the cross-platform naming rules in Section 2.2 |
 | Coordinate basis | **MUST** | All line numbers (`line`) and column numbers (`column`) MUST be 0-based; columns are measured in UTF-16 character offsets |
 
-### 17.2 Adornment Data Types
+### 17.2 Shared Data Types
 
-**`StyleSpan`** — Inline highlight range
+**`TextChange`** 鈥?Incremental text change
+
+| Field | Type | MUST/MAY | Description |
+|---|---|---|---|
+| `range` | TextRange | **MUST** | Changed range in document coordinates |
+| `text` | String | **MUST** | Replacement text; empty string means pure deletion |
+
+### 17.3 Adornment Data Types
+
+**`StyleSpan`** 鈥?Inline highlight range
 
 | Field | Type | MUST/MAY | Description |
 |---|---|---|---|
@@ -1262,7 +1303,7 @@ The Core layer defines numerous decoration data types. All platforms MUST implem
 | `length` | int | **MUST** | Character length |
 | `styleId` | int | **MUST** | Style ID registered via `registerTextStyle()` |
 
-**`TextStyle`** — Text style definition
+**`TextStyle`** 鈥?Text style definition
 
 | Field | Type | MUST/MAY | Description |
 |---|---|---|---|
@@ -1270,7 +1311,7 @@ The Core layer defines numerous decoration data types. All platforms MUST implem
 | `backgroundColor` | int | **MUST** | Background color (ARGB), 0 means transparent |
 | `fontStyle` | int | **MUST** | Font style bit flags: `BOLD=1`, `ITALIC=2`, `STRIKETHROUGH=4` |
 
-**`InlayHint`** — Inline embedded hint
+**`InlayHint`** 鈥?Inline embedded hint
 
 | Field | Type | MUST/MAY | Description |
 |---|---|---|---|
@@ -1281,20 +1322,20 @@ The Core layer defines numerous decoration data types. All platforms MUST implem
 
 > Platforms SHOULD provide convenience factory methods: `TextHint(column, text)`, `IconHint(column, iconId)`, `ColorHint(column, color)`.
 
-**`PhantomText`** — Ghost text
+**`PhantomText`** 鈥?Ghost text
 
 | Field | Type | MUST/MAY | Description |
 |---|---|---|---|
 | `column` | int | **MUST** | Insertion column (0-based, UTF-16 offset) |
 | `text` | String | **MUST** | Phantom text content |
 
-**`GutterIcon`** — Gutter area icon
+**`GutterIcon`** 鈥?Gutter area icon
 
 | Field | Type | MUST/MAY | Description |
 |---|---|---|---|
 | `iconId` | int | **MUST** | Icon resource ID (resolved and rendered by the platform's `EditorIconProvider`) |
 
-**`Diagnostic`** — Diagnostic information
+**`Diagnostic`** 鈥?Diagnostic information
 
 | Field | Type | MUST/MAY | Description |
 |---|---|---|---|
@@ -1303,21 +1344,23 @@ The Core layer defines numerous decoration data types. All platforms MUST implem
 | `severity` | int | **MUST** | Severity level: ERROR=0, WARNING=1, INFO=2, HINT=3 |
 | `color` | int | **MUST** | Custom color (ARGB), 0 means use severity default color |
 
-**`FoldRegion`** — Foldable region
+> `Diagnostic` in this standard is a minimal diagnostic decoration model. It is intended for diagnostic rendering and lightweight interactions, not as a full IDE diagnostic object.
+
+**`FoldRegion`** 鈥?Foldable region
 
 | Field | Type | MUST/MAY | Description |
 |---|---|---|---|
 | `startLine` | int | **MUST** | Fold region start line (0-based, this line remains visible) |
 | `endLine` | int | **MUST** | Fold region end line (0-based, inclusive) |
 
-**`IndentGuide`** — Indentation guide line
+**`IndentGuide`** 鈥?Indentation guide line
 
 | Field | Type | MUST/MAY | Description |
 |---|---|---|---|
 | `start` | TextPosition | **MUST** | Start position |
 | `end` | TextPosition | **MUST** | End position |
 
-**`BracketGuide`** — Bracket pair guide line
+**`BracketGuide`** 鈥?Bracket pair guide line
 
 | Field | Type | MUST/MAY | Description |
 |---|---|---|---|
@@ -1325,14 +1368,14 @@ The Core layer defines numerous decoration data types. All platforms MUST implem
 | `end` | TextPosition | **MUST** | End bracket position |
 | `children` | List\<TextPosition\> | **MUST** | Child node position list |
 
-**`FlowGuide`** — Control flow guide line
+**`FlowGuide`** 鈥?Control flow guide line
 
 | Field | Type | MUST/MAY | Description |
 |---|---|---|---|
 | `start` | TextPosition | **MUST** | Start position |
 | `end` | TextPosition | **MUST** | End position |
 
-**`SeparatorGuide`** — Separator line
+**`SeparatorGuide`** 鈥?Separator line
 
 | Field | Type | MUST/MAY | Description |
 |---|---|---|---|
@@ -1371,7 +1414,7 @@ All platforms MUST support at least the following two construction methods:
 | Rule | Constraint | Description |
 |---|---|---|
 | Native document reference | **MUST** | `Document` MUST internally retain a bridge-layer reference to a C++ side document instance; whether this is represented as an opaque handle, pointer wrapper, object wrapper, or another mechanism is an implementation detail |
-| Resource release | **MUST** | When `Document` is destroyed / disposed according to the platform lifecycle, the bridge layer MUST eventually release the C++ side document memory; the exact cleanup mechanism is platform-specific |
+| Resource release | **MUST** | When `Document` reaches its terminal platform lifecycle state, the bridge layer MUST eventually release the C++ side document memory; the exact cleanup mechanism is platform-specific, and an explicit `dispose()` / `close()` API is optional |
 | Encoding model | **MUST** | Platform layers MUST NOT assume or expose a specific internal storage / layout encoding beyond the semantics guaranteed by the public APIs |
 | Line endings | **MUST** | C++ Core supports LF, CR, and CRLF line endings; text returned by `getLineText()` MUST NOT include line endings |
 
@@ -1404,8 +1447,8 @@ All platforms MUST support at least the following two construction methods:
 | `languageId` | String | **MUST** | Language identifier (e.g. `"java"`, `"cpp"`, `"swift"`) |
 | `brackets` | List\<BracketPair\>? | **MAY** | Bracket pair list (null = not configured; platform MUST NOT sync to Core when null) |
 | `autoClosingPairs` | List\<BracketPair\>? | **MAY** | Auto-closing bracket pair list (null = not configured; platform MUST NOT sync to Core when null) |
-| `tabSize` | int? | **MAY** | Tab width (null means use editor default) |
-| `insertSpaces` | bool? | **MAY** | Whether to use spaces instead of tabs (null means use editor default) |
+| `tabSize` | int / int? | **MAY** | Tab stop width |
+| `insertSpaces` | bool / bool? | **MAY** | Whether pressing Tab inserts spaces instead of a hard tab character |
 
 **`BracketPair`** sub-type:
 
@@ -1418,7 +1461,10 @@ All platforms MUST support at least the following two construction methods:
 |---|---|---|
 | Construction | **SHOULD** | SHOULD provide Builder pattern construction (Java/Kotlin); MAY use direct constructors or named-parameter constructors (Swift/C#/Dart/ArkTS) |
 | Immutability | **SHOULD** | SHOULD be immutable after construction |
-| Runtime effect | **MUST** | When `setLanguageConfiguration()` is called, bracket matching and auto-closing behavior visible to the editor MUST be updated consistently with the new configuration |
+| Optionality and defaults | **MUST** | Platforms MAY expose `tabSize` / `insertSpaces` as nullable or non-null fields. If nullable, `null` MAY mean "use editor default". If non-null, their default values MUST match the editor defaults |
+| Runtime effect | **MUST** | When `setLanguageConfiguration()` is called, bracket matching, auto-closing behavior, and Tab insertion behavior visible to the editor MUST be updated consistently with the new configuration |
+| `tabSize` semantics | **MUST** | `tabSize` and `insertSpaces` MUST be treated as independent dimensions: `tabSize` controls tab-stop width, while `insertSpaces` controls whether the Tab key inserts spaces or a hard tab character |
+| `insertSpaces=true` behavior | **MUST** | If `insertSpaces` is `true`, the Tab key / `INSERT_TAB` command MUST insert the number of spaces required to reach the next tab stop, rather than always inserting a fixed `tabSize` count |
 ## 20. Performance Guidance & Reference Targets (SHOULD)
 
 Based on the `perf/` module (`PerfOverlay`, `PerfStepRecorder`, `MeasurePerfStats`) and the C++ Core `PERF_TIMER` macros, this section defines cross-platform performance guidance and reference targets rather than hard conformance gates.
@@ -1487,7 +1533,7 @@ The following numbers are reference targets for release builds on representative
 | Rule | Constraint Level | Description |
 |---|---|---|
 | Unit tests | **SHOULD** | Each platform SHOULD provide unit tests for Core-layer data types (e.g., `EditorSettings` default value validation, `EditorTheme` factory method validation) |
-| Integration tests | **MAY** | MAY provide widget-level integration tests (e.g., create widget → load document → verify line count) |
+| Integration tests | **MAY** | MAY provide widget-level integration tests (e.g., create widget 鈫?load document 鈫?verify line count) |
 | Test framework | **SHOULD** | Use the platform's idiomatic test framework (Android: JUnit/Espresso, Apple: XCTest, C#: xUnit/NUnit, OHOS: Hypium) |
 
 ### 21.3 Cross-Platform Consistency Verification
@@ -1527,7 +1573,7 @@ Accessibility support is at the MAY level, but implementations SHOULD follow the
 |---|---|---|
 | High contrast | **MAY** | MAY provide a high-contrast theme or respond to system high-contrast settings |
 | Font scaling | **SHOULD** | SHOULD respond to system font scaling settings (via `setScale()` or `setEditorTextSize()`) |
-| Cursor visibility | **SHOULD** | The cursor SHOULD have sufficient visual contrast, and blink frequency SHOULD be between 0.5–2Hz |
+| Cursor visibility | **SHOULD** | The cursor SHOULD have sufficient visual contrast, and blink frequency SHOULD be between 0.5鈥?Hz |
 
 ---
 
@@ -1541,10 +1587,11 @@ Platform package version numbers MUST maintain alignment with the C++ Core versi
 
 | Segment | Constraint | Rule | Example (Core `1.0.0`) |
 |---|---|---|---|
-| `a` (major) | **MUST** | Platform package major version MUST match the Core major version and MUST NOT exceed it | Package `1.x.x` ✅; `2.0.0` ❌ |
-| `b` (minor) | **SHOULD** | Platform package minor version SHOULD NOT exceed Core minor version `+9`; exceeding requires documented justification | Core `1.0.0` → package `1.9.x` is the recommended ceiling |
-| `c` (patch) | **MAY** | Platform package patch version may increment freely for platform-specific bugfixes | `1.0.15` ✅ |
+| `a` (major) | **MUST** | Platform package major version MUST match the Core major version and MUST NOT exceed it | Package `1.x.x` 鉁? `2.0.0` 鉂?|
+| `b` (minor) | **SHOULD** | Platform package minor version SHOULD NOT exceed Core minor version `+9`; exceeding requires documented justification | Core `1.0.0` 鈫?package `1.9.x` is the recommended ceiling |
+| `c` (patch) | **MAY** | Platform package patch version may increment freely for platform-specific bugfixes | `1.0.15` 鉁?|
 
 - When Core releases a new major version (e.g. `2.0.0`), all platform packages MUST upgrade their major version within the same release cycle.
 - Platform packages MAY independently release patch versions (`c` increment) while the Core version remains unchanged, for platform-specific fixes.
 - The recommended ceiling on the minor version (`b`) is to prevent platform package versions from diverging too far from the Core version, which would cause version mapping confusion.
+

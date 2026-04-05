@@ -9,4 +9,5 @@ public class KeyEventResult {
     @SerializedName("cursor_changed") public boolean cursorChanged;
     @SerializedName("selection_changed") public boolean selectionChanged;
     @SerializedName("edit_result") public TextEditResult editResult;
+    @SerializedName("command") public int command;
 }

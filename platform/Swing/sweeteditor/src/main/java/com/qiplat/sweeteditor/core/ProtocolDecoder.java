@@ -96,6 +96,9 @@ final class ProtocolDecoder {
                 }
             }
         }
+        if (data.remaining() >= 4) {
+            result.command = data.getInt();
+        }
         return result;
     }
 
@@ -163,6 +166,23 @@ final class ProtocolDecoder {
                 data.getFloat(),
                 data.getFloat(),
                 data.getInt() != 0,
+                data.getInt() != 0
+        );
+    }
+
+    static LayoutMetrics decodeLayoutMetrics(ByteBuffer data) {
+        if (data == null || data.remaining() < 40) return null;
+        return new LayoutMetrics(
+                data.getFloat(),
+                data.getFloat(),
+                data.getFloat(),
+                data.getFloat(),
+                data.getFloat(),
+                data.getFloat(),
+                data.getInt(),
+                data.getFloat(),
+                data.getFloat(),
+                FoldArrowMode.fromValue(data.getInt()),
                 data.getInt() != 0
         );
     }

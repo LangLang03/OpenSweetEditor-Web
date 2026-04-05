@@ -364,7 +364,7 @@ namespace Demo {
 
 			private async Task ProduceDecorationsAsync(DecorationContext context, IDecorationReceiver receiver) {
 				bool hasTextChanges = context.TextChanges.Count > 0;
-				Dictionary<int, List<DecorationResult.DiagnosticItem>> diagnostics = new();
+				Dictionary<int, List<Diagnostic>> diagnostics = new();
 				DecorationResult? sweetLineResult = null;
 
 				try {
@@ -400,14 +400,14 @@ namespace Demo {
 
 			private DecorationResult BuildSweetLineDecorationResult(
 				DecorationContext context,
-				Dictionary<int, List<DecorationResult.DiagnosticItem>> dynamicDiagnostics) {
-				var dynamicPhantoms = new Dictionary<int, List<DecorationResult.PhantomTextItem>>();
-				var syntaxSpans = new Dictionary<int, List<DecorationResult.SpanItem>>();
-				var inlayHints = new Dictionary<int, List<DecorationResult.InlayHintItem>>();
-				var gutterIcons = new Dictionary<int, List<int>>();
-				var indentGuides = new List<DecorationResult.IndentGuideItem>();
-				var foldRegions = new List<DecorationResult.FoldRegionItem>();
-				var separatorGuides = new List<DecorationResult.SeparatorGuideItem>();
+				Dictionary<int, List<Diagnostic>> dynamicDiagnostics) {
+				var dynamicPhantoms = new Dictionary<int, List<PhantomText>>();
+				var syntaxSpans = new Dictionary<int, List<StyleSpan>>();
+				var inlayHints = new Dictionary<int, List<InlayHint>>();
+				var gutterIcons = new Dictionary<int, List<GutterIcon>>();
+				var indentGuides = new List<IndentGuide>();
+				var foldRegions = new List<FoldRegion>();
+				var separatorGuides = new List<SeparatorGuide>();
 				var seenColorHints = new HashSet<string>();
 				var phantomLines = new HashSet<int>();
 				var seenDiagnostics = new HashSet<string>();
@@ -508,7 +508,7 @@ namespace Demo {
 							}
 
 							int column = Math.Max(guide.Column, 0);
-							indentGuides.Add(new DecorationResult.IndentGuideItem(
+							indentGuides.Add(new IndentGuide(
 								new EditorTextPosition { Line = guide.StartLine, Column = column },
 								new EditorTextPosition { Line = guide.EndLine, Column = column }));
 
@@ -518,7 +518,7 @@ namespace Demo {
 
 							string key = $"{guide.StartLine}:{guide.EndLine}";
 							if (seenFolds.Add(key)) {
-								foldRegions.Add(new DecorationResult.FoldRegionItem(guide.StartLine, guide.EndLine));
+								foldRegions.Add(new FoldRegion(guide.StartLine, guide.EndLine));
 							}
 						}
 					}
@@ -572,7 +572,7 @@ namespace Demo {
 				return $"file:///{fileName}";
 			}
 
-			private static void AppendStyleSpan(Dictionary<int, List<DecorationResult.SpanItem>> syntaxSpans, TokenSpan token) {
+			private static void AppendStyleSpan(Dictionary<int, List<StyleSpan>> syntaxSpans, TokenSpan token) {
 				if (token.StyleId <= 0) {
 					return;
 				}
@@ -581,10 +581,10 @@ namespace Demo {
 					return;
 				}
 				GetOrCreate(syntaxSpans, range.Line)
-					.Add(new DecorationResult.SpanItem(range.StartColumn, range.Length, token.StyleId));
+					.Add(new StyleSpan(range.StartColumn, range.Length, token.StyleId));
 			}
 
-			private static void AppendColorInlayHint(Dictionary<int, List<DecorationResult.InlayHintItem>> inlayHints,
+			private static void AppendColorInlayHint(Dictionary<int, List<InlayHint>> inlayHints,
 													 HashSet<string> seenHints,
 													 List<string> textLines,
 													 TokenSpan token) {
@@ -605,10 +605,10 @@ namespace Demo {
 					return;
 				}
 				GetOrCreate(inlayHints, range.Line)
-					.Add(DecorationResult.InlayHintItem.ColorHint(range.StartColumn, color.Value));
+					.Add(InlayHint.ColorHint(range.StartColumn, color.Value));
 			}
 
-			private static void AppendTextInlayHint(Dictionary<int, List<DecorationResult.InlayHintItem>> inlayHints,
+			private static void AppendTextInlayHint(Dictionary<int, List<InlayHint>> inlayHints,
 													List<string> textLines,
 													TokenSpan token) {
 				if (token.StyleId != (int)EditorTheme.STYLE_KEYWORD) {
@@ -619,17 +619,17 @@ namespace Demo {
 					return;
 				}
 				string literal = GetTokenLiteral(textLines, range);
-				List<DecorationResult.InlayHintItem> lineHints = GetOrCreate(inlayHints, range.Line);
+				List<InlayHint> lineHints = GetOrCreate(inlayHints, range.Line);
 				if (literal == "const") {
-					lineHints.Add(DecorationResult.InlayHintItem.TextHint(range.EndColumn + 1, "immutable"));
+					lineHints.Add(InlayHint.TextHint(range.EndColumn + 1, "immutable"));
 				} else if (literal == "return") {
-					lineHints.Add(DecorationResult.InlayHintItem.TextHint(range.EndColumn + 1, "value: "));
+					lineHints.Add(InlayHint.TextHint(range.EndColumn + 1, "value: "));
 				} else if (literal == "case") {
-					lineHints.Add(DecorationResult.InlayHintItem.TextHint(range.EndColumn + 1, "condition: "));
+					lineHints.Add(InlayHint.TextHint(range.EndColumn + 1, "condition: "));
 				}
 			}
 
-			private static void AppendSeparator(List<DecorationResult.SeparatorGuideItem> separatorGuides,
+			private static void AppendSeparator(List<SeparatorGuide> separatorGuides,
 												List<string> textLines,
 												TokenSpan token) {
 				if (token.StyleId != (int)EditorTheme.STYLE_COMMENT) {
@@ -667,7 +667,7 @@ namespace Demo {
 					}
 				}
 				if (count > 0) {
-					separatorGuides.Add(new DecorationResult.SeparatorGuideItem(
+					separatorGuides.Add(new SeparatorGuide(
 						range.Line,
 						isDouble ? 1 : 0,
 						count,
@@ -675,7 +675,7 @@ namespace Demo {
 				}
 			}
 
-			private static void AppendGutterIcons(Dictionary<int, List<int>> gutterIcons,
+			private static void AppendGutterIcons(Dictionary<int, List<GutterIcon>> gutterIcons,
 												  List<string> textLines,
 												  TokenSpan token) {
 				if (token.StyleId != (int)EditorTheme.STYLE_KEYWORD) {
@@ -687,14 +687,14 @@ namespace Demo {
 				}
 				string literal = GetTokenLiteral(textLines, range);
 				if (literal == "class" || literal == "struct") {
-					GetOrCreate(gutterIcons, range.Line).Add(IconClass);
+					GetOrCreate(gutterIcons, range.Line).Add(new GutterIcon(IconClass));
 				}
 			}
 
 			private static TokenRangeInfo? AppendDynamicDemoDecorations(
-				Dictionary<int, List<DecorationResult.PhantomTextItem>> phantoms,
+				Dictionary<int, List<PhantomText>> phantoms,
 				HashSet<int> phantomLines,
-				Dictionary<int, List<DecorationResult.DiagnosticItem>> diagnostics,
+				Dictionary<int, List<Diagnostic>> diagnostics,
 				HashSet<string> seenDiagnostics,
 				ref int diagnosticCount,
 				TokenRangeInfo? firstKeywordRange,
@@ -713,11 +713,11 @@ namespace Demo {
 					firstKeywordRange ??= range;
 					if (phantomLines.Count == 0 && (literal == "class" || literal == "struct")) {
 						GetOrCreate(phantoms, range.Line)
-							.Add(new DecorationResult.PhantomTextItem(range.EndColumn, PhantomMemberStub));
+							.Add(new PhantomText(range.EndColumn, PhantomMemberStub));
 						phantomLines.Add(range.Line);
 					} else if (phantomLines.Count == 0 && literal == "return") {
 						GetOrCreate(phantoms, range.Line)
-							.Add(new DecorationResult.PhantomTextItem(range.EndColumn, PhantomInlineHint));
+							.Add(new PhantomText(range.EndColumn, PhantomInlineHint));
 						phantomLines.Add(range.Line);
 					}
 					return firstKeywordRange;
@@ -754,7 +754,7 @@ namespace Demo {
 			}
 
 			private static void AppendDiagnostic(
-				Dictionary<int, List<DecorationResult.DiagnosticItem>> diagnostics,
+				Dictionary<int, List<Diagnostic>> diagnostics,
 				HashSet<string> seenDiagnostics,
 				ref int diagnosticCount,
 				int line,
@@ -772,12 +772,12 @@ namespace Demo {
 				if (!seenDiagnostics.Add(key)) {
 					return;
 				}
-				GetOrCreate(diagnostics, line).Add(new DecorationResult.DiagnosticItem(column, length, severity, color));
+				GetOrCreate(diagnostics, line).Add(new Diagnostic(column, length, severity, color));
 				diagnosticCount++;
 			}
 
 			private static void AppendDiagnosticFallbackIfNeeded(
-				Dictionary<int, List<DecorationResult.DiagnosticItem>> diagnostics,
+				Dictionary<int, List<Diagnostic>> diagnostics,
 				HashSet<string> seenDiagnostics,
 				ref int diagnosticCount,
 				TokenRangeInfo? firstKeywordRange) {

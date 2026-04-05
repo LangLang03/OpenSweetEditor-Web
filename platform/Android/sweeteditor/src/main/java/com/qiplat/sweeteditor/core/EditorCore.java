@@ -5,6 +5,7 @@ import android.util.SparseArray;
 import android.view.MotionEvent;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.MainThread;
 import androidx.annotation.Nullable;
 
 import com.qiplat.sweeteditor.core.adornment.Diagnostic;
@@ -21,6 +22,7 @@ import com.qiplat.sweeteditor.core.visual.EditorRenderModel;
 import com.qiplat.sweeteditor.core.visual.LayoutMetrics;
 import com.qiplat.sweeteditor.core.snippet.LinkedEditingModel;
 import com.qiplat.sweeteditor.core.visual.ScrollMetrics;
+import com.qiplat.sweeteditor.core.foundation.TextChange;
 import com.qiplat.sweeteditor.core.foundation.TextPosition;
 import com.qiplat.sweeteditor.core.foundation.TextRange;
 import com.qiplat.sweeteditor.core.adornment.PhantomText;
@@ -40,9 +42,11 @@ import dalvik.annotation.optimization.FastNative;
  * Encapsulates all low-level functionalities including text editing, cursor management,
  * selection operations, gesture/keyboard event handling, code folding, and diagnostic
  * decorations through JNI bridging.
+ * Unless otherwise noted, public APIs on this class are main-thread only.
  *
  * @author Scave
  */
+@MainThread
 public class EditorCore {
 
     public static final int EVENT_TYPE_UNDEFINED = 0;
@@ -777,6 +781,16 @@ public class EditorCore {
     public void setBackspaceUnindent(boolean enabled) {
         if (mNativeHandle == 0) return;
         nativeSetBackspaceUnindent(mNativeHandle, enabled);
+    }
+
+    /**
+     * Sets whether Tab inserts spaces up to the next tab stop instead of a literal tab.
+     *
+     * @param enabled true=insert spaces, false=insert '\t'
+     */
+    public void setInsertSpaces(boolean enabled) {
+        if (mNativeHandle == 0) return;
+        nativeSetInsertSpaces(mNativeHandle, enabled);
     }
 
     // ==================== Handle Config ==
@@ -1523,25 +1537,6 @@ public class EditorCore {
 
     // ==================== Inner Classes/Enums ====================
 
-    /** Single text change (exact change info at one edit location, contains only range + newText). */
-    public static class TextChange {
-        @NonNull
-        public final TextRange range;
-        @NonNull
-        public final String newText;
-
-        public TextChange(@NonNull TextRange range, @NonNull String newText) {
-            this.range = range;
-            this.newText = newText;
-        }
-
-        @NonNull
-        @Override
-        public String toString() {
-            return "TextChange{range=" + range + ", newText=" + newText + '}';
-        }
-    }
-
     public static class TextEditResult {
         public final boolean changed;
         @NonNull
@@ -2028,6 +2023,9 @@ public class EditorCore {
 
     @CriticalNative
     private static native void nativeSetBackspaceUnindent(long handle, boolean enabled);
+
+    @CriticalNative
+    private static native void nativeSetInsertSpaces(long handle, boolean enabled);
 
     @CriticalNative
     private static native void nativeSetHandleConfig(long handle,

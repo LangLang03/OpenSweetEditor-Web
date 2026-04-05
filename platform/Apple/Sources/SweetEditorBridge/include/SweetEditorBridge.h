@@ -30,9 +30,11 @@ typedef struct {
 intptr_t create_document_from_utf16(const SEU16Char* text);
 intptr_t create_document_from_file(const char* path);
 void     free_document(intptr_t document_handle);
-const char*     get_document_text(intptr_t document_handle);
+char*          get_document_utf8(intptr_t document_handle);
+SEU16Char*     get_document_utf16(intptr_t document_handle);
 size_t          get_document_line_count(intptr_t document_handle);
-const SEU16Char* get_document_line_text(intptr_t document_handle, size_t line);
+char*          get_document_line_utf8(intptr_t document_handle, size_t line);
+SEU16Char*     get_document_line_utf16(intptr_t document_handle, size_t line);
 
 // ===================== Editor API =====================
 
@@ -117,6 +119,8 @@ int  editor_is_read_only(intptr_t editor_handle);
 
 void editor_set_auto_indent_mode(intptr_t editor_handle, int mode);
 int  editor_get_auto_indent_mode(intptr_t editor_handle);
+void editor_set_backspace_unindent(intptr_t editor_handle, int enabled);
+void editor_set_insert_spaces(intptr_t editor_handle, int enabled);
 
 // ===================== Position Rect API =====================
 
@@ -157,6 +161,7 @@ void editor_clear_gutter_icons(intptr_t editor_handle);
 void editor_set_max_gutter_icons(intptr_t editor_handle, uint32_t count);
 void editor_set_fold_arrow_mode(intptr_t editor_handle, int mode);
 void editor_set_wrap_mode(intptr_t editor_handle, int mode);
+void editor_set_tab_size(intptr_t editor_handle, int tab_size);
 void editor_set_scale(intptr_t editor_handle, float scale);
 void editor_set_line_spacing(intptr_t editor_handle, float add, float mult);
 void editor_set_content_start_padding(intptr_t editor_handle, float padding);
@@ -240,6 +245,7 @@ void editor_clear_matched_brackets(intptr_t editor_handle);
 
 // ===================== Memory Management =====================
 
+void free_u8_string(intptr_t string_ptr);
 void free_u16_string(intptr_t string_ptr);
 void free_binary_data(intptr_t data_ptr);
 

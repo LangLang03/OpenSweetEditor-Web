@@ -117,11 +117,13 @@ enum KeyCode {
   pageDown(34),
   a(65),
   c(67),
+  d(68),
   v(86),
   x(88),
   z(90),
   y(89),
-  k(75);
+  k(75),
+  space(32);
 
   const KeyCode(this.value);
   final int value;
@@ -129,10 +131,10 @@ enum KeyCode {
 
 /// A single text change from an edit operation.
 class TextChange {
-  const TextChange(this.range, this.newText);
+  const TextChange(this.range, this.text);
 
   final TextRange range;
-  final String newText;
+  final String text;
 }
 
 /// Result of a text edit operation.
@@ -325,10 +327,6 @@ class GestureEvent {
   final double directScale;
 }
 
-// ---------------------------------------------------------------------------
-// EditorCore — high-level wrapper for the native editor engine
-// ---------------------------------------------------------------------------
-
 class EditorCore {
   /// Create an EditorCore with the given text measurer callbacks and options.
   EditorCore({
@@ -357,11 +355,7 @@ class EditorCore {
 
   int get handle => _handle;
 
-  // ---------------------------------------------------------------------------
-  // Document & Viewport
-  // ---------------------------------------------------------------------------
-
-  void setDocument(Document document) {
+  void loadDocument(Document document) {
     _ensureOpen();
     document._ensureOpen();
     bindings.set_editor_document(_handle, document._handle);
@@ -377,10 +371,6 @@ class EditorCore {
     bindings.editor_on_font_metrics_changed(_handle);
   }
 
-  // ---------------------------------------------------------------------------
-  // Configuration
-  // ---------------------------------------------------------------------------
-
   void setFoldArrowMode(FoldArrowMode mode) {
     _ensureOpen();
     bindings.editor_set_fold_arrow_mode(_handle, mode.value);
@@ -394,6 +384,21 @@ class EditorCore {
   void setTabSize(int tabSize) {
     _ensureOpen();
     bindings.editor_set_tab_size(_handle, tabSize);
+  }
+
+  void setInsertSpaces(bool enabled) {
+    _ensureOpen();
+    bindings.editor_set_insert_spaces(_handle, enabled ? 1 : 0);
+  }
+
+  void setKeyMap(KeyMap keyMap) {
+    _ensureOpen();
+    final bytes = keyMap.toBytes();
+    using((arena) {
+      final ptr = arena.allocate<ffi.Uint8>(bytes.length);
+      ptr.asTypedList(bytes.length).setAll(0, bytes);
+      bindings.editor_set_keymap(_handle, ptr, bytes.length);
+    });
   }
 
   void setScale(double scale) {
@@ -489,10 +494,6 @@ class EditorCore {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Rendering
-  // ---------------------------------------------------------------------------
-
   /// Build render model. Returns parsed [EditorRenderModel].
   EditorRenderModel buildRenderModel() {
     _ensureOpen();
@@ -517,15 +518,38 @@ class EditorCore {
     });
   }
 
-  // ---------------------------------------------------------------------------
-  // Gesture Events
-  // ---------------------------------------------------------------------------
+  LayoutMetrics getLayoutMetrics() {
+    _ensureOpen();
+    return _callAndParse(
+      LayoutMetrics.empty,
+      (outSize) => bindings.get_layout_metrics(_handle, outSize),
+      ProtocolDecoder.decodeLayoutMetrics,
+    );
+  }
 
   GestureResult handleGestureEvent(GestureEvent event) {
+    return handleGestureEventEx(
+      type: event.type,
+      points: event.points,
+      modifiers: event.modifiers,
+      wheelDeltaX: event.wheelDeltaX,
+      wheelDeltaY: event.wheelDeltaY,
+      directScale: event.directScale,
+    );
+  }
+
+  GestureResult handleGestureEventEx({
+    required int type,
+    required List<PointF> points,
+    int modifiers = 0,
+    double wheelDeltaX = 0,
+    double wheelDeltaY = 0,
+    double directScale = 0,
+  }) {
     _ensureOpen();
     return using((arena) {
       final flatPoints = <double>[];
-      for (final p in event.points) {
+      for (final p in points) {
         flatPoints.add(p.x);
         flatPoints.add(p.y);
       }
@@ -538,13 +562,13 @@ class EditorCore {
       final outSize = arena.allocate<ffi.Size>(ffi.sizeOf<ffi.Size>());
       final ptr = bindings.handle_editor_gesture_event_ex(
         _handle,
-        event.type,
-        event.points.length,
+        type,
+        points.length,
         pointsPtr,
-        event.modifiers,
-        event.wheelDeltaX,
-        event.wheelDeltaY,
-        event.directScale,
+        modifiers,
+        wheelDeltaX,
+        wheelDeltaY,
+        directScale,
         outSize,
       );
       if (ptr == ffi.nullptr) return GestureResult.empty;
@@ -584,10 +608,6 @@ class EditorCore {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Key Events
-  // ---------------------------------------------------------------------------
-
   KeyEventResult handleKeyEvent(
     KeyCode keyCode, {
     String? text,
@@ -615,10 +635,6 @@ class EditorCore {
       }
     });
   }
-
-  // ---------------------------------------------------------------------------
-  // Editing
-  // ---------------------------------------------------------------------------
 
   TextEditResult insertText(String text) {
     _ensureOpen();
@@ -720,10 +736,6 @@ class EditorCore {
     _ensureOpen();
     return bindings.editor_can_redo(_handle) != 0;
   }
-
-  // ---------------------------------------------------------------------------
-  // Cursor & Selection
-  // ---------------------------------------------------------------------------
 
   void setCursorPosition(int line, int column) {
     _ensureOpen();
@@ -833,10 +845,6 @@ class EditorCore {
     bindings.editor_move_cursor_to_line_end(_handle, extendSelection ? 1 : 0);
   }
 
-  // ---------------------------------------------------------------------------
-  // IME Composition
-  // ---------------------------------------------------------------------------
-
   void compositionStart() {
     _ensureOpen();
     bindings.editor_composition_start(_handle);
@@ -883,13 +891,9 @@ class EditorCore {
     return bindings.editor_is_composition_enabled(_handle) != 0;
   }
 
-  // ---------------------------------------------------------------------------
-  // Navigation
-  // ---------------------------------------------------------------------------
-
   void scrollToLine(
     int line, {
-    ScrollBehavior behavior = ScrollBehavior.gotoCenter,
+    ScrollBehavior behavior = ScrollBehavior.center,
   }) {
     _ensureOpen();
     bindings.editor_scroll_to_line(_handle, line, behavior.value);
@@ -919,9 +923,34 @@ class EditorCore {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Styles & Decorations
-  // ---------------------------------------------------------------------------
+  CursorRect getPositionRect(int line, int column) {
+    _ensureOpen();
+    return using((arena) {
+      final outX = arena.allocate<ffi.Float>(ffi.sizeOf<ffi.Float>());
+      final outY = arena.allocate<ffi.Float>(ffi.sizeOf<ffi.Float>());
+      final outHeight = arena.allocate<ffi.Float>(ffi.sizeOf<ffi.Float>());
+      bindings.editor_get_position_rect(
+        _handle,
+        line,
+        column,
+        outX,
+        outY,
+        outHeight,
+      );
+      return CursorRect(x: outX.value, y: outY.value, height: outHeight.value);
+    });
+  }
+
+  CursorRect getCursorRect() {
+    _ensureOpen();
+    return using((arena) {
+      final outX = arena.allocate<ffi.Float>(ffi.sizeOf<ffi.Float>());
+      final outY = arena.allocate<ffi.Float>(ffi.sizeOf<ffi.Float>());
+      final outHeight = arena.allocate<ffi.Float>(ffi.sizeOf<ffi.Float>());
+      bindings.editor_get_cursor_rect(_handle, outX, outY, outHeight);
+      return CursorRect(x: outX.value, y: outY.value, height: outHeight.value);
+    });
+  }
 
   void registerTextStyle(
     int styleId,
@@ -939,7 +968,11 @@ class EditorCore {
     );
   }
 
-  void setLineSpans(Uint8List data) {
+  void setLineSpans(int line, SpanLayer layer, List<StyleSpan> spans) {
+    setLineSpansRaw(ProtocolEncoder.packLineSpans(line, layer.value, spans));
+  }
+
+  void setLineSpansRaw(Uint8List data) {
     _ensureOpen();
     _callWithBinaryData(
       data,
@@ -947,7 +980,16 @@ class EditorCore {
     );
   }
 
-  void setBatchLineSpans(Uint8List data) {
+  void setBatchLineSpans(
+    SpanLayer layer,
+    Map<int, List<StyleSpan>> spansByLine,
+  ) {
+    setBatchLineSpansRaw(
+      ProtocolEncoder.packBatchLineSpans(layer.value, spansByLine),
+    );
+  }
+
+  void setBatchLineSpansRaw(Uint8List data) {
     _ensureOpen();
     _callWithBinaryData(
       data,
@@ -955,7 +997,25 @@ class EditorCore {
     );
   }
 
-  void setBatchLineInlayHints(Uint8List data) {
+  void setLineInlayHints(int line, List<InlayHint> hints) {
+    setLineInlayHintsRaw(ProtocolEncoder.packLineInlayHints(line, hints));
+  }
+
+  void setLineInlayHintsRaw(Uint8List data) {
+    _ensureOpen();
+    _callWithBinaryData(
+      data,
+      (ptr, len) => bindings.editor_set_line_inlay_hints(_handle, ptr, len),
+    );
+  }
+
+  void setBatchLineInlayHints(Map<int, List<InlayHint>> hintsByLine) {
+    setBatchLineInlayHintsRaw(
+      ProtocolEncoder.packBatchLineInlayHints(hintsByLine),
+    );
+  }
+
+  void setBatchLineInlayHintsRaw(Uint8List data) {
     _ensureOpen();
     _callWithBinaryData(
       data,
@@ -964,7 +1024,25 @@ class EditorCore {
     );
   }
 
-  void setBatchLinePhantomTexts(Uint8List data) {
+  void setLinePhantomTexts(int line, List<PhantomText> phantoms) {
+    setLinePhantomTextsRaw(ProtocolEncoder.packLinePhantomTexts(line, phantoms));
+  }
+
+  void setLinePhantomTextsRaw(Uint8List data) {
+    _ensureOpen();
+    _callWithBinaryData(
+      data,
+      (ptr, len) => bindings.editor_set_line_phantom_texts(_handle, ptr, len),
+    );
+  }
+
+  void setBatchLinePhantomTexts(Map<int, List<PhantomText>> phantomsByLine) {
+    setBatchLinePhantomTextsRaw(
+      ProtocolEncoder.packBatchLinePhantomTexts(phantomsByLine),
+    );
+  }
+
+  void setBatchLinePhantomTextsRaw(Uint8List data) {
     _ensureOpen();
     _callWithBinaryData(
       data,
@@ -973,7 +1051,25 @@ class EditorCore {
     );
   }
 
-  void setBatchLineGutterIcons(Uint8List data) {
+  void setLineGutterIcons(int line, List<GutterIcon> icons) {
+    setLineGutterIconsRaw(ProtocolEncoder.packLineGutterIcons(line, icons));
+  }
+
+  void setLineGutterIconsRaw(Uint8List data) {
+    _ensureOpen();
+    _callWithBinaryData(
+      data,
+      (ptr, len) => bindings.editor_set_line_gutter_icons(_handle, ptr, len),
+    );
+  }
+
+  void setBatchLineGutterIcons(Map<int, List<GutterIcon>> iconsByLine) {
+    setBatchLineGutterIconsRaw(
+      ProtocolEncoder.packBatchLineGutterIcons(iconsByLine),
+    );
+  }
+
+  void setBatchLineGutterIconsRaw(Uint8List data) {
     _ensureOpen();
     _callWithBinaryData(
       data,
@@ -982,7 +1078,25 @@ class EditorCore {
     );
   }
 
-  void setBatchLineDiagnostics(Uint8List data) {
+  void setLineDiagnostics(int line, List<Diagnostic> items) {
+    setLineDiagnosticsRaw(ProtocolEncoder.packLineDiagnostics(line, items));
+  }
+
+  void setLineDiagnosticsRaw(Uint8List data) {
+    _ensureOpen();
+    _callWithBinaryData(
+      data,
+      (ptr, len) => bindings.editor_set_line_diagnostics(_handle, ptr, len),
+    );
+  }
+
+  void setBatchLineDiagnostics(Map<int, List<Diagnostic>> itemsByLine) {
+    setBatchLineDiagnosticsRaw(
+      ProtocolEncoder.packBatchLineDiagnostics(itemsByLine),
+    );
+  }
+
+  void setBatchLineDiagnosticsRaw(Uint8List data) {
     _ensureOpen();
     _callWithBinaryData(
       data,
@@ -991,7 +1105,11 @@ class EditorCore {
     );
   }
 
-  void setIndentGuides(Uint8List data) {
+  void setIndentGuides(List<IndentGuide> guides) {
+    setIndentGuidesRaw(ProtocolEncoder.packIndentGuides(guides));
+  }
+
+  void setIndentGuidesRaw(Uint8List data) {
     _ensureOpen();
     _callWithBinaryData(
       data,
@@ -999,7 +1117,11 @@ class EditorCore {
     );
   }
 
-  void setBracketGuides(Uint8List data) {
+  void setBracketGuides(List<BracketGuide> guides) {
+    setBracketGuidesRaw(ProtocolEncoder.packBracketGuides(guides));
+  }
+
+  void setBracketGuidesRaw(Uint8List data) {
     _ensureOpen();
     _callWithBinaryData(
       data,
@@ -1007,7 +1129,11 @@ class EditorCore {
     );
   }
 
-  void setFlowGuides(Uint8List data) {
+  void setFlowGuides(List<FlowGuide> guides) {
+    setFlowGuidesRaw(ProtocolEncoder.packFlowGuides(guides));
+  }
+
+  void setFlowGuidesRaw(Uint8List data) {
     _ensureOpen();
     _callWithBinaryData(
       data,
@@ -1015,7 +1141,11 @@ class EditorCore {
     );
   }
 
-  void setSeparatorGuides(Uint8List data) {
+  void setSeparatorGuides(List<SeparatorGuide> guides) {
+    setSeparatorGuidesRaw(ProtocolEncoder.packSeparatorGuides(guides));
+  }
+
+  void setSeparatorGuidesRaw(Uint8List data) {
     _ensureOpen();
     _callWithBinaryData(
       data,
@@ -1028,7 +1158,11 @@ class EditorCore {
     bindings.editor_set_max_gutter_icons(_handle, count);
   }
 
-  void registerBatchTextStyles(Uint8List data) {
+  void registerBatchTextStyles(Map<int, TextStyle> stylesById) {
+    registerBatchTextStylesRaw(ProtocolEncoder.packBatchTextStyles(stylesById));
+  }
+
+  void registerBatchTextStylesRaw(Uint8List data) {
     _ensureOpen();
     _callWithBinaryData(
       data,
@@ -1042,14 +1176,13 @@ class EditorCore {
     bindings.editor_clear_line_spans(_handle, line, layer.value);
   }
 
-  void clearHighlightsLayer(SpanLayer layer) {
+  void clearHighlights([SpanLayer? layer]) {
     _ensureOpen();
-    bindings.editor_clear_highlights_layer(_handle, layer.value);
-  }
-
-  void clearHighlights() {
-    _ensureOpen();
-    bindings.editor_clear_highlights(_handle);
+    if (layer == null) {
+      bindings.editor_clear_highlights(_handle);
+    } else {
+      bindings.editor_clear_highlights_layer(_handle, layer.value);
+    }
   }
 
   void clearInlayHints() {
@@ -1082,11 +1215,66 @@ class EditorCore {
     bindings.editor_clear_guides(_handle);
   }
 
-  // ---------------------------------------------------------------------------
-  // Folding
-  // ---------------------------------------------------------------------------
+  void setBracketPairs(List<int> openChars, List<int> closeChars) {
+    _ensureOpen();
+    assert(openChars.length == closeChars.length);
+    using((arena) {
+      final openPtr = arena.allocate<ffi.Uint32>(openChars.length);
+      final closePtr = arena.allocate<ffi.Uint32>(closeChars.length);
+      openPtr.asTypedList(openChars.length).setAll(0, openChars);
+      closePtr.asTypedList(closeChars.length).setAll(0, closeChars);
+      bindings.editor_set_bracket_pairs(
+        _handle,
+        openPtr,
+        closePtr,
+        openChars.length,
+      );
+    });
+  }
 
-  void setFoldRegions(Uint8List data) {
+  void setAutoClosingPairs(List<int> openChars, List<int> closeChars) {
+    _ensureOpen();
+    assert(openChars.length == closeChars.length);
+    using((arena) {
+      final openPtr = arena.allocate<ffi.Uint32>(openChars.length);
+      final closePtr = arena.allocate<ffi.Uint32>(closeChars.length);
+      openPtr.asTypedList(openChars.length).setAll(0, openChars);
+      closePtr.asTypedList(closeChars.length).setAll(0, closeChars);
+      bindings.editor_set_auto_closing_pairs(
+        _handle,
+        openPtr,
+        closePtr,
+        openChars.length,
+      );
+    });
+  }
+
+  void setMatchedBrackets(
+    int openLine,
+    int openColumn,
+    int closeLine,
+    int closeColumn,
+  ) {
+    _ensureOpen();
+    bindings.editor_set_matched_brackets(
+      _handle,
+      openLine,
+      openColumn,
+      closeLine,
+      closeColumn,
+    );
+  }
+
+  void clearMatchedBrackets() {
+    _ensureOpen();
+    bindings.editor_clear_matched_brackets(_handle);
+  }
+
+  void setFoldRegions(List<FoldRegion> regions) {
+    setFoldRegionsRaw(ProtocolEncoder.packFoldRegions(regions));
+  }
+
+  void setFoldRegionsRaw(Uint8List data) {
     _ensureOpen();
     _callWithBinaryData(
       data,
@@ -1094,7 +1282,7 @@ class EditorCore {
     );
   }
 
-  bool toggleFold(int line) {
+  bool toggleFoldAt(int line) {
     _ensureOpen();
     return bindings.editor_toggle_fold(_handle, line) != 0;
   }
@@ -1124,10 +1312,6 @@ class EditorCore {
     return bindings.editor_is_line_visible(_handle, line) != 0;
   }
 
-  // ---------------------------------------------------------------------------
-  // Linked Editing
-  // ---------------------------------------------------------------------------
-
   TextEditResult insertSnippet(String snippetTemplate) {
     _ensureOpen();
     return using((arena) {
@@ -1139,6 +1323,19 @@ class EditorCore {
         ProtocolDecoder.decodeTextEditResult,
       );
     });
+  }
+
+  void startLinkedEditing(LinkedEditingModel model) {
+    _ensureOpen();
+    startLinkedEditingRaw(ProtocolEncoder.packLinkedEditingModel(model));
+  }
+
+  void startLinkedEditingRaw(Uint8List data) {
+    _ensureOpen();
+    _callWithBinaryData(
+      data,
+      (ptr, len) => bindings.editor_start_linked_editing(_handle, ptr, len),
+    );
   }
 
   bool get isInLinkedEditing {
@@ -1161,10 +1358,6 @@ class EditorCore {
     bindings.editor_cancel_linked_editing(_handle);
   }
 
-  // ---------------------------------------------------------------------------
-  // Lifecycle
-  // ---------------------------------------------------------------------------
-
   void close() {
     if (_closed) return;
     _closed = true;
@@ -1177,10 +1370,6 @@ class EditorCore {
     if (_closed) throw StateError('EditorCore is already closed');
   }
 }
-
-// ---------------------------------------------------------------------------
-// Document — wrapper for the native document handle
-// ---------------------------------------------------------------------------
 
 class Document {
   /// Create a document from a Dart string.
@@ -1213,14 +1402,14 @@ class Document {
   /// Get document text as UTF8 string.
   String get text {
     _ensureOpen();
-    final ptr = bindings.get_document_text(_handle);
+    final ptr = bindings.get_document_utf8(_handle);
     return _readNativeUtf8(ptr);
   }
 
   /// Get a single line's text (0-indexed).
   String getLineText(int line) {
     _ensureOpen();
-    final ptr = bindings.get_document_line_text(_handle, line);
+    final ptr = bindings.get_document_line_utf16(_handle, line);
     return _readNativeUtf16(ptr);
   }
 

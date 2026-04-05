@@ -16,7 +16,7 @@ public class EditorSettings {
 
     private float mScale = 1.0f;
     private float mEditorTextSize = 14f;
-    private String mFontFamily = null;
+    private String mFontFamily = "monospace";
     private boolean mGutterVisible = true;
     private FoldArrowMode mFoldArrowMode = FoldArrowMode.ALWAYS;
     private WrapMode mWrapMode = WrapMode.NONE;
@@ -26,13 +26,15 @@ public class EditorSettings {
     private boolean mShowSplitLine = true;
     private boolean mGutterSticky = true;
     private CurrentLineRenderMode mCurrentLineRenderMode = CurrentLineRenderMode.BACKGROUND;
-    private AutoIndentMode mAutoIndentMode = AutoIndentMode.NONE;
+    private AutoIndentMode mAutoIndentMode = AutoIndentMode.KEEP_INDENT;
     private boolean mBackspaceUnindent = true;
     private boolean mReadOnly = false;
     private boolean mCompositionEnabled = true;
     private int mMaxGutterIcons = 0;
     private int mDecorationScrollRefreshMinIntervalMs = 16;
     private float mDecorationOverscanViewportMultiplier = 1.5f;
+    private boolean mCursorAnimationEnabled = true;
+    private boolean mGutterAnimationEnabled = true;
 
     EditorSettings(SweetEditor editor) {
         mEditor = editor;
@@ -82,6 +84,7 @@ public class EditorSettings {
     public void setFoldArrowMode(FoldArrowMode mode) {
         mFoldArrowMode = mode;
         mEditor.getEditorCore().setFoldArrowMode(mode.value);
+        mEditor.flush();
     }
 
     public FoldArrowMode getFoldArrowMode() {
@@ -193,6 +196,7 @@ public class EditorSettings {
     public void setMaxGutterIcons(int count) {
         mMaxGutterIcons = count;
         mEditor.getEditorCore().setMaxGutterIcons(count);
+        mEditor.flush();
     }
 
     public int getMaxGutterIcons() {
@@ -216,4 +220,23 @@ public class EditorSettings {
     public float getDecorationOverscanViewportMultiplier() {
         return mDecorationOverscanViewportMultiplier;
     }
+
+    public void setCursorAnimationEnabled(boolean enabled) {
+        mCursorAnimationEnabled = enabled;
+        mEditor.requestCursorAnimationRefresh();
+    }
+
+    public boolean isCursorAnimationEnabled() {
+        return mCursorAnimationEnabled;
+    }
+
+    public void setGutterAnimationEnabled(boolean enabled) {
+        mGutterAnimationEnabled = enabled;
+        mEditor.requestGutterAnimationRefresh();
+    }
+
+    public boolean isGutterAnimationEnabled() {
+        return mGutterAnimationEnabled;
+    }
+
 }

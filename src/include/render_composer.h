@@ -1,9 +1,9 @@
 #ifndef SWEETEDITOR_RENDER_COMPOSER_H
 #define SWEETEDITOR_RENDER_COMPOSER_H
 
-#include <editor_types.h>
-#include <layout.h>
-#include <visual.h>
+#include "editor_types.h"
+#include "layout.h"
+#include "visual.h"
 
 namespace NS_SWEETEDITOR {
   class Document;
@@ -31,7 +31,7 @@ namespace NS_SWEETEDITOR {
 
     void buildDiagnosticDecorations(EditorRenderModel& model, Document* document, float line_height) const;
 
-    void buildBracketHighlightRects(EditorRenderModel& model, const Document* document,
+    void buildBracketHighlightRects(EditorRenderModel& model, Document* document,
                                     const TextPosition& cursor_position, const Vector<BracketPair>& bracket_pairs,
                                     const TextPosition& external_bracket_open, const TextPosition& external_bracket_close,
                                     bool has_external_brackets, float line_height) const;
