@@ -1,5 +1,6 @@
 package com.qiplat.sweeteditor;
 
+import com.qiplat.sweeteditor.animation.AnimationHolder;
 import com.qiplat.sweeteditor.completion.*;
 import com.qiplat.sweeteditor.copilot.InlineSuggestion;
 import com.qiplat.sweeteditor.copilot.InlineSuggestionController;
@@ -62,12 +63,12 @@ public class SweetEditor extends JPanel {
     private int cachedVisibleStartLine;
     private int cachedVisibleEndLine = -1;
     private EditorRenderer renderer;
+    private AnimationHolder animationHolder;
 
     private Timer cursorBlinkTimer;
     private Timer cursorAnimationTimer;
+    private Timer gutterAnimationTimer;
     private boolean cursorVisible = true;
-    private float cursorAnimatedX = -1f;
-    private float cursorAnimatedY = -1f;
 
     // Unified animation timer: drives edge-scroll, fling, etc. at ~16ms
     private static final int ANIMATION_INTERVAL_MS = 16;
@@ -97,6 +98,7 @@ public class SweetEditor extends JPanel {
         setDoubleBuffered(true);
 
         renderer = new EditorRenderer(theme);
+        animationHolder = new AnimationHolder();
 
         editorCore = new EditorCore(renderer.getTextMeasureCallback(), new EditorOptions(20.0f, 300));
         keyMap = createDefaultKeyMap();
@@ -133,7 +135,8 @@ public class SweetEditor extends JPanel {
         setFont(renderer.getRegularFont());
         setupEventListeners();
         setupCursorBlink();
-        setupCursorTranslation();
+        setupCursorAnimation();
+        setupGutterAnimation();
         setupAnimationTimer();
         enableInputMethods(true);
     }
@@ -780,7 +783,7 @@ public class SweetEditor extends JPanel {
         renderer.prepareGraphicsForRender(g2);
         ensureRenderModelUpToDate();
 
-        renderer.render(g2, renderModel, getWidth(), getHeight(), cursorVisible, cursorAnimatedX, cursorAnimatedY);
+        renderer.render(g2, renderModel, getWidth(), getHeight(), cursorVisible, animationHolder);
         updateCompletionPopupCursorAnchor();
         updateInlineSuggestionPosition();
     }
@@ -1131,8 +1134,8 @@ public class SweetEditor extends JPanel {
                 }
                 if (settings.isCursorAnimationEnabled()) {
                     ensureRenderModelUpToDate();
-                    cursorAnimatedX = renderModel.cursor.position.x;
-                    cursorAnimatedY = renderModel.cursor.position.y;
+                    animationHolder.cursorAnimatedX = renderModel.cursor.position.x;
+                    animationHolder.cursorAnimatedY = renderModel.cursor.position.y;
                 }
                 break;
             case SCALE:
@@ -1277,27 +1280,27 @@ public class SweetEditor extends JPanel {
         }
     }
 
-    private void setupCursorTranslation() {
+    private void setupCursorAnimation() {
         cursorAnimationTimer = new Timer(ANIMATION_INTERVAL_MS, e -> {
             Cursor cursor = renderModel.cursor;
             PointF position = cursor.position;
             float targetX = position.x;
             float targetY = position.y;
 
-            if (cursorAnimatedX == -1 || cursorAnimatedY == -1) {
-                cursorAnimatedX = targetX;
-                cursorAnimatedY = targetY;
+            if (animationHolder.cursorAnimatedX == -1f || animationHolder.cursorAnimatedY == -1f) {
+                animationHolder.cursorAnimatedX = targetX;
+                animationHolder.cursorAnimatedY = targetY;
             }
 
-            cursorAnimatedX += (targetX - cursorAnimatedX) * 0.35f;
-            cursorAnimatedY += (targetY - cursorAnimatedY) * 0.35f;
+            animationHolder.cursorAnimatedX += (targetX - animationHolder.cursorAnimatedX) * 0.35f;
+            animationHolder.cursorAnimatedY += (targetY - animationHolder.cursorAnimatedY) * 0.35f;
 
-            if (Math.abs(targetX - cursorAnimatedX) < 0.01f) {
-                cursorAnimatedX = targetX;
+            if (Math.abs(targetX - animationHolder.cursorAnimatedX) < 0.01f) {
+                animationHolder.cursorAnimatedX = targetX;
             }
 
-            if (Math.abs(targetY - cursorAnimatedY) < 0.01f) {
-                cursorAnimatedY = targetY;
+            if (Math.abs(targetY - animationHolder.cursorAnimatedY) < 0.01f) {
+                animationHolder.cursorAnimatedY = targetY;
             }
 
             flush();
@@ -1311,8 +1314,37 @@ public class SweetEditor extends JPanel {
             cursorAnimationTimer.start();
         } else {
             cursorAnimationTimer.stop();
-            cursorAnimatedX = -1;
-            cursorAnimatedY = -1;
+            animationHolder.cursorAnimatedX = -1;
+            animationHolder.cursorAnimatedY = -1;
+        }
+    }
+
+    private void setupGutterAnimation() {
+        gutterAnimationTimer = new Timer(ANIMATION_INTERVAL_MS, e -> {
+            float targetX = renderModel.splitX;
+
+            if (animationHolder.splitAnimatedX == -1f) {
+                animationHolder.splitAnimatedX = targetX;
+            }
+
+            animationHolder.splitAnimatedX += (targetX - animationHolder.splitAnimatedX) * 0.25f;
+
+            if (Math.abs(targetX - animationHolder.splitAnimatedX) < 0.01f) {
+                animationHolder.splitAnimatedX = targetX;
+            }
+
+            flush();
+        });
+        gutterAnimationTimer.setInitialDelay(530);
+        gutterAnimationTimer.start();
+    }
+
+    public void requestGutterAnimationRefresh() {
+        if (settings.isGutterAnimationEnabled()) {
+            gutterAnimationTimer.start();
+        } else {
+            gutterAnimationTimer.stop();
+            animationHolder.splitAnimatedX = -1f;
         }
     }
 

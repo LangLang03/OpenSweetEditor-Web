@@ -1,5 +1,6 @@
 package com.qiplat.sweeteditor;
 
+import com.qiplat.sweeteditor.animation.AnimationHolder;
 import com.qiplat.sweeteditor.core.EditorCore;
 import com.qiplat.sweeteditor.core.EditorNative;
 import com.qiplat.sweeteditor.core.adornment.TextStyle;
@@ -185,7 +186,7 @@ final class EditorRenderer implements EditorCore.TextMeasureCallback {
     }
 
     public void render(Graphics2D g2, EditorRenderModel model,
-                       int viewWidth, int viewHeight, boolean cursorVisible, float cursorAnimatedX, float cursorAnimatedY) {
+                       int viewWidth, int viewHeight, boolean cursorVisible, AnimationHolder animationHolder) {
         PerfStepRecorder drawPerf = perfOverlay.isEnabled() ? PerfStepRecorder.start() : null;
         g2.setColor(theme.backgroundColor);
         g2.fillRect(0, 0, viewWidth, viewHeight);
@@ -218,9 +219,9 @@ final class EditorRenderer implements EditorCore.TextMeasureCallback {
         if (drawPerf != null) drawPerf.mark(PerfStepRecorder.STEP_LINKED);
         drawBracketHighlightRects(g2, model);
         if (drawPerf != null) drawPerf.mark(PerfStepRecorder.STEP_BRACKET);
-        drawCursor(g2, model, cursorVisible, cursorAnimatedX, cursorAnimatedY);
+        drawCursor(g2, model, cursorVisible, animationHolder);
         if (drawPerf != null) drawPerf.mark(PerfStepRecorder.STEP_CURSOR);
-        drawGutterOverlay(g2, model, viewWidth, viewHeight);
+        drawGutterOverlay(g2, model, viewWidth, viewHeight, animationHolder);
         if (drawPerf != null) drawPerf.mark(PerfStepRecorder.STEP_GUTTER);
         drawLineNumbers(g2, model);
         if (drawPerf != null) drawPerf.mark(PerfStepRecorder.STEP_LINE_NO);
@@ -368,14 +369,26 @@ final class EditorRenderer implements EditorCore.TextMeasureCallback {
         }
     }
 
-    private void drawGutterOverlay(Graphics2D g, EditorRenderModel model, int viewWidth, int viewHeight) {
+    private void drawGutterOverlay(Graphics2D g, EditorRenderModel model, int viewWidth, int viewHeight, AnimationHolder animationHolder) {
         if (model.splitX <= 0) return;
+        float animatedSplitX = animationHolder.splitAnimatedX;
+
         g.setColor(theme.backgroundColor);
-        g.fillRect(0, 0, (int) model.splitX, viewHeight);
-        drawCurrentLineDecoration(g, model, 0f, model.splitX);
+        if (animatedSplitX <= 0) {
+            g.fillRect(0, 0, (int) model.splitX, viewHeight);
+            drawCurrentLineDecoration(g, model, 0f, model.splitX);
+        } else {
+            g.fillRect(0, 0, (int) animatedSplitX, viewHeight);
+            drawCurrentLineDecoration(g, model, 0f, animatedSplitX);
+        }
+
         if (model.splitLineVisible) {
             g.setColor(theme.splitLineColor);
-            g.drawLine((int) model.splitX, 0, (int) model.splitX, viewHeight);
+            if (animatedSplitX <= 0) {
+                g.drawLine((int) model.splitX, 0, (int) model.splitX, viewHeight);
+            } else {
+                g.drawLine((int) animatedSplitX, 0, (int) animatedSplitX, viewHeight);
+            }
         }
     }
 
@@ -579,8 +592,11 @@ final class EditorRenderer implements EditorCore.TextMeasureCallback {
         }
     }
 
-    private void drawCursor(Graphics2D g, EditorRenderModel model, boolean cursorVisible, float cursorAnimatedX, float cursorAnimatedY) {
+    private void drawCursor(Graphics2D g, EditorRenderModel model, boolean cursorVisible, AnimationHolder animationHolder) {
         if (model.cursor == null || !model.cursor.visible || !cursorVisible) return;
+        float cursorAnimatedX = animationHolder.cursorAnimatedX;
+        float cursorAnimatedY = animationHolder.cursorAnimatedY;
+
         g.setColor(theme.cursorColor);
         if ((cursorAnimatedX == -1 || cursorAnimatedY == -1)) {
             g.fillRect((int) model.cursor.position.x, (int) model.cursor.position.y,
