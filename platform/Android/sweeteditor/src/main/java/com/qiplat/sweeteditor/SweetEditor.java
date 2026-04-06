@@ -161,53 +161,75 @@ public class SweetEditor extends View {
             mHandler.postDelayed(this, 500);
         }
     };
-    private final Runnable mCursorAnimation = new Runnable() {
+    // Unified visual-transition callback: cursor smooth move + gutter width transition.
+    // Aligned to vsync via Choreographer, single invalidate per frame.
+    private boolean mVisualTransitionActive = false;
+    private final Choreographer.FrameCallback mVisualTransitionCallback = new Choreographer.FrameCallback() {
         @Override
-        public void run() {
-            Cursor cursor = mCachedModel.cursor;
-            com.qiplat.sweeteditor.core.visual.PointF position = cursor.position;
-            float targetX = position.x;
-            float targetY = position.y;
+        public void doFrame(long frameTimeNanos) {
+            if (!mVisualTransitionActive) return;
 
-            if (animationHolder.cursorAnimatedX == -1f || animationHolder.cursorAnimatedY == -1f) {
-                animationHolder.cursorAnimatedX = targetX;
-                animationHolder.cursorAnimatedY = targetY;
+            // Model not yet rebuilt — keep running so we can animate toward the new target
+            // once onDraw rebuilds mCachedModel.
+            if (mModelDirty) {
+                postInvalidate();
+                Choreographer.getInstance().postFrameCallback(this);
+                return;
             }
 
-            animationHolder.cursorAnimatedX += (targetX - animationHolder.cursorAnimatedX) * 0.35f;
-            animationHolder.cursorAnimatedY += (targetY - animationHolder.cursorAnimatedY) * 0.35f;
+            boolean needsNextFrame = false;
 
-            if (Math.abs(targetX - animationHolder.cursorAnimatedX) < 0.01f) {
-                animationHolder.cursorAnimatedX = targetX;
+            if (mSettings.isCursorAnimationEnabled()
+                    && mCachedModel != null && mCachedModel.cursor != null && mCachedModel.cursor.position != null) {
+                float targetX = mCachedModel.cursor.position.x;
+                float targetY = mCachedModel.cursor.position.y;
+
+                if (animationHolder.cursorAnimatedX < 0 || animationHolder.cursorAnimatedY < 0) {
+                    animationHolder.cursorAnimatedX = targetX;
+                    animationHolder.cursorAnimatedY = targetY;
+                }
+
+                animationHolder.cursorAnimatedX += (targetX - animationHolder.cursorAnimatedX) * 0.35f;
+                animationHolder.cursorAnimatedY += (targetY - animationHolder.cursorAnimatedY) * 0.35f;
+
+                if (Math.abs(targetX - animationHolder.cursorAnimatedX) < 0.01f) {
+                    animationHolder.cursorAnimatedX = targetX;
+                } else {
+                    needsNextFrame = true;
+                }
+
+                if (Math.abs(targetY - animationHolder.cursorAnimatedY) < 0.01f) {
+                    animationHolder.cursorAnimatedY = targetY;
+                } else {
+                    needsNextFrame = true;
+                }
             }
 
-            if (Math.abs(targetY - animationHolder.cursorAnimatedY) < 0.01f) {
-                animationHolder.cursorAnimatedY = targetY;
+            if (mSettings.isGutterAnimationEnabled() && mCachedModel != null) {
+                float targetX = mCachedModel.splitX;
+
+                if (animationHolder.splitAnimatedX < 0) {
+                    animationHolder.splitAnimatedX = targetX;
+                }
+
+                animationHolder.splitAnimatedX += (targetX - animationHolder.splitAnimatedX) * 0.25f;
+
+                if (Math.abs(targetX - animationHolder.splitAnimatedX) < 0.01f) {
+                    animationHolder.splitAnimatedX = targetX;
+                } else {
+                    needsNextFrame = true;
+                }
             }
 
-            flush();
-            mHandler.postDelayed(this, 16);
+            postInvalidate();
+            if (needsNextFrame) {
+                Choreographer.getInstance().postFrameCallback(this);
+            } else {
+                mVisualTransitionActive = false;
+            }
         }
     };
-    private final Runnable mGutterAnimation = new Runnable() {
-        @Override
-        public void run() {
-            float targetX = mCachedModel.splitX;
 
-            if (animationHolder.splitAnimatedX == -1f) {
-                animationHolder.splitAnimatedX = targetX;
-            }
-
-            animationHolder.splitAnimatedX += (targetX - animationHolder.splitAnimatedX) * 0.25f;
-
-            if (Math.abs(targetX - animationHolder.splitAnimatedX) < 0.01f) {
-                animationHolder.splitAnimatedX = targetX;
-            }
-
-            flush();
-            mHandler.postDelayed(this, 16);
-        }
-    };
     private final Runnable mTransientScrollbarRefresh = new Runnable() {
         @Override
         public void run() {
@@ -217,18 +239,18 @@ public class SweetEditor extends View {
     };
 
     // Unified animation callback: drives edge-scroll, fling, etc. via Choreographer
-    private boolean mAnimationActive = false;
-    private final Choreographer.FrameCallback mAnimationFrameCallback = new Choreographer.FrameCallback() {
+    private boolean mScrollAnimationActive = false;
+    private final Choreographer.FrameCallback mScrollAnimationCallback = new Choreographer.FrameCallback() {
         @Override
         public void doFrame(long frameTimeNanos) {
-            if (!mAnimationActive) return;
+            if (!mScrollAnimationActive) return;
             EditorCore.GestureResult result = mEditorCore.tickAnimations();
             fireGestureEvents(result, null, -1);
             flush();
             if (result.needsAnimation) {
                 Choreographer.getInstance().postFrameCallback(this);
             } else {
-                mAnimationActive = false;
+                mScrollAnimationActive = false;
             }
         }
     };
@@ -281,12 +303,12 @@ public class SweetEditor extends View {
             syncPlatformScale(result.viewScale);
         }
         flush();
-        if (result.needsAnimation && !mAnimationActive) {
-            mAnimationActive = true;
-            Choreographer.getInstance().postFrameCallback(mAnimationFrameCallback);
-        } else if (!result.needsAnimation && mAnimationActive) {
-            mAnimationActive = false;
-            Choreographer.getInstance().removeFrameCallback(mAnimationFrameCallback);
+        if (result.needsAnimation && !mScrollAnimationActive) {
+            mScrollAnimationActive = true;
+            Choreographer.getInstance().postFrameCallback(mScrollAnimationCallback);
+        } else if (!result.needsAnimation && mScrollAnimationActive) {
+            mScrollAnimationActive = false;
+            Choreographer.getInstance().removeFrameCallback(mScrollAnimationCallback);
         }
         if (ENABLE_PERF_LOG) {
             float ms = (System.nanoTime() - t0) / 1_000_000f;
@@ -380,8 +402,7 @@ public class SweetEditor extends View {
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
         mHandler.postDelayed(mCursorBlink, 500);
-        mHandler.postDelayed(mCursorAnimation, 500);
-        mHandler.postDelayed(mGutterAnimation, 500);
+        startVisualTransition();
         requestApplyInsets();
         post(() -> refreshViewportForVisibleBounds(false));
     }
@@ -390,11 +411,10 @@ public class SweetEditor extends View {
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         mHandler.removeCallbacks(mCursorBlink);
-        mHandler.removeCallbacks(mCursorAnimation);
-        mHandler.removeCallbacks(mGutterAnimation);
+        stopVisualTransition();
         mHandler.removeCallbacks(mTransientScrollbarRefresh);
-        Choreographer.getInstance().removeFrameCallback(mAnimationFrameCallback);
-        mAnimationActive = false;
+        Choreographer.getInstance().removeFrameCallback(mScrollAnimationCallback);
+        mScrollAnimationActive = false;
         if (mSelectionMenuController != null) {
             mSelectionMenuController.dismiss();
         }
@@ -405,13 +425,13 @@ public class SweetEditor extends View {
         super.onWindowFocusChanged(hasWindowFocus);
         if (hasWindowFocus) {
             resetCursorBlink();
+            startVisualTransition();
         } else {
             mHandler.removeCallbacks(mCursorBlink);
-            mHandler.removeCallbacks(mCursorAnimation);
-            mHandler.removeCallbacks(mGutterAnimation);
+            stopVisualTransition();
             mHandler.removeCallbacks(mTransientScrollbarRefresh);
-            Choreographer.getInstance().removeFrameCallback(mAnimationFrameCallback);
-            mAnimationActive = false;
+            Choreographer.getInstance().removeFrameCallback(mScrollAnimationCallback);
+            mScrollAnimationActive = false;
         }
     }
 
@@ -425,6 +445,10 @@ public class SweetEditor extends View {
     public void loadDocument(Document document) {
         mDocument = document;
         mEditorCore.loadDocument(document);
+        mCachedModel = null;
+        animationHolder.cursorAnimatedX = -1f;
+        animationHolder.cursorAnimatedY = -1f;
+        animationHolder.splitAnimatedX = -1f;
         if (mDecorationProviderManager != null) {
             mDecorationProviderManager.onDocumentLoaded();
         }
@@ -1330,6 +1354,7 @@ public class SweetEditor extends View {
      */
     public void flush() {
         mModelDirty = true;
+        startVisualTransition();
         postInvalidate();
     }
 
@@ -1737,9 +1762,8 @@ public class SweetEditor extends View {
                     mCompletionProviderManager.dismiss();
                 }
                 if (mSettings.isCursorAnimationEnabled()) {
-                    mEditorCore.buildRenderModel();
-                    animationHolder.cursorAnimatedX = mCachedModel.cursor.position.x;
-                    animationHolder.cursorAnimatedY = mCachedModel.cursor.position.y;
+                    animationHolder.cursorAnimatedX = -1f;
+                    animationHolder.cursorAnimatedY = -1f;
                 }
                 break;
             case SCALE:
@@ -1984,21 +2008,34 @@ public class SweetEditor extends View {
 
     public void requestCursorAnimationRefresh() {
         if (mSettings.isCursorAnimationEnabled()) {
-            mHandler.post(mCursorAnimation);
+            startVisualTransition();
         } else {
-            mHandler.removeCallbacks(mCursorAnimation);
             animationHolder.cursorAnimatedX = -1;
             animationHolder.cursorAnimatedY = -1;
+            postInvalidate();
         }
     }
 
     public void requestGutterAnimationRefresh() {
         if (mSettings.isGutterAnimationEnabled()) {
-            mHandler.post(mGutterAnimation);
+            startVisualTransition();
         } else {
-            mHandler.removeCallbacks(mGutterAnimation);
             animationHolder.splitAnimatedX = -1f;
+            postInvalidate();
         }
+    }
+
+    private void startVisualTransition() {
+        if (!mVisualTransitionActive
+                && (mSettings.isCursorAnimationEnabled() || mSettings.isGutterAnimationEnabled())) {
+            mVisualTransitionActive = true;
+            Choreographer.getInstance().postFrameCallback(mVisualTransitionCallback);
+        }
+    }
+
+    private void stopVisualTransition() {
+        mVisualTransitionActive = false;
+        Choreographer.getInstance().removeFrameCallback(mVisualTransitionCallback);
     }
 
     private void showSoftKeyboard() {

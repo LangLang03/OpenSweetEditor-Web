@@ -759,7 +759,7 @@ final class EditorRenderer {
         float cursorAnimatedX = animationHolder.cursorAnimatedX;
         float cursorAnimatedY = animationHolder.cursorAnimatedY;
 
-        if ((cursorAnimatedX == -1 || cursorAnimatedY == -1)) {
+        if (cursorAnimatedX < 0 || cursorAnimatedY < 0) {
             canvas.drawRect(
                     cursor.position.x,
                     cursor.position.y,
