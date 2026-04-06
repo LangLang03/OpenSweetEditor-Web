@@ -1,0 +1,7 @@
+.build-tools/
+.tmp/
+.adb-screen.png
+.adb-screen-demo.png
+demo.png
+**/bin/
+**/obj/
