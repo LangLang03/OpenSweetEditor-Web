@@ -1616,8 +1616,8 @@ public class SweetEditor extends View {
             if (!mEditorCore.isInLinkedEditing()) {
                 // Completion trigger: based on first change (primary change)
                 TextChange primaryChange = editResult.changes.get(0);
-                if (mCompletionProviderManager != null && primaryChange.text.length() == 1) {
-                    String ch = primaryChange.text;
+                if (mCompletionProviderManager != null && primaryChange.newText.length() == 1) {
+                    String ch = primaryChange.newText;
                     if (mCompletionProviderManager.isTriggerCharacter(ch)) {
                         mCompletionProviderManager.triggerCompletion(
                                 CompletionContext.TriggerKind.CHARACTER, ch);

@@ -239,9 +239,9 @@ public class MainActivity extends AppCompatActivity {
                 TextChange first = e.changes.get(0);
                 String rangeStr = first.range.start.line + ":" + first.range.start.column
                         + "-" + first.range.end.line + ":" + first.range.end.column;
-                String textPreview = first.text.length() > 50
-                        ? first.text.substring(0, 50) + "..."
-                        : first.text;
+                String textPreview = first.newText.length() > 50
+                        ? first.newText.substring(0, 50) + "..."
+                        : first.newText;
                 summary = "range=" + rangeStr + " text=" + textPreview.replace("\n", "\\n");
             }
             Log.d("SweetEditor", "[TextChanged] changes=" + count + " " + summary);
