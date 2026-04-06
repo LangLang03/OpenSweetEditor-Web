@@ -364,7 +364,7 @@ public class CompletionPopupController implements CompletionProviderManager.Comp
 
         @Override
         public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
-            CompletionItem item = items.get(position);
+            CompletionItem item = items.get(holder.getAdapterPosition());
             boolean isSelected = position == selectedIndex;
             if (factory != null) {
                 factory.bindItemView(holder.itemView, item, isSelected);
