@@ -166,6 +166,16 @@ class SweetEditorCore {
         }
     }
 
+    struct CodeLensPayload {
+        let text: String
+        let commandId: Int32
+
+        init(text: String, commandId: Int32) {
+            self.text = text
+            self.commandId = commandId
+        }
+    }
+
     struct FoldRegion {
         let startLine: Int
         let endLine: Int
@@ -380,6 +390,37 @@ class SweetEditorCore {
                 icons.map(\.iconId)
             }
             return packBatchLineGutterIcons(iconIdsByLine)
+        }
+
+        func packLineCodeLens(line: Int, items: [CodeLensPayload]) -> Data {
+            var payload = Data()
+            payload.reserveCapacity(8 + items.count * 16)
+            appendU32(UInt32(line), to: &payload)
+            appendU32(UInt32(items.count), to: &payload)
+            for item in items {
+                appendI32(item.commandId, to: &payload)
+                appendUTF8(item.text, to: &payload)
+            }
+            return payload
+        }
+
+        func packBatchLineCodeLens(_ itemsByLine: [Int: [CodeLensPayload]]) -> Data {
+            let lines = itemsByLine.keys.sorted()
+            var payload = Data()
+            payload.reserveCapacity(4 + lines.reduce(0) {
+                $0 + 8 + (itemsByLine[$1]?.count ?? 0) * 16
+            })
+            appendU32(UInt32(lines.count), to: &payload)
+            for line in lines {
+                let items = itemsByLine[line] ?? []
+                appendU32(UInt32(line), to: &payload)
+                appendU32(UInt32(items.count), to: &payload)
+                for item in items {
+                    appendI32(item.commandId, to: &payload)
+                    appendUTF8(item.text, to: &payload)
+                }
+            }
+            return payload
         }
 
         func packLineDiagnostics(line: Int, diagnostics: [(column: Int32, length: Int32, severity: Int32, color: Int32)]) -> Data {
@@ -1557,6 +1598,41 @@ class SweetEditorCore {
     func setMaxGutterIcons(_ count: UInt32) {
         performCoreCall {
             editor_set_max_gutter_icons(handle, count)
+        }
+    }
+
+    // MARK: - CodeLens
+
+    func setLineCodeLens(line: Int, items: [CodeLensPayload]) {
+        let payload = protocolEncoder.packLineCodeLens(line: line, items: items)
+        setLineCodeLens(payload: payload)
+    }
+
+    func setLineCodeLens(payload: Data) {
+        performCoreCall {
+            withPayload(payload) { ptr, size in
+                editor_set_line_codelens(handle, ptr, size)
+            }
+        }
+    }
+
+    func setBatchLineCodeLens(_ itemsByLine: [Int: [CodeLensPayload]]) {
+        if itemsByLine.isEmpty { return }
+        let payload = protocolEncoder.packBatchLineCodeLens(itemsByLine)
+        setBatchLineCodeLens(payload: payload)
+    }
+
+    func setBatchLineCodeLens(payload: Data) {
+        performCoreCall {
+            withPayload(payload) { ptr, size in
+                editor_set_batch_line_codelens(handle, ptr, size)
+            }
+        }
+    }
+
+    func clearCodeLens() {
+        performCoreCall {
+            editor_clear_codelens(handle)
         }
     }
 

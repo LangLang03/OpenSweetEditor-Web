@@ -22,6 +22,7 @@ import com.qiplat.sweeteditor.core.adornment.InlayHint;
 import com.qiplat.sweeteditor.core.adornment.SpanLayer;
 import com.qiplat.sweeteditor.core.adornment.StyleSpan;
 import com.qiplat.sweeteditor.core.EditorCore;
+import com.qiplat.sweeteditor.core.adornment.CodeLensItem;
 import com.qiplat.sweeteditor.core.adornment.PhantomText;
 import com.qiplat.sweeteditor.core.foundation.TextChange;
 
@@ -185,6 +186,7 @@ public final class DecorationProviderManager {
         List<FoldRegion> foldRegions = new ArrayList<>();
         SparseArray<List<GutterIcon>> gutterIcons = new SparseArray<>();
         SparseArray<List<PhantomText>> phantomTexts = new SparseArray<>();
+        SparseArray<List<CodeLensItem>> codeLensItems = new SparseArray<>();
         DecorationResult.ApplyMode syntaxMode = DecorationResult.ApplyMode.MERGE;
         DecorationResult.ApplyMode semanticMode = DecorationResult.ApplyMode.MERGE;
         DecorationResult.ApplyMode inlayMode = DecorationResult.ApplyMode.MERGE;
@@ -196,6 +198,7 @@ public final class DecorationProviderManager {
         DecorationResult.ApplyMode foldMode = DecorationResult.ApplyMode.MERGE;
         DecorationResult.ApplyMode gutterMode = DecorationResult.ApplyMode.MERGE;
         DecorationResult.ApplyMode phantomMode = DecorationResult.ApplyMode.MERGE;
+        DecorationResult.ApplyMode codeLensMode = DecorationResult.ApplyMode.MERGE;
 
         for (DecorationProvider provider : providers) {
             ProviderState state = providerStates.get(provider);
@@ -225,6 +228,10 @@ public final class DecorationProviderManager {
             phantomMode = mergeMode(phantomMode, r.getPhantomTextsMode());
             if (r.getPhantomTexts() != null) {
                 appendSparseArrayOfList(phantomTexts, r.getPhantomTexts());
+            }
+            codeLensMode = mergeMode(codeLensMode, r.getCodeLensItemsMode());
+            if (r.getCodeLensItems() != null) {
+                appendSparseArrayOfList(codeLensItems, r.getCodeLensItems());
             }
 
             indentMode = mergeMode(indentMode, r.getIndentGuidesMode());
@@ -277,6 +284,9 @@ public final class DecorationProviderManager {
         applyPhantomMode(phantomMode);
         editor.setBatchLinePhantomTexts(phantomTexts);
 
+        applyCodeLensMode(codeLensMode);
+        editor.setBatchLineCodeLens(codeLensItems);
+
         editor.flush();
     }
 
@@ -317,6 +327,14 @@ public final class DecorationProviderManager {
             editor.clearPhantomTexts();
         } else if (mode == DecorationResult.ApplyMode.REPLACE_RANGE) {
             clearPhantomRange(lastVisibleStartLine, lastVisibleEndLine);
+        }
+    }
+
+    private void applyCodeLensMode(@NonNull DecorationResult.ApplyMode mode) {
+        if (mode == DecorationResult.ApplyMode.REPLACE_ALL) {
+            editor.clearCodeLens();
+        } else if (mode == DecorationResult.ApplyMode.REPLACE_RANGE) {
+            clearCodeLensRange(lastVisibleStartLine, lastVisibleEndLine);
         }
     }
 
@@ -415,6 +433,12 @@ public final class DecorationProviderManager {
         SparseArray<List<PhantomText>> empty = buildEmptySparseRange(startLine, endLine);
         if (empty.size() == 0) return;
         editor.setBatchLinePhantomTexts(empty);
+    }
+
+    private void clearCodeLensRange(int startLine, int endLine) {
+        SparseArray<List<CodeLensItem>> empty = buildEmptySparseRange(startLine, endLine);
+        if (empty.size() == 0) return;
+        editor.setBatchLineCodeLens(empty);
     }
 
     @NonNull
@@ -561,6 +585,13 @@ public final class DecorationProviderManager {
         } else if (patch.getPhantomTextsMode() != DecorationResult.ApplyMode.MERGE) {
             target.setPhantomTexts(null);
             target.setPhantomTextsMode(patch.getPhantomTextsMode());
+        }
+        if (patch.getCodeLensItems() != null) {
+            target.setCodeLensItems(patch.getCodeLensItems());
+            target.setCodeLensItemsMode(patch.getCodeLensItemsMode());
+        } else if (patch.getCodeLensItemsMode() != DecorationResult.ApplyMode.MERGE) {
+            target.setCodeLensItems(null);
+            target.setCodeLensItemsMode(patch.getCodeLensItemsMode());
         }
     }
 

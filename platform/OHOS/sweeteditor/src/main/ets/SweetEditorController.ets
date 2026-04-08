@@ -6,6 +6,7 @@ import {
   DiagnosticItem,
   FlowGuide,
   FoldRegion,
+  CodeLensItem,
   GutterIcon,
   IndentGuide,
   InlayHint,
@@ -21,6 +22,7 @@ import { EditorKeyMap } from './EditorKeymap';
 import { EditorSettings } from './EditorSettings';
 import {
   ContextMenuEvent,
+  CodeLensClickEvent,
   CursorChangedEvent,
   DocumentLoadedEvent,
   DoubleTapEvent,
@@ -388,6 +390,14 @@ export class SweetEditorController {
     this.run((api) => api.setBatchLineGutterIcons(iconsByLine));
   }
 
+  setLineCodeLens(line: number, items: CodeLensItem[]): void {
+    this.run((api) => api.setLineCodeLens(line, items));
+  }
+
+  setBatchLineCodeLens(itemsByLine: Map<number, CodeLensItem[]>): void {
+    this.run((api) => api.setBatchLineCodeLens(itemsByLine));
+  }
+
   setLineDiagnostics(line: number, items: DiagnosticItem[]): void {
     this.run((api) => api.setLineDiagnostics(line, items));
   }
@@ -478,6 +488,10 @@ export class SweetEditorController {
 
   clearGutterIcons(): void {
     this.run((api) => api.clearGutterIcons());
+  }
+
+  clearCodeLens(): void {
+    this.run((api) => api.clearCodeLens());
   }
 
   clearGuides(): void {
@@ -586,6 +600,14 @@ export class SweetEditorController {
 
   offInlayHintClick(listener: EditorEventListener<InlayHintClickEvent>): void {
     this.removeEventListener('inlayHintClick', listener as EditorEventListener<EditorEvent>);
+  }
+
+  onCodeLensClick(listener: EditorEventListener<CodeLensClickEvent>): void {
+    this.addEventListener('codeLensClick', listener as EditorEventListener<EditorEvent>);
+  }
+
+  offCodeLensClick(listener: EditorEventListener<CodeLensClickEvent>): void {
+    this.removeEventListener('codeLensClick', listener as EditorEventListener<EditorEvent>);
   }
 
   onFoldToggle(listener: EditorEventListener<FoldToggleEvent>): void {
@@ -711,6 +733,9 @@ export class SweetEditorController {
       case 'inlayHintClick':
         api.onInlayHintClick(listener as EditorEventListener<InlayHintClickEvent>);
         break;
+      case 'codeLensClick':
+        api.onCodeLensClick(listener as EditorEventListener<CodeLensClickEvent>);
+        break;
       case 'foldToggle':
         api.onFoldToggle(listener as EditorEventListener<FoldToggleEvent>);
         break;
@@ -754,6 +779,9 @@ export class SweetEditorController {
         break;
       case 'inlayHintClick':
         api.offInlayHintClick(listener as EditorEventListener<InlayHintClickEvent>);
+        break;
+      case 'codeLensClick':
+        api.offCodeLensClick(listener as EditorEventListener<CodeLensClickEvent>);
         break;
       case 'foldToggle':
         api.offFoldToggle(listener as EditorEventListener<FoldToggleEvent>);

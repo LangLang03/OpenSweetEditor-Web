@@ -303,7 +303,8 @@ external void editor_set_scrollbar_config(
 /// - i32 logical_line
 /// - i32 wrap_index
 /// - PointF line_number_position
-/// - i32 is_phantom_line
+/// - i32 kind (0=CONTENT, 1=PHANTOM, 2=CODELENS)
+/// - i32 owns_gutter_semantics
 /// - i32 fold_state
 /// - i32 run_count
 /// - VisualRun[run_count] runs
@@ -1304,11 +1305,35 @@ external void editor_set_batch_line_gutter_icons(
 )
 external void editor_set_max_gutter_icons(int editor_handle, int count);
 
-/// Clear all gutter icons
-@ffi.Native<ffi.Void Function(ffi.IntPtr)>(assetId: _sweeteditorAssetId)
-external void editor_clear_gutter_icons(int editor_handle);
+  /// Clear all gutter icons
+  @ffi.Native<ffi.Void Function(ffi.IntPtr)>(assetId: _sweeteditorAssetId)
+  external void editor_clear_gutter_icons(int editor_handle);
 
-/// Set diagnostic decoration ranges for specified line (compact binary)
+  /// Set CodeLens items for specified line (compact binary)
+  @ffi.Native<ffi.Void Function(ffi.IntPtr, ffi.Pointer<ffi.Uint8>, ffi.Size)>(
+    assetId: _sweeteditorAssetId,
+  )
+  external void editor_set_line_codelens(
+    int editor_handle,
+    ffi.Pointer<ffi.Uint8> data,
+    int size,
+  );
+
+  /// Batch set CodeLens items for multiple lines (compact binary)
+  @ffi.Native<ffi.Void Function(ffi.IntPtr, ffi.Pointer<ffi.Uint8>, ffi.Size)>(
+    assetId: _sweeteditorAssetId,
+  )
+  external void editor_set_batch_line_codelens(
+    int editor_handle,
+    ffi.Pointer<ffi.Uint8> data,
+    int size,
+  );
+
+  /// Clear all CodeLens items
+  @ffi.Native<ffi.Void Function(ffi.IntPtr)>(assetId: _sweeteditorAssetId)
+  external void editor_clear_codelens(int editor_handle);
+
+  /// Set diagnostic decoration ranges for specified line (compact binary)
 /// @param data payload(LE):
 /// u32 line, u32 diag_count, then repeat for diag_count groups
 /// [u32 column, u32 length, i32 severity, i32 color]

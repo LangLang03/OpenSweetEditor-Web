@@ -8,6 +8,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.MainThread;
 import androidx.annotation.Nullable;
 
+import com.qiplat.sweeteditor.core.adornment.CodeLensItem;
 import com.qiplat.sweeteditor.core.adornment.Diagnostic;
 import com.qiplat.sweeteditor.core.adornment.FoldRegion;
 import com.qiplat.sweeteditor.core.adornment.GutterIcon;
@@ -1517,6 +1518,50 @@ public class EditorCore {
         nativeClearGutterIcons(mNativeHandle);
     }
 
+    // ==================== CodeLens ====================
+
+    /**
+     * Sets CodeLens items for the specified line (replaces entire line).
+     *
+     * @param line  Line number (0-based)
+     * @param items CodeLensItem list
+     */
+    public void setLineCodeLens(int line, @NonNull List<? extends CodeLensItem> items) {
+        if (mNativeHandle == 0 || items == null) return;
+        setLineCodeLens(ProtocolEncoder.packLineCodeLens(line, items));
+    }
+
+    /**
+     * Sets CodeLens items for the specified line (already packed by caller via ProtocolEncoder).
+     */
+    public void setLineCodeLens(ByteBuffer payload) {
+        if (mNativeHandle == 0 || payload == null) return;
+        nativeSetLineCodeLens(mNativeHandle, payload, payload.remaining());
+    }
+
+    /**
+     * Batch sets CodeLens items for multiple lines (reduces JNI calls).
+     */
+    public void setBatchLineCodeLens(@Nullable SparseArray<? extends List<? extends CodeLensItem>> itemsByLine) {
+        if (mNativeHandle == 0 || itemsByLine == null || itemsByLine.size() == 0) return;
+        ByteBuffer payload = ProtocolEncoder.packBatchLineCodeLens(itemsByLine);
+        setBatchLineCodeLens(payload);
+    }
+
+    /**
+     * Batch sets CodeLens items for multiple lines (already encoded as ByteBuffer by caller).
+     */
+    public void setBatchLineCodeLens(ByteBuffer payload) {
+        if (mNativeHandle == 0 || payload == null) return;
+        nativeSetBatchLineCodeLens(mNativeHandle, payload, payload.remaining());
+    }
+
+    /** Clears all CodeLens items. */
+    public void clearCodeLens() {
+        if (mNativeHandle == 0) return;
+        nativeClearCodeLens(mNativeHandle);
+    }
+
     /** Clears all code structure guides (indent guides, bracket guides, flow arrows, separators). */
     public void clearGuides() {
         if (mNativeHandle == 0) return;
@@ -1627,7 +1672,11 @@ public class EditorCore {
         /**
          * Hit InlayHint (color block type)
          */
-        INLAY_HINT_COLOR(6);
+        INLAY_HINT_COLOR(6),
+        /**
+         * Hit a CodeLens item
+         */
+        CODELENS(7);
 
         public final int value;
 
@@ -2162,6 +2211,15 @@ public class EditorCore {
 
     @CriticalNative
     private static native void nativeClearGutterIcons(long handle);
+
+    @FastNative
+    private static native void nativeSetLineCodeLens(long handle, ByteBuffer data, int size);
+
+    @FastNative
+    private static native void nativeSetBatchLineCodeLens(long handle, ByteBuffer data, int size);
+
+    @CriticalNative
+    private static native void nativeClearCodeLens(long handle);
 
     @CriticalNative
     private static native void nativeClearGuides(long handle);

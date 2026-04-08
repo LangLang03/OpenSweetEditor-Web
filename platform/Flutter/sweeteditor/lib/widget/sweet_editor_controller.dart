@@ -352,6 +352,9 @@ class SweetEditorController {
   Stream<InlayHintClickEvent> get onInlayHintClick =>
       _eventBus.on<InlayHintClickEvent>();
 
+  Stream<CodeLensClickEvent> get onCodeLensClick =>
+      _eventBus.on<CodeLensClickEvent>();
+
   Stream<FoldToggleEvent> get onFoldToggle => _eventBus.on<FoldToggleEvent>();
 
   Stream<DocumentLoadedEvent> get onDocumentLoaded =>
@@ -533,6 +536,18 @@ class SweetEditorController {
     });
   }
 
+  void setLineCodeLens(int line, List<core.CodeLensItem> items) {
+    _withEditorCore((editorCore) {
+      editorCore.setLineCodeLens(line, items);
+    });
+  }
+
+  void setBatchLineCodeLens(Map<int, List<core.CodeLensItem>> itemsByLine) {
+    _withEditorCore((editorCore) {
+      editorCore.setBatchLineCodeLens(itemsByLine);
+    });
+  }
+
   void setLineDiagnostics(int line, List<core.Diagnostic> items) {
     _withEditorCore((editorCore) {
       editorCore.setLineDiagnostics(line, items);
@@ -613,6 +628,10 @@ class SweetEditorController {
 
   void clearGutterIcons() {
     _withEditorCore((editorCore) => editorCore.clearGutterIcons());
+  }
+
+  void clearCodeLens() {
+    _withEditorCore((editorCore) => editorCore.clearCodeLens());
   }
 
   void clearGuides() {

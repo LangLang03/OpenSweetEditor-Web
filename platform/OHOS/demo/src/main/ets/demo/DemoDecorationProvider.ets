@@ -16,6 +16,7 @@ import {
   IndentGuide,
   InlayHint,
   InlayType,
+  CodeLensItem,
   SeparatorGuide,
   StyleSpan,
   TextRange
@@ -26,6 +27,8 @@ import { DemoFileMetadata } from './DemoTypes';
 
 const DEFAULT_ANALYSIS_FILE_NAME: string = 'sample.cpp';
 const MAX_DYNAMIC_DIAGNOSTICS: number = 8;
+const CODELENS_RUN: number = 1;
+const CODELENS_DEBUG: number = 2;
 
 class TokenRangeInfo {
   readonly line: number;
@@ -85,7 +88,8 @@ export class DemoDecorationProvider implements DecorationProvider {
       DecorationType.INLAY_HINT,
       DecorationType.DIAGNOSTIC,
       DecorationType.SEPARATOR_GUIDE,
-      DecorationType.GUTTER_ICON
+      DecorationType.GUTTER_ICON,
+      DecorationType.CODELENS
     ]);
   }
 
@@ -112,6 +116,7 @@ export class DemoDecorationProvider implements DecorationProvider {
     const syntaxSpans = new Map<number, StyleSpan[]>();
     const inlayHints = new Map<number, InlayHint[]>();
     const gutterIcons = new Map<number, GutterIcon[]>();
+    const codeLensItems = new Map<number, CodeLensItem[]>();
     const indentGuides: IndentGuide[] = [];
     const foldRegions: FoldRegion[] = [];
     const separatorGuides: SeparatorGuide[] = [];
@@ -164,6 +169,7 @@ export class DemoDecorationProvider implements DecorationProvider {
         this.appendTextInlayHint(inlayHints, editorDocument, token);
         this.appendSeparator(separatorGuides, editorDocument, token);
         this.appendGutterIcons(gutterIcons, editorDocument, token);
+        this.appendCodeLens(codeLensItems, editorDocument, token);
         firstKeywordRange = this.appendDynamicDemoDecorations(
           dynamicDiagnostics,
           seenDiagnostics,
@@ -218,6 +224,7 @@ export class DemoDecorationProvider implements DecorationProvider {
       .foldRegions(foldRegions, ApplyMode.REPLACE_ALL)
       .separatorGuides(separatorGuides, ApplyMode.REPLACE_ALL)
       .gutterIcons(gutterIcons, ApplyMode.REPLACE_ALL)
+      .codeLensItems(codeLensItems, ApplyMode.REPLACE_ALL)
       .build();
   }
 
@@ -465,6 +472,28 @@ export class DemoDecorationProvider implements DecorationProvider {
       gutterIcons.set(range.line, lineIcons);
     }
     lineIcons.push({ iconId });
+  }
+
+  private appendCodeLens(codeLensItems: Map<number, CodeLensItem[]>,
+    editorDocument: EditorDocument,
+    token: sweetline.TokenSpan): void {
+    if (codeLensItems.size > 0) {
+      return;
+    }
+    if (token.styleId !== EditorTheme.STYLE_KEYWORD) {
+      return;
+    }
+    const range = DemoDecorationProvider.extractSingleLineTokenRange(token);
+    if (range === null) {
+      return;
+    }
+    const literal = DemoDecorationProvider.getTokenLiteral(editorDocument, range);
+    if (literal === 'class' || literal === 'struct') {
+      codeLensItems.set(range.line, [
+        { text: 'Run', commandId: CODELENS_RUN },
+        { text: 'Debug', commandId: CODELENS_DEBUG }
+      ]);
+    }
   }
 
   private static appendDiagnostic(diagnostics: Map<number, DiagnosticItem[]>,

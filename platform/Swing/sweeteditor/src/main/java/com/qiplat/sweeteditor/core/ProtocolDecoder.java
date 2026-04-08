@@ -246,6 +246,7 @@ final class ProtocolDecoder {
         run.width = data.getFloat();
         run.padding = data.getFloat();
         run.margin = data.getFloat();
+        run.active = data.getInt() != 0;
         return run;
     }
 
@@ -263,7 +264,8 @@ final class ProtocolDecoder {
         line.logicalLine = data.getInt();
         line.wrapIndex = data.getInt();
         line.lineNumberPosition = readPoint(data);
-        line.isPhantomLine = data.getInt() != 0;
+        line.kind = enumByOrdinal(data.getInt(), VisualLineKind.values(), VisualLineKind.CONTENT);
+        line.ownsGutterSemantics = data.getInt() != 0;
         line.foldState = readFoldState(data);
         line.runs = readVisualRuns(data);
         return line;

@@ -24,8 +24,8 @@ The Core layer does not involve UI rendering. It contains only bridging, data mo
 |---|---|---|
 | **Core Bridge** | `EditorCore`, `Document`, `ProtocolEncoder`, `ProtocolDecoder`, `TextMeasurer`, `EditorOptions` | Native bridge + public core API wrapper |
 | **Foundation** | `TextPosition`, `TextRange`, `TextChange`, `WrapMode`, `FoldArrowMode`, `AutoIndentMode`, `CurrentLineRenderMode`, `ScrollBehavior` | Fundamental value types and enums |
-| **Adornment** | `StyleSpan`, `SpanLayer`, `InlayHint`, `InlayType`, `PhantomText`, `FoldRegion`, `GutterIcon`, `Diagnostic`, `IndentGuide`, `BracketGuide`, `FlowGuide`, `SeparatorGuide`, `SeparatorStyle`, `TextStyle` | Decoration data types |
-| **Visual** | `EditorRenderModel`, `VisualLine`, `VisualRun`, `VisualRunType`, `Cursor`, `CursorRect`, `SelectionRect`, `SelectionHandle`, `ScrollMetrics`, `ScrollbarModel`, `ScrollbarRect`, `GuideSegment`, `GuideType`, `GuideDirection`, `GuideStyle`, `DiagnosticDecoration`, `CompositionDecoration`, `FoldMarkerRenderItem`, `FoldState`, `GutterIconRenderItem`, `LinkedEditingRect`, `BracketHighlightRect` | Render model types (geometry semantics follow Section 2.4) |
+| **Adornment** | `StyleSpan`, `SpanLayer`, `InlayHint`, `InlayType`, `PhantomText`, `CodeLensItem`, `FoldRegion`, `GutterIcon`, `Diagnostic`, `IndentGuide`, `BracketGuide`, `FlowGuide`, `SeparatorGuide`, `SeparatorStyle`, `TextStyle` | Decoration data types |
+| **Visual** | `EditorRenderModel`, `VisualLine`, `VisualLineKind`, `VisualRun`, `VisualRunType`, `Cursor`, `CursorRect`, `SelectionRect`, `SelectionHandle`, `ScrollMetrics`, `ScrollbarModel`, `ScrollbarRect`, `GuideSegment`, `GuideType`, `GuideDirection`, `GuideStyle`, `DiagnosticDecoration`, `CompositionDecoration`, `FoldMarkerRenderItem`, `FoldState`, `GutterIconRenderItem`, `LinkedEditingRect`, `BracketHighlightRect` | Render model types (geometry semantics follow Section 2.4) |
 | **Snippet** | `LinkedEditingModel`, `TabStopGroup` | Linked editing / tab stop groups |
 | **Keymap** | `KeyMap`, `KeyBinding`, `KeyChord`, `KeyCode`, `KeyModifier`, `EditorCommand` | Shortcut mapping data types and command identifiers |
 
@@ -38,7 +38,7 @@ The Widget layer handles platform-native rendering, user interaction, and extens
 | **Widget** | `SweetEditor`, `SweetEditorController` *(declarative frameworks MUST; imperative frameworks MAY)*, `EditorTheme`, `EditorSettings`, `EditorIconProvider`, `EditorMetadata`, `LanguageConfiguration` | Widget entry, controller, theme, configuration |
 | **Decoration** | `DecorationProvider`, `DecorationProviderManager`, `DecorationContext`, `DecorationResult`, `DecorationType`; if the Receiver callback pattern is used, `DecorationReceiver` is the recommended name | Decoration provider system |
 | **Completion** | `CompletionProvider`, `CompletionProviderManager`, `CompletionContext`, `CompletionItem`, `CompletionResult`; if the Receiver callback pattern is used, `CompletionReceiver` is the recommended name | Completion provider system |
-| **Event** | A type-safe event mechanism, `EditorEvent`, `TextChangedEvent`, `CursorChangedEvent`, `SelectionChangedEvent`, `ScrollChangedEvent`, `ScaleChangedEvent`, `DocumentLoadedEvent`, `FoldToggleEvent`, `GutterIconClickEvent`, `InlayHintClickEvent`, `LongPressEvent`*(mobile only)*, `DoubleTapEvent`, `ContextMenuEvent`*(desktop & cross-platform UI frameworks)*; if an explicit event-bus/listener pattern is used, `EditorEventBus` and `EditorEventListener` are the recommended names | Event system |
+| **Event** | A type-safe event mechanism, `EditorEvent`, `TextChangedEvent`, `CursorChangedEvent`, `SelectionChangedEvent`, `ScrollChangedEvent`, `ScaleChangedEvent`, `DocumentLoadedEvent`, `FoldToggleEvent`, `GutterIconClickEvent`, `InlayHintClickEvent`, `CodeLensClickEvent`, `LongPressEvent`*(mobile only)*, `DoubleTapEvent`, `ContextMenuEvent`*(desktop & cross-platform UI frameworks)*; if an explicit event-bus/listener pattern is used, `EditorEventBus` and `EditorEventListener` are the recommended names | Event system |
 | **NewLine** | `NewLineActionProvider`, `NewLineActionProviderManager`, `NewLineAction`, `NewLineContext` | Newline action provider system |
 | **Keymap** | `EditorKeyMap` | Widget-layer keymap extension that binds command ids to host-side handlers |
 | **Copilot** *(SHOULD)* | `InlineSuggestion`, `InlineSuggestionListener` or an equivalent host-visible accept/dismiss callback mechanism; MAY: `InlineSuggestionController` | Inline suggestion data + callback; listener shape is the primary path when exposed |
@@ -334,6 +334,10 @@ controller.applyTheme(EditorTheme.dark());
 | Batch set gutter icons | `setBatchLineGutterIcons(entries)` | 鈥?|
 | Set max gutter icons | `setMaxGutterIcons(count)` | 鈥?|
 | Clear gutter icons | `clearGutterIcons()` | 鈥?|
+| **CodeLens** | | |
+| Set line CodeLens | `setLineCodeLens(line, items)` | — |
+| Batch set CodeLens | `setBatchLineCodeLens(entries)` | — |
+| Clear CodeLens | `clearCodeLens()` | — |
 | **Diagnostic** | | |
 | Set line diagnostics | `setLineDiagnostics(line, items)` | 鈥?|
 | Batch set diagnostics | `setBatchLineDiagnostics(entries)` | 鈥?|
@@ -456,6 +460,8 @@ controller.applyTheme(EditorTheme.dark());
 | Set batch line phantom texts | `setBatchLinePhantomTexts(phantomsByLine)` | 鈥?|
 | Set line gutter icons | `setLineGutterIcons(line, icons)` | 鈥?|
 | Set batch line gutter icons | `setBatchLineGutterIcons(iconsByLine)` | 鈥?|
+| Set line CodeLens | `setLineCodeLens(line, items)` | — |
+| Set batch line CodeLens | `setBatchLineCodeLens(itemsByLine)` | — |
 | Set line diagnostics | `setLineDiagnostics(line, items)` | 鈥?|
 | Set batch line diagnostics | `setBatchLineDiagnostics(diagsByLine)` | 鈥?|
 | Set indent guides | `setIndentGuides(guides)` | 鈥?|
@@ -469,6 +475,7 @@ controller.applyTheme(EditorTheme.dark());
 | Clear inlay hints | `clearInlayHints()` | 鈥?|
 | Clear phantom texts | `clearPhantomTexts()` | 鈥?|
 | Clear gutter icons | `clearGutterIcons()` | 鈥?|
+| Clear CodeLens | `clearCodeLens()` | — |
 | Clear guides | `clearGuides()` | 鈥?|
 | Clear diagnostics | `clearDiagnostics()` | 鈥?|
 | Clear all decorations | `clearAllDecorations()` | 鈥?|
@@ -544,7 +551,7 @@ When multiple Providers return different ApplyModes, the Manager MUST use the hi
 
 #### DecorationResult MUST Fields
 
-`DecorationResult` contains 11 decoration data types, each with a corresponding `ApplyMode` (default `MERGE`). Data types MUST use the standard types defined in the Core layer (e.g. `StyleSpan`, `InlayHint`, `Diagnostic`, etc.).
+`DecorationResult` contains 12 decoration data types, each with a corresponding `ApplyMode` (default `MERGE`). Data types MUST use the standard types defined in the Core layer (e.g. `StyleSpan`, `InlayHint`, `CodeLensItem`, `Diagnostic`, etc.).
 
 | Data Field | Type | ApplyMode Field |
 |---|---|---|
@@ -559,8 +566,13 @@ When multiple Providers return different ApplyModes, the Manager MUST use the hi
 | `foldRegions` | List\<FoldRegion\>? | `foldRegionsMode` |
 | `gutterIcons` | Map\<int, List\<GutterIcon\>\>? | `gutterIconsMode` |
 | `phantomTexts` | Map\<int, List\<PhantomText\>\>? | `phantomTextsMode` |
+| `codeLensItems` | Map\<int, List\<CodeLensItem\>\>? | `codeLensItemsMode` |
 
 > Line-indexed data (syntaxSpans, semanticSpans, etc.) uses `Map<int, List<T>>` where the key is the line number (0-based).
+
+#### DecorationType Enum (MUST)
+
+Platforms MUST include `CODELENS` in `DecorationType` when exposing the decoration capability set.
 
 #### Multi-Provider Merge Strategy
 
@@ -1070,7 +1082,7 @@ All platforms MUST support the following event types:
 ```
 TextChangedEvent, CursorChangedEvent, SelectionChangedEvent,
 ScrollChangedEvent, ScaleChangedEvent, DocumentLoadedEvent,
-FoldToggleEvent, GutterIconClickEvent, InlayHintClickEvent,
+FoldToggleEvent, GutterIconClickEvent, InlayHintClickEvent, CodeLensClickEvent,
 LongPressEvent,       // mobile only (iOS/Android)
 DoubleTapEvent,
 ContextMenuEvent      // desktop (macOS/Windows/Linux) & cross-platform UI frameworks
@@ -1097,6 +1109,7 @@ Event payloads MUST be defined per-event. Platforms MUST NOT assume or require a
 | `FoldToggleEvent` | `line: int`, `isGutter: boolean`, `screenPoint: PointF or platform-native point type` | Toggled fold line, whether the click came from gutter, and screen position |
 | `GutterIconClickEvent` | `line: int`, `iconId: int`, `screenPoint: PointF or platform-native point type` | Clicked gutter icon line, icon id, and screen position |
 | `InlayHintClickEvent` | `line: int`, `column: int`, `type: InlayType`, `intValue: int`, `screenPoint: PointF or platform-native point type` | Clicked inlay hint position, inlay type, type-specific value, and screen position |
+| `CodeLensClickEvent` | `line: int`, `commandId: int`, `screenPoint: PointF or platform-native point type` | Clicked CodeLens line, unique command id, and screen position |
 | `LongPressEvent` | `cursorPosition: TextPosition`, `screenPoint: PointF or platform-native point type` | Long-press target position and screen position |
 | `DoubleTapEvent` | `cursorPosition: TextPosition`, `hasSelection: boolean`, `selection: TextRange?`, `screenPoint: PointF or platform-native point type` | Double-tap target position, resulting selection state, and screen position |
 | `ContextMenuEvent` | `cursorPosition: TextPosition`, `screenPoint: PointF or platform-native point type` | Context-menu target position and screen position |
@@ -1117,9 +1130,10 @@ Enum and enum-like constant values MUST match the C++ core definitions. The foll
 | `ScrollBehavior` | TOP=0, CENTER=1, BOTTOM=2 |
 | `SpanLayer` | SYNTAX=0, SEMANTIC=1 |
 | `InlayType` | TEXT=0, ICON=1, COLOR=2 |
-| `VisualRunType` | TEXT=0, WHITESPACE=1, NEWLINE=2, INLAY_HINT=3, PHANTOM_TEXT=4, FOLD_PLACEHOLDER=5, TAB=6 |
+| `VisualRunType` | TEXT=0, WHITESPACE=1, NEWLINE=2, INLAY_HINT=3, PHANTOM_TEXT=4, FOLD_PLACEHOLDER=5, TAB=6, CODELENS=7 |
+| `VisualLineKind` | CONTENT=0, PHANTOM=1, CODELENS=2 |
 | `FoldState` | NONE=0, EXPANDED=1, COLLAPSED=2 |
-| `DecorationType` | SYNTAX_HIGHLIGHT, SEMANTIC_HIGHLIGHT, INLAY_HINT, DIAGNOSTIC, FOLD_REGION, INDENT_GUIDE, BRACKET_GUIDE, FLOW_GUIDE, SEPARATOR_GUIDE, GUTTER_ICON, PHANTOM_TEXT |
+| `DecorationType` | SYNTAX_HIGHLIGHT, SEMANTIC_HIGHLIGHT, INLAY_HINT, DIAGNOSTIC, FOLD_REGION, INDENT_GUIDE, BRACKET_GUIDE, FLOW_GUIDE, SEPARATOR_GUIDE, GUTTER_ICON, PHANTOM_TEXT, CODELENS |
 | `GuideType` | INDENT=0, BRACKET=1, FLOW=2, SEPARATOR=3 |
 | `GuideDirection` | (platform-aligned with C++ core) |
 | `GuideStyle` | SOLID=0, DASHED=1, DOUBLE=2 |
@@ -1329,6 +1343,13 @@ The Core layer defines numerous decoration data types. All platforms MUST implem
 | `column` | int | **MUST** | Insertion column (0-based, UTF-16 offset) |
 | `text` | String | **MUST** | Phantom text content |
 
+**`CodeLensItem`** - Clickable label shown above a code line
+
+| Field | Type | MUST/MAY | Description |
+|---|---|---|---|
+| `text` | String | **MUST** | Display label text |
+| `commandId` | int | **MUST** | Unique command identifier passed back in `CodeLensClickEvent` |
+
 **`GutterIcon`** 鈥?Gutter area icon
 
 | Field | Type | MUST/MAY | Description |
@@ -1385,6 +1406,25 @@ The Core layer defines numerous decoration data types. All platforms MUST implem
 | `textEndColumn` | int | **MUST** | Text end column (used to determine separator drawing start position) |
 
 ---
+
+### 17.4 Visual Render Types
+
+**`VisualRun`** - One resolved render run
+
+| Field | Type | MUST/MAY | Description |
+|---|---|---|---|
+| `type` | VisualRunType | **MUST** | Run semantic type |
+| `iconId` | int | **MUST** | For `INLAY_HINT(ICON)`, icon resource id; for `CODELENS`, the unique `commandId` |
+| `active` | boolean | **MUST** | Render-time interactive active state for clickable runs such as `CODELENS` |
+
+**`VisualLine`** - One resolved visual line
+
+| Field | Type | MUST/MAY | Description |
+|---|---|---|---|
+| `kind` | VisualLineKind | **MUST** | Semantic line kind |
+| `ownsGutterSemantics` | boolean | **MUST** | Whether this visual line owns line-number, gutter-icon, and fold-marker semantics |
+
+> `CODELENS` is represented as a virtual visual line. The first real content line of the same logical line MUST be identified through `ownsGutterSemantics` rather than inferred from `wrapIndex`.
 
 ## 18. Document Specification (MUST)
 
@@ -1594,4 +1634,3 @@ Platform package version numbers MUST maintain alignment with the C++ Core versi
 - When Core releases a new major version (e.g. `2.0.0`), all platform packages MUST upgrade their major version within the same release cycle.
 - Platform packages MAY independently release patch versions (`c` increment) while the Core version remains unchanged, for platform-specific fixes.
 - The recommended ceiling on the minor version (`b`) is to prevent platform package versions from diverging too far from the Core version, which would cause version mapping confusion.
-

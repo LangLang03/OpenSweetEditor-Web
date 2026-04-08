@@ -210,6 +210,70 @@ namespace SweetEditor {
 
 		#endregion
 
+		#region CodeLens
+
+		internal static byte[] PackLineCodeLens(int line, IList<CodeLensItem> items) {
+			int count = items.Count;
+			int totalSize = 8;
+			byte[][] textBytes = new byte[count][];
+			for (int i = 0; i < count; i++) {
+				var tb = Encoding.UTF8.GetBytes(items[i].Text ?? string.Empty);
+				textBytes[i] = tb;
+				totalSize += 8 + tb.Length;
+			}
+			byte[] payload = new byte[totalSize];
+			int offset = 0;
+			WriteInt32LE(payload, ref offset, line);
+			WriteInt32LE(payload, ref offset, count);
+			for (int i = 0; i < count; i++) {
+				WriteInt32LE(payload, ref offset, items[i].CommandId);
+				var tb = textBytes[i];
+				WriteInt32LE(payload, ref offset, tb.Length);
+				if (tb.Length > 0) {
+					Buffer.BlockCopy(tb, 0, payload, offset, tb.Length);
+					offset += tb.Length;
+				}
+			}
+			return payload;
+		}
+
+		internal static byte[] PackBatchLineCodeLens(Dictionary<int, IList<CodeLensItem>> itemsByLine) {
+			int totalSize = 4;
+			var allTextBytes = new Dictionary<int, byte[][]>();
+			foreach (var kv in itemsByLine) {
+				var items = kv.Value;
+				totalSize += 8;
+				var lineTexts = new byte[items.Count][];
+				for (int i = 0; i < items.Count; i++) {
+					var tb = Encoding.UTF8.GetBytes(items[i].Text ?? string.Empty);
+					lineTexts[i] = tb;
+					totalSize += 8 + tb.Length;
+				}
+				allTextBytes[kv.Key] = lineTexts;
+			}
+			byte[] payload = new byte[totalSize];
+			int offset = 0;
+			WriteInt32LE(payload, ref offset, itemsByLine.Count);
+			foreach (var kv in itemsByLine) {
+				WriteInt32LE(payload, ref offset, kv.Key);
+				var items = kv.Value;
+				WriteInt32LE(payload, ref offset, items.Count);
+				var lineTexts = allTextBytes[kv.Key];
+				for (int i = 0; i < items.Count; i++) {
+					WriteInt32LE(payload, ref offset, items[i].CommandId);
+					var tb = lineTexts[i];
+					WriteInt32LE(payload, ref offset, tb.Length);
+					if (tb.Length > 0) {
+						Buffer.BlockCopy(tb, 0, payload, offset, tb.Length);
+						offset += tb.Length;
+					}
+				}
+			}
+			return payload;
+		}
+
+		#endregion
+
 		#region Diagnostics
 
 		internal static byte[] PackLineDiagnostics(int line, IList<Diagnostic> items) {
@@ -550,6 +614,9 @@ namespace SweetEditor {
 				!TryReadFloat(data, ref offset, out float margin)) {
 				return false;
 			}
+			if (!TryReadInt32(data, ref offset, out int active)) {
+				return false;
+			}
 			run = new VisualRun {
 				Type = ToVisualRunType(typeValue),
 				X = x,
@@ -561,6 +628,7 @@ namespace SweetEditor {
 				Width = width,
 				Padding = padding,
 				Margin = margin,
+				Active = active != 0,
 			};
 			return true;
 		}
@@ -570,7 +638,8 @@ namespace SweetEditor {
 			if (!TryReadInt32(data, ref offset, out int logicalLine) ||
 				!TryReadInt32(data, ref offset, out int wrapIndex) ||
 				!TryReadPointF(data, ref offset, out PointF lineNumberPosition) ||
-				!TryReadInt32(data, ref offset, out int isPhantomLine) ||
+				!TryReadInt32(data, ref offset, out int kindValue) ||
+				!TryReadInt32(data, ref offset, out int ownsGutterSemanticsValue) ||
 				!TryReadInt32(data, ref offset, out int foldStateValue)) {
 				return false;
 			}
@@ -589,7 +658,8 @@ namespace SweetEditor {
 				WrapIndex = wrapIndex,
 				LineNumberPosition = lineNumberPosition,
 				Runs = runs,
-				IsPhantomLine = isPhantomLine != 0,
+				Kind = Enum.IsDefined(typeof(VisualLineKind), kindValue) ? (VisualLineKind)kindValue : VisualLineKind.CONTENT,
+				OwnsGutterSemantics = ownsGutterSemanticsValue != 0,
 				FoldState = ToFoldState(foldStateValue),
 			};
 			return true;

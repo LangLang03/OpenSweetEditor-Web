@@ -162,8 +162,8 @@ namespace NS_SWEETEDITOR {
             run.x += text_area_x;
           }
         }
-        // For first line (not continuation, not phantom), fill fold state and gutter icon render items
-        if (visual_line.wrap_index == 0 && !visual_line.is_phantom_line && m_layout_metrics_.gutter_visible) {
+        // Fill gutter state only for the line that explicitly owns logical-line gutter semantics.
+        if (visual_line.owns_gutter_semantics && m_layout_metrics_.gutter_visible) {
           buildGutterIconRenderItems(i, screen_y, gutter_offset, model.gutter_icons);
           // Set fold state (used by platform to draw fold/unfold arrow)
           int fs = m_decoration_manager_->getFoldStateForLine(i);
@@ -184,7 +184,15 @@ namespace NS_SWEETEDITOR {
     model.viewport_height = m_viewport_.height;
   }
 
-  TextPosition TextLayout::hitTest(const PointF& screen_point) {
+  TextPosition TextLayout::hitTestPointer(const PointF& screen_point) {
+    return hitTestInternal(screen_point, false);
+  }
+
+  TextPosition TextLayout::hitTestTextBoundary(const PointF& screen_point) {
+    return hitTestInternal(screen_point, true);
+  }
+
+  TextPosition TextLayout::hitTestInternal(const PointF& screen_point, bool text_boundary) {
     PERF_TIMER("hitTest");
     if (m_document_ == nullptr) {
       return {0, 0};
@@ -204,15 +212,8 @@ namespace NS_SWEETEDITOR {
     const float abs_x = screen_point.x - text_area_x + scroll_x;
     const float abs_y = screen_point.y + scroll_y;
 
-    // Click on the left of text area (line number area): go to line start
-    const bool in_line_number_area = (screen_point.x < split_x);
-
     // Find hit logical line (skip fold-hidden lines)
     size_t hit_line = findHitLine(abs_y);
-
-    if (in_line_number_area) {
-      return {hit_line, 0};
-    }
 
     const LogicalLine& ll = logical_lines[hit_line];
     const U16String& line_text = ll.cached_u16_text;
@@ -221,6 +222,16 @@ namespace NS_SWEETEDITOR {
     size_t target_wrap = findHitWrapIndex(ll, abs_y, line_height);
 
     const VisualLine& vl = ll.visual_lines[target_wrap];
+
+    if (text_boundary && vl.kind != VisualLineKind::CONTENT) {
+      return mapVirtualLineToTextBoundary(hit_line, vl);
+    }
+
+    // Click on the left of text area (line number area): go to line start
+    const bool in_line_number_area = (screen_point.x < split_x);
+    if (in_line_number_area) {
+      return {hit_line, 0};
+    }
 
     // In both wrap and non-wrap modes, run.x is relative to the line
     // Compute relative click x inside the line
@@ -244,13 +255,18 @@ namespace NS_SWEETEDITOR {
       return {hit_line, 0};
     }
 
+    // Pointer hit on a CodeLens virtual line maps to the associated logical line start.
+    if (vl.kind == VisualLineKind::CODELENS) {
+      return {hit_line, 0};
+    }
+
     // Iterate runs to find the hit character
     float run_x = 0;
     for (const VisualRun& run : vl.runs) {
       float run_right = run_x + run.width;
 
       if (run.type == VisualRunType::INLAY_HINT || run.type == VisualRunType::PHANTOM_TEXT
-          || run.type == VisualRunType::FOLD_PLACEHOLDER) {
+          || run.type == VisualRunType::FOLD_PLACEHOLDER || run.type == VisualRunType::CODELENS) {
         run_x = run_right;
         continue;
       }
@@ -322,7 +338,7 @@ namespace NS_SWEETEDITOR {
 
     // Detect click in gutter area (line number area)
     if (screen_point.x < split_x) {
-      const float line_top_screen = ll.start_y - scroll_y;
+      const float line_top_screen = getGutterOwnerTopScreen(ll, scroll_y);
       const float icon_size = m_layout_metrics_.font_height;
       const float marker_height = m_layout_metrics_.font_height;
       const float item_top = line_top_screen + std::max(0.0f, (line_height - marker_height) * 0.5f);
@@ -385,7 +401,7 @@ namespace NS_SWEETEDITOR {
       click_x = screen_point.x - text_area_x + scroll_x;
     }
 
-    // Iterate runs to check hit on InlayHint or FoldPlaceholder
+    // Iterate runs to check hit on InlayHint, FoldPlaceholder, or CodeLens
     float run_x = 0;
     for (const VisualRun& run : vl.runs) {
       float run_right = run_x + run.width;
@@ -403,6 +419,10 @@ namespace NS_SWEETEDITOR {
           } else {
             return {HitTargetType::INLAY_HINT_TEXT, hit_line, run.column, 0};
           }
+        }
+      } else if (run.type == VisualRunType::CODELENS) {
+        if (click_x >= run_x && click_x < run_right) {
+          return {HitTargetType::CODELENS, hit_line, 0, run.icon_id};
         }
       }
 
@@ -477,8 +497,8 @@ namespace NS_SWEETEDITOR {
       }
     }
 
-    // column = 0, at start of first VisualLine
-    float screen_y = ll.start_y - scroll_y;
+    // column = 0, at start of the primary content visual line
+    float screen_y = getGutterOwnerTopScreen(ll, scroll_y);
     return {text_area_x - (m_wrap_mode_ == WrapMode::NONE ? scroll_x : 0), screen_y};
   }
 
@@ -1034,19 +1054,65 @@ namespace NS_SWEETEDITOR {
   void TextLayout::layoutLineIntoVisualLines(size_t line_index, const U16String& line_text, float start_y,
                                       Vector<VisualLine>& out_visual_lines) {
     float line_height = getLineHeight();
+    const float base_start_y = start_y;  // Save original start_y for phantom continuation y calculation
+
+    // CodeLens: prepend virtual line above the real code line
+    const auto& codelens_items = m_decoration_manager_->getLineCodeLens(line_index);
+    if (!codelens_items.empty()) {
+      VisualLine codelens_vl = {line_index, 0};
+      codelens_vl.line_number_position = {m_layout_metrics_.line_number_margin, start_y};
+      codelens_vl.kind = VisualLineKind::CODELENS;
+
+      float run_x = 0;
+      for (size_t ci = 0; ci < codelens_items.size(); ++ci) {
+        if (ci > 0) {
+          // Insert " | " separator run (plain TEXT, not clickable)
+          VisualRun sep;
+          sep.type = VisualRunType::TEXT;
+          sep.column = 0;
+          sep.length = 0;
+          sep.x = run_x;
+          sep.y = start_y;
+          static const U16String kSepText = {CHAR16(' '), CHAR16('|'), CHAR16(' ')};
+          sep.text = kSepText;
+          sep.width = measureWidth(sep.text, FONT_STYLE_NORMAL);
+          run_x += sep.width;
+          codelens_vl.runs.push_back(std::move(sep));
+        }
+        // Insert CODELENS run
+        VisualRun cl_run;
+        cl_run.type = VisualRunType::CODELENS;
+        cl_run.column = 0;
+        cl_run.length = 0;
+        cl_run.x = run_x;
+        cl_run.y = start_y;
+        cl_run.icon_id = codelens_items[ci].command_id;
+        U16String cl_u16;
+        StrUtil::convertUTF8ToUTF16(codelens_items[ci].text, cl_u16);
+        cl_run.text = std::move(cl_u16);
+        cl_run.width = cl_run.text.empty() ? 0 : measureWidth(cl_run.text, FONT_STYLE_NORMAL);
+        run_x += cl_run.width;
+        codelens_vl.runs.push_back(std::move(cl_run));
+      }
+      out_visual_lines.push_back(std::move(codelens_vl));
+      start_y += line_height;
+    }
 
     // Build runs for original line (includes first phantom line segment)
     Vector<VisualRun> all_runs;
     buildLineRuns(line_index, line_text, start_y, all_runs);
 
     // Handle original line based on wrap mode
+    const size_t codelens_line_count = codelens_items.empty() ? 0 : 1;
     if (m_wrap_mode_ == WrapMode::NONE) {
-      VisualLine visual_line = {line_index, 0};
+      VisualLine visual_line = {line_index, codelens_line_count};
       visual_line.line_number_position = {m_layout_metrics_.line_number_margin, start_y};
+      visual_line.kind = VisualLineKind::CONTENT;
+      visual_line.owns_gutter_semantics = true;
       visual_line.runs = std::move(all_runs);
       out_visual_lines.push_back(std::move(visual_line));
     } else {
-      wrapLineRuns(line_index, start_y, line_height, all_runs, out_visual_lines);
+      wrapLineRuns(line_index, start_y, line_height, all_runs, out_visual_lines, codelens_line_count);
     }
 
     // Handle cross-line phantom text continuation (2nd, 3rd... lines), each segment also wraps
@@ -1070,7 +1136,7 @@ namespace NS_SWEETEDITOR {
 
         // Build one PHANTOM_TEXT run for this continuation line
         size_t base_wrap_idx = out_visual_lines.size();
-        float seg_y = start_y + base_wrap_idx * line_height;
+        float seg_y = base_start_y + base_wrap_idx * line_height;
 
         VisualRun run;
         run.type = VisualRunType::PHANTOM_TEXT;
@@ -1087,7 +1153,7 @@ namespace NS_SWEETEDITOR {
           // No wrap: generate one phantom VisualLine directly
           VisualLine phantom_vl = {line_index, base_wrap_idx};
           phantom_vl.line_number_position = {m_layout_metrics_.line_number_margin, seg_y};
-          phantom_vl.is_phantom_line = true;
+          phantom_vl.kind = VisualLineKind::PHANTOM;
           phantom_vl.runs.push_back(std::move(run));
           out_visual_lines.push_back(std::move(phantom_vl));
         } else {
@@ -1096,11 +1162,12 @@ namespace NS_SWEETEDITOR {
           seg_runs.push_back(std::move(run));
           Vector<VisualLine> wrapped_lines;
           wrapLineRuns(line_index, seg_y, line_height, seg_runs, wrapped_lines);
-          // Fix wrap_index and mark as phantom line
+          // Fix wrap_index and mark as phantom lines
           for (auto& wl : wrapped_lines) {
             wl.wrap_index = out_visual_lines.size();
-            wl.is_phantom_line = true;
-            wl.line_number_position.y = start_y + wl.wrap_index * line_height;
+            wl.kind = VisualLineKind::PHANTOM;
+            wl.owns_gutter_semantics = false;
+            wl.line_number_position.y = base_start_y + wl.wrap_index * line_height;
             for (auto& r : wl.runs) {
               r.y = wl.line_number_position.y;
             }
@@ -1332,8 +1399,9 @@ namespace NS_SWEETEDITOR {
       // Set screen x (can be negative; overflow is covered by platform line-number background)
       run.x = text_area_x + run_left - scroll_x;
 
-      // INLAY_HINT / TAB: do not split
-      if (run.type == VisualRunType::INLAY_HINT || run.type == VisualRunType::TAB) {
+      // INLAY_HINT / TAB / CODELENS: do not split
+      if (run.type == VisualRunType::INLAY_HINT || run.type == VisualRunType::TAB
+          || run.type == VisualRunType::CODELENS) {
         current_x = run_right;
         ++run_it;
         continue;
@@ -1431,22 +1499,27 @@ namespace NS_SWEETEDITOR {
   }
 
   void TextLayout::wrapLineRuns(size_t line_index, float start_y, float line_height,
-                                Vector<VisualRun>& runs, Vector<VisualLine>& out_lines) {
+                                Vector<VisualRun>& runs, Vector<VisualLine>& out_lines,
+                                size_t wrap_index_offset) {
     const float text_area_x = m_layout_metrics_.textAreaX();
     const float wrap_width = m_viewport_.width - text_area_x;
     if (wrap_width <= 0) {
       // Viewport is too small: do not wrap, output single line
-      VisualLine vl = {line_index, 0};
+      VisualLine vl = {line_index, wrap_index_offset};
       vl.line_number_position = {m_layout_metrics_.line_number_margin, start_y};
+      vl.kind = VisualLineKind::CONTENT;
+      vl.owns_gutter_semantics = true;
       vl.runs = std::move(runs);
       out_lines.push_back(std::move(vl));
       return;
     }
 
-    size_t wrap_index = 0;
+    size_t wrap_index = wrap_index_offset;
     float current_x = 0; // Accumulated width in current line
     VisualLine current_line = {line_index, wrap_index};
     current_line.line_number_position = {m_layout_metrics_.line_number_margin, start_y};
+    current_line.kind = VisualLineKind::CONTENT;
+    current_line.owns_gutter_semantics = true;
 
     for (size_t ri = 0; ri < runs.size(); ++ri) {
       VisualRun& run = runs[ri];
@@ -1460,6 +1533,8 @@ namespace NS_SWEETEDITOR {
           float new_y = start_y + wrap_index * line_height;
           current_line = {line_index, wrap_index};
           current_line.line_number_position = {m_layout_metrics_.line_number_margin, new_y};
+          current_line.kind = VisualLineKind::CONTENT;
+          current_line.owns_gutter_semantics = false;
           current_x = 0;
         }
         run.x = current_x;
@@ -1543,6 +1618,8 @@ namespace NS_SWEETEDITOR {
           float new_y = start_y + wrap_index * line_height;
           current_line = {line_index, wrap_index};
           current_line.line_number_position = {m_layout_metrics_.line_number_margin, new_y};
+          current_line.kind = VisualLineKind::CONTENT;
+          current_line.owns_gutter_semantics = false;
           current_x = 0;
           seg_start_u16 = break_u16;
           seg_width = 0;
@@ -1749,6 +1826,21 @@ namespace NS_SWEETEDITOR {
     return true;
   }
 
+  const VisualLine* TextLayout::findGutterOwnerLine(const LogicalLine& logical_line) const {
+    for (const VisualLine& visual_line : logical_line.visual_lines) {
+      if (visual_line.owns_gutter_semantics) {
+        return &visual_line;
+      }
+    }
+    return nullptr;
+  }
+
+  float TextLayout::getGutterOwnerTopScreen(const LogicalLine& logical_line, float scroll_y) const {
+    const VisualLine* gutter_owner = findGutterOwnerLine(logical_line);
+    const float abs_y = gutter_owner != nullptr ? gutter_owner->line_number_position.y : logical_line.start_y;
+    return abs_y - scroll_y;
+  }
+
   size_t TextLayout::findHitLine(float abs_y) {
     Vector<LogicalLine>& logical_lines = m_document_->getLogicalLines();
     const size_t size = logical_lines.size();
@@ -1800,6 +1892,39 @@ namespace NS_SWEETEDITOR {
       }
     }
     return target_wrap;
+  }
+
+  TextPosition TextLayout::mapVirtualLineToTextBoundary(size_t logical_line, const VisualLine& visual_line) const {
+    if (m_document_ == nullptr) {
+      return {0, 0};
+    }
+    switch (visual_line.kind) {
+      case VisualLineKind::CODELENS:
+        return previousVisibleLineEnd(logical_line);
+      case VisualLineKind::PHANTOM:
+        return {logical_line, m_document_->getLineColumns(logical_line)};
+      case VisualLineKind::CONTENT:
+      default:
+        return {logical_line, 0};
+    }
+  }
+
+  TextPosition TextLayout::previousVisibleLineEnd(size_t logical_line) const {
+    if (m_document_ == nullptr) {
+      return {0, 0};
+    }
+    const auto& logical_lines = m_document_->getLogicalLines();
+    if (logical_line == 0 || logical_lines.empty()) {
+      return {0, 0};
+    }
+    size_t line = logical_line;
+    while (line > 0) {
+      --line;
+      if (!logical_lines[line].is_fold_hidden) {
+        return {line, m_document_->getLineColumns(line)};
+      }
+    }
+    return {0, 0};
   }
 #pragma endregion
 }

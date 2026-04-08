@@ -1,8 +1,30 @@
 #include <catch2/catch_amalgamated.hpp>
+#include <algorithm>
 #include "editor_core.h"
 #include "test_measurer.h"
 
 using namespace NS_SWEETEDITOR;
+
+namespace {
+  const VisualLine& findCodeLensVisualLine(const EditorRenderModel& model, size_t logical_line) {
+    auto it = std::find_if(model.lines.begin(), model.lines.end(), [logical_line](const VisualLine& line) {
+      return line.logical_line == logical_line && line.kind == VisualLineKind::CODELENS;
+    });
+    REQUIRE(it != model.lines.end());
+    return *it;
+  }
+
+  const VisualRun& findNthCodeLensRun(const VisualLine& line, size_t index) {
+    size_t current = 0;
+    for (const VisualRun& run : line.runs) {
+      if (run.type != VisualRunType::CODELENS) continue;
+      if (current == index) return run;
+      ++current;
+    }
+    REQUIRE(false);
+    return line.runs.front();
+  }
+}
 
 TEST_CASE("EditorCore buildRenderModel exposes normalized selection handles") {
   EditorOptions options;
@@ -87,4 +109,118 @@ TEST_CASE("EditorCore buildRenderModel uses external bracket match positions whe
   EditorRenderModel cleared_model;
   editor.buildRenderModel(cleared_model);
   CHECK(cleared_model.bracket_highlight_rects.empty());
+}
+
+TEST_CASE("EditorCore handleGestureEvent tap on CodeLens keeps cursor unchanged") {
+  EditorOptions options;
+  EditorCore editor(makeShared<FixedWidthTextMeasurer>(10.0f), options);
+
+  editor.loadDocument(makeShared<LineArrayDocument>("abcdef"));
+  editor.setViewport({400, 160});
+  editor.setCursorPosition({0, 3});
+  Vector<CodeLensItem> items;
+  items.push_back({"3 references", 101});
+  editor.setLineCodeLens(0, std::move(items));
+
+  EditorRenderModel model;
+  editor.buildRenderModel(model);
+  const VisualLine& codelens_line = findCodeLensVisualLine(model, 0);
+  const VisualRun& codelens_run = findNthCodeLensRun(codelens_line, 0);
+  const float point[2] = {
+      codelens_run.x + codelens_run.width * 0.5f,
+      codelens_run.y
+  };
+
+  const GestureResult result = editor.handleGestureEvent(
+      GestureEvent::create(EventType::MOUSE_DOWN, 1, point));
+
+  CHECK(result.hit_target.type == HitTargetType::CODELENS);
+  CHECK(result.hit_target.icon_id == 101);
+  CHECK(result.cursor_position == (TextPosition{0, 3}));
+  CHECK(editor.getCursorPosition() == (TextPosition{0, 3}));
+}
+
+TEST_CASE("EditorCore buildRenderModel activates only hovered CodeLens run") {
+  EditorOptions options;
+  EditorCore editor(makeShared<FixedWidthTextMeasurer>(10.0f), options);
+
+  editor.loadDocument(makeShared<LineArrayDocument>("abcdef"));
+  editor.setViewport({480, 160});
+  Vector<CodeLensItem> items;
+  items.push_back({"3 references", 101});
+  items.push_back({"2 implementations", 202});
+  editor.setLineCodeLens(0, std::move(items));
+
+  EditorRenderModel model;
+  editor.buildRenderModel(model);
+  const VisualLine& initial_codelens = findCodeLensVisualLine(model, 0);
+  const VisualRun& first_initial = findNthCodeLensRun(initial_codelens, 0);
+  const VisualRun& second_initial = findNthCodeLensRun(initial_codelens, 1);
+  CHECK_FALSE(first_initial.active);
+  CHECK_FALSE(second_initial.active);
+
+  const float hover_first[2] = {
+      first_initial.x + first_initial.width * 0.5f,
+      first_initial.y
+  };
+  editor.handleGestureEvent(GestureEvent::create(EventType::MOUSE_MOVE, 1, hover_first));
+
+  model = {};
+  editor.buildRenderModel(model);
+  const VisualLine& after_first_hover = findCodeLensVisualLine(model, 0);
+  CHECK(findNthCodeLensRun(after_first_hover, 0).active);
+  CHECK_FALSE(findNthCodeLensRun(after_first_hover, 1).active);
+
+  const VisualRun& second_hover_target = findNthCodeLensRun(after_first_hover, 1);
+  const float hover_second[2] = {
+      second_hover_target.x + second_hover_target.width * 0.5f,
+      second_hover_target.y
+  };
+  editor.handleGestureEvent(GestureEvent::create(EventType::MOUSE_MOVE, 1, hover_second));
+
+  model = {};
+  editor.buildRenderModel(model);
+  const VisualLine& after_second_hover = findCodeLensVisualLine(model, 0);
+  CHECK_FALSE(findNthCodeLensRun(after_second_hover, 0).active);
+  CHECK(findNthCodeLensRun(after_second_hover, 1).active);
+}
+
+TEST_CASE("EditorCore line-start word selection end handle can cross CodeLens virtual line") {
+  EditorOptions options;
+  EditorCore editor(makeShared<FixedWidthTextMeasurer>(10.0f), options);
+
+  editor.loadDocument(makeShared<LineArrayDocument>("alpha\nbeta"));
+  editor.setViewport({420, 200});
+  editor.setSelection({{1, 0}, {1, 4}});
+  Vector<CodeLensItem> items;
+  items.push_back({"3 references", 101});
+  editor.setLineCodeLens(1, std::move(items));
+
+  EditorRenderModel model;
+  editor.buildRenderModel(model);
+  REQUIRE(model.selection_end_handle.visible);
+  const VisualLine& codelens_line = findCodeLensVisualLine(model, 1);
+  const float codelens_mid_y = codelens_line.line_number_position.y + model.selection_end_handle.height * 0.5f;
+
+  const float down_point[2] = {
+      model.selection_end_handle.position.x + 12.0f,
+      model.selection_end_handle.position.y + model.selection_end_handle.height + 12.0f
+  };
+  const GestureResult down = editor.handleGestureEvent(
+      GestureEvent::create(EventType::TOUCH_DOWN, 1, down_point));
+
+  CHECK(down.is_handle_drag);
+  CHECK(down.has_selection);
+  CHECK(down.selection == (TextRange{{1, 0}, {1, 4}}));
+
+  const float move_point[2] = {
+      model.selection_end_handle.position.x + 12.0f,
+      codelens_mid_y + 4.0f
+  };
+  const GestureResult move = editor.handleGestureEvent(
+      GestureEvent::create(EventType::TOUCH_MOVE, 1, move_point));
+
+  CHECK(move.is_handle_drag);
+  CHECK(move.has_selection);
+  CHECK(move.selection == (TextRange{{0, 5}, {1, 0}}));
 }

@@ -135,6 +135,11 @@ export const editorSetBatchLineGutterIcons: (handle: number, data: ArrayBuffer, 
 export const editorSetMaxGutterIcons: (handle: number, count: number) => void;
 export const editorClearGutterIcons: (handle: number) => void;
 
+// CodeLens
+export const editorSetLineCodeLens: (handle: number, data: ArrayBuffer, size: number) => void;
+export const editorSetBatchLineCodeLens: (handle: number, data: ArrayBuffer, size: number) => void;
+export const editorClearCodeLens: (handle: number) => void;
+
 // Diagnostics
 export const editorSetLineDiagnostics: (handle: number, data: ArrayBuffer, size: number) => void;
 export const editorSetBatchLineDiagnostics: (handle: number, data: ArrayBuffer, size: number) => void;

@@ -428,6 +428,18 @@ namespace NS_SWEETEDITOR {
     /// @param count Max icon count (0=no reserved space, default 0)
     void setMaxGutterIcons(uint32_t count);
 
+    /// Set CodeLens items for given line (replace whole line)
+    /// @param line Line number
+    /// @param items CodeLens item list
+    void setLineCodeLens(size_t line, Vector<CodeLensItem>&& items);
+
+    /// Batch set CodeLens items for multiple lines
+    /// @param entries Array of line->items pairs
+    void setBatchLineCodeLens(Vector<std::pair<size_t, Vector<CodeLensItem>>>&& entries);
+
+    /// Clear all CodeLens items
+    void clearCodeLens();
+
     /// Set diagnostic decorations for given line (wavy underline/underline)
     /// @param line Line number
     /// @param diagnostics Diagnostic span list
@@ -552,6 +564,9 @@ namespace NS_SWEETEDITOR {
     TextPosition m_external_bracket_open_;
     TextPosition m_external_bracket_close_;
     bool m_has_external_brackets_ {false};
+
+    /// Currently active (hovered) clickable hit target (CODELENS, future hyperlinks)
+    HitTarget m_active_hit_target_;
 
     /// Max character distance for built-in bracket scan
     static constexpr size_t kMaxBracketScanChars = 10000;

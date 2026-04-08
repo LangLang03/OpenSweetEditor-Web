@@ -45,6 +45,7 @@ import com.qiplat.sweeteditor.core.adornment.BracketGuide;
 import com.qiplat.sweeteditor.core.adornment.FlowGuide;
 import com.qiplat.sweeteditor.core.adornment.IndentGuide;
 import com.qiplat.sweeteditor.core.adornment.SeparatorGuide;
+import com.qiplat.sweeteditor.core.adornment.CodeLensItem;
 import com.qiplat.sweeteditor.core.adornment.GutterIcon;
 import com.qiplat.sweeteditor.core.adornment.InlayHint;
 import com.qiplat.sweeteditor.core.adornment.InlayType;
@@ -83,6 +84,7 @@ import com.qiplat.sweeteditor.event.DoubleTapEvent;
 import com.qiplat.sweeteditor.event.EditorEvent;
 import com.qiplat.sweeteditor.event.EditorEventBus;
 import com.qiplat.sweeteditor.event.EditorEventListener;
+import com.qiplat.sweeteditor.event.CodeLensClickEvent;
 import com.qiplat.sweeteditor.event.FoldToggleEvent;
 import com.qiplat.sweeteditor.event.GutterIconClickEvent;
 import com.qiplat.sweeteditor.event.InlayHintClickEvent;
@@ -1081,6 +1083,27 @@ public class SweetEditor extends View {
         mEditorCore.setBatchLineGutterIcons(iconsByLine);
     }
 
+    // -------------------- CodeLens --------------------
+
+    /**
+     * Set CodeLens items for a specified line (replaces entire line).
+     *
+     * @param line  Line number (0-based)
+     * @param items CodeLens item list
+     */
+    public void setLineCodeLens(int line, @NonNull List<? extends CodeLensItem> items) {
+        mEditorCore.setLineCodeLens(line, items);
+    }
+
+    /**
+     * Batch set CodeLens items for multiple lines (reduces JNI calls).
+     *
+     * @param itemsByLine Sparse array of line number → CodeLens item list
+     */
+    public void setBatchLineCodeLens(@Nullable SparseArray<? extends List<? extends CodeLensItem>> itemsByLine) {
+        mEditorCore.setBatchLineCodeLens(itemsByLine);
+    }
+
     // -------------------- Diagnostic Decorations --------------------
 
     /**
@@ -1319,6 +1342,13 @@ public class SweetEditor extends View {
      */
     public void clearGutterIcons() {
         mEditorCore.clearGutterIcons();
+    }
+
+    /**
+     * Clear all CodeLens items.
+     */
+    public void clearCodeLens() {
+        mEditorCore.clearCodeLens();
     }
 
     /**
@@ -1746,6 +1776,12 @@ public class SweetEditor extends View {
                             mEventBus.publish(new FoldToggleEvent(
                                     result.hitTarget.line,
                                     result.hitTarget.type == EditorCore.HitTargetType.FOLD_GUTTER,
+                                    screenPoint));
+                            break;
+                        case CODELENS:
+                            mEventBus.publish(new CodeLensClickEvent(
+                                    result.hitTarget.line,
+                                    result.hitTarget.iconId,
                                     screenPoint));
                             break;
                     }

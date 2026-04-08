@@ -24,9 +24,13 @@ public class VisualLine {
     @SerializedName("runs")
     public List<VisualRun> runs;
 
-    /** Whether this is a phantom text continuation line (2nd/3rd... line of cross-line phantom text). */
-    @SerializedName("is_phantom_line")
-    public boolean isPhantomLine;
+    /** Semantic kind of this visual line. */
+    @SerializedName("kind")
+    public VisualLineKind kind = VisualLineKind.CONTENT;
+
+    /** Whether this visual line owns gutter semantics (line number, gutter icon, fold marker). */
+    @SerializedName("owns_gutter_semantics")
+    public boolean ownsGutterSemantics;
 
     /** Fold state: NONE=not a fold line, EXPANDED=foldable (expanded), COLLAPSED=folded. */
     @SerializedName("fold_state")

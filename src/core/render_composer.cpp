@@ -252,7 +252,7 @@ namespace NS_SWEETEDITOR {
     float top_padding = (line_height - font_height) * 0.5f;
 
     for (const auto& vl : model.lines) {
-      if (vl.is_phantom_line) continue;
+      if (vl.kind != VisualLineKind::CONTENT) continue;
       size_t logical_line = vl.logical_line;
       const auto& diags = m_decorations_->getLineDiagnostics(logical_line);
       if (diags.empty()) continue;

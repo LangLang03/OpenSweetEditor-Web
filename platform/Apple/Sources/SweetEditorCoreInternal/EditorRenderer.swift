@@ -128,7 +128,7 @@ struct EditorRenderer {
         drawLineSplit(context: context, x: splitX, height: CGFloat(model.viewport_height))
 
         // Line numbers (drawn after gutter overlay)
-        for line in model.lines where line.wrap_index == 0 && !line.is_phantom_line {
+        for line in model.lines where line.owns_gutter_semantics {
             drawLineNumber(context: context,
                            lineNumber: line.logical_line + 1,
                            visualLine: line,
@@ -267,7 +267,9 @@ struct EditorRenderer {
         }
 
         let textColor: CGColor
-        if run.style.color != 0 {
+        if run.type == .CODELENS {
+            textColor = run.active ? t.currentLineNumberColor : t.inlayHintTextColor
+        } else if run.style.color != 0 {
             textColor = cgColorFromARGB(run.style.color)
         } else {
             textColor = t.textColor
@@ -372,6 +374,15 @@ struct EditorRenderer {
             context.setLineWidth(1.0)
             context.move(to: CGPoint(x: CGFloat(run.x), y: strikeY))
             context.addLine(to: CGPoint(x: CGFloat(run.x) + CGFloat(run.width), y: strikeY))
+            context.strokePath()
+        }
+
+        if run.type == .CODELENS, run.active {
+            let underlineY = CGFloat(run.y) + max(1.0, descent * 0.25)
+            context.setStrokeColor(textColor)
+            context.setLineWidth(1.0)
+            context.move(to: CGPoint(x: CGFloat(run.x), y: underlineY))
+            context.addLine(to: CGPoint(x: CGFloat(run.x) + CGFloat(run.width), y: underlineY))
             context.strokePath()
         }
     }

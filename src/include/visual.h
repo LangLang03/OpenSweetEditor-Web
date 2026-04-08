@@ -26,7 +26,9 @@ namespace NS_SWEETEDITOR {
     /// Fold placeholder ("..." shown at end of folded region first line)
     FOLD_PLACEHOLDER,
     /// Tab character (width computed by core based on tab_size and column position)
-    TAB
+    TAB,
+    /// CodeLens clickable label (above code line)
+    CODELENS
   };
 
   /// Data for each rendered text run
@@ -45,7 +47,7 @@ namespace NS_SWEETEDITOR {
     U16String text;
     /// Text style (color + background color + font style)
     TextStyle style;
-    /// Icon resource ID (used by INLAY_HINT(ICON) only)
+    /// Icon resource ID for INLAY_HINT(ICON), or unique command_id for CODELENS
     int32_t icon_id {0};
     /// Color value (ARGB, used by INLAY_HINT(COLOR) only)
     int32_t color_value {0};
@@ -55,6 +57,8 @@ namespace NS_SWEETEDITOR {
     float padding {0};
     /// Horizontal margin with previous/next run (InlayHint only; both left and right; width already includes 2*margin)
     float margin {0};
+    /// Whether this run is in active state (hovered/pressed), used by clickable runs (CODELENS, future hyperlinks)
+    bool active {false};
 
     U8String dump() const;
   };
@@ -79,6 +83,16 @@ namespace NS_SWEETEDITOR {
     COLLAPSED = 2,
   };
 
+  /// Visual line semantic kind
+  enum struct VisualLineKind : uint8_t {
+    /// Real content line (primary line or wrapped continuation)
+    CONTENT = 0,
+    /// Phantom text continuation line
+    PHANTOM = 1,
+    /// CodeLens virtual line above a code line
+    CODELENS = 2,
+  };
+
   /// Visual rendered line data
   struct VisualLine {
     /// Logical line index
@@ -89,8 +103,10 @@ namespace NS_SWEETEDITOR {
     PointF line_number_position;
     /// Text runs in this visual line
     Vector<VisualRun> runs;
-    /// Whether this is a ghost-text continuation line (2nd/3rd... line of cross-line phantom text)
-    bool is_phantom_line {false};
+    /// Semantic kind of this visual line
+    VisualLineKind kind {VisualLineKind::CONTENT};
+    /// Whether this visual line owns gutter semantics (line number, gutter icon, fold marker)
+    bool owns_gutter_semantics {false};
     /// Fold state (NONE=not fold line, EXPANDED=expandable, COLLAPSED=folded)
     FoldState fold_state {FoldState::NONE};
 

@@ -188,6 +188,7 @@ class DecorationProviderManager {
     final foldRegions = <core.FoldRegion>[];
     final gutterIcons = <int, List<core.GutterIcon>>{};
     final phantomTexts = <int, List<core.PhantomText>>{};
+    final codeLensItems = <int, List<core.CodeLensItem>>{};
 
     var syntaxMode = ApplyMode.merge;
     var semanticMode = ApplyMode.merge;
@@ -200,6 +201,7 @@ class DecorationProviderManager {
     var foldMode = ApplyMode.merge;
     var gutterMode = ApplyMode.merge;
     var phantomMode = ApplyMode.merge;
+    var codeLensMode = ApplyMode.merge;
 
     for (final provider in _providers) {
       final state = _providerStates[provider];
@@ -229,6 +231,10 @@ class DecorationProviderManager {
       phantomMode = _mergeMode(phantomMode, r.phantomTextsMode);
       if (r.phantomTexts != null) {
         _appendMapOfArrays(phantomTexts, r.phantomTexts!);
+      }
+      codeLensMode = _mergeMode(codeLensMode, r.codeLensItemsMode);
+      if (r.codeLensItems != null) {
+        _appendMapOfArrays(codeLensItems, r.codeLensItems!);
       }
 
       indentMode = _mergeMode(indentMode, r.indentGuidesMode);
@@ -274,6 +280,9 @@ class DecorationProviderManager {
     _applyPhantomMode(phantomMode);
     _setBatchLinePhantomTexts(phantomTexts);
 
+    _applyCodeLensMode(codeLensMode);
+    _setBatchLineCodeLens(codeLensItems);
+
     session.requestFlush();
   }
 
@@ -314,6 +323,14 @@ class DecorationProviderManager {
       _clearPhantomTexts();
     } else if (mode == ApplyMode.replaceRange) {
       _clearPhantomRange(_lastVisibleStartLine, _lastVisibleEndLine);
+    }
+  }
+
+  void _applyCodeLensMode(ApplyMode mode) {
+    if (mode == ApplyMode.replaceAll) {
+      _clearCodeLens();
+    } else if (mode == ApplyMode.replaceRange) {
+      _clearCodeLensRange(_lastVisibleStartLine, _lastVisibleEndLine);
     }
   }
 
@@ -380,6 +397,12 @@ class DecorationProviderManager {
     final empty = _buildEmptyMapRange<core.PhantomText>(startLine, endLine);
     if (empty.isEmpty) return;
     _setBatchLinePhantomTexts(empty);
+  }
+
+  void _clearCodeLensRange(int startLine, int endLine) {
+    final empty = _buildEmptyMapRange<core.CodeLensItem>(startLine, endLine);
+    if (empty.isEmpty) return;
+    _setBatchLineCodeLens(empty);
   }
 
   void onProviderResult(
@@ -479,6 +502,13 @@ class DecorationProviderManager {
       target.phantomTexts = null;
       target.phantomTextsMode = patch.phantomTextsMode;
     }
+    if (patch.codeLensItems != null) {
+      target.codeLensItems = patch.codeLensItems;
+      target.codeLensItemsMode = patch.codeLensItemsMode;
+    } else if (patch.codeLensItemsMode != ApplyMode.merge) {
+      target.codeLensItems = null;
+      target.codeLensItemsMode = patch.codeLensItemsMode;
+    }
   }
 
   static ApplyMode _mergeMode(ApplyMode current, ApplyMode next) {
@@ -544,6 +574,16 @@ class DecorationProviderManager {
     final ec = session.editorCore;
     if (ec == null) return;
     ec.setBatchLinePhantomTexts(texts);
+  }
+
+  void _clearCodeLens() {
+    session.editorCore?.clearCodeLens();
+  }
+
+  void _setBatchLineCodeLens(Map<int, List<core.CodeLensItem>> items) {
+    final ec = session.editorCore;
+    if (ec == null) return;
+    ec.setBatchLineCodeLens(items);
   }
 
   void _setIndentGuides(List<core.IndentGuide> guides) {

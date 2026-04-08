@@ -150,13 +150,15 @@ static void appendVisualRun(std::vector<uint8_t>& buffer, const VisualRun& run) 
   appendF32(buffer, run.width);
   appendF32(buffer, run.padding);
   appendF32(buffer, run.margin);
+  appendBool(buffer, run.active);
 }
 
 static void appendVisualLine(std::vector<uint8_t>& buffer, const VisualLine& line) {
   appendI32(buffer, static_cast<int32_t>(line.logical_line));
   appendI32(buffer, static_cast<int32_t>(line.wrap_index));
   appendPoint(buffer, line.line_number_position);
-  appendBool(buffer, line.is_phantom_line);
+  appendI32(buffer, static_cast<int32_t>(line.kind));
+  appendBool(buffer, line.owns_gutter_semantics);
   appendI32(buffer, static_cast<int32_t>(line.fold_state));
   appendI32(buffer, static_cast<int32_t>(line.runs.size()));
   for (const auto& run : line.runs) {
@@ -1997,6 +1999,78 @@ void editor_clear_gutter_icons(intptr_t editor_handle) {
   SharedPtr<EditorCore> editor_core = getCPtrHolderValue<EditorCore>(editor_handle);
   if (editor_core == nullptr) return;
   editor_core->clearGutterIcons();
+}
+
+void editor_set_line_codelens(intptr_t editor_handle, const uint8_t* data, size_t size) {
+  SharedPtr<EditorCore> editor_core = getCPtrHolderValue<EditorCore>(editor_handle);
+  if (editor_core == nullptr || data == nullptr) return;
+
+  ByteCursor cursor(data, size);
+  uint32_t line = 0;
+  uint32_t item_count = 0;
+  if (!cursor.readU32(line) || !cursor.readU32(item_count)) return;
+
+  Vector<CodeLensItem> items;
+  items.reserve(item_count);
+  for (uint32_t i = 0; i < item_count; ++i) {
+    int32_t command_id = 0;
+    uint32_t text_len = 0;
+    if (!cursor.readI32(command_id) || !cursor.readU32(text_len)) return;
+    U8String text;
+    if (text_len > 0) {
+      const uint8_t* text_ptr = nullptr;
+      if (!cursor.readBytes(text_ptr, text_len)) return;
+      text = U8String(reinterpret_cast<const char*>(text_ptr), text_len);
+    }
+    CodeLensItem item;
+    item.command_id = command_id;
+    item.text = std::move(text);
+    items.push_back(std::move(item));
+  }
+  editor_core->setLineCodeLens(static_cast<size_t>(line), std::move(items));
+}
+
+void editor_set_batch_line_codelens(intptr_t editor_handle, const uint8_t* data, size_t size) {
+  SharedPtr<EditorCore> editor_core = getCPtrHolderValue<EditorCore>(editor_handle);
+  if (editor_core == nullptr || data == nullptr) return;
+
+  ByteCursor cursor(data, size);
+  uint32_t entry_count = 0;
+  if (!cursor.readU32(entry_count)) return;
+
+  Vector<std::pair<size_t, Vector<CodeLensItem>>> entries;
+  entries.reserve(entry_count);
+  for (uint32_t e = 0; e < entry_count; ++e) {
+    uint32_t line = 0;
+    uint32_t item_count = 0;
+    if (!cursor.readU32(line) || !cursor.readU32(item_count)) return;
+
+    Vector<CodeLensItem> items;
+    items.reserve(item_count);
+    for (uint32_t i = 0; i < item_count; ++i) {
+      int32_t command_id = 0;
+      uint32_t text_len = 0;
+      if (!cursor.readI32(command_id) || !cursor.readU32(text_len)) return;
+      U8String text;
+      if (text_len > 0) {
+        const uint8_t* text_ptr = nullptr;
+        if (!cursor.readBytes(text_ptr, text_len)) return;
+        text = U8String(reinterpret_cast<const char*>(text_ptr), text_len);
+      }
+      CodeLensItem item;
+      item.command_id = command_id;
+      item.text = std::move(text);
+      items.push_back(std::move(item));
+    }
+    entries.emplace_back(static_cast<size_t>(line), std::move(items));
+  }
+  editor_core->setBatchLineCodeLens(std::move(entries));
+}
+
+void editor_clear_codelens(intptr_t editor_handle) {
+  SharedPtr<EditorCore> editor_core = getCPtrHolderValue<EditorCore>(editor_handle);
+  if (editor_core == nullptr) return;
+  editor_core->clearCodeLens();
 }
 
 void editor_clear_guides(intptr_t editor_handle) {

@@ -37,6 +37,7 @@ import {
   DiagnosticItem,
   FlowGuide,
   FoldRegion,
+  CodeLensItem,
   GutterIcon,
   IndentGuide,
   InlayHint,
@@ -56,6 +57,7 @@ import { EditorRenderer } from './EditorRenderer';
 import { EditorEventBus } from './event/EditorEventBus';
 import {
   ContextMenuEvent,
+  CodeLensClickEvent,
   CursorChangedEvent,
   DocumentLoadedEvent,
   DoubleTapEvent,
@@ -1395,6 +1397,20 @@ export struct SweetEditor {
     this.editorCore.setBatchLineGutterIcons(iconsByLine);
   }
 
+  setLineCodeLens(line: number, items: CodeLensItem[]): void {
+    if (!this.editorCore) {
+      return;
+    }
+    this.editorCore.setLineCodeLens(line, items);
+  }
+
+  setBatchLineCodeLens(itemsByLine: Map<number, CodeLensItem[]>): void {
+    if (!this.editorCore) {
+      return;
+    }
+    this.editorCore.setBatchLineCodeLens(itemsByLine);
+  }
+
   setLineDiagnostics(line: number, items: DiagnosticItem[]): void {
     if (!this.editorCore) {
       return;
@@ -1570,6 +1586,12 @@ export struct SweetEditor {
   clearGutterIcons(): void {
     if (this.editorCore) {
       this.editorCore.clearGutterIcons();
+    }
+  }
+
+  clearCodeLens(): void {
+    if (this.editorCore) {
+      this.editorCore.clearCodeLens();
     }
   }
 
@@ -1828,6 +1850,14 @@ export struct SweetEditor {
 
   offFoldToggle(listener: EditorEventListener<FoldToggleEvent>): void {
     this.eventBus.off('foldToggle', listener as EditorEventListener<EditorEvent>);
+  }
+
+  onCodeLensClick(listener: EditorEventListener<CodeLensClickEvent>): void {
+    this.eventBus.on('codeLensClick', listener as EditorEventListener<EditorEvent>);
+  }
+
+  offCodeLensClick(listener: EditorEventListener<CodeLensClickEvent>): void {
+    this.eventBus.off('codeLensClick', listener as EditorEventListener<EditorEvent>);
   }
 
   onDocumentLoaded(listener: EditorEventListener<DocumentLoadedEvent>): void {
@@ -2268,6 +2298,10 @@ export struct SweetEditor {
       case HitTargetType.FOLD_GUTTER:
         this.eventBus.emit('foldToggle', new FoldToggleEvent(
           ht.line, ht.type === HitTargetType.FOLD_GUTTER, screenPoint));
+        break;
+      case HitTargetType.CODELENS:
+        this.eventBus.emit('codeLensClick', new CodeLensClickEvent(
+          ht.line, ht.iconId, screenPoint));
         break;
     }
   }

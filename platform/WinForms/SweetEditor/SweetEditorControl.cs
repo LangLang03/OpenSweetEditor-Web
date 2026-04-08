@@ -575,6 +575,8 @@ namespace SweetEditor {
 		public event EventHandler<GutterIconClickEventArgs> GutterIconClick;
 		/// <summary>Fold toggle event.</summary>
 		public event EventHandler<FoldToggleEventArgs> FoldToggle;
+		/// <summary>CodeLens click event.</summary>
+		public event EventHandler<CodeLensClickEventArgs> CodeLensClick;
 		#endregion
 
 		#region Constants
@@ -1095,6 +1097,19 @@ namespace SweetEditor {
 
 		/// <summary>Clears gutter icons.</summary>
 		public void ClearGutterIcons() { editorCore.ClearGutterIcons(); }
+
+		/// <summary>Sets CodeLens items for a specified line.</summary>
+		public void SetLineCodeLens(int line, IList<CodeLensItem> items) {
+			editorCore.SetLineCodeLens(line, items);
+		}
+
+		/// <summary>Sets batch CodeLens items for multiple lines.</summary>
+		public void SetBatchLineCodeLens(Dictionary<int, IList<CodeLensItem>> itemsByLine) {
+			editorCore.SetBatchLineCodeLens(itemsByLine);
+		}
+
+		/// <summary>Clears all CodeLens items.</summary>
+		public void ClearCodeLens() { editorCore.ClearCodeLens(); }
 
 		public void AddDecorationProvider(IDecorationProvider provider) => decorationProviderManager?.AddProvider(provider);
 		public void RemoveDecorationProvider(IDecorationProvider provider) => decorationProviderManager?.RemoveProvider(provider);
@@ -1696,6 +1711,12 @@ namespace SweetEditor {
 									result.HitTarget.Type == HitTargetType.FOLD_GUTTER,
 									sp));
 								break;
+							case HitTargetType.CODELENS:
+								CodeLensClick?.Invoke(this, new CodeLensClickEventArgs(
+									result.HitTarget.Line,
+									result.HitTarget.IconId,
+									sp));
+								break;
 						}
 					}
 					break;
@@ -1927,6 +1948,7 @@ namespace SweetEditor {
 			InlayHintClick = null;
 			GutterIconClick = null;
 			FoldToggle = null;
+			CodeLensClick = null;
 		}
 
 		protected override void Dispose(bool disposing) {

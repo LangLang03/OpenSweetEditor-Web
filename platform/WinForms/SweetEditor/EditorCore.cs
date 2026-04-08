@@ -670,6 +670,15 @@ namespace SweetEditor {
 		public PhantomText(int column, string text) { Column = column; Text = text; }
 	}
 
+	/// <summary>Immutable value object representing a single CodeLens item.</summary>
+	public sealed class CodeLensItem {
+		/// <summary>Display text (e.g. "3 references")</summary>
+		public string Text { get; }
+		/// <summary>Command ID (platform-defined, passed back on click)</summary>
+		public int CommandId { get; }
+		public CodeLensItem(string text, int commandId) { Text = text; CommandId = commandId; }
+	}
+
 	/// <summary>Immutable value object describing a single gutter icon.</summary>
 	public sealed class GutterIcon {
 		/// <summary>Icon resource ID</summary>
@@ -761,6 +770,8 @@ namespace SweetEditor {
 		FOLD_GUTTER = 5,
 		/// <summary>Hit InlayHint (color block type).</summary>
 		INLAY_HINT_COLOR = 6,
+		/// <summary>Hit a CodeLens item.</summary>
+		CODELENS = 7,
 	}
 
 	/// <summary>
@@ -865,7 +876,9 @@ namespace SweetEditor {
 		/// <summary>Fold placeholder (" ... " at the end of the first line of a folded region).</summary>
 		FOLD_PLACEHOLDER,
 		/// <summary>Tab character (width computed by core based on tab_size and column position).</summary>
-		TAB
+		TAB,
+		/// <summary>CodeLens clickable label (above code line).</summary>
+		CODELENS
 	}
 
 	/// <summary>
@@ -902,6 +915,9 @@ namespace SweetEditor {
 		/// <summary>Color value (ARGB, used only for INLAY_HINT(COLOR)).</summary>
 		[JsonPropertyName("color_value")]
 		public int ColorValue { get; set; }
+		/// <summary>Whether this run is in active state (hovered/pressed).</summary>
+		[JsonPropertyName("active")]
+		public bool Active { get; set; }
 	}
 
 	/// <summary>
@@ -915,6 +931,12 @@ namespace SweetEditor {
 		EXPANDED,
 		/// <summary>Folded (click to expand).</summary>
 		COLLAPSED,
+	}
+
+	public enum VisualLineKind {
+		CONTENT = 0,
+		PHANTOM = 1,
+		CODELENS = 2,
 	}
 
 	/// <summary>
@@ -933,9 +955,12 @@ namespace SweetEditor {
 		/// <summary>Text segments in this visual row</summary>
 		[JsonPropertyName("runs")]
 		public List<VisualRun> Runs { get; set; }
-		/// <summary>Whether this is a ghost-text continuation row (2nd, 3rd, ... rows of multi-line phantom text).</summary>
-		[JsonPropertyName("is_phantom_line")]
-		public bool IsPhantomLine { get; set; }
+		/// <summary>Semantic kind of this visual row.</summary>
+		[JsonPropertyName("kind")]
+		public VisualLineKind Kind { get; set; }
+		/// <summary>Whether this visual row owns gutter semantics (line number, gutter icon, fold marker).</summary>
+		[JsonPropertyName("owns_gutter_semantics")]
+		public bool OwnsGutterSemantics { get; set; }
 		/// <summary>Fold state</summary>
 		[JsonPropertyName("fold_state")]
 		public FoldState FoldState { get; set; }
@@ -1185,6 +1210,21 @@ namespace SweetEditor {
 		public PointF ScreenPoint { get; }
 		public FoldToggleEventArgs(int line, bool isGutter, PointF point) {
 			Line = line; IsGutter = isGutter; ScreenPoint = point;
+		}
+	}
+
+	/// <summary>
+	/// CodeLens click event args.
+	/// </summary>
+	public class CodeLensClickEventArgs : EventArgs {
+		/// <summary>Hit logical line (0-based)</summary>
+		public int Line { get; }
+		/// <summary>Command ID (from CodeLensItem)</summary>
+		public int CommandId { get; }
+		/// <summary>Tap screen position</summary>
+		public PointF ScreenPoint { get; }
+		public CodeLensClickEventArgs(int line, int commandId, PointF point) {
+			Line = line; CommandId = commandId; ScreenPoint = point;
 		}
 	}
 
@@ -1807,6 +1847,15 @@ namespace SweetEditor {
 
 		[DllImport(LibraryName, EntryPoint = "editor_set_batch_line_gutter_icons", CallingConvention = CallingConvention.Cdecl)]
 		internal static extern void SetBatchLineGutterIcons(IntPtr handle, byte[] data, nuint size);
+
+		[DllImport(LibraryName, EntryPoint = "editor_set_line_codelens", CallingConvention = CallingConvention.Cdecl)]
+		internal static extern void SetLineCodeLens(IntPtr handle, byte[] data, nuint size);
+
+		[DllImport(LibraryName, EntryPoint = "editor_set_batch_line_codelens", CallingConvention = CallingConvention.Cdecl)]
+		internal static extern void SetBatchLineCodeLens(IntPtr handle, byte[] data, nuint size);
+
+		[DllImport(LibraryName, EntryPoint = "editor_clear_codelens", CallingConvention = CallingConvention.Cdecl)]
+		internal static extern void ClearCodeLens(IntPtr handle);
 
 		[DllImport(LibraryName, EntryPoint = "editor_set_batch_line_diagnostics", CallingConvention = CallingConvention.Cdecl)]
 		internal static extern void SetBatchLineDiagnostics(IntPtr handle, byte[] data, nuint size);
@@ -2815,6 +2864,38 @@ namespace SweetEditor {
 		public void SetMaxGutterIcons(int count) {
 			if (IsReleased) return;
 			NativeMethods.SetMaxGutterIcons(nativeHandle, (uint)count);
+		}
+
+		/// <summary>Sets CodeLens items for the specified line (model overload).</summary>
+		public void SetLineCodeLens(int line, IList<CodeLensItem> items) {
+			if (IsReleased || items == null) return;
+			byte[] payload = ProtocolEncoder.PackLineCodeLens(line, items);
+			NativeMethods.SetLineCodeLens(nativeHandle, payload, (nuint)payload.Length);
+		}
+
+		/// <summary>Sets CodeLens items for the specified line (buffer overload).</summary>
+		public void SetLineCodeLens(byte[] payload) {
+			if (IsReleased || payload == null) return;
+			NativeMethods.SetLineCodeLens(nativeHandle, payload, (nuint)payload.Length);
+		}
+
+		/// <summary>Batch sets CodeLens items for multiple lines (model overload).</summary>
+		public void SetBatchLineCodeLens(Dictionary<int, IList<CodeLensItem>> itemsByLine) {
+			if (IsReleased || itemsByLine == null || itemsByLine.Count == 0) return;
+			byte[] payload = ProtocolEncoder.PackBatchLineCodeLens(itemsByLine);
+			NativeMethods.SetBatchLineCodeLens(nativeHandle, payload, (nuint)payload.Length);
+		}
+
+		/// <summary>Batch sets CodeLens items for multiple lines (buffer overload).</summary>
+		public void SetBatchLineCodeLens(byte[] payload) {
+			if (IsReleased || payload == null) return;
+			NativeMethods.SetBatchLineCodeLens(nativeHandle, payload, (nuint)payload.Length);
+		}
+
+		/// <summary>Clears all CodeLens items.</summary>
+		public void ClearCodeLens() {
+			if (IsReleased) return;
+			NativeMethods.ClearCodeLens(nativeHandle);
 		}
 
 		/// <summary>Sets diagnostic decorations for the specified line (model overload).</summary>

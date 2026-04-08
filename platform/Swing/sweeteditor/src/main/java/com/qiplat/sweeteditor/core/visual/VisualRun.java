@@ -14,4 +14,5 @@ public class VisualRun {
     @SerializedName("margin") public float margin;
     @SerializedName("icon_id") public int iconId;
     @SerializedName("color_value") public int colorValue;
+    @SerializedName("active") public boolean active;
 }

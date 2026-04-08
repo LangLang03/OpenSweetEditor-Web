@@ -12,6 +12,8 @@ namespace Demo {
 	public partial class Form1 : Form {
 		private const int STYLE_COLOR = (int)EditorTheme.STYLE_USER_BASE + 1;
 		private const string DEFAULT_FILE_NAME = "example.cpp";
+		private const int CODELENS_RUN = 1;
+		private const int CODELENS_DEBUG = 2;
 		private const string FALLBACK_SAMPLE_CODE =
 			"// SweetEditor Demo\n" +
 			"int main() {\n" +
@@ -44,6 +46,8 @@ namespace Demo {
 
 			demoCompletionProvider = new DemoCompletionProvider();
 			editorControl1.AddCompletionProvider(demoCompletionProvider);
+			editorControl1.CodeLensClick += (_, e) =>
+				UpdateStatus($"CodeLens {DescribeCodeLensCommand(e.CommandId)} at line {e.Line + 1}");
 
 			editorControl1.Settings.SetCurrentLineRenderMode(CurrentLineRenderMode.BORDER);
 
@@ -179,6 +183,14 @@ namespace Demo {
 			statusLabel.Text = message;
 		}
 
+		private static string DescribeCodeLensCommand(int commandId) {
+			return commandId switch {
+				CODELENS_RUN => "Run",
+				CODELENS_DEBUG => "Debug",
+				_ => $"Command#{commandId}",
+			};
+		}
+
 		private void CycleWrapMode() {
 			var wrapModes = Enum.GetValues<WrapMode>();
 			wrapModePreset = wrapModes[((int)wrapModePreset + 1) % wrapModes.Length];
@@ -299,6 +311,8 @@ namespace Demo {
 			private const string DefaultAnalysisFileName = "example.cpp";
 			private const int StyleColor = STYLE_COLOR;
 			private const int IconClass = 1;
+			private const int CodeLensRun = CODELENS_RUN;
+			private const int CodeLensDebug = CODELENS_DEBUG;
 			private const int MaxDynamicDiagnostics = 8;
 			private const string PhantomMemberStub =
 				"\n    void debugTrace(const std::string& tag) {\n        log(DEBUG, tag);\n    }";
@@ -322,7 +336,8 @@ namespace Demo {
 				DecorationType.GutterIcon |
 				DecorationType.InlayHint |
 				DecorationType.PhantomText |
-				DecorationType.Diagnostic;
+				DecorationType.Diagnostic |
+				DecorationType.CodeLens;
 
 			public static bool EnsureSweetLineReady(IReadOnlyList<string> syntaxFiles) {
 				if (highlightEngine != null) {
@@ -405,6 +420,7 @@ namespace Demo {
 				var syntaxSpans = new Dictionary<int, List<StyleSpan>>();
 				var inlayHints = new Dictionary<int, List<InlayHint>>();
 				var gutterIcons = new Dictionary<int, List<GutterIcon>>();
+				var codeLensItems = new Dictionary<int, List<CodeLensItem>>();
 				var indentGuides = new List<IndentGuide>();
 				var foldRegions = new List<FoldRegion>();
 				var separatorGuides = new List<SeparatorGuide>();
@@ -485,6 +501,7 @@ namespace Demo {
 						AppendTextInlayHint(inlayHints, textLines, token);
 						AppendSeparator(separatorGuides, textLines, token);
 						AppendGutterIcons(gutterIcons, textLines, token);
+						AppendCodeLens(codeLensItems, textLines, token);
 						firstKeywordRange = AppendDynamicDemoDecorations(
 							dynamicPhantoms,
 							phantomLines,
@@ -538,7 +555,9 @@ namespace Demo {
 					SeparatorGuides = separatorGuides,
 					SeparatorGuidesMode = DecorationApplyMode.REPLACE_ALL,
 					GutterIcons = gutterIcons,
-					GutterIconsMode = DecorationApplyMode.REPLACE_ALL
+					GutterIconsMode = DecorationApplyMode.REPLACE_ALL,
+					CodeLensItems = codeLensItems,
+					CodeLensItemsMode = DecorationApplyMode.REPLACE_ALL
 				};
 			}
 
@@ -688,6 +707,28 @@ namespace Demo {
 				string literal = GetTokenLiteral(textLines, range);
 				if (literal == "class" || literal == "struct") {
 					GetOrCreate(gutterIcons, range.Line).Add(new GutterIcon(IconClass));
+				}
+			}
+
+			private static void AppendCodeLens(Dictionary<int, List<CodeLensItem>> codeLensItems,
+												List<string> textLines,
+												TokenSpan token) {
+				if (codeLensItems.Count > 0) {
+					return;
+				}
+				if (token.StyleId != (int)EditorTheme.STYLE_KEYWORD) {
+					return;
+				}
+				TokenRangeInfo? range = ExtractSingleLineTokenRange(token);
+				if (range == null) {
+					return;
+				}
+				string literal = GetTokenLiteral(textLines, range);
+				if (literal == "class" || literal == "struct") {
+					codeLensItems[range.Line] = new List<CodeLensItem> {
+						new("Run", CodeLensRun),
+						new("Debug", CodeLensDebug)
+					};
 				}
 			}
 

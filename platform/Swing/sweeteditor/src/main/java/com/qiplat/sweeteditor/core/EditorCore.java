@@ -802,6 +802,42 @@ public class EditorCore {
         EditorNative.setMaxGutterIcons(nativeHandle, count);
     }
 
+    // ===================== CodeLens =====================
+
+    /** Set CodeLens items for a specific line */
+    public void setLineCodeLens(int line, List<? extends CodeLensItem> items) {
+        if (items == null) return;
+        try (Arena tempArena = Arena.ofConfined()) {
+            byte[] payload = ProtocolEncoder.packLineCodeLens(line, items);
+            EditorNative.setLineCodeLens(nativeHandle, payload, tempArena);
+        }
+    }
+
+    /** Set CodeLens items for a specific line (zero-copy overload) */
+    public void setLineCodeLens(MemorySegment payload, long size) {
+        EditorNative.setLineCodeLens(nativeHandle, payload, size);
+    }
+
+    /** Batch set CodeLens items for multiple lines */
+    public void setBatchLineCodeLens(Map<Integer, ? extends List<? extends CodeLensItem>> itemsByLine) {
+        if (itemsByLine == null || itemsByLine.isEmpty()) return;
+        byte[] payload = ProtocolEncoder.packBatchLineCodeLens(itemsByLine);
+        if (payload == null) return;
+        try (Arena tempArena = Arena.ofConfined()) {
+            EditorNative.setBatchLineCodeLens(nativeHandle, payload, tempArena);
+        }
+    }
+
+    /** Batch set CodeLens items for multiple lines (zero-copy overload) */
+    public void setBatchLineCodeLens(MemorySegment payload, long size) {
+        EditorNative.setBatchLineCodeLens(nativeHandle, payload, size);
+    }
+
+    /** Clears all CodeLens items */
+    public void clearCodeLens() {
+        EditorNative.clearCodeLens(nativeHandle);
+    }
+
     // ===================== Diagnostics =====================
 
     /** Set diagnostic decorations for a specific line (model overload) */

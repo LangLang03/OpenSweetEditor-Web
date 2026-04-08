@@ -8,6 +8,7 @@ import androidx.annotation.NonNull;
 import com.qiplat.sweeteditor.EditorTheme;
 import com.qiplat.sweeteditor.SweetEditor;
 import com.qiplat.sweeteditor.core.Document;
+import com.qiplat.sweeteditor.core.adornment.CodeLensItem;
 import com.qiplat.sweeteditor.core.adornment.Diagnostic;
 import com.qiplat.sweeteditor.core.adornment.FoldRegion;
 import com.qiplat.sweeteditor.core.adornment.GutterIcon;
@@ -61,6 +62,8 @@ public class DemoDecorationProvider implements DecorationProvider {
 
     public static final int ICON_TYPE = 1;
     public static final int ICON_AT = 2;
+    public static final int CODELENS_RUN = 1;
+    public static final int CODELENS_DEBUG = 2;
 
     private final SweetEditor editor;
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -83,7 +86,8 @@ public class DemoDecorationProvider implements DecorationProvider {
                 DecorationType.INDENT_GUIDE,
                 DecorationType.FOLD_REGION,
                 DecorationType.INLAY_HINT,
-                DecorationType.DIAGNOSTIC
+                DecorationType.DIAGNOSTIC,
+                DecorationType.CODELENS
         );
     }
 
@@ -119,6 +123,7 @@ public class DemoDecorationProvider implements DecorationProvider {
         SparseArray<List<StyleSpan>> syntaxSpans = new SparseArray<>();
         SparseArray<List<InlayHint>> colorInlayHints = new SparseArray<>();
         SparseArray<List<GutterIcon>> gutterIcons = new SparseArray<>();
+        SparseArray<List<CodeLensItem>> codeLensItems = new SparseArray<>();
         List<IndentGuide> indentGuides = new ArrayList<>();
         List<FoldRegion> foldRegions = new ArrayList<>();
         List<SeparatorGuide> separatorGuides = new ArrayList<>();
@@ -175,6 +180,7 @@ public class DemoDecorationProvider implements DecorationProvider {
                 appendTextInlayHint(colorInlayHints, editorDocument, token);
                 appendSeparator(separatorGuides, editorDocument, token);
                 appendGutterIcons(gutterIcons, editorDocument, token);
+                appendCodeLens(codeLensItems, editorDocument, token);
                 firstKeywordRange = appendDynamicDemoDecorations(
                         dynamicDiagnostics,
                         seenDiagnostics,
@@ -218,6 +224,7 @@ public class DemoDecorationProvider implements DecorationProvider {
                 .foldRegions(foldRegions, DecorationResult.ApplyMode.REPLACE_ALL)
                 .separatorGuides(separatorGuides, DecorationResult.ApplyMode.REPLACE_ALL)
                 .gutterIcons(gutterIcons, DecorationResult.ApplyMode.REPLACE_ALL)
+                .codeLensItems(codeLensItems, DecorationResult.ApplyMode.REPLACE_ALL)
                 .build();
     }
 
@@ -484,6 +491,30 @@ public class DemoDecorationProvider implements DecorationProvider {
                 gutterIcons.put(range.line, lineIcons);
             }
             lineIcons.add(new GutterIcon(ICON_AT));
+        }
+    }
+
+    private void appendCodeLens(@NonNull SparseArray<List<CodeLensItem>> codeLensItems,
+                                @NonNull Document editorDocument, TokenSpan token) {
+        if (codeLensItems.size() > 0) {
+            return;
+        }
+        if (token.styleId != EditorTheme.STYLE_KEYWORD) {
+            return;
+        }
+        TokenRangeInfo range = extractSingleLineTokenRange(token);
+        if (range == null) {
+            return;
+        }
+        String literal = getTokenLiteral(editorDocument, range);
+        if ("class".equals(literal) || "struct".equals(literal)) {
+            List<CodeLensItem> lineItems = codeLensItems.get(range.line);
+            if (lineItems == null) {
+                lineItems = new ArrayList<>();
+                codeLensItems.put(range.line, lineItems);
+            }
+            lineItems.add(new CodeLensItem("Run", CODELENS_RUN));
+            lineItems.add(new CodeLensItem("Debug", CODELENS_DEBUG));
         }
     }
 

@@ -205,6 +205,12 @@ void editor_clear_phantom_texts(intptr_t editor_handle);
 void editor_set_line_gutter_icons(intptr_t editor_handle, const uint8_t* data, size_t size);
 void editor_set_batch_line_gutter_icons(intptr_t editor_handle, const uint8_t* data, size_t size);
 
+// ===================== CodeLens API =====================
+
+void editor_set_line_codelens(intptr_t editor_handle, const uint8_t* data, size_t size);
+void editor_set_batch_line_codelens(intptr_t editor_handle, const uint8_t* data, size_t size);
+void editor_clear_codelens(intptr_t editor_handle);
+
 // ===================== Guide API =====================
 
 void editor_set_indent_guides(intptr_t editor_handle, const uint8_t* data, size_t size);

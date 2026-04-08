@@ -19,6 +19,25 @@ static U8String collectVisualLineText(const VisualLine& line) {
   return out;
 }
 
+static const VisualLine& findCodeLensVisualLine(const EditorRenderModel& model, size_t logical_line) {
+  auto it = std::find_if(model.lines.begin(), model.lines.end(), [logical_line](const VisualLine& line) {
+    return line.logical_line == logical_line && line.kind == VisualLineKind::CODELENS;
+  });
+  REQUIRE(it != model.lines.end());
+  return *it;
+}
+
+static const VisualRun& findNthCodeLensRun(const VisualLine& line, size_t index) {
+  size_t current = 0;
+  for (const VisualRun& run : line.runs) {
+    if (run.type != VisualRunType::CODELENS) continue;
+    if (current == index) return run;
+    ++current;
+  }
+  REQUIRE(false);
+  return line.runs.front();
+}
+
 TEST_CASE("TextLayout hitTest matches getPositionScreenCoord in non-wrap mode") {
   SharedPtr<TextMeasurer> measurer = makeShared<FixedWidthTextMeasurer>(10.0f);
   SharedPtr<DecorationManager> decorations = makeShared<DecorationManager>();
@@ -36,12 +55,12 @@ TEST_CASE("TextLayout hitTest matches getPositionScreenCoord in non-wrap mode") 
   const float probe_y = layout.getPositionScreenCoord({0, 0}).y + layout.getLineHeight() * 0.5f;
   for (size_t col = 0; col < 6; ++col) {
     const PointF pos = layout.getPositionScreenCoord({0, col});
-    const TextPosition mapped = layout.hitTest({pos.x + 1.0f, probe_y});
+    const TextPosition mapped = layout.hitTestPointer({pos.x + 1.0f, probe_y});
     CHECK(mapped == (TextPosition{0, col}));
   }
 
   const PointF end_pos = layout.getPositionScreenCoord({0, 6});
-  const TextPosition mapped_end = layout.hitTest({end_pos.x + 4.0f, probe_y});
+  const TextPosition mapped_end = layout.hitTestPointer({end_pos.x + 4.0f, probe_y});
   CHECK(mapped_end == (TextPosition{0, 6}));
 }
 
@@ -66,7 +85,7 @@ TEST_CASE("TextLayout hitTest/getPositionScreenCoord stay consistent in wrap mod
   for (size_t col = 0; col < 10; ++col) {
     const PointF pos = layout.getPositionScreenCoord({0, col});
     const float probe_y = pos.y + layout.getLineHeight() * 0.5f;
-    const TextPosition mapped = layout.hitTest({pos.x + 1.0f, probe_y});
+    const TextPosition mapped = layout.hitTestPointer({pos.x + 1.0f, probe_y});
     CHECK(mapped == (TextPosition{0, col}));
   }
 }
@@ -90,8 +109,8 @@ TEST_CASE("TextLayout hitTest snaps emoji modifier graphemes to left and right b
   const float probe_y = cluster_start.y + layout.getLineHeight() * 0.5f;
   const float cluster_width = cluster_end.x - cluster_start.x;
 
-  CHECK(layout.hitTest({cluster_start.x + cluster_width * 0.25f, probe_y}) == (TextPosition{0, 1}));
-  CHECK(layout.hitTest({cluster_start.x + cluster_width * 0.75f, probe_y}) == (TextPosition{0, 5}));
+  CHECK(layout.hitTestPointer({cluster_start.x + cluster_width * 0.25f, probe_y}) == (TextPosition{0, 1}));
+  CHECK(layout.hitTestPointer({cluster_start.x + cluster_width * 0.75f, probe_y}) == (TextPosition{0, 5}));
 }
 
 TEST_CASE("TextLayout horizontal cropping preserves grapheme hit testing") {
@@ -167,4 +186,145 @@ TEST_CASE("TextLayout monospace left crop does not over-trim complex graphemes")
   REQUIRE_FALSE(model.lines.empty());
   CHECK(collectVisualLineText(model.lines[0]) ==
         "\xF0\x9F\x87\xA8\xF0\x9F\x87\xB3\xF0\x9F\x87\xB2\xF0\x9F\x87\xB4\xF0\x9F\x91\x8C\xF0\x9F\x8F\xBB");
+}
+
+TEST_CASE("TextLayout getPositionScreenCoord skips CodeLens virtual line for line start") {
+  SharedPtr<TextMeasurer> measurer = makeShared<FixedWidthTextMeasurer>(10.0f);
+  SharedPtr<DecorationManager> decorations = makeShared<DecorationManager>();
+  TextLayout layout(measurer, decorations);
+
+  SharedPtr<Document> document = makeShared<LineArrayDocument>("abcdef");
+  layout.loadDocument(document);
+  layout.setViewport({320, 200});
+  layout.setViewState({1.0f, 0.0f, 0.0f});
+  layout.setWrapMode(WrapMode::NONE);
+  layout.getLayoutMetrics().fold_arrow_mode = FoldArrowMode::ALWAYS;
+
+  Vector<CodeLensItem> items;
+  items.push_back({"3 references", 101});
+  decorations->setLineCodeLens(0, std::move(items));
+
+  const PointF line_start = layout.getPositionScreenCoord({0, 0});
+  CHECK(line_start.y == Catch::Approx(layout.getLineHeight()));
+}
+
+TEST_CASE("TextLayout hitTestTextBoundary maps CodeLens virtual line to previous visible line end") {
+  SharedPtr<TextMeasurer> measurer = makeShared<FixedWidthTextMeasurer>(10.0f);
+  SharedPtr<DecorationManager> decorations = makeShared<DecorationManager>();
+  TextLayout layout(measurer, decorations);
+
+  SharedPtr<Document> document = makeShared<LineArrayDocument>("alpha\nbeta");
+  layout.loadDocument(document);
+  layout.setViewport({400, 200});
+  layout.setViewState({1.0f, 0.0f, 0.0f});
+  layout.setWrapMode(WrapMode::NONE);
+
+  Vector<CodeLensItem> items;
+  items.push_back({"3 references", 101});
+  decorations->setLineCodeLens(1, std::move(items));
+
+  const PointF line_start = layout.getPositionScreenCoord({1, 0});
+  const float probe_y = line_start.y - layout.getLineHeight() * 0.5f;
+  const float probe_x = layout.getLayoutMetrics().textAreaX() + 20.0f;
+
+  CHECK(layout.hitTestPointer({probe_x, probe_y}) == (TextPosition{1, 0}));
+  CHECK(layout.hitTestTextBoundary({probe_x, probe_y}) == (TextPosition{0, 5}));
+}
+
+TEST_CASE("TextLayout hitTestDecoration returns unique command ids for CodeLens runs") {
+  SharedPtr<TextMeasurer> measurer = makeShared<FixedWidthTextMeasurer>(10.0f);
+  SharedPtr<DecorationManager> decorations = makeShared<DecorationManager>();
+  TextLayout layout(measurer, decorations);
+
+  SharedPtr<Document> document = makeShared<LineArrayDocument>("abcdef");
+  layout.loadDocument(document);
+  layout.setViewport({400, 200});
+  layout.setViewState({1.0f, 0.0f, 0.0f});
+  layout.setWrapMode(WrapMode::NONE);
+
+  Vector<CodeLensItem> items;
+  items.push_back({"3 references", 101});
+  items.push_back({"2 implementations", 202});
+  decorations->setLineCodeLens(0, std::move(items));
+
+  EditorRenderModel model;
+  layout.layoutVisibleLines(model);
+  const VisualLine& codelens_line = findCodeLensVisualLine(model, 0);
+  const VisualRun& first = findNthCodeLensRun(codelens_line, 0);
+  const VisualRun& second = findNthCodeLensRun(codelens_line, 1);
+  const float codelens_y = layout.getPositionScreenCoord({0, 0}).y - layout.getLineHeight() * 0.5f;
+
+  const HitTarget first_target = layout.hitTestDecoration({first.x + first.width * 0.5f, codelens_y});
+  CHECK(first_target.type == HitTargetType::CODELENS);
+  CHECK(first_target.line == 0);
+  CHECK(first_target.icon_id == 101);
+
+  const HitTarget second_target = layout.hitTestDecoration({second.x + second.width * 0.5f, codelens_y});
+  CHECK(second_target.type == HitTargetType::CODELENS);
+  CHECK(second_target.line == 0);
+  CHECK(second_target.icon_id == 202);
+}
+
+TEST_CASE("TextLayout gutter fold hit uses content line geometry when CodeLens exists") {
+  SharedPtr<TextMeasurer> measurer = makeShared<FixedWidthTextMeasurer>(10.0f);
+  SharedPtr<DecorationManager> decorations = makeShared<DecorationManager>();
+  TextLayout layout(measurer, decorations);
+
+  SharedPtr<Document> document = makeShared<LineArrayDocument>("head\nbody");
+  layout.loadDocument(document);
+  layout.setViewport({320, 200});
+  layout.setViewState({1.0f, 0.0f, 0.0f});
+  layout.setWrapMode(WrapMode::NONE);
+  layout.getLayoutMetrics().fold_arrow_mode = FoldArrowMode::ALWAYS;
+
+  Vector<CodeLensItem> items;
+  items.push_back({"3 references", 101});
+  decorations->setLineCodeLens(0, std::move(items));
+  Vector<FoldRegion> folds;
+  folds.push_back({0, 1, false});
+  decorations->setFoldRegions(std::move(folds));
+
+  const float line_height = layout.getLineHeight();
+  const LayoutMetrics& metrics = layout.getLayoutMetrics();
+  const float content_top = layout.getPositionScreenCoord({0, 0}).y;
+  const float fold_width = metrics.foldArrowAreaWidth();
+  REQUIRE(fold_width > 0.0f);
+
+  const float fold_x = metrics.gutterWidth() - metrics.line_number_margin - fold_width * 0.5f;
+  const float fold_y = content_top + line_height * 0.5f;
+  const HitTarget target = layout.hitTestDecoration({fold_x, fold_y});
+
+  CHECK(target.type == HitTargetType::FOLD_GUTTER);
+  CHECK(target.line == 0);
+}
+
+TEST_CASE("TextLayout gutter icon hit uses content line geometry when CodeLens exists") {
+  SharedPtr<TextMeasurer> measurer = makeShared<FixedWidthTextMeasurer>(10.0f);
+  SharedPtr<DecorationManager> decorations = makeShared<DecorationManager>();
+  TextLayout layout(measurer, decorations);
+
+  SharedPtr<Document> document = makeShared<LineArrayDocument>("head");
+  layout.loadDocument(document);
+  layout.setViewport({320, 200});
+  layout.setViewState({1.0f, 0.0f, 0.0f});
+  layout.setWrapMode(WrapMode::NONE);
+  layout.getLayoutMetrics().max_gutter_icons = 0;
+
+  Vector<CodeLensItem> items;
+  items.push_back({"3 references", 101});
+  decorations->setLineCodeLens(0, std::move(items));
+  Vector<GutterIcon> icons;
+  icons.push_back({77});
+  decorations->setLineGutterIcons(0, std::move(icons));
+
+  const float line_height = layout.getLineHeight();
+  const LayoutMetrics& metrics = layout.getLayoutMetrics();
+  const float content_top = layout.getPositionScreenCoord({0, 0}).y;
+  const float icon_x = metrics.line_number_margin + metrics.font_height * 0.5f;
+  const float icon_y = content_top + line_height * 0.5f;
+  const HitTarget target = layout.hitTestDecoration({icon_x, icon_y});
+
+  CHECK(target.type == HitTargetType::GUTTER_ICON);
+  CHECK(target.line == 0);
+  CHECK(target.icon_id == 77);
 }

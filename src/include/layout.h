@@ -85,9 +85,15 @@ namespace NS_SWEETEDITOR {
 
     void layoutVisibleLines(EditorRenderModel& model);
 
-    /// Screen hit test: convert screen point to text position (for cursor placement)
+    /// Pointer hit test: convert screen point to text position (for cursor placement / tap)
     /// @param screen_point Screen point (relative to editor view top-left)
-    TextPosition hitTest(const PointF& screen_point);
+    TextPosition hitTestPointer(const PointF& screen_point);
+
+    /// Text-boundary hit test: convert screen point to a stable text boundary
+    /// used by selection dragging and handle dragging.
+    /// Virtual lines (for example CodeLens) are mapped to adjacent document text boundaries.
+    /// @param screen_point Screen point (relative to editor view top-left)
+    TextPosition hitTestTextBoundary(const PointF& screen_point);
 
     /// Screen hit test: detect hit on InlayHint, GutterIcon, fold marker, and other decorations
     /// @param screen_point Screen point (relative to editor view top-left)
@@ -221,7 +227,8 @@ namespace NS_SWEETEDITOR {
     void cropVisualLineRuns(VisualLine& visual_line, float scroll_x);
     /// Auto-wrap: split one line's runs into multiple VisualLines by available width
     void wrapLineRuns(size_t line_index, float start_y, float line_height,
-                      Vector<VisualRun>& runs, Vector<VisualLine>& out_lines);
+                      Vector<VisualRun>& runs, Vector<VisualLine>& out_lines,
+                      size_t wrap_index_offset = 0);
     /// Append fold placeholder and tail-line runs to collapsed first line (first line + placeholder + tail content)
     void appendFoldTailRuns(size_t index, const U16String& line_text, LogicalLine& logical_line);
     float computeLineNumberWidth() const;
@@ -231,6 +238,12 @@ namespace NS_SWEETEDITOR {
     size_t findHitLine(float abs_y);
     /// Find wrapped sub-line index hit inside a logical line
     size_t findHitWrapIndex(const LogicalLine& ll, float abs_y, float line_height) const;
+    /// Shared implementation behind pointer/text-boundary hit testing.
+    TextPosition hitTestInternal(const PointF& screen_point, bool text_boundary);
+    /// Map a virtual visual line to an adjacent stable document text boundary.
+    TextPosition mapVirtualLineToTextBoundary(size_t logical_line, const VisualLine& visual_line) const;
+    /// Find the previous visible logical line and return its end position.
+    TextPosition previousVisibleLineEnd(size_t logical_line) const;
     /// Build gutter icon render items for one logical line at the given screen Y
     void buildGutterIconRenderItems(size_t logical_line, float line_top_screen,
                                     float gutter_offset,
@@ -239,6 +252,10 @@ namespace NS_SWEETEDITOR {
     bool buildFoldMarkerRenderItem(size_t logical_line, float line_top_screen,
                                    float gutter_offset,
                                    FoldMarkerRenderItem& out_item) const;
+    /// Find the visual line that owns gutter semantics for a logical line.
+    const VisualLine* findGutterOwnerLine(const LogicalLine& logical_line) const;
+    /// Get the screen top y of the visual line that owns gutter semantics.
+    float getGutterOwnerTopScreen(const LogicalLine& logical_line, float scroll_y) const;
   };
 }
 

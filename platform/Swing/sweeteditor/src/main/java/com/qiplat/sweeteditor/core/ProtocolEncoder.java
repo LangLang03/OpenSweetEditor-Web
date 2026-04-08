@@ -385,6 +385,92 @@ final class ProtocolEncoder {
         return payload.array();
     }
 
+    // ==================== CodeLens ====================
+
+    static byte[] packLineCodeLens(int line, List<? extends CodeLensItem> items) {
+        int count = items.size();
+        int totalSize = 8; // line(4) + count(4)
+        byte[][] textBytes = new byte[count][];
+        for (int i = 0; i < count; i++) {
+            CodeLensItem item = items.get(i);
+            totalSize += 8; // command_id(4) + text_len(4)
+            if (item.text != null) {
+                byte[] bytes = item.text.getBytes(StandardCharsets.UTF_8);
+                textBytes[i] = bytes;
+                totalSize += bytes.length;
+            }
+        }
+        ByteBuffer payload = ByteBuffer.allocate(totalSize).order(ByteOrder.LITTLE_ENDIAN);
+        payload.putInt(line);
+        payload.putInt(count);
+        for (int i = 0; i < count; i++) {
+            CodeLensItem item = items.get(i);
+            payload.putInt(item.commandId);
+            byte[] tb = textBytes[i];
+            if (tb != null) {
+                payload.putInt(tb.length);
+                payload.put(tb);
+            } else {
+                payload.putInt(0);
+            }
+        }
+        return payload.array();
+    }
+
+    static byte[] packBatchLineCodeLens(Map<Integer, ? extends List<? extends CodeLensItem>> itemsByLine) {
+        if (itemsByLine == null || itemsByLine.isEmpty()) return null;
+        int entryCount = itemsByLine.size();
+        int totalSize = 4; // entry_count(4)
+        int totalItemCount = 0;
+        for (var entry : itemsByLine.entrySet()) {
+            List<? extends CodeLensItem> items = entry.getValue();
+            int itemCount = (items != null) ? items.size() : 0;
+            totalItemCount += itemCount;
+            totalSize += 8; // line(4) + item_count(4)
+        }
+        byte[][] textBytesCache = new byte[totalItemCount][];
+        int itemIdx = 0;
+        for (var entry : itemsByLine.entrySet()) {
+            List<? extends CodeLensItem> items = entry.getValue();
+            if (items == null) continue;
+            for (int j = 0; j < items.size(); j++) {
+                CodeLensItem item = items.get(j);
+                totalSize += 8; // command_id(4) + text_len(4)
+                if (item.text != null) {
+                    byte[] bytes = item.text.getBytes(StandardCharsets.UTF_8);
+                    textBytesCache[itemIdx] = bytes;
+                    totalSize += bytes.length;
+                }
+                itemIdx++;
+            }
+        }
+        ByteBuffer payload = ByteBuffer.allocate(totalSize).order(ByteOrder.LITTLE_ENDIAN);
+        payload.putInt(entryCount);
+        var sortedEntries = itemsByLine.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey()).toList();
+        itemIdx = 0;
+        for (var entry : sortedEntries) {
+            int line = entry.getKey();
+            List<? extends CodeLensItem> items = entry.getValue();
+            int itemCount = (items != null) ? items.size() : 0;
+            payload.putInt(line);
+            payload.putInt(itemCount);
+            for (int j = 0; j < itemCount; j++) {
+                CodeLensItem item = items.get(j);
+                payload.putInt(item.commandId);
+                byte[] tb = textBytesCache[itemIdx];
+                if (tb != null) {
+                    payload.putInt(tb.length);
+                    payload.put(tb);
+                } else {
+                    payload.putInt(0);
+                }
+                itemIdx++;
+            }
+        }
+        return payload.array();
+    }
+
     // ==================== Guide ====================
 
     static byte[] packIndentGuides(List<? extends IndentGuide> guides) {

@@ -123,6 +123,7 @@ extension SweetEditorCore {
         case 4: return .FOLD_PLACEHOLDER
         case 5: return .FOLD_GUTTER
         case 6: return .INLAY_HINT_COLOR
+        case 7: return .CODELENS
         default: return .NONE
         }
     }
@@ -264,6 +265,8 @@ extension SweetEditorCore {
         case 3: return .INLAY_HINT
         case 4: return .PHANTOM_TEXT
         case 5: return .FOLD_PLACEHOLDER
+        case 6: return .TAB
+        case 7: return .CODELENS
         default: return .TEXT
         }
     }
@@ -337,7 +340,8 @@ extension SweetEditorCore {
               let colorValue = reader.readInt32(),
               let width = reader.readFloat(),
               let padding = reader.readFloat(),
-              let margin = reader.readFloat() else {
+              let margin = reader.readFloat(),
+              let active = reader.readInt32() else {
             return nil
         }
         return VisualRun(
@@ -350,7 +354,8 @@ extension SweetEditorCore {
             color_value: colorValue,
             width: width,
             padding: padding,
-            margin: margin
+            margin: margin,
+            active: active != 0
         )
     }
 
@@ -358,7 +363,8 @@ extension SweetEditorCore {
         guard let logicalLine = reader.readInt32(),
               let wrapIndex = reader.readInt32(),
               let lineNumberPosition = readPointData(&reader),
-              let isPhantomLine = reader.readInt32(),
+              let kindValue = reader.readInt32(),
+              let ownsGutterSemanticsValue = reader.readInt32(),
               let foldStateValue = reader.readInt32() else {
             return nil
         }
@@ -376,7 +382,8 @@ extension SweetEditorCore {
             wrap_index: Int(wrapIndex),
             line_number_position: lineNumberPosition,
             runs: runs,
-            is_phantom_line: isPhantomLine != 0,
+            kind: VisualLineKind(rawValue: Int(kindValue)) ?? .CONTENT,
+            owns_gutter_semantics: ownsGutterSemanticsValue != 0,
             gutter_icon_ids: gutterIconIds,
             fold_state: foldState(from: foldStateValue)
         )

@@ -10,6 +10,7 @@ import com.qiplat.sweeteditor.core.adornment.IndentGuide;
 import com.qiplat.sweeteditor.core.adornment.SeparatorGuide;
 import com.qiplat.sweeteditor.core.adornment.InlayHint;
 import com.qiplat.sweeteditor.core.adornment.SpanLayer;
+import com.qiplat.sweeteditor.core.adornment.CodeLensItem;
 import com.qiplat.sweeteditor.core.adornment.PhantomText;
 import com.qiplat.sweeteditor.core.adornment.StyleSpan;
 import com.qiplat.sweeteditor.core.foundation.TextChange;
@@ -204,6 +205,7 @@ public final class DecorationProviderManager {
         List<FoldRegion> foldRegions = new ArrayList<>();
         Map<Integer, List<GutterIcon>> gutterIcons = new HashMap<>();
         Map<Integer, List<PhantomText>> phantomTexts = new HashMap<>();
+        Map<Integer, List<CodeLensItem>> codeLensItems = new HashMap<>();
         DecorationResult.ApplyMode syntaxMode = DecorationResult.ApplyMode.MERGE;
         DecorationResult.ApplyMode semanticMode = DecorationResult.ApplyMode.MERGE;
         DecorationResult.ApplyMode inlayMode = DecorationResult.ApplyMode.MERGE;
@@ -215,6 +217,7 @@ public final class DecorationProviderManager {
         DecorationResult.ApplyMode foldMode = DecorationResult.ApplyMode.MERGE;
         DecorationResult.ApplyMode gutterMode = DecorationResult.ApplyMode.MERGE;
         DecorationResult.ApplyMode phantomMode = DecorationResult.ApplyMode.MERGE;
+        DecorationResult.ApplyMode codeLensMode = DecorationResult.ApplyMode.MERGE;
 
         for (DecorationProvider provider : providers) {
             ProviderState state = providerStates.get(provider);
@@ -244,6 +247,10 @@ public final class DecorationProviderManager {
             phantomMode = mergeMode(phantomMode, r.getPhantomTextsMode());
             if (r.getPhantomTexts() != null) {
                 appendMapOfList(phantomTexts, r.getPhantomTexts());
+            }
+            codeLensMode = mergeMode(codeLensMode, r.getCodeLensItemsMode());
+            if (r.getCodeLensItems() != null) {
+                appendMapOfList(codeLensItems, r.getCodeLensItems());
             }
 
             indentMode = mergeMode(indentMode, r.getIndentGuidesMode());
@@ -296,6 +303,9 @@ public final class DecorationProviderManager {
         applyPhantomMode(phantomMode);
         editor.setBatchLinePhantomTexts(phantomTexts);
 
+        applyCodeLensMode(codeLensMode);
+        editor.setBatchLineCodeLens(codeLensItems);
+
         editor.flush();
     }
 
@@ -345,6 +355,14 @@ public final class DecorationProviderManager {
             editor.clearPhantomTexts();
         } else if (mode == DecorationResult.ApplyMode.REPLACE_RANGE) {
             clearPhantomRange(lastVisibleStartLine, lastVisibleEndLine);
+        }
+    }
+
+    private void applyCodeLensMode(DecorationResult.ApplyMode mode) {
+        if (mode == DecorationResult.ApplyMode.REPLACE_ALL) {
+            editor.clearCodeLens();
+        } else if (mode == DecorationResult.ApplyMode.REPLACE_RANGE) {
+            clearCodeLensRange(lastVisibleStartLine, lastVisibleEndLine);
         }
     }
 
@@ -408,6 +426,12 @@ public final class DecorationProviderManager {
         Map<Integer, List<PhantomText>> empty = buildEmptyRangeMap(startLine, endLine);
         if (empty.isEmpty()) return;
         editor.setBatchLinePhantomTexts(empty);
+    }
+
+    private void clearCodeLensRange(int startLine, int endLine) {
+        Map<Integer, List<CodeLensItem>> empty = buildEmptyRangeMap(startLine, endLine);
+        if (empty.isEmpty()) return;
+        editor.setBatchLineCodeLens(empty);
     }
 
     private static <T> Map<Integer, List<T>> buildEmptyRangeMap(int startLine, int endLine) {
@@ -558,6 +582,13 @@ public final class DecorationProviderManager {
         } else if (patch.getPhantomTextsMode() != DecorationResult.ApplyMode.MERGE) {
             target.setPhantomTexts(null);
             target.setPhantomTextsMode(patch.getPhantomTextsMode());
+        }
+        if (patch.getCodeLensItems() != null) {
+            target.setCodeLensItems(patch.getCodeLensItems());
+            target.setCodeLensItemsMode(patch.getCodeLensItemsMode());
+        } else if (patch.getCodeLensItemsMode() != DecorationResult.ApplyMode.MERGE) {
+            target.setCodeLensItems(null);
+            target.setCodeLensItemsMode(patch.getCodeLensItemsMode());
         }
     }
 

@@ -2,6 +2,7 @@ package com.qiplat.sweeteditor.demo;
 
 import com.qiplat.sweeteditor.EditorTheme;
 import com.qiplat.sweeteditor.EditorMetadata;
+import com.qiplat.sweeteditor.core.adornment.CodeLensItem;
 import com.qiplat.sweeteditor.core.adornment.Diagnostic;
 import com.qiplat.sweeteditor.core.adornment.FoldRegion;
 import com.qiplat.sweeteditor.core.adornment.GutterIcon;
@@ -52,6 +53,8 @@ public class DemoDecorationProvider implements DecorationProvider {
     private static final String PHANTOM_INLINE_HINT = " /* demo phantom */";
 
     public static final int ICON_CLASS = 1;
+    public static final int CODELENS_RUN = 1;
+    public static final int CODELENS_DEBUG = 2;
 
     private static HighlightEngine highlightEngine;
 
@@ -74,7 +77,8 @@ public class DemoDecorationProvider implements DecorationProvider {
                 DecorationType.GUTTER_ICON,
                 DecorationType.INLAY_HINT,
                 DecorationType.PHANTOM_TEXT,
-                DecorationType.DIAGNOSTIC
+                DecorationType.DIAGNOSTIC,
+                DecorationType.CODELENS
         );
     }
 
@@ -117,6 +121,7 @@ public class DemoDecorationProvider implements DecorationProvider {
         Map<Integer, List<StyleSpan>> syntaxSpans = new HashMap<>();
         Map<Integer, List<InlayHint>> colorInlayHints = new HashMap<>();
         Map<Integer, List<GutterIcon>> gutterIcons = new HashMap<>();
+        Map<Integer, List<CodeLensItem>> codeLensItems = new HashMap<>();
         List<IndentGuide> indentGuides = new ArrayList<>();
         List<FoldRegion> foldRegions = new ArrayList<>();
         List<SeparatorGuide> separatorGuides = new ArrayList<>();
@@ -190,6 +195,7 @@ public class DemoDecorationProvider implements DecorationProvider {
                 appendTextInlayHint(colorInlayHints, textLines, token);
                 appendSeparator(separatorGuides, textLines, token);
                 appendGutterIcons(gutterIcons, textLines, token);
+                appendCodeLens(codeLensItems, textLines, token);
                 firstKeywordRange = appendDynamicDemoDecorations(
                         dynamicPhantoms,
                         phantomLines,
@@ -241,6 +247,7 @@ public class DemoDecorationProvider implements DecorationProvider {
                 .foldRegions(foldRegions, DecorationResult.ApplyMode.REPLACE_ALL)
                 .separatorGuides(separatorGuides, DecorationResult.ApplyMode.REPLACE_ALL)
                 .gutterIcons(gutterIcons, DecorationResult.ApplyMode.REPLACE_ALL)
+                .codeLensItems(codeLensItems, DecorationResult.ApplyMode.REPLACE_ALL)
                 .build();
     }
 
@@ -446,6 +453,26 @@ public class DemoDecorationProvider implements DecorationProvider {
         if ("class".equals(literal) || "struct".equals(literal)) {
             gutterIcons.computeIfAbsent(range.line, ignored -> new ArrayList<>())
                     .add(new GutterIcon(ICON_CLASS));
+        }
+    }
+
+    private void appendCodeLens(Map<Integer, List<CodeLensItem>> codeLensItems, List<String> textLines, TokenSpan token) {
+        if (!codeLensItems.isEmpty()) {
+            return;
+        }
+        if (token.styleId() != EditorTheme.STYLE_KEYWORD) {
+            return;
+        }
+        TokenRangeInfo range = extractSingleLineTokenRange(token);
+        if (range == null) {
+            return;
+        }
+        String literal = getTokenLiteral(textLines, range);
+        if ("class".equals(literal) || "struct".equals(literal)) {
+            List<CodeLensItem> lineItems = new ArrayList<>();
+            lineItems.add(new CodeLensItem("Run", CODELENS_RUN));
+            lineItems.add(new CodeLensItem("Debug", CODELENS_DEBUG));
+            codeLensItems.put(range.line, lineItems);
         }
     }
 

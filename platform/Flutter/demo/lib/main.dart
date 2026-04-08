@@ -48,6 +48,7 @@ class _EditorDemoPageState extends State<EditorDemoPage> {
   late final SweetEditorController _controller;
   StreamSubscription<TextChangedEvent>? _textChangedSub;
   StreamSubscription<CursorChangedEvent>? _cursorChangedSub;
+  StreamSubscription<CodeLensClickEvent>? _codeLensClickSub;
   bool _isDarkTheme = true;
   core.WrapMode _wrapMode = core.WrapMode.none;
   String _statusText = 'Ready';
@@ -70,6 +71,7 @@ class _EditorDemoPageState extends State<EditorDemoPage> {
     _suggestionTimer?.cancel();
     _textChangedSub?.cancel();
     _cursorChangedSub?.cancel();
+    _codeLensClickSub?.cancel();
     super.dispose();
   }
 
@@ -89,6 +91,7 @@ class _EditorDemoPageState extends State<EditorDemoPage> {
 
     _textChangedSub = _controller.onTextChanged.listen(_onTextChanged);
     _cursorChangedSub = _controller.onCursorChanged.listen(_onCursorChanged);
+    _codeLensClickSub = _controller.onCodeLensClick.listen(_onCodeLensClick);
 
     _controller.setInlineSuggestionListener(
       _DemoSuggestionListener(
@@ -113,6 +116,10 @@ class _EditorDemoPageState extends State<EditorDemoPage> {
 
   void _onCursorChanged(CursorChangedEvent e) {
     _scheduleSuggestionIfAtLineEnd(e);
+  }
+
+  void _onCodeLensClick(CodeLensClickEvent e) {
+    _updateStatus('CodeLens ${_describeCodeLensCommand(e.commandId)} at line ${e.line + 1}');
   }
 
   void _scheduleSuggestionIfAtLineEnd(CursorChangedEvent event) {
@@ -162,6 +169,17 @@ class _EditorDemoPageState extends State<EditorDemoPage> {
 
   void _updateStatus(String message) {
     if (mounted) setState(() => _statusText = message);
+  }
+
+  String _describeCodeLensCommand(int commandId) {
+    switch (commandId) {
+      case codeLensRun:
+        return 'Run';
+      case codeLensDebug:
+        return 'Debug';
+      default:
+        return 'Command#$commandId';
+    }
   }
 
   Future<void> _loadSampleByIndex(int index) async {

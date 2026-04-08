@@ -10,6 +10,7 @@ class IOSEditorView: UIView, UIKeyInput, UITextInput, UITextInputTraits, UIPoint
     var onFoldToggle: ((SweetEditorFoldToggleEvent) -> Void)?
     var onInlayHintClick: ((SweetEditorInlayHintClickEvent) -> Void)?
     var onGutterIconClick: ((SweetEditorGutterIconClickEvent) -> Void)?
+    var onCodeLensClick: ((SweetEditorCodeLensClickEvent) -> Void)?
     var onDocumentTextChanged: ((String) -> Void)?
     var editorIconProvider: EditorIconProvider?
     let settings = EditorSettings(host: nil)
@@ -232,6 +233,16 @@ class IOSEditorView: UIView, UIKeyInput, UITextInput, UITextInputTraits, UIPoint
         rebuildAndRedraw()
     }
 
+    func setLineCodeLens(line: Int, items: [SweetEditorCore.CodeLensPayload]) {
+        editorCore.setLineCodeLens(line: line, items: items)
+        rebuildAndRedraw()
+    }
+
+    func setBatchLineCodeLens(_ itemsByLine: [Int: [SweetEditorCore.CodeLensPayload]]) {
+        editorCore.setBatchLineCodeLens(itemsByLine)
+        rebuildAndRedraw()
+    }
+
     func setMaxGutterIcons(_ count: UInt32) {
         settings.setMaxGutterIcons(count)
     }
@@ -317,6 +328,11 @@ class IOSEditorView: UIView, UIKeyInput, UITextInput, UITextInputTraits, UIPoint
 
     func clearGutterIcons() {
         editorCore.clearGutterIcons()
+        rebuildAndRedraw()
+    }
+
+    func clearCodeLens() {
+        editorCore.clearCodeLens()
         rebuildAndRedraw()
     }
 
@@ -733,6 +749,14 @@ class IOSEditorView: UIView, UIKeyInput, UITextInput, UITextInputTraits, UIPoint
                 SweetEditorGutterIconClickEvent(
                     line: result.hit_target.line,
                     iconId: result.hit_target.icon_id,
+                    locationInView: CGPoint(x: CGFloat(result.tap_point.x), y: CGFloat(result.tap_point.y))
+                )
+            )
+        case .CODELENS:
+            onCodeLensClick?(
+                SweetEditorCodeLensClickEvent(
+                    line: result.hit_target.line,
+                    commandId: result.hit_target.icon_id,
                     locationInView: CGPoint(x: CGFloat(result.tap_point.x), y: CGFloat(result.tap_point.y))
                 )
             )

@@ -343,6 +343,14 @@ class EditorInteractionController {
       case core.HitTargetType.foldPlaceholder:
       case core.HitTargetType.foldGutter:
         break;
+      case core.HitTargetType.codelens:
+        _session.eventBus.publish(
+          CodeLensClickEvent(
+            line: hitTarget.line,
+            commandId: hitTarget.iconId,
+            screenPoint: screenPoint,
+          ),
+        );
     }
   }
 

@@ -111,6 +111,14 @@ namespace NS_SWEETEDITOR {
     int32_t icon_id {0};
   };
 
+  /// CodeLens item (clickable label above a code line)
+  struct CodeLensItem {
+    /// Display text (UTF8), e.g. "3 references"
+    U8String text;
+    /// Unique command ID (platform-defined, transparently passed back on click)
+    int32_t command_id {0};
+  };
+
 #pragma region Diagnostic (Diagnostic Decorations)
 
   /// Diagnostic severity level
@@ -207,6 +215,15 @@ namespace NS_SWEETEDITOR {
 
     /// Set gutter icons for a given line (replace whole line, empty vector removes icons on this line)
     void setLineGutterIcons(size_t line, Vector<GutterIcon>&& icons);
+
+    /// Set CodeLens items for a given line (replace whole line, empty vector removes codelens on this line)
+    void setLineCodeLens(size_t line, Vector<CodeLensItem>&& items);
+
+    /// Get CodeLens items for a given line
+    const Vector<CodeLensItem>& getLineCodeLens(size_t line) const;
+
+    /// Clear all CodeLens items
+    void clearCodeLens();
 
     /// Get highlight spans for a given line and layer (sorted by column ascending)
     const Vector<StyleSpan>& getLineSpans(size_t line, SpanLayer layer) const;
@@ -322,6 +339,7 @@ namespace NS_SWEETEDITOR {
     Vector<Vector<InlayHint>> m_inlay_hints_;
     Vector<Vector<PhantomText>> m_phantom_texts_;
     HashMap<size_t, Vector<GutterIcon>> m_gutter_icons_;
+    HashMap<size_t, Vector<CodeLensItem>> m_codelens_items_;
     Vector<Vector<DiagnosticSpan>> m_diagnostics_;
 
     Vector<IndentGuide> m_indent_guides_;
@@ -335,8 +353,8 @@ namespace NS_SWEETEDITOR {
     static const Vector<PhantomText> kEmptyPhantomTexts;
     static const Vector<GutterIcon> kEmptyGutterIcons;
     static const Vector<DiagnosticSpan> kEmptyDiagnostics;
+    static const Vector<CodeLensItem> kEmptyCodeLensItems;
   };
 }
 
 #endif //SWEETEDITOR_DECORATION_H
-

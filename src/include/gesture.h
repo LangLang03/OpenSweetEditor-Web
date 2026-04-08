@@ -164,6 +164,8 @@ namespace NS_SWEETEDITOR {
     FOLD_GUTTER = 5,
     /// Hit InlayHint (color block)
     INLAY_HINT_COLOR = 6,
+    /// Hit CodeLens item (icon_id carries the unique command_id)
+    CODELENS = 7,
   };
 
   /// Tap hit target info (filled by EditorCore for TAP)
@@ -173,7 +175,7 @@ namespace NS_SWEETEDITOR {
     size_t line {0};
     /// Hit column index (0-based, meaningful for INLAY_HINT only)
     size_t column {0};
-    /// Icon ID (valid for INLAY_HINT_ICON / GUTTER_ICON)
+    /// Icon ID (valid for INLAY_HINT_ICON / GUTTER_ICON, or unique command_id for CODELENS)
     int32_t icon_id {0};
     /// Color value (ARGB, valid for INLAY_HINT_COLOR)
     int32_t color_value {0};

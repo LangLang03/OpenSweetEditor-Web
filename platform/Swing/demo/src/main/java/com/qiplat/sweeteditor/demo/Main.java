@@ -5,6 +5,7 @@ import com.qiplat.sweeteditor.SweetEditor;
 import com.qiplat.sweeteditor.core.Document;
 import com.qiplat.sweeteditor.core.foundation.CurrentLineRenderMode;
 import com.qiplat.sweeteditor.core.foundation.WrapMode;
+import com.qiplat.sweeteditor.event.CodeLensClickEvent;
 
 import javax.swing.BorderFactory;
 import javax.swing.DefaultComboBoxModel;
@@ -76,6 +77,8 @@ public class Main extends JFrame {
 
         demoCompletionProvider = new DemoCompletionProvider();
         editor.addCompletionProvider(demoCompletionProvider);
+        editor.subscribe(CodeLensClickEvent.class, e ->
+                updateStatus("CodeLens " + describeCodeLensCommand(e.commandId) + " at line: " + (e.line + 1)));
 
         JPanel toolbar = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 4));
         fileComboBox = new JComboBox<>();
@@ -180,6 +183,16 @@ public class Main extends JFrame {
 
     private void updateStatus(String message) {
         statusLabel.setText(message);
+    }
+
+    private String describeCodeLensCommand(int commandId) {
+        if (commandId == DemoDecorationProvider.CODELENS_RUN) {
+            return "Run";
+        }
+        if (commandId == DemoDecorationProvider.CODELENS_DEBUG) {
+            return "Debug";
+        }
+        return "Command#" + commandId;
     }
 
     private void registerColorStyleForCurrentTheme() {
