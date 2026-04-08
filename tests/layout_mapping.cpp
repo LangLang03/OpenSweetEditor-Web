@@ -50,7 +50,7 @@ TEST_CASE("TextLayout hitTest matches getPositionScreenCoord in non-wrap mode") 
   layout.setWrapMode(WrapMode::NONE);
 
   EditorRenderModel model;
-  layout.layoutVisibleLines(model);
+  layout.layoutVisibleLines(model, PresentationContext {});
 
   const float probe_y = layout.getPositionScreenCoord({0, 0}).y + layout.getLineHeight() * 0.5f;
   for (size_t col = 0; col < 6; ++col) {
@@ -76,7 +76,7 @@ TEST_CASE("TextLayout hitTest/getPositionScreenCoord stay consistent in wrap mod
   layout.setWrapMode(WrapMode::CHAR_BREAK);
 
   EditorRenderModel model;
-  layout.layoutVisibleLines(model);
+  layout.layoutVisibleLines(model, PresentationContext {});
 
   const PointF p0 = layout.getPositionScreenCoord({0, 0});
   const PointF p7 = layout.getPositionScreenCoord({0, 7});
@@ -102,7 +102,7 @@ TEST_CASE("TextLayout hitTest snaps emoji modifier graphemes to left and right b
   layout.setWrapMode(WrapMode::NONE);
 
   EditorRenderModel model;
-  layout.layoutVisibleLines(model);
+  layout.layoutVisibleLines(model, PresentationContext {});
 
   const PointF cluster_start = layout.getPositionScreenCoord({0, 1});
   const PointF cluster_end = layout.getPositionScreenCoord({0, 5});
@@ -124,12 +124,12 @@ TEST_CASE("TextLayout horizontal cropping preserves grapheme hit testing") {
   layout.setWrapMode(WrapMode::NONE);
 
   EditorRenderModel model;
-  layout.layoutVisibleLines(model);
+  layout.layoutVisibleLines(model, PresentationContext {});
 
   const float text_area_x = layout.getLayoutMetrics().textAreaX();
   layout.setViewState({1.0f, text_area_x + 15.0f, 0.0f});
   model = {};
-  layout.layoutVisibleLines(model);
+  layout.layoutVisibleLines(model, PresentationContext {});
 
   REQUIRE_FALSE(model.lines.empty());
 
@@ -156,7 +156,7 @@ TEST_CASE("TextLayout wrap keeps emoji modifier grapheme on one visual line") {
   layout.setWrapMode(WrapMode::CHAR_BREAK);
 
   EditorRenderModel model;
-  layout.layoutVisibleLines(model);
+  layout.layoutVisibleLines(model, PresentationContext {});
 
   REQUIRE(model.lines.size() == 3);
   CHECK(collectVisualLineText(model.lines[0]) == "A");
@@ -176,12 +176,12 @@ TEST_CASE("TextLayout monospace left crop does not over-trim complex graphemes")
   layout.setWrapMode(WrapMode::NONE);
 
   EditorRenderModel model;
-  layout.layoutVisibleLines(model);
+  layout.layoutVisibleLines(model, PresentationContext {});
 
   const float text_area_x = layout.getLayoutMetrics().textAreaX();
   layout.setViewState({1.0f, text_area_x + 25.0f, 0.0f});
   model = {};
-  layout.layoutVisibleLines(model);
+  layout.layoutVisibleLines(model, PresentationContext {});
 
   REQUIRE_FALSE(model.lines.empty());
   CHECK(collectVisualLineText(model.lines[0]) ==
@@ -248,7 +248,7 @@ TEST_CASE("TextLayout hitTestDecoration returns unique command ids for CodeLens 
   decorations->setLineCodeLens(0, std::move(items));
 
   EditorRenderModel model;
-  layout.layoutVisibleLines(model);
+  layout.layoutVisibleLines(model, PresentationContext {});
   const VisualLine& codelens_line = findCodeLensVisualLine(model, 0);
   const VisualRun& first = findNthCodeLensRun(codelens_line, 0);
   const VisualRun& second = findNthCodeLensRun(codelens_line, 1);

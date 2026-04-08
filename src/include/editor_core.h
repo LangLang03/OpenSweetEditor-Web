@@ -269,6 +269,7 @@ namespace NS_SWEETEDITOR {
     /// Move cursor down by one page (viewport height / line height)
     /// @param extend_selection Whether to extend selection
     void moveCursorPageDown(bool extend_selection = false);
+
     /// Notify editor that IME composition starts
     /// Called by platform side when compositionstart / composingText starts
     void compositionStart();

@@ -367,19 +367,13 @@ namespace NS_SWEETEDITOR {
   void EditorCore::buildRenderModel(EditorRenderModel& model) {
     PERF_TIMER("buildRenderModel");
     PERF_BEGIN(compose);
-    m_text_layout_->layoutVisibleLines(model);
-    // Apply active (hover) state to clickable runs
-    if (m_active_hit_target_.type != HitTargetType::NONE) {
-      for (auto& vl : model.lines) {
-        if (vl.logical_line != m_active_hit_target_.line) continue;
-        for (auto& run : vl.runs) {
-          if (run.type == VisualRunType::CODELENS
-              && run.icon_id == m_active_hit_target_.icon_id) {
-            run.active = true;
-          }
-        }
-      }
+    PresentationContext presentation_context;
+    presentation_context.active_hit_target = m_active_hit_target_;
+    presentation_context.has_selection = m_caret_.has_selection;
+    if (m_caret_.has_selection) {
+      presentation_context.selection_range = m_caret_.selection;
     }
+    m_text_layout_->layoutVisibleLines(model, presentation_context);
     model.split_line_visible = m_settings_.show_split_line;
     model.current_line_render_mode = m_settings_.current_line_render_mode;
     model.gutter_sticky = m_settings_.gutter_sticky;

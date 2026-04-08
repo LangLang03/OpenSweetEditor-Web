@@ -19,7 +19,7 @@ namespace {
 
   void primeLayout(TextLayout& layout) {
     EditorRenderModel model;
-    layout.layoutVisibleLines(model);
+    layout.layoutVisibleLines(model, PresentationContext {});
   }
 }
 

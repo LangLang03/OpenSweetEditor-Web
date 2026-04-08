@@ -21,7 +21,7 @@ TEST_CASE("TextLayout hitTest/getPositionScreenCoord stay consistent with inlay 
   decorations->setLinePhantomTexts(0, {PhantomText{2, "ghost"}});
 
   EditorRenderModel model;
-  layout.layoutVisibleLines(model);
+  layout.layoutVisibleLines(model, PresentationContext {});
 
   for (size_t col = 0; col <= 4; ++col) {
     const PointF pos = layout.getPositionScreenCoord({0, col});

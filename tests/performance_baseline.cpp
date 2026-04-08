@@ -72,7 +72,7 @@ TEST_CASE("Performance baseline: hitTest mapping on large wrapped layout") {
                                  WrapMode::CHAR_BREAK);
 
   EditorRenderModel model;
-  layout.layoutVisibleLines(model);
+  layout.layoutVisibleLines(model, PresentationContext {});
   REQUIRE_FALSE(model.lines.empty());
 
   BENCHMARK("HitTest_WrappedLargeLayout") {
