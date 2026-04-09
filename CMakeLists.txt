@@ -59,7 +59,7 @@ elseif (APPLE)
 elseif (EMSCRIPTEN)
     add_definitions(-DWASM)
     set(BUILD_STATIC_LIB ON)
-    #file(GLOB_RECURSE WASM_FILES ${CMAKE_PROJECT_DIR}/platform/Emscripten/*.*)
+    file(GLOB_RECURSE WASM_FILES ${CMAKE_PROJECT_DIR}/platform/Emscripten/*.*)
     message(STATUS "add target: libsweeteditor for wasm")
     add_executable("libsweeteditor" ${WASM_FILES})
     target_link_libraries("libsweeteditor" PRIVATE ${CMAKE_PROJECT_NAME}
