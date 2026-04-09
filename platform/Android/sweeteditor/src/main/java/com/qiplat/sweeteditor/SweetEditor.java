@@ -207,22 +207,6 @@ public class SweetEditor extends View {
                 }
             }
 
-            if (mSettings.isGutterAnimationEnabled() && mCachedModel != null) {
-                float targetX = mCachedModel.splitX;
-
-                if (animationHolder.splitAnimatedX < 0) {
-                    animationHolder.splitAnimatedX = targetX;
-                }
-
-                animationHolder.splitAnimatedX += (targetX - animationHolder.splitAnimatedX) * 0.25f;
-
-                if (Math.abs(targetX - animationHolder.splitAnimatedX) < 0.01f) {
-                    animationHolder.splitAnimatedX = targetX;
-                } else {
-                    needsNextFrame = true;
-                }
-            }
-
             postInvalidate();
             if (needsNextFrame) {
                 Choreographer.getInstance().postFrameCallback(this);
@@ -450,7 +434,6 @@ public class SweetEditor extends View {
         mCachedModel = null;
         animationHolder.cursorAnimatedX = -1f;
         animationHolder.cursorAnimatedY = -1f;
-        animationHolder.splitAnimatedX = -1f;
         if (mDecorationProviderManager != null) {
             mDecorationProviderManager.onDocumentLoaded();
         }
@@ -2052,18 +2035,8 @@ public class SweetEditor extends View {
         }
     }
 
-    public void requestGutterAnimationRefresh() {
-        if (mSettings.isGutterAnimationEnabled()) {
-            startVisualTransition();
-        } else {
-            animationHolder.splitAnimatedX = -1f;
-            postInvalidate();
-        }
-    }
-
     private void startVisualTransition() {
-        if (!mVisualTransitionActive
-                && (mSettings.isCursorAnimationEnabled() || mSettings.isGutterAnimationEnabled())) {
+        if (!mVisualTransitionActive && mSettings.isCursorAnimationEnabled()) {
             mVisualTransitionActive = true;
             Choreographer.getInstance().postFrameCallback(mVisualTransitionCallback);
         }

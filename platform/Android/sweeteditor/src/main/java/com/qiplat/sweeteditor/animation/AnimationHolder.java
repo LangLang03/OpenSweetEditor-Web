@@ -6,6 +6,4 @@ public class AnimationHolder {
 
     public float cursorAnimatedY = -1;
 
-    public float splitAnimatedX = -1f;
-
 }

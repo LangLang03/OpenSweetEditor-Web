@@ -41,7 +41,6 @@ public class EditorSettings {
     private long mDecorationScrollRefreshMinIntervalMs = 16L;
     private float mDecorationOverscanViewportMultiplier = 1.5f;
     private boolean mCursorAnimationEnabled = true;
-    private boolean mGutterAnimationEnabled = true;
 
     EditorSettings(@NonNull SweetEditor editor) {
         mEditor = editor;
@@ -238,15 +237,6 @@ public class EditorSettings {
 
     public boolean isCursorAnimationEnabled() {
         return mCursorAnimationEnabled;
-    }
-
-    public void setGutterAnimationEnabled(boolean enabled) {
-        mGutterAnimationEnabled = enabled;
-        mEditor.requestGutterAnimationRefresh();
-    }
-
-    public boolean isGutterAnimationEnabled() {
-        return mGutterAnimationEnabled;
     }
 
 }

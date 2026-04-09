@@ -378,21 +378,11 @@ final class EditorRenderer {
         if (drawPerf != null) drawPerf.mark(PerfStepRecorder.STEP_CURSOR);
 
         if (model.splitX > 0) {
-            float splitAnimatedX = animationHolder.splitAnimatedX;
-            if (splitAnimatedX <= 0) {
-                canvas.drawRect(0, 0, model.splitX, viewHeight, mBackgroundPaint);
-                drawCurrentLineDecoration(canvas, model, 0f, model.splitX);
-            } else {
-                canvas.drawRect(0, 0, splitAnimatedX, viewHeight, mBackgroundPaint);
-                drawCurrentLineDecoration(canvas, model, 0f, animationHolder.splitAnimatedX);
-            }
+            canvas.drawRect(0, 0, model.splitX, viewHeight, mBackgroundPaint);
+            drawCurrentLineDecoration(canvas, model, 0f, model.splitX);
 
             if (model.splitLineVisible) {
-                if (splitAnimatedX <= 0) {
-                    canvas.drawLine(model.splitX, 0, model.splitX, viewHeight, mSplitLinePaint);
-                } else {
-                    canvas.drawLine(splitAnimatedX, 0, splitAnimatedX, viewHeight, mSplitLinePaint);
-                }
+                canvas.drawLine(model.splitX, 0, model.splitX, viewHeight, mSplitLinePaint);
             }
         }
 
