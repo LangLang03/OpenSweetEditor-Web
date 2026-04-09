@@ -876,7 +876,13 @@ namespace NS_SWEETEDITOR {
         run_count = 0;
       } else {
         const LogicalLine& prev = lines[i - 1];
-        float h = (prev.height >= 0) ? prev.height : default_height;
+        float h;
+        if (prev.height >= 0) {
+          h = prev.height;
+        } else {
+          bool has_codelens = !m_decoration_manager_->getLineCodeLens(i - 1).empty();
+          h = has_codelens ? default_height * 2 : default_height;
+        }
         if (h == run_height && run_count > 0) {
           // Same height as current run: extend and use multiplication
           run_count++;
@@ -989,7 +995,8 @@ namespace NS_SWEETEDITOR {
           sep.type = VisualRunType::TEXT;
           sep.column = 0;
           sep.length = 0;
-          sep.x = run_x;
+          sep.x = run_x;
+
           static const U16String kSepText = {CHAR16(' '), CHAR16('|'), CHAR16(' ')};
           sep.text = kSepText;
           sep.width = measureWidth(sep.text, FONT_STYLE_NORMAL);
@@ -1001,7 +1008,8 @@ namespace NS_SWEETEDITOR {
         cl_run.type = VisualRunType::CODELENS;
         cl_run.column = 0;
         cl_run.length = 0;
-        cl_run.x = run_x;
+        cl_run.x = run_x;
+
         cl_run.icon_id = codelens_items[ci].command_id;
         U16String cl_u16;
         StrUtil::convertUTF8ToUTF16(codelens_items[ci].text, cl_u16);
@@ -1057,7 +1065,8 @@ namespace NS_SWEETEDITOR {
         VisualRun run;
         run.type = VisualRunType::PHANTOM_TEXT;
         run.column = phantom.column;
-        run.length = 0;
+        run.length = 0;
+
         run.style.font_style = FONT_STYLE_ITALIC;
         U16String seg_u16;
         StrUtil::convertUTF8ToUTF16(seg, seg_u16);
@@ -1583,7 +1592,8 @@ namespace NS_SWEETEDITOR {
     fold_run.type = VisualRunType::FOLD_PLACEHOLDER;
     fold_run.column = line_text.length();
     fold_run.length = 0;
-    fold_run.x = fold_x;
+    fold_run.x = fold_x;
+
     static const U16String kFoldText = CHAR16(" \u2026 ");
     fold_run.text = kFoldText;
     fold_run.width = measureWidth(kFoldText, FONT_STYLE_NORMAL);
@@ -1642,7 +1652,8 @@ namespace NS_SWEETEDITOR {
       }
 
       // Set x/y coordinates and append
-      end_run.x = append_x;
+      end_run.x = append_x;
+
       append_x += end_run.width;
       last_vl.runs.push_back(std::move(end_run));
     }

@@ -179,7 +179,13 @@ namespace NS_SWEETEDITOR {
         while (lo < hi) {
           size_t mid = lo + (hi - lo) / 2;
           float line_y = m_text_layout_->getLineStartY(mid);
-          float h = (lines[mid].height >= 0) ? lines[mid].height : old_line_height;
+          float h;
+          if (lines[mid].height >= 0) {
+            h = lines[mid].height;
+          } else {
+            bool has_codelens = !m_decorations_->getLineCodeLens(mid).empty();
+            h = has_codelens ? old_line_height * 2 : old_line_height;
+          }
           if (line_y + h <= scroll_y) {
             lo = mid + 1;
           } else {
@@ -188,9 +194,13 @@ namespace NS_SWEETEDITOR {
         }
         anchor_line = lo < lines.size() ? lo : lines.size() - 1;
         float anchor_y = m_text_layout_->getLineStartY(anchor_line);
-        float anchor_h = (lines[anchor_line].height >= 0)
-                             ? lines[anchor_line].height
-                             : old_line_height;
+        float anchor_h;
+        if (lines[anchor_line].height >= 0) {
+          anchor_h = lines[anchor_line].height;
+        } else {
+          bool has_codelens = !m_decorations_->getLineCodeLens(anchor_line).empty();
+          anchor_h = has_codelens ? old_line_height * 2 : old_line_height;
+        }
         anchor_fraction = (anchor_h > 0)
                               ? (scroll_y - anchor_y) / anchor_h
                               : 0.0f;
@@ -209,10 +219,16 @@ namespace NS_SWEETEDITOR {
     const float wrap_text_area_width = std::max(1.0f, m_viewport_.width - m_text_layout_->getLayoutMetrics().textAreaX());
     if (use_wrap_scale_anchor) {
       auto& lines = m_document_->getLogicalLines();
-      auto estimate_wrap_height = [&](const LogicalLine& line) -> float {
+      auto estimate_wrap_height = [&](size_t line_index, const LogicalLine& line) -> float {
         if (line.is_fold_hidden) return 0.0f;
         if (line.visual_lines.empty()) {
-          const float old_height = (line.height >= 0) ? line.height : old_line_height;
+          float old_height;
+          if (line.height >= 0) {
+            old_height = line.height;
+          } else {
+            bool has_codelens = !m_decorations_->getLineCodeLens(line_index).empty();
+            old_height = has_codelens ? old_line_height * 2 : old_line_height;
+          }
           return std::max(new_line_height, old_height * wrap_scale_ratio);
         }
         float old_total_width = 0.0f;
@@ -231,7 +247,7 @@ namespace NS_SWEETEDITOR {
       };
       const size_t estimate_end = std::min(anchor_line, lines.size());
       for (size_t i = 0; i < estimate_end; ++i) {
-        lines[i].height = estimate_wrap_height(lines[i]);
+        lines[i].height = estimate_wrap_height(i, lines[i]);
       }
     }
 
