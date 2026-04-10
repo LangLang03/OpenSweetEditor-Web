@@ -360,13 +360,14 @@ function Build-LinuxWsl {
         }
     }
 
-    $bashCommand = @"
-set -euo pipefail
-mkdir -p '$linuxPrebuiltDirWsl'
-cmake '$projectDirWsl' -B '$linuxBuildDirWsl' -G 'Ninja' -DCMAKE_CXX_FLAGS='-std=c++17 -fPIC' -DCMAKE_BUILD_TYPE=Release -DBUILD_STATIC_LIB=OFF -DBUILD_TESTING=OFF
-cmake --build '$linuxBuildDirWsl' --target '$TargetName' -j 12
-find '$linuxBuildDirWsl/lib' -type f \( -name '*.dll' -o -name '*.so' -o -name '*.dylib' -o -name '*.wasm' -o -name '*.js' \) -exec cp -f {} '$linuxPrebuiltDirWsl/' \;
-"@
+    $bashLines = @(
+        'set -euo pipefail'
+        "mkdir -p '$linuxPrebuiltDirWsl'"
+        "cmake '$projectDirWsl' -B '$linuxBuildDirWsl' -G 'Ninja' -DCMAKE_CXX_FLAGS='-std=c++17 -fPIC' -DCMAKE_BUILD_TYPE=Release -DBUILD_STATIC_LIB=OFF -DBUILD_TESTING=OFF"
+        "cmake --build '$linuxBuildDirWsl' --target '$TargetName' -j 12"
+        "find '$linuxBuildDirWsl/lib' -type f \( -name '*.dll' -o -name '*.so' -o -name '*.dylib' -o -name '*.wasm' -o -name '*.js' \) -exec cp -f {} '$linuxPrebuiltDirWsl/' \;"
+    )
+    $bashCommand = $bashLines -join "`n"
 
     $arguments = @()
     if ($resolvedWslDistro) {
