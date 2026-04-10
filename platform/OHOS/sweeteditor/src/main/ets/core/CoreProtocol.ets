@@ -45,6 +45,7 @@ import {
   SelectionHandle,
   SelectionRect,
   VisualLine,
+  VisualLineKind,
   VisualRun,
   VisualRunType
 } from './CoreVisual';
