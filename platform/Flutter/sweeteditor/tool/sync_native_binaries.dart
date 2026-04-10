@@ -1,23 +1,13 @@
 import 'dart:io';
 
-const List<String> _supportedRoots = <String>[
-  'android',
-  'ios',
-  'linux',
-  'osx',
-  'windows',
-];
+const List<String> _supportedRoots = <String>['android', 'ios', 'osx', 'windows', 'linux'];
 
 void main() {
   final scriptFile = File.fromUri(Platform.script).absolute;
   final packageRoot = scriptFile.parent.parent;
   final repoRoot = packageRoot.parent.parent.parent;
-  final prebuiltRoot = Directory(
-    '${repoRoot.path}${Platform.pathSeparator}prebuilt',
-  );
-  final nativeRoot = Directory(
-    '${packageRoot.path}${Platform.pathSeparator}native',
-  );
+  final prebuiltRoot = Directory('${repoRoot.path}${Platform.pathSeparator}prebuilt');
+  final nativeRoot = Directory('${packageRoot.path}${Platform.pathSeparator}native');
 
   if (!prebuiltRoot.existsSync()) {
     throw StateError('Prebuilt directory not found: ${prebuiltRoot.path}');
@@ -30,9 +20,7 @@ void main() {
 
   final copiedTargets = <String>[];
   for (final rootName in _supportedRoots) {
-    final sourceDir = Directory(
-      '${prebuiltRoot.path}${Platform.pathSeparator}$rootName',
-    );
+    final sourceDir = Directory('${prebuiltRoot.path}${Platform.pathSeparator}$rootName');
     if (!sourceDir.existsSync()) {
       continue;
     }
@@ -64,12 +52,13 @@ int _copyDirectoryContents(Directory sourceDir, Directory destinationDir) {
       continue;
     }
 
-    final destinationPath =
-        '${destinationDir.path}${Platform.pathSeparator}$name';
+    final destinationPath = '${destinationDir.path}${Platform.pathSeparator}$name';
     if (entity is File) {
-      destinationDir.createSync(recursive: true);
-      entity.copySync(destinationPath);
-      copiedFiles++;
+      if (_shouldCopyFile(entity)) {
+        destinationDir.createSync(recursive: true);
+        entity.copySync(destinationPath);
+        copiedFiles++;
+      }
     } else if (entity is Directory) {
       copiedFiles += _copyDirectory(entity, Directory(destinationPath));
     }
@@ -78,7 +67,6 @@ int _copyDirectoryContents(Directory sourceDir, Directory destinationDir) {
 }
 
 int _copyDirectory(Directory sourceDir, Directory destinationDir) {
-  destinationDir.createSync(recursive: true);
   var copiedFiles = 0;
   for (final entity in sourceDir.listSync(followLinks: false)) {
     final name = _entityName(entity.path);
@@ -86,16 +74,26 @@ int _copyDirectory(Directory sourceDir, Directory destinationDir) {
       continue;
     }
 
-    final destinationPath =
-        '${destinationDir.path}${Platform.pathSeparator}$name';
+    final destinationPath = '${destinationDir.path}${Platform.pathSeparator}$name';
     if (entity is File) {
-      entity.copySync(destinationPath);
-      copiedFiles++;
+      if (_shouldCopyFile(entity)) {
+        destinationDir.createSync(recursive: true);
+        entity.copySync(destinationPath);
+        copiedFiles++;
+      }
     } else if (entity is Directory) {
-      copiedFiles += _copyDirectory(entity, Directory(destinationPath));
+      final nestedCopiedFiles = _copyDirectory(entity, Directory(destinationPath));
+      copiedFiles += nestedCopiedFiles;
     }
   }
   return copiedFiles;
+}
+
+bool _shouldCopyFile(File file) {
+  final lowerPath = file.path.toLowerCase();
+  return lowerPath.endsWith('.dll') ||
+      lowerPath.endsWith('.so') ||
+      lowerPath.endsWith('.dylib');
 }
 
 String _entityName(String path) {

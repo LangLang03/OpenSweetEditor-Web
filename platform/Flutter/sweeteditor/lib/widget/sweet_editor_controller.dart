@@ -106,15 +106,32 @@ class SweetEditorController {
       _pendingDocument?.getLineText(line) ??
       '';
 
-  LanguageConfiguration? get languageConfiguration => _languageConfiguration;
+  LanguageConfiguration? get languageConfiguration =>
+      getLanguageConfiguration();
 
-  set languageConfiguration(LanguageConfiguration? value) {
+  set languageConfiguration(LanguageConfiguration? value) =>
+      setLanguageConfiguration(value);
+
+  LanguageConfiguration? getLanguageConfiguration() => _languageConfiguration;
+
+  void setLanguageConfiguration(LanguageConfiguration? value) {
     if (_closed) return;
     _languageConfiguration = value;
     _state?._applyLanguageConfiguration(value);
   }
 
-  EditorMetadata? metadata;
+  EditorMetadata? _metadata;
+
+  EditorMetadata? get metadata => getMetadata();
+
+  set metadata(EditorMetadata? value) => setMetadata(value);
+
+  EditorMetadata? getMetadata() => _metadata;
+
+  void setMetadata(EditorMetadata? value) {
+    if (_closed) return;
+    _metadata = value;
+  }
 
   core.TextPosition getCursorPosition() =>
       _state?._editorCore?.getCursorPosition() ?? const core.TextPosition(0, 0);

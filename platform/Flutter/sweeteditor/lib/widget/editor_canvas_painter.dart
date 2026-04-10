@@ -98,7 +98,7 @@ class EditorCanvasPainter extends ChangeNotifier implements CustomPainter {
         Offset(cd.origin.x, y),
         Offset(cd.origin.x + cd.width, y),
         Paint()
-          ..color = Color(_theme.compositionColor)
+          ..color = Color(_theme.compositionUnderlineColor)
           ..strokeWidth = 2,
       );
     }
@@ -397,7 +397,7 @@ class EditorCanvasPainter extends ChangeNotifier implements CustomPainter {
   void _drawGuideSegments(Canvas canvas, core.EditorRenderModel m) {
     for (final seg in m.guideSegments) {
       final isSeparator = seg.type == core.GuideType.separator;
-      final color = isSeparator ? _theme.separatorColor : _theme.guideColor;
+      final color = isSeparator ? _theme.separatorLineColor : _theme.guideColor;
       final paint = Paint()
         ..color = Color(color)
         ..strokeWidth = 1
