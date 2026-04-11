@@ -74,6 +74,9 @@ export class SweetEditorController {
   getTheme() { return this._read("getTheme", {}); }
   getSettings() { return this._read("getSettings", null); }
   setKeyMap(keyMap:IAnyValue) { this.invoke("setKeyMap", keyMap); }
+  setTabSize(tabSize:number) { this.invoke("setTabSize", tabSize); }
+  setBackspaceUnindent(enabled:boolean) { this.invoke("setBackspaceUnindent", enabled); }
+  setInsertSpaces(enabled:boolean) { this.invoke("setInsertSpaces", enabled); }
   getKeyMap() { return this._read("getKeyMap", null); }
   setEditorIconProvider(provider:IAnyValue) { this.invoke("setEditorIconProvider", provider); }
   getEditorIconProvider() { return this._read("getEditorIconProvider", null); }
@@ -106,10 +109,14 @@ export class SweetEditorController {
   getCursorPosition() { return this._read("getCursorPosition", null); }
   getWordRangeAtCursor() { return this._read("getWordRangeAtCursor", null); }
   getWordAtCursor() { return this._read("getWordAtCursor", ""); }
+  moveCursorPageUp(extendSelection:boolean = false) { this.invoke("moveCursorPageUp", extendSelection); }
+  moveCursorPageDown(extendSelection:boolean = false) { this.invoke("moveCursorPageDown", extendSelection); }
 
   gotoPosition(line:number, column:number) { this.invoke("gotoPosition", line, column); }
   scrollToLine(line:number, behavior:number = 0) { this.invoke("scrollToLine", line, behavior); }
   setScroll(x:number, y:number) { this.invoke("setScroll", x, y); }
+  ensureCursorVisible() { this.invoke("ensureCursorVisible"); }
+  stopFling() { this.invoke("stopFling"); }
   getScrollMetrics() { return this._read("getScrollMetrics", null); }
   getPositionRect(line:number, column:number) { return this._read("getPositionRect", null, line, column); }
   getCursorRect() { return this._read("getCursorRect", null); }
@@ -122,6 +129,7 @@ export class SweetEditorController {
   isLineVisible(line:number) { return this._read("isLineVisible", false, line); }
 
   setLanguageConfiguration(config:IAnyValue) { this.invoke("setLanguageConfiguration", config); }
+  setAutoClosingPairs(pairs:IAnyValue) { this.invoke("setAutoClosingPairs", pairs); }
   getLanguageConfiguration() { return this._read("getLanguageConfiguration", null); }
   setMetadata(metadata:IAnyValue) { this.invoke("setMetadata", metadata); }
   getMetadata() { return this._read("getMetadata", null); }
@@ -150,6 +158,9 @@ export class SweetEditorController {
   setBatchLinePhantomTexts(phantomsByLine:IAnyValue) { this.invoke("setBatchLinePhantomTexts", phantomsByLine); }
   setLineGutterIcons(line:number, icons:IAnyValue[]) { this.invoke("setLineGutterIcons", line, icons); }
   setBatchLineGutterIcons(iconsByLine:IAnyValue) { this.invoke("setBatchLineGutterIcons", iconsByLine); }
+  setLineCodeLens(line:number, items:IAnyValue[]) { this.invoke("setLineCodeLens", line, items); }
+  setBatchLineCodeLens(itemsByLine:IAnyValue) { this.invoke("setBatchLineCodeLens", itemsByLine); }
+  clearCodeLens() { this.invoke("clearCodeLens"); }
   setLineDiagnostics(line:number, diagnostics:IAnyValue[]) { this.invoke("setLineDiagnostics", line, diagnostics); }
   setBatchLineDiagnostics(diagsByLine:IAnyValue) { this.invoke("setBatchLineDiagnostics", diagsByLine); }
   setIndentGuides(guides:IAnyValue[]) { this.invoke("setIndentGuides", guides); }

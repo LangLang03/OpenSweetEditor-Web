@@ -1,6 +1,9 @@
 # @sweeteditor/providers-sweetline
 
-Optional SweetLine decoration provider package for OpenSweetEditor Web SDK v2.
+Optional SweetLine decoration provider for OpenSweetEditor Web SDK.
+
+Use this package when you want SweetLine-powered syntax/semantic decoration input
+through the standard editor decoration-provider interface.
 
 ## Install
 
@@ -8,17 +11,28 @@ Optional SweetLine decoration provider package for OpenSweetEditor Web SDK v2.
 npm i @sweeteditor/providers-sweetline
 ```
 
-## Usage
+## Quick start
 
 ```ts
-import { createSweetLineDecorationProvider } from "@sweeteditor/providers-sweetline";
+import { createEditor } from "@sweeteditor/sdk";
+import { registerSweetLineDecorationProvider } from "@sweeteditor/providers-sweetline";
 
-const provider = createSweetLineDecorationProvider({
+const editor = await createEditor(container, { value: "let x = 1;\n" });
+
+const { disposable } = registerSweetLineDecorationProvider(editor, {
   sweetLine,
-  highlightEngine
+  highlightEngine,
 });
 
-editor.registerDecorationProvider(provider);
+// later
+// disposable.dispose();
 ```
 
+## Main exports
 
+- `createSweetLineDecorationProvider(...)`
+- `registerSweetLineDecorationProvider(...)`
+
+## Changelog
+
+See [CHANGELOG.md](./CHANGELOG.md).

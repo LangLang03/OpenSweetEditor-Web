@@ -1,6 +1,6 @@
 {
   "name": "@sweeteditor/widget",
-  "version": "0.0.5",
+  "version": "0.0.7-rc.1",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -23,4 +23,3 @@
     "@sweeteditor/core": "workspace:*"
   }
 }
-

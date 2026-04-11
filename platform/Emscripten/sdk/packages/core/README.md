@@ -1,13 +1,37 @@
 # @sweeteditor/core
 
-Low-level core package for OpenSweetEditor Web SDK v2.
+Low-level core package for OpenSweetEditor Web SDK.
 
-Includes:
+If you want a ready-to-use editor API, use `@sweeteditor/sdk` first.
 
-- model/disposable utilities
-- wasm loader bridge
-- legacy core/provider infrastructure used by higher-level packages
+## Install
 
-Most users should prefer `@sweeteditor/sdk`.
+```bash
+npm i @sweeteditor/core
+```
 
+## What this package provides
 
+- Lifecycle utilities: `DisposableStore`, `toDisposable`
+- Text model: `TextModel`, `createTextModel`
+- Wasm loader bridge: `loadWasmModule`
+- Legacy typed bridge exports (`WebEditorCore`, document/decorations/completion types)
+
+## Quick start
+
+```ts
+import { createTextModel, loadWasmModule } from "@sweeteditor/core";
+
+const model = createTextModel("int main() {}\n", {
+  uri: "inmemory://demo/main.cpp",
+  language: "cpp",
+});
+
+const wasm = await loadWasmModule({
+  modulePath: "/runtime/sweeteditor.js",
+});
+```
+
+## Changelog
+
+See [CHANGELOG.md](./CHANGELOG.md).

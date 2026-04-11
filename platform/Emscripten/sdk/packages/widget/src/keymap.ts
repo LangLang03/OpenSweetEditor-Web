@@ -180,6 +180,10 @@ export class EditorKeyMap implements KeyMap {
     return { bindings: this.bindings };
   }
 
+  toJSON(): KeyMap {
+    return this.toKeyMap();
+  }
+
   clone(): EditorKeyMap {
     const cloned = new EditorKeyMap(this._bindings, { pendingTimeoutMs: this._pendingTimeoutMs });
     for (const [commandId, handler] of this._handlers.entries()) {

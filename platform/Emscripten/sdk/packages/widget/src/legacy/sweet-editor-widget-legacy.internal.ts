@@ -130,6 +130,7 @@ const FALLBACK_HIT_TARGET_TYPE = {
   FOLD_PLACEHOLDER: 4,
   FOLD_GUTTER: 5,
   INLAY_HINT_COLOR: 6,
+  CODELENS: 7,
 };
 
 const DEFAULT_TOUCH_LONG_PRESS_MS = 520;
@@ -483,6 +484,7 @@ export const EditorEventType = {
   DOUBLE_TAP: "DoubleTapEvent",
   CONTEXT_MENU: "ContextMenuEvent",
   INLAY_HINT_CLICK: "InlayHintClickEvent",
+  CODELENS_CLICK: "CodeLensClickEvent",
   GUTTER_ICON_CLICK: "GutterIconClickEvent",
   FOLD_TOGGLE: "FoldToggleEvent",
   DOCUMENT_LOADED: "DocumentLoadedEvent",
@@ -498,6 +500,7 @@ const LEGACY_EDITOR_EVENT_TYPE = {
   DOUBLE_TAP: "DoubleTap",
   CONTEXT_MENU: "ContextMenu",
   INLAY_HINT_CLICK: "InlayHintClick",
+  CODELENS_CLICK: "CodeLensClick",
   GUTTER_ICON_CLICK: "GutterIconClick",
   FOLD_TOGGLE: "FoldToggle",
   DOCUMENT_LOADED: "DocumentLoaded",
@@ -513,6 +516,7 @@ const EVENT_STANDARD_TO_LEGACY = Object.freeze({
   [EditorEventType.DOUBLE_TAP]: LEGACY_EDITOR_EVENT_TYPE.DOUBLE_TAP,
   [EditorEventType.CONTEXT_MENU]: LEGACY_EDITOR_EVENT_TYPE.CONTEXT_MENU,
   [EditorEventType.INLAY_HINT_CLICK]: LEGACY_EDITOR_EVENT_TYPE.INLAY_HINT_CLICK,
+  [EditorEventType.CODELENS_CLICK]: LEGACY_EDITOR_EVENT_TYPE.CODELENS_CLICK,
   [EditorEventType.GUTTER_ICON_CLICK]: LEGACY_EDITOR_EVENT_TYPE.GUTTER_ICON_CLICK,
   [EditorEventType.FOLD_TOGGLE]: LEGACY_EDITOR_EVENT_TYPE.FOLD_TOGGLE,
   [EditorEventType.DOCUMENT_LOADED]: LEGACY_EDITOR_EVENT_TYPE.DOCUMENT_LOADED,
@@ -528,6 +532,7 @@ const EVENT_LEGACY_TO_STANDARD = Object.freeze({
   [LEGACY_EDITOR_EVENT_TYPE.DOUBLE_TAP]: EditorEventType.DOUBLE_TAP,
   [LEGACY_EDITOR_EVENT_TYPE.CONTEXT_MENU]: EditorEventType.CONTEXT_MENU,
   [LEGACY_EDITOR_EVENT_TYPE.INLAY_HINT_CLICK]: EditorEventType.INLAY_HINT_CLICK,
+  [LEGACY_EDITOR_EVENT_TYPE.CODELENS_CLICK]: EditorEventType.CODELENS_CLICK,
   [LEGACY_EDITOR_EVENT_TYPE.GUTTER_ICON_CLICK]: EditorEventType.GUTTER_ICON_CLICK,
   [LEGACY_EDITOR_EVENT_TYPE.FOLD_TOGGLE]: EditorEventType.FOLD_TOGGLE,
   [LEGACY_EDITOR_EVENT_TYPE.DOCUMENT_LOADED]: EditorEventType.DOCUMENT_LOADED,
@@ -843,7 +848,13 @@ export class Canvas2DRenderer {
     ctx.fillStyle = this.theme.lineNumber;
     ctx.font = `12px ${this._fontFamily}`;
     forVector(model.lines, (line:IAnyValue) => {
-      if (line.wrap_index !== 0 || line.is_phantom_line) return;
+      const hasOwnsGutterSemantics = typeof line?.owns_gutter_semantics === "boolean";
+      if (hasOwnsGutterSemantics) {
+        if (!line.owns_gutter_semantics) return;
+      } else if (line.wrap_index !== 0 || line.is_phantom_line) {
+        // Legacy fallback for older wasm runtimes.
+        return;
+      }
       const p = line.line_number_position;
       ctx.fillText(String(line.logical_line + 1), p.x, this._snapY(p.y));
     });
@@ -1307,6 +1318,7 @@ export class CompletionPopupController {
 }
 export class SweetEditorWidget {
   [key: string]: IAnyValue;
+  private _editorKeyMap!: EditorKeyMap;
 
   constructor(container: HTMLElement, wasmModule:IAnyValue, options: IAnyRecord = {}) {
     this.container = container;
@@ -1522,6 +1534,7 @@ export class SweetEditorWidget {
     this._resize();
 
     this._core.setCompositionEnabled(options.enableComposition ?? true);
+    this._core.setKeyMap(this._editorKeyMap.toJSON());
     if (options.editorIconProvider) {
       this.setEditorIconProvider(options.editorIconProvider);
     }
@@ -1586,6 +1599,7 @@ export class SweetEditorWidget {
 
   setKeyMap(keyMap:IAnyValue) {
     this._editorKeyMap = EditorKeyMap.from(keyMap || defaultKeyMap());
+    this._core.setKeyMap(this._editorKeyMap.toJSON());
   }
 
   getKeyMap() {
@@ -1686,6 +1700,18 @@ export class SweetEditorWidget {
     const value = toInt(mode, 0);
     this._settingsState.wrapMode = value;
     this._core.setWrapMode(value);
+  }
+
+  setTabSize(tabSize:number) {
+    this._core.setTabSize(Math.max(1, toInt(tabSize, 4)));
+  }
+
+  setBackspaceUnindent(enabled:boolean) {
+    this._core.setBackspaceUnindent(Boolean(enabled));
+  }
+
+  setInsertSpaces(enabled:boolean) {
+    this._core.setInsertSpaces(Boolean(enabled));
   }
 
   getWrapMode() {
@@ -2009,6 +2035,16 @@ export class SweetEditorWidget {
     this._emitStateEventsFromCore({ forceCursor: true, forceSelection: !!extendSelection });
   }
 
+  moveCursorPageUp(extendSelection:boolean = false) {
+    this._core.moveCursorPageUp(extendSelection);
+    this._emitStateEventsFromCore({ forceCursor: true, forceSelection: !!extendSelection, includeScrollScale: true });
+  }
+
+  moveCursorPageDown(extendSelection:boolean = false) {
+    this._core.moveCursorPageDown(extendSelection);
+    this._emitStateEventsFromCore({ forceCursor: true, forceSelection: !!extendSelection, includeScrollScale: true });
+  }
+
   goto(line:number, column:number = 0) {
     this.gotoPosition(line, column);
   }
@@ -2026,6 +2062,15 @@ export class SweetEditorWidget {
   setScroll(scrollX:number, scrollY:number) {
     this._core.setScroll(scrollX, scrollY);
     this._emitScrollScaleFromCore(true, false);
+  }
+
+  ensureCursorVisible() {
+    this._core.ensureCursorVisible();
+    this._emitStateEventsFromCore({ forceCursor: true, includeScrollScale: true });
+  }
+
+  stopFling() {
+    this._core.stopFling();
   }
 
   getScrollMetrics() {
@@ -2070,6 +2115,18 @@ export class SweetEditorWidget {
 
   setBatchLineGutterIcons(iconsByLine:IAnyValue) {
     this._core.setBatchLineGutterIcons(iconsByLine);
+  }
+
+  setLineCodeLens(line:number, items:IAnyValue[]) {
+    this._core.setLineCodeLens(line, items);
+  }
+
+  setBatchLineCodeLens(itemsByLine:IAnyValue) {
+    this._core.setBatchLineCodeLens(itemsByLine);
+  }
+
+  clearCodeLens() {
+    this._core.clearCodeLens();
   }
 
   setLineDiagnostics(line:number, diagnostics:IAnyValue[]) {
@@ -2217,6 +2274,10 @@ export class SweetEditorWidget {
 
   clearMatchedBrackets() {
     this._core.clearMatchedBrackets();
+  }
+
+  setAutoClosingPairs(pairs:IAnyValue) {
+    this._core.setAutoClosingPairs(pairs);
   }
 
   setLocale(locale:string) {
@@ -2626,6 +2687,9 @@ export class SweetEditorWidget {
       getFoldArrowMode: () => this.getFoldArrowMode(),
       setWrapMode: (mode:IAnyValue) => this.setWrapMode(mode),
       getWrapMode: () => this.getWrapMode(),
+      setTabSize: (tabSize:number) => this.setTabSize(tabSize),
+      setBackspaceUnindent: (enabled:boolean) => this.setBackspaceUnindent(enabled),
+      setInsertSpaces: (enabled:boolean) => this.setInsertSpaces(enabled),
       setShowSplitLine: (show:boolean) => this.setShowSplitLine(show),
       isShowSplitLine: () => this.isShowSplitLine(),
       setGutterSticky: (sticky:boolean) => this.setGutterSticky(sticky),
@@ -2681,6 +2745,15 @@ export class SweetEditorWidget {
     }
     if ("wrapMode" in settings) {
       this.setWrapMode(settings.wrapMode);
+    }
+    if ("tabSize" in settings) {
+      this.setTabSize(settings.tabSize);
+    }
+    if ("backspaceUnindent" in settings) {
+      this.setBackspaceUnindent(settings.backspaceUnindent);
+    }
+    if ("insertSpaces" in settings) {
+      this.setInsertSpaces(settings.insertSpaces);
     }
     if ("showSplitLine" in settings) {
       this.setShowSplitLine(settings.showSplitLine);
@@ -2955,6 +3028,18 @@ export class SweetEditorWidget {
         column,
         colorValue,
         isColor: true,
+        screenPoint,
+        nativeEvent,
+      });
+      return;
+    }
+
+    if (hitType === this._hitTargetType.CODELENS) {
+      this._emitEvent(EditorEventType.CODELENS_CLICK, {
+        line,
+        commandId: iconId,
+        command_id: iconId,
+        iconId,
         screenPoint,
         nativeEvent,
       });
@@ -5441,42 +5526,46 @@ export class SweetEditorWidget {
   }
 
   _applyLanguageBracketPairs() {
-    const rawPairs = asArray(this._languageConfiguration?.bracketPairs);
-    if (rawPairs.length === 0) {
-      return;
-    }
-
-    const pairs:Array<{ open: number; close: number; autoClose: boolean; surround: boolean }> = [];
-    rawPairs.forEach((pair:IAnyValue) => {
-      const openText = String(pair.open ?? "");
-      const closeText = String(pair.close ?? "");
-      if (!openText || !closeText) {
-        return;
-      }
-
-      const open = openText.codePointAt(0) ?? Number.NaN;
-      const close = closeText.codePointAt(0) ?? Number.NaN;
-      if (!Number.isFinite(open) || !Number.isFinite(close)) {
-        return;
-      }
-
-      pairs.push({
-        open,
-        close,
-        autoClose: pair.autoClose ?? pair.auto_close ?? true,
-        surround: pair.surround ?? true,
+    const toNativePairs = (rawPairs:IAnyValue[]) => {
+      const pairs:Array<{ open: number; close: number }> = [];
+      rawPairs.forEach((pair:IAnyValue) => {
+        const openText = String(pair?.open ?? "");
+        const closeText = String(pair?.close ?? "");
+        if (!openText || !closeText) {
+          return;
+        }
+        const open = openText.codePointAt(0) ?? Number.NaN;
+        const close = closeText.codePointAt(0) ?? Number.NaN;
+        if (!Number.isFinite(open) || !Number.isFinite(close)) {
+          return;
+        }
+        pairs.push({ open, close });
       });
-    });
+      return pairs;
+    };
 
-    if (pairs.length > 0) {
+    const bracketPairs = toNativePairs(asArray(this._languageConfiguration?.bracketPairs));
+    if (bracketPairs.length > 0) {
       try {
-        this._core.setBracketPairs(pairs);
+        this._core.setBracketPairs(bracketPairs);
       } catch (error) {
         if (!this._bracketPairsUnsupportedLogged) {
           this._bracketPairsUnsupportedLogged = true;
           console.warn("setBracketPairs unavailable in current wasm runtime; continuing without language bracket pairs.", error);
         }
       }
+    }
+
+    const autoClosingPairs = toNativePairs(asArray(this._languageConfiguration?.autoClosingPairs));
+    if (autoClosingPairs.length > 0) {
+      this._core.setAutoClosingPairs(autoClosingPairs);
+    }
+
+    if (this._languageConfiguration?.tabSize != null) {
+      this._core.setTabSize(Math.max(1, toInt(this._languageConfiguration.tabSize, 4)));
+    }
+    if (this._languageConfiguration?.insertSpaces != null) {
+      this._core.setInsertSpaces(Boolean(this._languageConfiguration.insertSpaces));
     }
   }
 

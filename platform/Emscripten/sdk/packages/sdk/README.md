@@ -1,6 +1,8 @@
 # @sweeteditor/sdk
 
-Stable public entry for OpenSweetEditor Web SDK v2.
+Stable public entry for OpenSweetEditor Web SDK.
+
+This is the recommended package for normal application integration.
 
 ## Install
 
@@ -8,14 +10,14 @@ Stable public entry for OpenSweetEditor Web SDK v2.
 npm i @sweeteditor/sdk
 ```
 
-## Quick Start
+## Quick start
 
 ```ts
 import { createEditor, createModel } from "@sweeteditor/sdk";
 
 const model = createModel("int main() {\n  return 0;\n}\n", {
   uri: "inmemory://demo/main.cpp",
-  language: "cpp"
+  language: "cpp",
 });
 
 const editor = await createEditor(container, { model });
@@ -23,7 +25,7 @@ const editor = await createEditor(container, { model });
 
 ## Runtime
 
-If `options.wasm` is omitted, bundled runtime is used automatically:
+If `options.wasm` is omitted, bundled runtime assets are used automatically:
 
 - `runtime/sweeteditor.js`
 - `runtime/sweeteditor.wasm`
@@ -35,8 +37,10 @@ Helpers:
 - `getBundledWasmModulePath()`
 - `getBundledSyntaxPath(name)`
 
-## Optional SweetLine
+## Optional SweetLine provider
 
-Use with `@sweeteditor/providers-sweetline`.
+You can use `@sweeteditor/providers-sweetline` for decoration-provider integration.
 
+## Changelog
 
+See [CHANGELOG.md](./CHANGELOG.md).

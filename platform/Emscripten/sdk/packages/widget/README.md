@@ -1,9 +1,35 @@
 # @sweeteditor/widget
 
-Browser widget layer for OpenSweetEditor Web SDK v2.
+Browser widget layer for OpenSweetEditor Web SDK.
 
-This package provides the browser-side rendering/input widget used by `@sweeteditor/sdk`.
+This package exposes the canvas/input widget and controller utilities.
+If you prefer a simpler integration API, use `@sweeteditor/sdk`.
 
-Most integration scenarios should use `@sweeteditor/sdk` directly.
+## Install
 
+```bash
+npm i @sweeteditor/widget @sweeteditor/core
+```
 
+## Quick start
+
+```ts
+import { loadWasmModule } from "@sweeteditor/core";
+import { createWidget } from "@sweeteditor/widget";
+
+const wasm = await loadWasmModule({ modulePath: "/runtime/sweeteditor.js" });
+const widget = createWidget(container, wasm, {
+  text: "function demo() {}\n",
+});
+```
+
+## Main exports
+
+- `createWidget(...)`
+- `SweetEditor` / `SweetEditorWidget`
+- `SweetEditorController`
+- Keymap helpers: `EditorKeyMap`, `defaultKeyMap`, `vscode`
+
+## Changelog
+
+See [CHANGELOG.md](./CHANGELOG.md).

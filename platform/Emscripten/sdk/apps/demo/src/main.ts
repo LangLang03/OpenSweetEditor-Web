@@ -14,6 +14,7 @@ import {
 
 type SweetLineModuleLoader = (options?: Record<string, unknown>) => Promise<any>;
 type LanguageKind = "cpp" | "java" | "kotlin" | "lua";
+type DemoCodeLensItem = { text: string; commandId: number };
 
 interface IDemoCompletionItem {
   label: string;
@@ -37,6 +38,11 @@ interface IWidgetLike {
   setLanguageConfiguration?(config: Record<string, unknown>): void;
   setScroll?(x: number, y: number): void;
   requestDecorationRefresh?(): void;
+  setLineCodeLens?(line: number, items: Array<{ text: string; commandId?: number; command_id?: number }>): void;
+  setBatchLineCodeLens?(itemsByLine: Record<number, Array<{ text: string; commandId?: number; command_id?: number }>>): void;
+  clearCodeLens?(): void;
+  subscribe?(eventType: string, listener: (event: any) => void): (() => void) | void;
+  unsubscribe?(eventType: string, listener: (event: any) => void): void;
   getText?(): string;
   undo?(): void;
   redo?(): void;
@@ -44,6 +50,33 @@ interface IWidgetLike {
 }
 
 const DEMO_FILE_FALLBACKS = Object.freeze({
+  "CodeLensDemo.java": `package demo.codelens;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class CodeLensDemo {
+    public static void main(String[] args) {
+        CodeLensDemo demo = new CodeLensDemo();
+        demo.run();
+    }
+
+    public void run() {
+        List<String> values = new ArrayList<>();
+        values.add("alpha");
+        values.add("beta");
+        values.forEach(this::log);
+    }
+
+    private void log(String value) {
+        System.out.println("value = " + value);
+    }
+
+    private int sum(int a, int b) {
+        return a + b;
+    }
+}
+`,
   "View.java": `package demo;
 
 import android.view.View;
@@ -122,16 +155,14 @@ const STYLE = Object.freeze({
 const INLAY_COLOR_TYPE = 2;
 const MAX_RENDER_LINES_PER_PASS = 420;
 const SYNTAX_JSON_FILES = Object.freeze(["cpp.json", "java.json", "kotlin.json", "lua.json"]);
+const CODELENS_DEMO_FILE = "CodeLensDemo.java";
+const CODELENS_EVENT_STANDARD = "CodeLensClickEvent";
+const CODELENS_EVENT_LEGACY = "CodeLensClick";
 const DEMO_EDITOR_FONT_FAMILY = [
-  "\"Cascadia Mono\"",
-  "\"JetBrains Mono\"",
-  "\"Sarasa Mono SC\"",
+  "\"0xProto Nerd Font Mono\"",
+  "Hack",
   "\"Noto Sans Mono CJK SC\"",
-  "\"Source Han Mono SC\"",
-  "Consolas",
-  "\"PingFang SC\"",
-  "\"Noto Sans CJK SC\"",
-  "\"Microsoft YaHei UI\"",
+  "\"Noto Sans Mono\"",
   "monospace",
 ].join(", ");
 
@@ -554,6 +585,121 @@ function setStatus(message: string): void {
   }
 }
 
+function appendCodeLensLog(logHost: HTMLElement | null, message: string): void {
+  if (!logHost) {
+    return;
+  }
+  const stamp = new Date().toLocaleTimeString();
+  const line = `[${stamp}] ${message}`;
+  const existing = (logHost.textContent || "")
+    .split("\n")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0 && entry !== "CodeLens event log ready.");
+  const output = existing.concat(line).slice(-48);
+  logHost.textContent = output.join("\n");
+  logHost.scrollTop = logHost.scrollHeight;
+}
+
+function normalizeCodeLensTargetLines(candidates: number[], lineCount: number, maxCount = 4): number[] {
+  const normalized: number[] = [];
+  const seen = new Set<number>();
+  candidates.forEach((line) => {
+    const value = toInt(line, -1);
+    if (value < 0 || value >= lineCount || seen.has(value)) {
+      return;
+    }
+    seen.add(value);
+    normalized.push(value);
+  });
+  if (normalized.length >= maxCount) {
+    return normalized.slice(0, maxCount);
+  }
+  for (let i = 0; i < lineCount && normalized.length < maxCount; i += 1) {
+    if (seen.has(i)) {
+      continue;
+    }
+    normalized.push(i);
+    seen.add(i);
+  }
+  return normalized.slice(0, maxCount);
+}
+
+function selectCodeLensTargetLines(text: string, fileName: string, maxCount = 4): number[] {
+  const lines = normalizeNewlines(text).split("\n");
+  const lineCount = Math.max(0, lines.length);
+  if (lineCount === 0) {
+    return [];
+  }
+
+  const selected: number[] = [];
+  if (fileName === CODELENS_DEMO_FILE) {
+    ["main(", "run(", "log(", "sum("].forEach((token) => {
+      const hit = lines.findIndex((line) => line.includes(token));
+      if (hit >= 0) {
+        selected.push(hit);
+      }
+    });
+  }
+
+  const functionPattern = /^\s*(?:public|protected|private|static|inline|virtual|constexpr|final|friend|internal|open|override|suspend|const|[\w:<>\[\]&*]+\s+)+[A-Za-z_~$][\w$]*\s*\([^;]*\)\s*\{/;
+  const kotlinPattern = /^\s*(?:public|private|protected|internal|open|override|suspend|inline|tailrec|operator|infix|external|expect|actual|\s)*fun\s+[A-Za-z_][\w$]*\s*\(/;
+  const luaPattern = /^\s*function\s+[A-Za-z_][\w.:]*\s*\(/;
+
+  lines.forEach((rawLine, lineNo) => {
+    const line = String(rawLine || "");
+    const trimmed = line.trim();
+    if (trimmed.length === 0) {
+      return;
+    }
+    if (
+      trimmed.startsWith("import ")
+      || trimmed.startsWith("package ")
+      || trimmed.startsWith("//")
+      || trimmed.startsWith("--")
+      || trimmed.startsWith("#")
+      || trimmed.startsWith("class ")
+      || trimmed.startsWith("interface ")
+      || trimmed.startsWith("object ")
+      || trimmed.startsWith("if ")
+      || trimmed.startsWith("for ")
+      || trimmed.startsWith("while ")
+      || trimmed.startsWith("switch ")
+      || trimmed.startsWith("catch ")
+    ) {
+      return;
+    }
+    if (functionPattern.test(line) || kotlinPattern.test(line) || luaPattern.test(line)) {
+      selected.push(lineNo);
+    }
+  });
+
+  if (selected.length === 0) {
+    lines.forEach((rawLine, lineNo) => {
+      const trimmed = String(rawLine || "").trim();
+      if (trimmed.length > 0 && !trimmed.startsWith("import ") && !trimmed.startsWith("package ")) {
+        selected.push(lineNo);
+      }
+    });
+  }
+
+  return normalizeCodeLensTargetLines(selected, lineCount, maxCount);
+}
+
+function buildCodeLensItemsForLine(line: number, variant: "line" | "batch"): DemoCodeLensItem[] {
+  const lineNo = Math.max(0, toInt(line, 0));
+  const base = lineNo + 1;
+  if (variant === "batch") {
+    return [
+      { text: `Batch refs on L${base}`, commandId: 3000 + base },
+      { text: `Batch run on L${base}`, commandId: 4000 + base },
+    ];
+  }
+  return [
+    { text: `Run L${base}`, commandId: 1000 + base },
+    { text: `Refs L${base}`, commandId: 2000 + base },
+  ];
+}
+
 async function bootstrap(): Promise<void> {
   const host = document.getElementById("editor") as HTMLElement | null;
   const fileSelect = document.getElementById("fileSelect") as HTMLSelectElement | null;
@@ -562,8 +708,23 @@ async function bootstrap(): Promise<void> {
   const undoBtn = document.getElementById("undoBtn") as HTMLButtonElement | null;
   const redoBtn = document.getElementById("redoBtn") as HTMLButtonElement | null;
   const completeBtn = document.getElementById("completeBtn") as HTMLButtonElement | null;
+  const applyCodeLensBtn = document.getElementById("applyCodeLensBtn") as HTMLButtonElement | null;
+  const applyBatchCodeLensBtn = document.getElementById("applyBatchCodeLensBtn") as HTMLButtonElement | null;
+  const clearCodeLensBtn = document.getElementById("clearCodeLensBtn") as HTMLButtonElement | null;
+  const codeLensLog = document.getElementById("codeLensLog") as HTMLElement | null;
 
-  if (!host || !fileSelect || !openLocalBtn || !localFileInput || !undoBtn || !redoBtn || !completeBtn) {
+  if (
+    !host
+    || !fileSelect
+    || !openLocalBtn
+    || !localFileInput
+    || !undoBtn
+    || !redoBtn
+    || !completeBtn
+    || !applyCodeLensBtn
+    || !applyBatchCodeLensBtn
+    || !clearCodeLensBtn
+  ) {
     throw new Error("Demo DOM missing required elements");
   }
   const fileSelectEl = fileSelect;
@@ -572,6 +733,10 @@ async function bootstrap(): Promise<void> {
   const undoBtnEl = undoBtn;
   const redoBtnEl = redoBtn;
   const completeBtnEl = completeBtn;
+  const applyCodeLensBtnEl = applyCodeLensBtn;
+  const applyBatchCodeLensBtnEl = applyBatchCodeLensBtn;
+  const clearCodeLensBtnEl = clearCodeLensBtn;
+  const codeLensLogEl = codeLensLog;
 
   const wasmVersion = String(Date.now());
   const locale = (navigator.language || "").toLowerCase().startsWith("zh") ? "zh-CN" : "en";
@@ -639,6 +804,90 @@ async function bootstrap(): Promise<void> {
 
   const demoCompletionProvider = new DemoCompletionProvider(() => activeFileName);
   widget.addCompletionProvider?.(demoCompletionProvider);
+
+  const readEditorText = (): string => String(widget.getText?.() ?? editor.getValue() ?? "");
+
+  const applyLineCodeLensDemo = (): void => {
+    if (typeof widget.setLineCodeLens !== "function") {
+      appendCodeLensLog(codeLensLogEl, "setLineCodeLens is unavailable in this runtime.");
+      setStatus("CodeLens API unavailable");
+      return;
+    }
+    const text = readEditorText();
+    const targets = selectCodeLensTargetLines(text, activeFileName, 3);
+    if (targets.length === 0) {
+      appendCodeLensLog(codeLensLogEl, "No target line found for CodeLens.");
+      setStatus("CodeLens: no target line");
+      return;
+    }
+    widget.clearCodeLens?.();
+    targets.forEach((line) => {
+      widget.setLineCodeLens?.(line, buildCodeLensItemsForLine(line, "line"));
+    });
+    widget.requestDecorationRefresh?.();
+    const humanLines = targets.map((line) => line + 1).join(", ");
+    appendCodeLensLog(codeLensLogEl, `Applied line API CodeLens on lines: ${humanLines}.`);
+    setStatus(`CodeLens(line): ${targets.length} line(s)`);
+  };
+
+  const applyBatchCodeLensDemo = (): void => {
+    if (typeof widget.setBatchLineCodeLens !== "function") {
+      appendCodeLensLog(codeLensLogEl, "setBatchLineCodeLens is unavailable in this runtime.");
+      setStatus("CodeLens API unavailable");
+      return;
+    }
+    const text = readEditorText();
+    const targets = selectCodeLensTargetLines(text, activeFileName, 4);
+    if (targets.length === 0) {
+      appendCodeLensLog(codeLensLogEl, "No target line found for batch CodeLens.");
+      setStatus("CodeLens: no target line");
+      return;
+    }
+    const payload: Record<number, DemoCodeLensItem[]> = {};
+    targets.forEach((line) => {
+      payload[line] = buildCodeLensItemsForLine(line, "batch");
+    });
+    widget.clearCodeLens?.();
+    widget.setBatchLineCodeLens?.(payload);
+    widget.requestDecorationRefresh?.();
+    const humanLines = targets.map((line) => line + 1).join(", ");
+    appendCodeLensLog(codeLensLogEl, `Applied batch API CodeLens on lines: ${humanLines}.`);
+    setStatus(`CodeLens(batch): ${targets.length} line(s)`);
+  };
+
+  const clearCodeLensDemo = (): void => {
+    widget.clearCodeLens?.();
+    widget.requestDecorationRefresh?.();
+    appendCodeLensLog(codeLensLogEl, "Cleared all CodeLens items.");
+    setStatus("CodeLens cleared");
+  };
+
+  const onCodeLensClick = (event: any): void => {
+    const line = toInt(event?.line ?? event?.payload?.line, -1);
+    const commandId = toInt(
+      event?.commandId
+      ?? event?.command_id
+      ?? event?.iconId
+      ?? event?.icon_id
+      ?? event?.payload?.commandId
+      ?? event?.payload?.command_id
+      ?? event?.payload?.iconId
+      ?? event?.payload?.icon_id,
+      -1,
+    );
+    const lineLabel = line >= 0 ? String(line + 1) : "?";
+    const commandLabel = commandId >= 0 ? String(commandId) : "?";
+    appendCodeLensLog(codeLensLogEl, `CodeLens clicked at line ${lineLabel}, commandId=${commandLabel}.`);
+    setStatus(`CodeLens click: line ${lineLabel}, commandId ${commandLabel}`);
+  };
+
+  if (typeof widget.subscribe === "function") {
+    widget.subscribe(CODELENS_EVENT_STANDARD, onCodeLensClick);
+    widget.subscribe(CODELENS_EVENT_LEGACY, onCodeLensClick);
+    appendCodeLensLog(codeLensLogEl, "Listening for CodeLens click events.");
+  } else {
+    appendCodeLensLog(codeLensLogEl, "Widget event subscribe is unavailable; click callback test disabled.");
+  }
 
   function ensureFileOption(fileName: string): void {
     for (let i = 0; i < fileSelectEl.options.length; i += 1) {
@@ -728,6 +977,9 @@ async function bootstrap(): Promise<void> {
       widget.setScroll?.(0, 0);
       widget.requestDecorationRefresh?.();
       setStatus(`Loaded: ${normalizedFileName}`);
+      if (normalizedFileName === CODELENS_DEMO_FILE) {
+        appendCodeLensLog(codeLensLogEl, "Loaded CodeLens demo file. Click \"CodeLens Batch\" or \"CodeLens Line\" to test.");
+      }
     } catch (error) {
       console.error("Failed to load file:", normalizedFileName, error);
       setStatus(`Load failed: ${normalizedFileName}`);
@@ -796,6 +1048,22 @@ async function bootstrap(): Promise<void> {
   completeBtnEl.addEventListener("click", () => {
     widget.triggerCompletion?.();
   });
+
+  applyCodeLensBtnEl.addEventListener("click", () => {
+    applyLineCodeLensDemo();
+  });
+
+  applyBatchCodeLensBtnEl.addEventListener("click", () => {
+    applyBatchCodeLensDemo();
+  });
+
+  clearCodeLensBtnEl.addEventListener("click", () => {
+    clearCodeLensDemo();
+  });
+
+  if (fileSelectEl.value === CODELENS_DEMO_FILE) {
+    applyBatchCodeLensDemo();
+  }
 }
 
 bootstrap().catch((error) => {

@@ -205,6 +205,9 @@ export interface EditorSettings {
   getFoldArrowMode(): number;
   setWrapMode(mode: IAnyValue): void;
   getWrapMode(): number;
+  setTabSize(tabSize: number): void;
+  setBackspaceUnindent(enabled: boolean): void;
+  setInsertSpaces(enabled: boolean): void;
   setLineSpacing(add: number, mult: number): void;
   getLineSpacingAdd(): number;
   getLineSpacingMult(): number;

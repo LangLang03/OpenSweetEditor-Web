@@ -831,6 +831,55 @@ export class WebEditorCore {
     return result;
   }
 
+  setKeyMap(keyMap:IAnyValue) {
+    const normalizedBindings:IAnyValue[] = [];
+    const pushBinding = (binding:IAnyValue) => {
+      if (!binding || typeof binding !== "object") {
+        return;
+      }
+      const first = binding.first || {};
+      const second = binding.second || {};
+      const firstChord = {
+        modifiers: toInt(first.modifiers, 0),
+        key_code: toInt(first.keyCode ?? first.key_code, 0),
+      };
+      if (!firstChord.key_code) {
+        return;
+      }
+      const secondChord = {
+        modifiers: toInt(second.modifiers, 0),
+        key_code: toInt(second.keyCode ?? second.key_code, 0),
+      };
+      normalizedBindings.push({
+        first: firstChord,
+        second: secondChord,
+        command: toInt(binding.command, 0),
+      });
+    };
+
+    if (Array.isArray(keyMap)) {
+      keyMap.forEach(pushBinding);
+    } else if (keyMap && typeof keyMap === "object") {
+      const record = keyMap as IAnyRecord;
+      const bindings = record.bindings;
+      if (Array.isArray(bindings)) {
+        bindings.forEach(pushBinding);
+      } else if (typeof bindings?.[Symbol.iterator] === "function") {
+        for (const item of Array.from(bindings as Iterable<IAnyValue>)) {
+          pushBinding(item);
+        }
+      }
+    }
+
+    const fn = this._native?.setKeyMap;
+    if (typeof fn !== "function") {
+      return undefined;
+    }
+    const result = fn.call(this._native, { bindings: normalizedBindings });
+    this._notifyMutate();
+    return result;
+  }
+
   tickEdgeScroll() {
     const result = this._native.tickEdgeScroll();
     this._notifyMutate();
@@ -839,6 +888,16 @@ export class WebEditorCore {
 
   tickFling() {
     const result = this._native.tickFling();
+    this._notifyMutate();
+    return result;
+  }
+
+  stopFling() {
+    const fn = this._native?.stopFling;
+    if (typeof fn !== "function") {
+      return undefined;
+    }
+    const result = fn.call(this._native);
     this._notifyMutate();
     return result;
   }
@@ -915,18 +974,22 @@ export class WebEditorCore {
   }
 
   setGutterSticky(sticky:boolean) {
-    const result = this._invokeOptional("setGutterSticky", Boolean(sticky));
-    if (typeof result !== "undefined") {
-      this._notifyMutate();
+    const fn = this._native?.setGutterSticky;
+    if (typeof fn !== "function") {
+      return undefined;
     }
+    const result = fn.call(this._native, Boolean(sticky));
+    this._notifyMutate();
     return result;
   }
 
   setGutterVisible(visible:boolean) {
-    const result = this._invokeOptional("setGutterVisible", Boolean(visible));
-    if (typeof result !== "undefined") {
-      this._notifyMutate();
+    const fn = this._native?.setGutterVisible;
+    if (typeof fn !== "function") {
+      return undefined;
     }
+    const result = fn.call(this._native, Boolean(visible));
+    this._notifyMutate();
     return result;
   }
 
@@ -1111,6 +1174,26 @@ export class WebEditorCore {
     return result;
   }
 
+  moveCursorPageUp(extendSelection:boolean = false) {
+    const fn = this._native?.moveCursorPageUp;
+    if (typeof fn !== "function") {
+      return undefined;
+    }
+    const result = fn.call(this._native, Boolean(extendSelection));
+    this._notifyMutate();
+    return result;
+  }
+
+  moveCursorPageDown(extendSelection:boolean = false) {
+    const fn = this._native?.moveCursorPageDown;
+    if (typeof fn !== "function") {
+      return undefined;
+    }
+    const result = fn.call(this._native, Boolean(extendSelection));
+    this._notifyMutate();
+    return result;
+  }
+
   compositionStart() {
     const result = this._native.compositionStart();
     this._notifyMutate();
@@ -1167,6 +1250,26 @@ export class WebEditorCore {
 
   getAutoIndentMode() {
     return this.read("getAutoIndentMode");
+  }
+
+  setBackspaceUnindent(enabled:boolean) {
+    const fn = this._native?.setBackspaceUnindent;
+    if (typeof fn !== "function") {
+      return undefined;
+    }
+    const result = fn.call(this._native, Boolean(enabled));
+    this._notifyMutate();
+    return result;
+  }
+
+  setInsertSpaces(enabled:boolean) {
+    const fn = this._native?.setInsertSpaces;
+    if (typeof fn !== "function") {
+      return undefined;
+    }
+    const result = fn.call(this._native, Boolean(enabled));
+    this._notifyMutate();
+    return result;
   }
 
   setHandleConfig(config:IAnyRecord) {
@@ -1233,10 +1336,12 @@ export class WebEditorCore {
   }
 
   ensureCursorVisible() {
-    const result = this._invokeOptional("ensureCursorVisible");
-    if (typeof result !== "undefined") {
-      this._notifyMutate();
+    const fn = this._native?.ensureCursorVisible;
+    if (typeof fn !== "function") {
+      return undefined;
     }
+    const result = fn.call(this._native);
+    this._notifyMutate();
     return result;
   }
 
@@ -1415,6 +1520,25 @@ export class WebEditorCore {
       return;
     }
 
+    if (
+      typeof this._native?.registerBatchTextStyles === "function"
+      && typeof this._wasm?.TextStyleEntryVector === "function"
+    ) {
+      this._callWithVector("TextStyleEntryVector", entries, (entry:IAnyValue) => ({
+        style_id: toInt(entry.styleId, 0),
+        style: {
+          color: toInt(entry.style?.color, 0),
+          background_color: toInt(entry.style?.backgroundColor ?? entry.style?.background_color, 0),
+          font_style: toInt(entry.style?.fontStyle ?? entry.style?.font_style, 0),
+        },
+      }), (vec:IAnyValue) => {
+        const result = this._native.registerBatchTextStyles(vec);
+        this._notifyMutate();
+        return result;
+      });
+      return;
+    }
+
     this.withBatch(() => {
       entries.forEach((entry) => {
         this.registerTextStyle(
@@ -1588,6 +1712,65 @@ export class WebEditorCore {
     });
   }
 
+  setLineCodeLens(line:number, items:IAnyValue[]) {
+    if (typeof this._native?.setLineCodeLens !== "function") {
+      return;
+    }
+    const lineNo = ensureLine(line);
+    this._callWithVector("CodeLensItemVector", asArray(items), (item:IAnyValue) => ({
+      text: String(item?.text ?? ""),
+      command_id: toInt(item?.commandId ?? item?.command_id ?? item?.command ?? item?.id, 0),
+    }), (vec:IAnyValue) => {
+      const result = this._native.setLineCodeLens(lineNo, vec);
+      this._notifyMutate();
+      return result;
+    });
+  }
+
+  setBatchLineCodeLens(itemsByLine:IAnyValue) {
+    if (typeof this._native?.setBatchLineCodeLens !== "function") {
+      this.withBatch(() => {
+        iterateLineEntries(itemsByLine, (line:number, items:IAnyValue[]) => {
+          this.setLineCodeLens(line, items);
+        });
+      });
+      return;
+    }
+    const batched = this._callBatchLineEntries(
+      "LineCodeLensEntryVector",
+      "CodeLensItemVector",
+      "items",
+      itemsByLine,
+      (item:IAnyValue) => ({
+        text: String(item?.text ?? ""),
+        command_id: toInt(item?.commandId ?? item?.command_id ?? item?.command ?? item?.id, 0),
+      }),
+      (entryVec:IAnyValue) => {
+        const result = this._native.setBatchLineCodeLens(entryVec);
+        return result;
+      },
+    );
+    if (batched) {
+      this._notifyMutate();
+      return;
+    }
+    this.withBatch(() => {
+      iterateLineEntries(itemsByLine, (line:number, items:IAnyValue[]) => {
+        this.setLineCodeLens(line, items);
+      });
+    });
+  }
+
+  clearCodeLens() {
+    const fn = this._native?.clearCodeLens;
+    if (typeof fn !== "function") {
+      return undefined;
+    }
+    const result = fn.call(this._native);
+    this._notifyMutate();
+    return result;
+  }
+
   setLineDiagnostics(line:number, diagnostics:IAnyValue[]) {
     const lineNo = ensureLine(line);
     const src = asArray(diagnostics);
@@ -1755,6 +1938,21 @@ export class WebEditorCore {
       surround: Boolean(pair.surround),
     }), (vec:IAnyValue) => {
       const result = this._native.setBracketPairs(vec);
+      this._notifyMutate();
+      return result;
+    });
+  }
+
+  setAutoClosingPairs(bracketPairs:IAnyValue) {
+    this._callWithVector("BracketPairVector", asArray(bracketPairs), (pair:IAnyValue) => ({
+      open: toInt(pair.open, 0),
+      close: toInt(pair.close, 0),
+    }), (vec:IAnyValue) => {
+      const fn = this._native?.setAutoClosingPairs;
+      if (typeof fn !== "function") {
+        return undefined;
+      }
+      const result = fn.call(this._native, vec);
       this._notifyMutate();
       return result;
     });

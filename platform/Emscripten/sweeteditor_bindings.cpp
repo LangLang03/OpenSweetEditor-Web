@@ -100,6 +100,16 @@ struct LineDiagnosticsEntry {
   Vector<DiagnosticSpan> diagnostics;
 };
 
+struct TextStyleEntry {
+  uint32_t style_id {0};
+  TextStyle style;
+};
+
+struct LineCodeLensEntry {
+  size_t line {0};
+  Vector<CodeLensItem> items;
+};
+
 SharedPtr<EditorCore> createEditorCore(const val& callbacks, const EditorOptions& options) {
   return makeShared<EditorCore>(makeShared<JsTextMeasurer>(callbacks), options);
 }
@@ -163,6 +173,15 @@ void editorRegisterTextStyle(EditorCore& editor, uint32_t style_id, const TextSt
   editor.registerTextStyle(style_id, std::move(copy));
 }
 
+void editorRegisterBatchTextStyles(EditorCore& editor, const Vector<TextStyleEntry>& entries) {
+  Vector<std::pair<uint32_t, TextStyle>> native_entries;
+  native_entries.reserve(entries.size());
+  for (const auto& entry : entries) {
+    native_entries.emplace_back(entry.style_id, entry.style);
+  }
+  editor.registerBatchTextStyles(std::move(native_entries));
+}
+
 void editorSetLineSpans(EditorCore& editor, size_t line, SpanLayer layer, const Vector<StyleSpan>& spans) {
   auto copy = spans;
   editor.setLineSpans(line, layer, std::move(copy));
@@ -219,6 +238,20 @@ void editorSetBatchLineGutterIcons(EditorCore& editor, const Vector<LineGutterIc
   editor.setBatchLineGutterIcons(std::move(native_entries));
 }
 
+void editorSetLineCodeLens(EditorCore& editor, size_t line, const Vector<CodeLensItem>& items) {
+  auto copy = items;
+  editor.setLineCodeLens(line, std::move(copy));
+}
+
+void editorSetBatchLineCodeLens(EditorCore& editor, const Vector<LineCodeLensEntry>& entries) {
+  Vector<std::pair<size_t, Vector<CodeLensItem>>> native_entries;
+  native_entries.reserve(entries.size());
+  for (const auto& entry : entries) {
+    native_entries.emplace_back(entry.line, entry.items);
+  }
+  editor.setBatchLineCodeLens(std::move(native_entries));
+}
+
 void editorSetLineDiagnostics(EditorCore& editor, size_t line, const Vector<DiagnosticSpan>& diagnostics) {
   auto copy = diagnostics;
   editor.setLineDiagnostics(line, std::move(copy));
@@ -261,6 +294,64 @@ void editorSetFoldRegions(EditorCore& editor, const Vector<FoldRegion>& regions)
 void editorSetBracketPairs(EditorCore& editor, const Vector<BracketPair>& pairs) {
   auto copy = pairs;
   editor.setBracketPairs(std::move(copy));
+}
+
+void editorSetAutoClosingPairs(EditorCore& editor, const Vector<BracketPair>& pairs) {
+  auto copy = pairs;
+  editor.setAutoClosingPairs(std::move(copy));
+}
+
+KeyChord keyChordFromJs(const val& chord_value) {
+  KeyChord chord;
+  if (chord_value.isUndefined() || chord_value.isNull()) {
+    return chord;
+  }
+  val modifiers = chord_value["modifiers"];
+  if (!modifiers.isUndefined() && !modifiers.isNull()) {
+    chord.modifiers = static_cast<KeyModifier>(modifiers.as<int32_t>());
+  }
+  val key_code = chord_value["key_code"];
+  if (key_code.isUndefined() || key_code.isNull()) {
+    key_code = chord_value["keyCode"];
+  }
+  if (!key_code.isUndefined() && !key_code.isNull()) {
+    chord.key_code = static_cast<KeyCode>(key_code.as<int32_t>());
+  }
+  return chord;
+}
+
+void editorSetKeyMap(EditorCore& editor, const val& key_map_value) {
+  auto parse_bindings = [&](const val& bindings_value, KeyMap& map) {
+    if (!bindings_value.isArray()) {
+      return;
+    }
+    const unsigned len = bindings_value["length"].as<unsigned>();
+    for (unsigned i = 0; i < len; ++i) {
+      val item = bindings_value[i];
+      if (item.isUndefined() || item.isNull()) {
+        continue;
+      }
+      KeyBinding binding;
+      binding.first = keyChordFromJs(item["first"]);
+      binding.second = keyChordFromJs(item["second"]);
+      val command = item["command"];
+      if (!command.isUndefined() && !command.isNull()) {
+        binding.command = static_cast<EditorCommand>(command.as<uint32_t>());
+      }
+      if (binding.first.empty()) {
+        continue;
+      }
+      map.addBinding(binding);
+    }
+  };
+
+  KeyMap key_map;
+  if (key_map_value.isArray()) {
+    parse_bindings(key_map_value, key_map);
+  } else if (!key_map_value.isUndefined() && !key_map_value.isNull()) {
+    parse_bindings(key_map_value["bindings"], key_map);
+  }
+  editor.setKeyMap(std::move(key_map));
 }
 
 void editorStartLinkedEditing(EditorCore& editor, const LinkedEditingModel& model) {
@@ -368,7 +459,8 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
     .value("GUTTER_ICON", HitTargetType::GUTTER_ICON)
     .value("FOLD_PLACEHOLDER", HitTargetType::FOLD_PLACEHOLDER)
     .value("FOLD_GUTTER", HitTargetType::FOLD_GUTTER)
-    .value("INLAY_HINT_COLOR", HitTargetType::INLAY_HINT_COLOR);
+    .value("INLAY_HINT_COLOR", HitTargetType::INLAY_HINT_COLOR)
+    .value("CODELENS", HitTargetType::CODELENS);
 
   enum_<WrapMode>("WrapMode")
     .value("NONE", WrapMode::NONE)
@@ -400,7 +492,14 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
     .value("NEWLINE", VisualRunType::NEWLINE)
     .value("INLAY_HINT", VisualRunType::INLAY_HINT)
     .value("PHANTOM_TEXT", VisualRunType::PHANTOM_TEXT)
-    .value("FOLD_PLACEHOLDER", VisualRunType::FOLD_PLACEHOLDER);
+    .value("FOLD_PLACEHOLDER", VisualRunType::FOLD_PLACEHOLDER)
+    .value("TAB", VisualRunType::TAB)
+    .value("CODELENS", VisualRunType::CODELENS);
+
+  enum_<VisualLineKind>("VisualLineKind")
+    .value("CONTENT", VisualLineKind::CONTENT)
+    .value("PHANTOM", VisualLineKind::PHANTOM)
+    .value("CODELENS", VisualLineKind::CODELENS);
 
   enum_<FoldArrowMode>("FoldArrowMode")
     .value("AUTO", FoldArrowMode::AUTO)
@@ -457,7 +556,10 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
   value_object<TouchConfig>("TouchConfig")
     .field("touch_slop", &TouchConfig::touch_slop)
     .field("double_tap_timeout", &TouchConfig::double_tap_timeout)
-    .field("long_press_ms", &TouchConfig::long_press_ms);
+    .field("long_press_ms", &TouchConfig::long_press_ms)
+    .field("fling_friction", &TouchConfig::fling_friction)
+    .field("fling_min_velocity", &TouchConfig::fling_min_velocity)
+    .field("fling_max_velocity", &TouchConfig::fling_max_velocity);
 
   value_object<GestureEvent>("GestureEvent")
     .field("type", &GestureEvent::type).field("points", &GestureEvent::points).field("modifiers", &GestureEvent::modifiers)
@@ -502,11 +604,13 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
     .field("type", &VisualRun::type).field("column", &VisualRun::column).field("length", &VisualRun::length)
     .field("x", &VisualRun::x).field("y", &VisualRun::y).field("text", &VisualRun::text).field("style", &VisualRun::style)
     .field("icon_id", &VisualRun::icon_id).field("color_value", &VisualRun::color_value)
-    .field("width", &VisualRun::width).field("padding", &VisualRun::padding).field("margin", &VisualRun::margin);
+    .field("width", &VisualRun::width).field("padding", &VisualRun::padding).field("margin", &VisualRun::margin)
+    .field("active", &VisualRun::active);
   value_object<VisualLine>("VisualLine")
     .field("logical_line", &VisualLine::logical_line).field("wrap_index", &VisualLine::wrap_index)
     .field("line_number_position", &VisualLine::line_number_position).field("runs", &VisualLine::runs)
-    .field("is_phantom_line", &VisualLine::is_phantom_line).field("fold_state", &VisualLine::fold_state);
+    .field("kind", &VisualLine::kind).field("owns_gutter_semantics", &VisualLine::owns_gutter_semantics)
+    .field("fold_state", &VisualLine::fold_state);
 
   value_object<Cursor>("Cursor")
     .field("text_position", &Cursor::text_position).field("position", &Cursor::position)
@@ -573,6 +677,8 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
 
   value_object<BracketPair>("BracketPair")
     .field("open", &BracketPair::open).field("close", &BracketPair::close);
+  value_object<CodeLensItem>("CodeLensItem")
+    .field("text", &CodeLensItem::text).field("command_id", &CodeLensItem::command_id);
 
   value_object<EditorOptions>("EditorOptions")
     .field("touch_slop", &EditorOptions::touch_slop).field("double_tap_timeout", &EditorOptions::double_tap_timeout)
@@ -628,6 +734,8 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
   value_object<LinePhantomTextsEntry>("LinePhantomTextsEntry").field("line", &LinePhantomTextsEntry::line).field("phantoms", &LinePhantomTextsEntry::phantoms);
   value_object<LineGutterIconsEntry>("LineGutterIconsEntry").field("line", &LineGutterIconsEntry::line).field("icons", &LineGutterIconsEntry::icons);
   value_object<LineDiagnosticsEntry>("LineDiagnosticsEntry").field("line", &LineDiagnosticsEntry::line).field("diagnostics", &LineDiagnosticsEntry::diagnostics);
+  value_object<TextStyleEntry>("TextStyleEntry").field("style_id", &TextStyleEntry::style_id).field("style", &TextStyleEntry::style);
+  value_object<LineCodeLensEntry>("LineCodeLensEntry").field("line", &LineCodeLensEntry::line).field("items", &LineCodeLensEntry::items);
 
   function("editorRenderModelDump", &editorRenderModelDump);
   function("editorRenderModelToJson", &editorRenderModelToJson);
@@ -644,6 +752,7 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
   register_vector<InlayHint>("InlayHintVector");
   register_vector<PhantomText>("PhantomTextVector");
   register_vector<GutterIcon>("GutterIconVector");
+  register_vector<CodeLensItem>("CodeLensItemVector");
   register_vector<DiagnosticSpan>("DiagnosticSpanVector");
   register_vector<FoldRegion>("FoldRegionVector");
   register_vector<IndentGuide>("IndentGuideVector");
@@ -667,6 +776,8 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
   register_vector<LinePhantomTextsEntry>("LinePhantomTextsEntryVector");
   register_vector<LineGutterIconsEntry>("LineGutterIconsEntryVector");
   register_vector<LineDiagnosticsEntry>("LineDiagnosticsEntryVector");
+  register_vector<TextStyleEntry>("TextStyleEntryVector");
+  register_vector<LineCodeLensEntry>("LineCodeLensEntryVector");
 
   class_<TextStyleRegistry>("TextStyleRegistry")
     .smart_ptr<SharedPtr<TextStyleRegistry>>("TextStyleRegistry")
@@ -706,12 +817,15 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
     .function("setViewport", &EditorCore::setViewport)
     .function("onFontMetricsChanged", &EditorCore::onFontMetricsChanged)
     .function("setWrapMode", &EditorCore::setWrapMode)
+    .function("setTabSize", &EditorCore::setTabSize)
     .function("setScale", &EditorCore::setScale)
     .function("setFoldArrowMode", &EditorCore::setFoldArrowMode)
     .function("setLineSpacing", &EditorCore::setLineSpacing)
     .function("setContentStartPadding", &EditorCore::setContentStartPadding)
     .function("setShowSplitLine", &EditorCore::setShowSplitLine)
     .function("setCurrentLineRenderMode", &EditorCore::setCurrentLineRenderMode)
+    .function("setGutterSticky", &EditorCore::setGutterSticky)
+    .function("setGutterVisible", &EditorCore::setGutterVisible)
     .function("getTextStyleRegistry", &EditorCore::getTextStyleRegistry)
     .function("buildRenderModel", &editorBuildRenderModel)
     .function("getViewState", &EditorCore::getViewState)
@@ -721,8 +835,11 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
     .function("handleGestureEventRaw", &editorHandleGestureEventRaw)
     .function("tickEdgeScroll", &EditorCore::tickEdgeScroll)
     .function("tickFling", &EditorCore::tickFling)
+    .function("tickAnimations", &EditorCore::tickAnimations)
+    .function("stopFling", &EditorCore::stopFling)
     .function("handleKeyEvent", &EditorCore::handleKeyEvent)
     .function("handleKeyEventRaw", &editorHandleKeyEventRaw)
+    .function("setKeyMap", &editorSetKeyMap)
     .function("insertText", &EditorCore::insertText)
     .function("replaceText", &EditorCore::replaceText)
     .function("deleteText", &EditorCore::deleteText)
@@ -755,6 +872,8 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
     .function("moveCursorDown", &EditorCore::moveCursorDown)
     .function("moveCursorToLineStart", &EditorCore::moveCursorToLineStart)
     .function("moveCursorToLineEnd", &EditorCore::moveCursorToLineEnd)
+    .function("moveCursorPageUp", &EditorCore::moveCursorPageUp)
+    .function("moveCursorPageDown", &EditorCore::moveCursorPageDown)
     .function("compositionStart", &EditorCore::compositionStart)
     .function("compositionUpdate", &EditorCore::compositionUpdate)
     .function("compositionEnd", &EditorCore::compositionEnd)
@@ -767,6 +886,8 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
     .function("isReadOnly", &EditorCore::isReadOnly)
     .function("setAutoIndentMode", &EditorCore::setAutoIndentMode)
     .function("getAutoIndentMode", &EditorCore::getAutoIndentMode)
+    .function("setBackspaceUnindent", &EditorCore::setBackspaceUnindent)
+    .function("setInsertSpaces", &EditorCore::setInsertSpaces)
     .function("getPositionScreenRect", &EditorCore::getPositionScreenRect)
     .function("getCursorScreenRect", &EditorCore::getCursorScreenRect)
     .function("insertSnippet", &EditorCore::insertSnippet)
@@ -778,8 +899,10 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
     .function("finishLinkedEditing", &EditorCore::finishLinkedEditing)
     .function("scrollToLine", &EditorCore::scrollToLine)
     .function("gotoPosition", &EditorCore::gotoPosition)
+    .function("ensureCursorVisible", &EditorCore::ensureCursorVisible)
     .function("setScroll", &EditorCore::setScroll)
     .function("registerTextStyle", &editorRegisterTextStyle)
+    .function("registerBatchTextStyles", &editorRegisterBatchTextStyles)
     .function("setLineSpans", &editorSetLineSpans)
     .function("setBatchLineSpans", &editorSetBatchLineSpans)
     .function("setLineInlayHints", &editorSetLineInlayHints)
@@ -789,6 +912,9 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
     .function("setLineGutterIcons", &editorSetLineGutterIcons)
     .function("setBatchLineGutterIcons", &editorSetBatchLineGutterIcons)
     .function("setMaxGutterIcons", &EditorCore::setMaxGutterIcons)
+    .function("setLineCodeLens", &editorSetLineCodeLens)
+    .function("setBatchLineCodeLens", &editorSetBatchLineCodeLens)
+    .function("clearCodeLens", &EditorCore::clearCodeLens)
     .function("setLineDiagnostics", &editorSetLineDiagnostics)
     .function("setBatchLineDiagnostics", &editorSetBatchLineDiagnostics)
     .function("clearDiagnostics", &EditorCore::clearDiagnostics)
@@ -811,6 +937,7 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
     .function("clearGuides", &EditorCore::clearGuides)
     .function("clearAllDecorations", &EditorCore::clearAllDecorations)
     .function("setBracketPairs", &editorSetBracketPairs)
+    .function("setAutoClosingPairs", &editorSetAutoClosingPairs)
     .function("setMatchedBrackets", &EditorCore::setMatchedBrackets)
     .function("clearMatchedBrackets", &EditorCore::clearMatchedBrackets);
 
