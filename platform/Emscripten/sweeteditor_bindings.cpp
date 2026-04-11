@@ -1,4 +1,4 @@
-﻿#include <emscripten/bind.h>
+#include <emscripten/bind.h>
 #include <emscripten/val.h>
 
 #include <decoration.h>
@@ -100,16 +100,16 @@ struct LineDiagnosticsEntry {
   Vector<DiagnosticSpan> diagnostics;
 };
 
-Ptr<EditorCore> createEditorCore(const val& callbacks, const EditorOptions& options) {
-  return makePtr<EditorCore>(makePtr<JsTextMeasurer>(callbacks), options);
+SharedPtr<EditorCore> createEditorCore(const val& callbacks, const EditorOptions& options) {
+  return makeShared<EditorCore>(makeShared<JsTextMeasurer>(callbacks), options);
 }
 
-Ptr<LineArrayDocument> createLineArrayDocument(const U8String& text) {
-  return makePtr<LineArrayDocument>(text);
+SharedPtr<LineArrayDocument> createLineArrayDocument(const U8String& text) {
+  return makeShared<LineArrayDocument>(text);
 }
 
-Ptr<PieceTableDocument> createPieceTableDocument(const U8String& text) {
-  return makePtr<PieceTableDocument>(text);
+SharedPtr<PieceTableDocument> createPieceTableDocument(const U8String& text) {
+  return makeShared<PieceTableDocument>(text);
 }
 
 TextStyle registryGetStyle(TextStyleRegistry& registry, uint32_t style_id) {
@@ -444,6 +444,7 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
   value_object<TextPosition>("TextPosition").field("line", &TextPosition::line).field("column", &TextPosition::column);
   value_object<TextRange>("TextRange").field("start", &TextRange::start).field("end", &TextRange::end);
   value_object<PointF>("PointF").field("x", &PointF::x).field("y", &PointF::y);
+  value_object<Rect>("Rect").field("origin", &Rect::origin).field("width", &Rect::width).field("height", &Rect::height);
   value_object<OffsetRect>("OffsetRect")
     .field("left", &OffsetRect::left).field("top", &OffsetRect::top)
     .field("right", &OffsetRect::right).field("bottom", &OffsetRect::bottom);
@@ -510,7 +511,6 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
   value_object<Cursor>("Cursor")
     .field("text_position", &Cursor::text_position).field("position", &Cursor::position)
     .field("height", &Cursor::height).field("visible", &Cursor::visible).field("show_dragger", &Cursor::show_dragger);
-  value_object<SelectionRect>("SelectionRect").field("origin", &SelectionRect::origin).field("width", &SelectionRect::width).field("height", &SelectionRect::height);
   value_object<SelectionHandle>("SelectionHandle")
     .field("position", &SelectionHandle::position).field("height", &SelectionHandle::height).field("visible", &SelectionHandle::visible);
 
@@ -518,26 +518,21 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
     .field("direction", &GuideSegment::direction).field("type", &GuideSegment::type).field("style", &GuideSegment::style)
     .field("start", &GuideSegment::start).field("end", &GuideSegment::end).field("arrow_end", &GuideSegment::arrow_end);
   value_object<CompositionDecoration>("CompositionDecoration")
-    .field("active", &CompositionDecoration::active).field("origin", &CompositionDecoration::origin)
-    .field("width", &CompositionDecoration::width).field("height", &CompositionDecoration::height);
+    .field("active", &CompositionDecoration::active).field("rect", &CompositionDecoration::rect);
   value_object<DiagnosticDecoration>("DiagnosticDecoration")
-    .field("origin", &DiagnosticDecoration::origin).field("width", &DiagnosticDecoration::width)
-    .field("height", &DiagnosticDecoration::height).field("severity", &DiagnosticDecoration::severity).field("color", &DiagnosticDecoration::color);
-  value_object<BracketHighlightRect>("BracketHighlightRect")
-    .field("origin", &BracketHighlightRect::origin).field("width", &BracketHighlightRect::width).field("height", &BracketHighlightRect::height);
+    .field("rect", &DiagnosticDecoration::rect).field("severity", &DiagnosticDecoration::severity).field("color", &DiagnosticDecoration::color);
   value_object<GutterIconRenderItem>("GutterIconRenderItem")
     .field("logical_line", &GutterIconRenderItem::logical_line).field("icon_id", &GutterIconRenderItem::icon_id)
-    .field("origin", &GutterIconRenderItem::origin).field("width", &GutterIconRenderItem::width).field("height", &GutterIconRenderItem::height);
+    .field("rect", &GutterIconRenderItem::rect);
   value_object<FoldMarkerRenderItem>("FoldMarkerRenderItem")
     .field("logical_line", &FoldMarkerRenderItem::logical_line).field("fold_state", &FoldMarkerRenderItem::fold_state)
-    .field("origin", &FoldMarkerRenderItem::origin).field("width", &FoldMarkerRenderItem::width).field("height", &FoldMarkerRenderItem::height);
+    .field("rect", &FoldMarkerRenderItem::rect);
   value_object<LinkedEditingRect>("LinkedEditingRect")
-    .field("origin", &LinkedEditingRect::origin).field("width", &LinkedEditingRect::width)
-    .field("height", &LinkedEditingRect::height).field("is_active", &LinkedEditingRect::is_active);
+    .field("rect", &LinkedEditingRect::rect).field("is_active", &LinkedEditingRect::is_active);
 
-  value_object<ScrollbarRect>("ScrollbarRect").field("origin", &ScrollbarRect::origin).field("width", &ScrollbarRect::width).field("height", &ScrollbarRect::height);
   value_object<ScrollbarModel>("ScrollbarModel")
     .field("visible", &ScrollbarModel::visible).field("alpha", &ScrollbarModel::alpha)
+    .field("thumb_active", &ScrollbarModel::thumb_active)
     .field("track", &ScrollbarModel::track).field("thumb", &ScrollbarModel::thumb);
 
   value_object<EditorRenderModel>("EditorRenderModel")
@@ -563,7 +558,9 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
     .field("gutter_icons", &EditorRenderModel::gutter_icons)
     .field("fold_markers", &EditorRenderModel::fold_markers)
     .field("vertical_scrollbar", &EditorRenderModel::vertical_scrollbar)
-    .field("horizontal_scrollbar", &EditorRenderModel::horizontal_scrollbar);
+    .field("horizontal_scrollbar", &EditorRenderModel::horizontal_scrollbar)
+    .field("gutter_sticky", &EditorRenderModel::gutter_sticky)
+    .field("gutter_visible", &EditorRenderModel::gutter_visible);
 
   value_object<LayoutMetrics>("LayoutMetrics")
     .field("font_height", &LayoutMetrics::font_height).field("font_ascent", &LayoutMetrics::font_ascent)
@@ -571,11 +568,11 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
     .field("line_number_margin", &LayoutMetrics::line_number_margin).field("line_number_width", &LayoutMetrics::line_number_width)
     .field("content_start_padding", &LayoutMetrics::content_start_padding).field("max_gutter_icons", &LayoutMetrics::max_gutter_icons)
     .field("inlay_hint_padding", &LayoutMetrics::inlay_hint_padding).field("inlay_hint_margin", &LayoutMetrics::inlay_hint_margin)
-    .field("fold_arrow_mode", &LayoutMetrics::fold_arrow_mode).field("has_fold_regions", &LayoutMetrics::has_fold_regions);
+    .field("fold_arrow_mode", &LayoutMetrics::fold_arrow_mode).field("has_fold_regions", &LayoutMetrics::has_fold_regions)
+    .field("gutter_sticky", &LayoutMetrics::gutter_sticky).field("gutter_visible", &LayoutMetrics::gutter_visible);
 
   value_object<BracketPair>("BracketPair")
-    .field("open", &BracketPair::open).field("close", &BracketPair::close)
-    .field("auto_close", &BracketPair::auto_close).field("surround", &BracketPair::surround);
+    .field("open", &BracketPair::open).field("close", &BracketPair::close);
 
   value_object<EditorOptions>("EditorOptions")
     .field("touch_slop", &EditorOptions::touch_slop).field("double_tap_timeout", &EditorOptions::double_tap_timeout)
@@ -617,8 +614,8 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
   value_object<CursorRect>("CursorRect").field("x", &CursorRect::x).field("y", &CursorRect::y).field("height", &CursorRect::height);
 
   value_object<LogicalLine>("LogicalLine")
-    .field("start_byte", &LogicalLine::start_byte).field("start_char", &LogicalLine::start_char).field("cached_text", &LogicalLine::cached_text)
-    .field("is_char_dirty", &LogicalLine::is_char_dirty).field("line_ending", &LogicalLine::line_ending)
+    .field("start_byte", &LogicalLine::start_byte).field("start_utf16", &LogicalLine::start_utf16)
+    .field("cached_u16_text", &LogicalLine::cached_u16_text).field("is_u16_dirty", &LogicalLine::is_u16_dirty).field("line_ending", &LogicalLine::line_ending)
     .field("start_y", &LogicalLine::start_y).field("height", &LogicalLine::height)
     .field("visual_lines", &LogicalLine::visual_lines).field("is_layout_dirty", &LogicalLine::is_layout_dirty).field("is_fold_hidden", &LogicalLine::is_fold_hidden);
 
@@ -655,10 +652,9 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
   register_vector<SeparatorGuide>("SeparatorGuideVector");
   register_vector<VisualRun>("VisualRunVector");
   register_vector<VisualLine>("VisualLineVector");
-  register_vector<SelectionRect>("SelectionRectVector");
+  register_vector<Rect>("RectVector");
   register_vector<GuideSegment>("GuideSegmentVector");
   register_vector<DiagnosticDecoration>("DiagnosticDecorationVector");
-  register_vector<BracketHighlightRect>("BracketHighlightRectVector");
   register_vector<GutterIconRenderItem>("GutterIconRenderItemVector");
   register_vector<FoldMarkerRenderItem>("FoldMarkerRenderItemVector");
   register_vector<LinkedEditingRect>("LinkedEditingRectVector");
@@ -673,7 +669,7 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
   register_vector<LineDiagnosticsEntry>("LineDiagnosticsEntryVector");
 
   class_<TextStyleRegistry>("TextStyleRegistry")
-    .smart_ptr<Ptr<TextStyleRegistry>>("TextStyleRegistry")
+    .smart_ptr<SharedPtr<TextStyleRegistry>>("TextStyleRegistry")
     .function("registerTextStyle", optional_override([](TextStyleRegistry& registry, uint32_t style_id, const TextStyle& style) {
       auto copy = style;
       registry.registerTextStyle(style_id, std::move(copy));
@@ -681,7 +677,7 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
     .function("getStyle", &registryGetStyle);
 
   class_<Document>("Document")
-    .smart_ptr<Ptr<Document>>("Document")
+    .smart_ptr<SharedPtr<Document>>("Document")
     .function("getU8Text", optional_override([](Document& document) { return document.getU8Text(); }))
     .function("getU8Text", optional_override([](Document& document, const TextRange& range) { return document.getU8Text(range); }))
     .function("getU16Text", &Document::getU16Text)
@@ -694,8 +690,7 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
     .function("deleteU8Text", &Document::deleteU8Text)
     .function("replaceU8Text", &Document::replaceU8Text)
     .function("countChars", &Document::countChars)
-    .function("getLogicalLines", &Document::getLogicalLines, return_value_policy::reference())
-    .function("updateDirtyLine", &Document::updateDirtyLine);
+    .function("getLogicalLines", &Document::getLogicalLines, return_value_policy::reference());
 
   class_<LineArrayDocument, base<Document>>("LineArrayDocument")
     .smart_ptr_constructor("LineArrayDocument", &createLineArrayDocument);

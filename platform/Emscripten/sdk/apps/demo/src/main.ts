@@ -122,6 +122,18 @@ const STYLE = Object.freeze({
 const INLAY_COLOR_TYPE = 2;
 const MAX_RENDER_LINES_PER_PASS = 420;
 const SYNTAX_JSON_FILES = Object.freeze(["cpp.json", "java.json", "kotlin.json", "lua.json"]);
+const DEMO_EDITOR_FONT_FAMILY = [
+  "\"Cascadia Mono\"",
+  "\"JetBrains Mono\"",
+  "\"Sarasa Mono SC\"",
+  "\"Noto Sans Mono CJK SC\"",
+  "\"Source Han Mono SC\"",
+  "Consolas",
+  "\"PingFang SC\"",
+  "\"Noto Sans CJK SC\"",
+  "\"Microsoft YaHei UI\"",
+  "monospace",
+].join(", ");
 
 const MEMBER_COMPLETIONS: Readonly<Record<LanguageKind, IDemoCompletionItem[]>> = Object.freeze({
   cpp: [
@@ -595,6 +607,12 @@ async function bootstrap(): Promise<void> {
       ...DEMO_DECORATION_OPTIONS,
       ...initialDecorationRuntimeOptions,
     },
+    widgetOptions: {
+      editorOptions: {
+        fontFamily: DEMO_EDITOR_FONT_FAMILY,
+        typeface: DEMO_EDITOR_FONT_FAMILY,
+      },
+    },
   });
 
   const widget = editor.getNativeWidget() as IWidgetLike;
@@ -784,4 +802,3 @@ bootstrap().catch((error) => {
   console.error(error);
   setStatus(`Error: ${String(error)}`);
 });
-

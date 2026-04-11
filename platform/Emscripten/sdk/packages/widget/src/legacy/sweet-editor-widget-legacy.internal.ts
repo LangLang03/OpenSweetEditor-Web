@@ -640,15 +640,29 @@ export class Canvas2DRenderer {
     this._iconProvider = null;
     this._pixelRatioX = 1;
     this._pixelRatioY = 1;
+    this._prepareTextContext(this._measureCtx);
+  }
+
+  _prepareTextContext(ctx:IAnyValue) {
+    if (!ctx) {
+      return;
+    }
+    // Force LTR text shaping for source code rendering/measurement.
+    // Relying on "inherit/start" can cause bidi reordering issues in some environments.
+    ctx.direction = "ltr";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
   }
 
   createTextMeasurerCallbacks() {
     return {
       measureTextWidth: (text:string, fontStyle:number) => {
+        this._prepareTextContext(this._measureCtx);
         this._measureCtx.font = this._fontByStyle(fontStyle);
         return this._measureCtx.measureText(text || "").width;
       },
       measureInlayHintWidth: (text:string) => {
+        this._prepareTextContext(this._measureCtx);
         this._measureCtx.font = `12px ${this._fontFamily}`;
         return this._measureCtx.measureText(text || "").width;
       },
@@ -661,6 +675,7 @@ export class Canvas2DRenderer {
         return this._baseFontSize;
       },
       getFontMetrics: () => {
+        this._prepareTextContext(this._measureCtx);
         this._measureCtx.font = this._fontByStyle(0);
         const metrics = this._measureCtx.measureText("Mg");
         const ascent = metrics.actualBoundingBoxAscent || this._baseFontSize * 0.8;
@@ -730,6 +745,7 @@ export class Canvas2DRenderer {
   }
 
   render(ctx:IAnyRecord, model:IAnyValue, viewportWidth:number, viewportHeight:number) {
+    this._prepareTextContext(ctx);
     this._setPixelSnapContext(ctx);
     ctx.fillStyle = this.theme.background;
     ctx.fillRect(0, 0, viewportWidth, viewportHeight);
@@ -971,8 +987,7 @@ export class Canvas2DRenderer {
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(glyph, this._snapX(x + width * 0.5), this._snapY(y + height * 0.5));
-        ctx.textAlign = "start";
-        ctx.textBaseline = "alphabetic";
+        this._prepareTextContext(ctx);
         return;
       }
     }
@@ -5716,4 +5731,3 @@ export class SweetEditorWidget {
     event.preventDefault();
   }
 }
-
