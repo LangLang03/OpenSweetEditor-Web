@@ -7,6 +7,7 @@ import androidx.annotation.Nullable;
 
 import com.qiplat.sweeteditor.core.keymap.KeyBinding;
 import com.qiplat.sweeteditor.core.keymap.KeyMap;
+import com.qiplat.sweeteditor.core.adornment.CodeLensItem;
 import com.qiplat.sweeteditor.core.adornment.Diagnostic;
 import com.qiplat.sweeteditor.core.adornment.FoldRegion;
 import com.qiplat.sweeteditor.core.adornment.GutterIcon;
@@ -682,6 +683,104 @@ public final class ProtocolEncoder {
             payload.putInt(iconCount);
             for (int j = 0; j < iconCount; j++) {
                 payload.putInt(icons.get(j).iconId);
+            }
+        }
+        payload.flip();
+        return payload;
+    }
+
+    /**
+     * Pack the CodeLensItem list for a given line into a binary ByteBuffer.
+     * <p>
+     * Format (LE): u32 line, u32 item_count,
+     * then repeat item_count times: [i32 command_id, u32 text_len, u8[text_len] text_utf8]
+     */
+    public static ByteBuffer packLineCodeLens(int line, @NonNull List<? extends CodeLensItem> items) {
+        int count = items.size();
+        int totalSize = 8; // line(4) + count(4)
+        byte[][] textBytes = new byte[count][];
+        for (int i = 0; i < count; i++) {
+            CodeLensItem item = items.get(i);
+            totalSize += 8; // command_id(4) + text_len(4)
+            if (item.text != null) {
+                byte[] bytes = item.text.getBytes(StandardCharsets.UTF_8);
+                textBytes[i] = bytes;
+                totalSize += bytes.length;
+            }
+        }
+        ByteBuffer payload = ByteBuffer.allocateDirect(totalSize).order(ByteOrder.LITTLE_ENDIAN);
+        payload.putInt(line);
+        payload.putInt(count);
+        for (int i = 0; i < count; i++) {
+            CodeLensItem item = items.get(i);
+            payload.putInt(item.commandId);
+            byte[] tb = textBytes[i];
+            if (tb != null) {
+                payload.putInt(tb.length);
+                payload.put(tb);
+            } else {
+                payload.putInt(0);
+            }
+        }
+        payload.flip();
+        return payload;
+    }
+
+    /**
+     * Batch encode multiple lines of CodeLens items (variable length, two-pass traversal).
+     * <p>
+     * Format (LE): u32 entry_count,
+     * [u32 line, u32 item_count,
+     *  [i32 command_id, u32 text_len, u8[text_len] text_utf8] x item_count] x entry_count
+     */
+    @Nullable
+    public static ByteBuffer packBatchLineCodeLens(@Nullable SparseArray<? extends List<? extends CodeLensItem>> itemsByLine) {
+        if (itemsByLine == null || itemsByLine.size() == 0) return null;
+        int entryCount = itemsByLine.size();
+        int totalSize = 4; // entry_count(4)
+        int totalItemCount = 0;
+        for (int i = 0; i < entryCount; i++) {
+            List<? extends CodeLensItem> items = itemsByLine.valueAt(i);
+            int itemCount = (items != null) ? items.size() : 0;
+            totalItemCount += itemCount;
+            totalSize += 8; // line(4) + item_count(4)
+        }
+        byte[][] textBytesCache = new byte[totalItemCount][];
+        int itemIdx = 0;
+        for (int i = 0; i < entryCount; i++) {
+            List<? extends CodeLensItem> items = itemsByLine.valueAt(i);
+            if (items == null) continue;
+            for (int j = 0; j < items.size(); j++) {
+                CodeLensItem item = items.get(j);
+                totalSize += 8; // command_id(4) + text_len(4)
+                if (item.text != null) {
+                    byte[] bytes = item.text.getBytes(StandardCharsets.UTF_8);
+                    textBytesCache[itemIdx] = bytes;
+                    totalSize += bytes.length;
+                }
+                itemIdx++;
+            }
+        }
+        ByteBuffer payload = ByteBuffer.allocateDirect(totalSize).order(ByteOrder.LITTLE_ENDIAN);
+        payload.putInt(entryCount);
+        itemIdx = 0;
+        for (int i = 0; i < entryCount; i++) {
+            int line = itemsByLine.keyAt(i);
+            List<? extends CodeLensItem> items = itemsByLine.valueAt(i);
+            int itemCount = (items != null) ? items.size() : 0;
+            payload.putInt(line);
+            payload.putInt(itemCount);
+            for (int j = 0; j < itemCount; j++) {
+                CodeLensItem item = items.get(j);
+                payload.putInt(item.commandId);
+                byte[] tb = textBytesCache[itemIdx];
+                if (tb != null) {
+                    payload.putInt(tb.length);
+                    payload.put(tb);
+                } else {
+                    payload.putInt(0);
+                }
+                itemIdx++;
             }
         }
         payload.flip();

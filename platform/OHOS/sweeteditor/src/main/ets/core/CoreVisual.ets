@@ -13,13 +13,20 @@ export enum VisualRunType {
   INLAY_HINT = 3,
   PHANTOM_TEXT = 4,
   FOLD_PLACEHOLDER = 5,
-  TAB = 6
+  TAB = 6,
+  CODELENS = 7
 }
 
 export enum FoldState {
   NONE = 0,
   EXPANDED = 1,
   COLLAPSED = 2
+}
+
+export enum VisualLineKind {
+  CONTENT = 0,
+  PHANTOM = 1,
+  CODELENS = 2
 }
 
 export enum GuideDirection {
@@ -52,6 +59,7 @@ export interface VisualRun {
   width: number;
   padding: number;
   margin: number;
+  active: boolean;
 }
 
 export interface VisualLine {
@@ -59,7 +67,8 @@ export interface VisualLine {
   wrapIndex: number;
   lineNumberPosition: PointF;
   runs: VisualRun[];
-  isPhantomLine: boolean;
+  kind: VisualLineKind;
+  ownsGutterSemantics: boolean;
   foldState: FoldState;
 }
 
@@ -199,4 +208,3 @@ export interface EditorRenderModel {
   gutterSticky: boolean;
   gutterVisible: boolean;
 }
-

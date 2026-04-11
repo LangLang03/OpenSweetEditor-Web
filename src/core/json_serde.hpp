@@ -66,6 +66,7 @@ namespace NS_SWEETEDITOR {
     {VisualRunType::PHANTOM_TEXT, "PHANTOM_TEXT"},
     {VisualRunType::FOLD_PLACEHOLDER, "FOLD_PLACEHOLDER"},
     {VisualRunType::TAB, "TAB"},
+    {VisualRunType::CODELENS, "CODELENS"},
   })
   inline void to_json(nlohmann::json& j, const VisualRun& r) {
     U8String u8_text;
@@ -88,6 +89,7 @@ namespace NS_SWEETEDITOR {
       {"width", r.width},
       {"padding", r.padding},
       {"margin", r.margin},
+      {"active", r.active},
     };
   }
   inline void from_json(const nlohmann::json& j, VisualRun& r) {
@@ -110,13 +112,19 @@ namespace NS_SWEETEDITOR {
     if (j.contains("width")) j.at("width").get_to(r.width);
     if (j.contains("padding")) j.at("padding").get_to(r.padding);
     if (j.contains("margin")) j.at("margin").get_to(r.margin);
+    if (j.contains("active")) j.at("active").get_to(r.active);
   }
   NLOHMANN_JSON_SERIALIZE_ENUM(FoldState, {
     {FoldState::NONE, "NONE"},
     {FoldState::EXPANDED, "EXPANDED"},
     {FoldState::COLLAPSED, "COLLAPSED"},
   })
-  NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(VisualLine, logical_line, wrap_index, line_number_position, runs, is_phantom_line, fold_state)
+  NLOHMANN_JSON_SERIALIZE_ENUM(VisualLineKind, {
+    {VisualLineKind::CONTENT, "CONTENT"},
+    {VisualLineKind::PHANTOM, "PHANTOM"},
+    {VisualLineKind::CODELENS, "CODELENS"},
+  })
+  NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(VisualLine, logical_line, wrap_index, line_number_position, runs, kind, owns_gutter_semantics, fold_state)
   NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Cursor, text_position, position, height, visible, show_dragger)
   NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SelectionHandle, position, height, visible)
   NLOHMANN_JSON_SERIALIZE_ENUM(GuideDirection, {

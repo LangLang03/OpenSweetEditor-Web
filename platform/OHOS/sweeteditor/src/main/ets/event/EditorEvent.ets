@@ -147,6 +147,18 @@ export class FoldToggleEvent implements EditorEvent {
   }
 }
 
+export class CodeLensClickEvent implements EditorEvent {
+  readonly line: number;
+  readonly commandId: number;
+  readonly screenPoint: PointF;
+
+  constructor(line: number, commandId: number, screenPoint: PointF) {
+    this.line = line;
+    this.commandId = commandId;
+    this.screenPoint = screenPoint;
+  }
+}
+
 export class DocumentLoadedEvent implements EditorEvent {
 }
 

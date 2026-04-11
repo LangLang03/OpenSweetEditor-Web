@@ -572,6 +572,10 @@ public:
     editor_clear_gutter_icons(static_cast<intptr_t>(handle));
   }
 
+  static void clearCodeLens(jlong handle) {
+    editor_clear_codelens(static_cast<intptr_t>(handle));
+  }
+
   static void clearGuides(jlong handle) {
     editor_clear_guides(static_cast<intptr_t>(handle));
   }
@@ -682,6 +686,19 @@ public:
     jlong capacity = env->GetDirectBufferCapacity(data);
     if (ptr == nullptr || capacity < 0 || static_cast<jlong>(size) > capacity) return;
     editor_set_batch_line_gutter_icons(static_cast<intptr_t>(handle), reinterpret_cast<const uint8_t*>(ptr), static_cast<size_t>(size));
+  }
+
+  static void setLineCodeLens(JNIEnv* env, jclass clazz, jlong handle, jobject buffer, jint size) {
+    auto* ptr = env->GetDirectBufferAddress(buffer);
+    editor_set_line_codelens(static_cast<intptr_t>(handle), reinterpret_cast<const uint8_t*>(ptr), static_cast<size_t>(size));
+  }
+
+  static void setBatchLineCodeLens(JNIEnv* env, jclass clazz, jlong handle, jobject data, jint size) {
+    if (handle == 0 || data == nullptr || size <= 0) return;
+    void* ptr = env->GetDirectBufferAddress(data);
+    jlong capacity = env->GetDirectBufferCapacity(data);
+    if (ptr == nullptr || capacity < 0 || static_cast<jlong>(size) > capacity) return;
+    editor_set_batch_line_codelens(static_cast<intptr_t>(handle), reinterpret_cast<const uint8_t*>(ptr), static_cast<size_t>(size));
   }
 
   static void setBatchLineDiagnostics(JNIEnv* env, jclass clazz, jlong handle, jobject data, jint size) {
@@ -1005,6 +1022,7 @@ public:
       {"nativeClearInlayHints", "(J)V", (void*) clearInlayHints},
       {"nativeClearPhantomTexts", "(J)V", (void*) clearPhantomTexts},
       {"nativeClearGutterIcons", "(J)V", (void*) clearGutterIcons},
+      {"nativeClearCodeLens", "(J)V", (void*) clearCodeLens},
       {"nativeClearGuides", "(J)V", (void*) clearGuides},
       {"nativeClearAllDecorations", "(J)V", (void*) clearAllDecorations},
       {"nativeSetIndentGuides", "(JLjava/nio/ByteBuffer;I)V", (void*) setIndentGuides},
@@ -1021,6 +1039,8 @@ public:
       {"nativeSetBatchLineInlayHints", "(JLjava/nio/ByteBuffer;I)V", (void*) setBatchLineInlayHints},
       {"nativeSetBatchLinePhantomTexts", "(JLjava/nio/ByteBuffer;I)V", (void*) setBatchLinePhantomTexts},
       {"nativeSetBatchLineGutterIcons", "(JLjava/nio/ByteBuffer;I)V", (void*) setBatchLineGutterIcons},
+      {"nativeSetLineCodeLens", "(JLjava/nio/ByteBuffer;I)V", (void*) setLineCodeLens},
+      {"nativeSetBatchLineCodeLens", "(JLjava/nio/ByteBuffer;I)V", (void*) setBatchLineCodeLens},
       {"nativeSetBatchLineDiagnostics", "(JLjava/nio/ByteBuffer;I)V", (void*) setBatchLineDiagnostics},
       {"nativeSetFoldRegions", "(JLjava/nio/ByteBuffer;I)V", (void*) setFoldRegions},
       {"nativeToggleFoldAt", "(JI)Z", (void*) toggleFoldAt},

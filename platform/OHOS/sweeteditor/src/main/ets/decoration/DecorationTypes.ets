@@ -6,6 +6,7 @@ import {
   GutterIcon,
   IndentGuide,
   InlayHint,
+  CodeLensItem,
   PhantomText,
   SeparatorGuide,
   StyleSpan
@@ -24,7 +25,8 @@ export enum DecorationType {
   FLOW_GUIDE = 'flow_guide',
   SEPARATOR_GUIDE = 'separator_guide',
   GUTTER_ICON = 'gutter_icon',
-  PHANTOM_TEXT = 'phantom_text'
+  PHANTOM_TEXT = 'phantom_text',
+  CODELENS = 'codelens'
 }
 
 export { TextChange } from '../core/EditorCore';
@@ -95,6 +97,7 @@ export class DecorationResult {
   foldRegions: FoldRegion[] | null = null;
   gutterIcons: Map<number, GutterIcon[]> | null = null;
   phantomTexts: Map<number, PhantomText[]> | null = null;
+  codeLensItems: Map<number, CodeLensItem[]> | null = null;
   syntaxSpansMode: ApplyMode = ApplyMode.MERGE;
   semanticSpansMode: ApplyMode = ApplyMode.MERGE;
   inlayHintsMode: ApplyMode = ApplyMode.MERGE;
@@ -106,6 +109,7 @@ export class DecorationResult {
   foldRegionsMode: ApplyMode = ApplyMode.MERGE;
   gutterIconsMode: ApplyMode = ApplyMode.MERGE;
   phantomTextsMode: ApplyMode = ApplyMode.MERGE;
+  codeLensItemsMode: ApplyMode = ApplyMode.MERGE;
 
   copy(): DecorationResult {
     const out = new DecorationResult();
@@ -120,6 +124,7 @@ export class DecorationResult {
     out.foldRegions = this.foldRegions ? [...this.foldRegions] : null;
     out.gutterIcons = copyMapOfArrays(this.gutterIcons);
     out.phantomTexts = copyMapOfArrays(this.phantomTexts);
+    out.codeLensItems = copyMapOfArrays(this.codeLensItems);
     out.syntaxSpansMode = this.syntaxSpansMode;
     out.semanticSpansMode = this.semanticSpansMode;
     out.inlayHintsMode = this.inlayHintsMode;
@@ -131,6 +136,7 @@ export class DecorationResult {
     out.foldRegionsMode = this.foldRegionsMode;
     out.gutterIconsMode = this.gutterIconsMode;
     out.phantomTextsMode = this.phantomTextsMode;
+    out.codeLensItemsMode = this.codeLensItemsMode;
     return out;
   }
 }
@@ -201,6 +207,12 @@ export class DecorationResultBuilder {
   phantomTexts(value: Map<number, PhantomText[]> | null, mode: ApplyMode): DecorationResultBuilder {
     this.result.phantomTexts = value;
     this.result.phantomTextsMode = mode;
+    return this;
+  }
+
+  codeLensItems(value: Map<number, CodeLensItem[]> | null, mode: ApplyMode): DecorationResultBuilder {
+    this.result.codeLensItems = value;
+    this.result.codeLensItemsMode = mode;
     return this;
   }
 

@@ -144,6 +144,11 @@ static napi_value Init(napi_env env, napi_value exports)
         NAPI_METHOD("editorSetMaxGutterIcons", EditorCoreNapi::setMaxGutterIcons),
         NAPI_METHOD("editorClearGutterIcons", EditorCoreNapi::clearGutterIcons),
 
+        // CodeLens
+        NAPI_METHOD("editorSetLineCodeLens", EditorCoreNapi::setLineCodeLens),
+        NAPI_METHOD("editorSetBatchLineCodeLens", EditorCoreNapi::setBatchLineCodeLens),
+        NAPI_METHOD("editorClearCodeLens", EditorCoreNapi::clearCodeLens),
+
         // Diagnostics
         NAPI_METHOD("editorSetLineDiagnostics", EditorCoreNapi::setLineDiagnostics),
         NAPI_METHOD("editorSetBatchLineDiagnostics", EditorCoreNapi::setBatchLineDiagnostics),

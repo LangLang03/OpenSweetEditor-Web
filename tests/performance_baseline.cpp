@@ -72,7 +72,7 @@ TEST_CASE("Performance baseline: hitTest mapping on large wrapped layout") {
                                  WrapMode::CHAR_BREAK);
 
   EditorRenderModel model;
-  layout.layoutVisibleLines(model);
+  layout.layoutVisibleLines(model, PresentationContext {});
   REQUIRE_FALSE(model.lines.empty());
 
   BENCHMARK("HitTest_WrappedLargeLayout") {
@@ -80,7 +80,7 @@ TEST_CASE("Performance baseline: hitTest mapping on large wrapped layout") {
     for (size_t i = 0; i < 60; ++i) {
       const float y = 6.0f + static_cast<float>((i % 12) * 14);
       const float x = 36.0f + static_cast<float>((i % 5) * 18);
-      last = layout.hitTest({x, y});
+      last = layout.hitTestPointer({x, y});
     }
     return last.line + last.column;
   };

@@ -14,7 +14,11 @@ namespace NS_SWEETEDITOR {
 
 #pragma region [Class: VisualLine]
   U8String VisualLine::dump() const {
-    U8String result = "VisualLine {logical_line = " + std::to_string(logical_line) + ", runs = [";
+    U8String result = "VisualLine {logical_line = " + std::to_string(logical_line)
+      + ", wrap_index = " + std::to_string(wrap_index)
+      + ", kind = " + std::to_string(static_cast<int>(kind))
+      + ", owns_gutter_semantics = " + std::to_string(owns_gutter_semantics)
+      + ", runs = [";
     for (const VisualRun& run : runs) {
       result += "\n  ";
       result += run.dump();
@@ -72,6 +76,8 @@ namespace NS_SWEETEDITOR {
       return "FOLD_PLACEHOLDER";
     case VisualRunType::TAB:
       return "TAB";
+    case VisualRunType::CODELENS:
+      return "CODELENS";
     default:
       return "UNDEFINED";
     }

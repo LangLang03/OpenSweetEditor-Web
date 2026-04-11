@@ -39,6 +39,7 @@ import com.qiplat.sweeteditor.core.foundation.FoldArrowMode;
 import com.qiplat.sweeteditor.core.foundation.TextChange;
 import com.qiplat.sweeteditor.core.foundation.WrapMode;
 import com.qiplat.sweeteditor.event.CursorChangedEvent;
+import com.qiplat.sweeteditor.event.CodeLensClickEvent;
 import com.qiplat.sweeteditor.event.GutterIconClickEvent;
 import com.qiplat.sweeteditor.event.InlayHintClickEvent;
 import com.qiplat.sweeteditor.event.TextChangedEvent;
@@ -257,6 +258,12 @@ public class MainActivity extends AppCompatActivity {
         });
         mEditor.subscribe(GutterIconClickEvent.class, e ->
                 Toast.makeText(this, "Click icon at line: " + e.line, Toast.LENGTH_SHORT).show());
+        mEditor.subscribe(CodeLensClickEvent.class, e -> {
+            String commandLabel = describeCodeLensCommand(e.commandId);
+            String message = "CodeLens " + commandLabel + " at line: " + (e.line + 1);
+            updateStatus(message);
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+        });
 
         mEditor.subscribe(CursorChangedEvent.class, e -> scheduleSuggestionIfAtLineEnd(e));
 
@@ -304,6 +311,17 @@ public class MainActivity extends AppCompatActivity {
             mSuggestionHandler.removeCallbacks(mPendingSuggestion);
             mPendingSuggestion = null;
         }
+    }
+
+    @NonNull
+    private String describeCodeLensCommand(int commandId) {
+        if (commandId == DemoDecorationProvider.CODELENS_RUN) {
+            return "Run";
+        }
+        if (commandId == DemoDecorationProvider.CODELENS_DEBUG) {
+            return "Debug";
+        }
+        return "Command#" + commandId;
     }
 
     private void setupFileSpinner() {

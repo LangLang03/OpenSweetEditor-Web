@@ -11,6 +11,7 @@ public class SweetEditorViewMacOS: NSView, NSTextInputClient, CompletionEditorAc
     public var onFoldToggle: ((SweetEditorFoldToggleEvent) -> Void)?
     public var onInlayHintClick: ((SweetEditorInlayHintClickEvent) -> Void)?
     public var onGutterIconClick: ((SweetEditorGutterIconClickEvent) -> Void)?
+    public var onCodeLensClick: ((SweetEditorCodeLensClickEvent) -> Void)?
     public var editorIconProvider: EditorIconProvider?
     public var scrollbarHoverRevealEnabled: Bool {
         get { scrollbarPolicy.hoverRevealEnabled }
@@ -255,6 +256,16 @@ public class SweetEditorViewMacOS: NSView, NSTextInputClient, CompletionEditorAc
         rebuildAndRedraw()
     }
 
+    public func setLineCodeLens(line: Int, items: [SweetEditorCore.CodeLensPayload]) {
+        editorCore.setLineCodeLens(line: line, items: items)
+        rebuildAndRedraw()
+    }
+
+    public func setBatchLineCodeLens(_ itemsByLine: [Int: [SweetEditorCore.CodeLensPayload]]) {
+        editorCore.setBatchLineCodeLens(itemsByLine)
+        rebuildAndRedraw()
+    }
+
     /// Compatibility wrapper for callers not yet migrated to `settings`.
     public func setMaxGutterIcons(_ count: UInt32) {
         settings.setMaxGutterIcons(count)
@@ -347,6 +358,11 @@ public class SweetEditorViewMacOS: NSView, NSTextInputClient, CompletionEditorAc
 
     public func clearGutterIcons() {
         editorCore.clearGutterIcons()
+        rebuildAndRedraw()
+    }
+
+    public func clearCodeLens() {
+        editorCore.clearCodeLens()
         rebuildAndRedraw()
     }
 
@@ -1069,6 +1085,14 @@ public class SweetEditorViewMacOS: NSView, NSTextInputClient, CompletionEditorAc
                 SweetEditorGutterIconClickEvent(
                     line: result.hit_target.line,
                     iconId: result.hit_target.icon_id,
+                    locationInView: CGPoint(x: CGFloat(result.tap_point.x), y: CGFloat(result.tap_point.y))
+                )
+            )
+        case .CODELENS:
+            onCodeLensClick?(
+                SweetEditorCodeLensClickEvent(
+                    line: result.hit_target.line,
+                    commandId: result.hit_target.icon_id,
                     locationInView: CGPoint(x: CGFloat(result.tap_point.x), y: CGFloat(result.tap_point.y))
                 )
             )

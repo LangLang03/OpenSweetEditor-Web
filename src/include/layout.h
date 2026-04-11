@@ -44,6 +44,68 @@ namespace NS_SWEETEDITOR {
     float max_scroll_y {0};
   };
 
+  /// Presentation-time state used when materializing the render model.
+  /// This context does not affect geometry/layout caches. It only affects
+  /// the final visual model emitted to platform renderers.
+  struct PresentationContext {
+    /// Active interactive hit target (for example hovered CodeLens item)
+    HitTarget active_hit_target;
+    /// Whether selection_range is valid
+    bool has_selection {false};
+    /// Current logical text selection range
+    TextRange selection_range;
+  };
+
+  enum struct PointerHitPolicy : uint8_t {
+    CONTENT = 0,
+    OWNER_LINE_START = 1,
+  };
+
+  enum struct TextBoundaryPolicy : uint8_t {
+    CONTENT = 0,
+    PREVIOUS_VISIBLE_LINE_END = 1,
+    OWNER_LINE_END = 2,
+  };
+
+  enum struct TextSemanticsPolicy : uint8_t {
+    PARTICIPATES = 0,
+    SKIP = 1,
+  };
+
+  struct VisualLineSemantics {
+    PointerHitPolicy pointer_hit {PointerHitPolicy::CONTENT};
+    TextBoundaryPolicy text_boundary {TextBoundaryPolicy::CONTENT};
+    TextSemanticsPolicy text_semantics {TextSemanticsPolicy::PARTICIPATES};
+  };
+
+  inline const VisualLineSemantics& getVisualLineSemantics(VisualLineKind kind) {
+    static const VisualLineSemantics content {
+      PointerHitPolicy::CONTENT,
+      TextBoundaryPolicy::CONTENT,
+      TextSemanticsPolicy::PARTICIPATES
+    };
+    static const VisualLineSemantics phantom {
+      PointerHitPolicy::CONTENT,
+      TextBoundaryPolicy::OWNER_LINE_END,
+      TextSemanticsPolicy::SKIP
+    };
+    static const VisualLineSemantics codelens {
+      PointerHitPolicy::OWNER_LINE_START,
+      TextBoundaryPolicy::PREVIOUS_VISIBLE_LINE_END,
+      TextSemanticsPolicy::SKIP
+    };
+
+    switch (kind) {
+      case VisualLineKind::PHANTOM:
+        return phantom;
+      case VisualLineKind::CODELENS:
+        return codelens;
+      case VisualLineKind::CONTENT:
+      default:
+        return content;
+    }
+  }
+
   /// Text width measurement interface implemented by each platform
   class TextMeasurer {
   public:
@@ -83,11 +145,17 @@ namespace NS_SWEETEDITOR {
 
     void layoutLine(size_t index, LogicalLine& logical_line);
 
-    void layoutVisibleLines(EditorRenderModel& model);
+    void layoutVisibleLines(EditorRenderModel& model, const PresentationContext& presentation_context);
 
-    /// Screen hit test: convert screen point to text position (for cursor placement)
+    /// Pointer hit test: convert screen point to text position (for cursor placement / tap)
     /// @param screen_point Screen point (relative to editor view top-left)
-    TextPosition hitTest(const PointF& screen_point);
+    TextPosition hitTestPointer(const PointF& screen_point);
+
+    /// Text-boundary hit test: convert screen point to a stable text boundary
+    /// used by selection dragging and handle dragging.
+    /// Virtual lines (for example CodeLens) are mapped to adjacent document text boundaries.
+    /// @param screen_point Screen point (relative to editor view top-left)
+    TextPosition hitTestTextBoundary(const PointF& screen_point);
 
     /// Screen hit test: detect hit on InlayHint, GutterIcon, fold marker, and other decorations
     /// @param screen_point Screen point (relative to editor view top-left)
@@ -96,14 +164,6 @@ namespace NS_SWEETEDITOR {
     /// Get screen coordinates for a text position (for cursor, floating panel, etc.)
     /// @return Screen coordinates (x = cursor x, y = line start y)
     PointF getPositionScreenCoord(const TextPosition& position);
-
-    /// Get screen x range from one column to another on a line (for selection highlight)
-    /// @param line Logical line index
-    /// @param col_start Start column
-    /// @param col_end End column
-    /// @param out_x_start Output start x screen coordinate
-    /// @param out_x_end Output end x screen coordinate
-    void getColumnScreenRange(size_t line, size_t col_start, size_t col_end, float& out_x_start, float& out_x_end);
 
     /// Get screen x range from one column to another and also return y (avoid repeated query)
     /// @param line Logical line index
@@ -217,11 +277,12 @@ namespace NS_SWEETEDITOR {
     void layoutLineIntoVisualLines(size_t line_index, const U16String& line_text, float start_y,
                             Vector<VisualLine>& out_visual_lines);
     /// Zip-align one line with highlight spans, inlay hints, and phantom texts to build VisualRuns
-    void buildLineRuns(size_t line_index, const U16String& line_text, float start_y, Vector<VisualRun>& runs);
+    void buildLineRuns(size_t line_index, const U16String& line_text, Vector<VisualRun>& runs);
     void cropVisualLineRuns(VisualLine& visual_line, float scroll_x);
     /// Auto-wrap: split one line's runs into multiple VisualLines by available width
     void wrapLineRuns(size_t line_index, float start_y, float line_height,
-                      Vector<VisualRun>& runs, Vector<VisualLine>& out_lines);
+                      Vector<VisualRun>& runs, Vector<VisualLine>& out_lines,
+                      size_t wrap_index_offset = 0);
     /// Append fold placeholder and tail-line runs to collapsed first line (first line + placeholder + tail content)
     void appendFoldTailRuns(size_t index, const U16String& line_text, LogicalLine& logical_line);
     float computeLineNumberWidth() const;
@@ -231,6 +292,27 @@ namespace NS_SWEETEDITOR {
     size_t findHitLine(float abs_y);
     /// Find wrapped sub-line index hit inside a logical line
     size_t findHitWrapIndex(const LogicalLine& ll, float abs_y, float line_height) const;
+    /// Shared implementation behind pointer/text-boundary hit testing.
+    TextPosition hitTestInternal(const PointF& screen_point, bool text_boundary);
+    /// Resolve a virtual visual line under pointer-hit semantics.
+    TextPosition mapVisualLineToPointerTarget(size_t logical_line, const VisualLine& visual_line) const;
+    /// Resolve a virtual visual line under text-boundary semantics.
+    TextPosition mapVisualLineToTextBoundary(size_t logical_line, const VisualLine& visual_line) const;
+    /// Find the previous visible logical line and return its end position.
+    TextPosition previousVisibleLineEnd(size_t logical_line) const;
+    /// Get TEXT/TAB logical column extent and total width for one visual line.
+    bool getVisualLineTextColumnExtent(const VisualLine& visual_line,
+                                       size_t& out_col_min,
+                                       size_t& out_col_max,
+                                       float& out_total_width);
+    /// Map one logical column to x within a single visual line.
+    bool columnToVisualLineX(const VisualLine& visual_line,
+                             size_t column,
+                             bool allow_line_end,
+                             float& out_x);
+    /// Resolve the screen x range for a logical column interval on one logical line.
+    void resolveColumnXRange(size_t line, size_t col_start, size_t col_end,
+                             float& out_x_start, float& out_x_end);
     /// Build gutter icon render items for one logical line at the given screen Y
     void buildGutterIconRenderItems(size_t logical_line, float line_top_screen,
                                     float gutter_offset,
@@ -239,6 +321,10 @@ namespace NS_SWEETEDITOR {
     bool buildFoldMarkerRenderItem(size_t logical_line, float line_top_screen,
                                    float gutter_offset,
                                    FoldMarkerRenderItem& out_item) const;
+    /// Find the visual line that owns gutter semantics for a logical line.
+    const VisualLine* findGutterOwnerLine(const LogicalLine& logical_line) const;
+    /// Get the screen top y of the visual line that owns gutter semantics.
+    float getGutterOwnerTopScreen(const LogicalLine& logical_line, float scroll_y) const;
   };
 }
 

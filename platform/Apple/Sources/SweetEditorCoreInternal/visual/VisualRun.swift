@@ -7,6 +7,8 @@ enum VisualRunType: String, Codable {
     case INLAY_HINT
     case PHANTOM_TEXT
     case FOLD_PLACEHOLDER
+    case TAB
+    case CODELENS
 }
 
 struct InlineStyle: Codable {
@@ -39,8 +41,9 @@ struct VisualRun: Codable {
     let width: Float
     let padding: Float
     let margin: Float
+    let active: Bool
 
-    init(type: VisualRunType, x: Float, y: Float, text: String, style: InlineStyle, icon_id: Int32, color_value: Int32, width: Float, padding: Float, margin: Float) {
+    init(type: VisualRunType, x: Float, y: Float, text: String, style: InlineStyle, icon_id: Int32, color_value: Int32, width: Float, padding: Float, margin: Float, active: Bool = false) {
         self.type = type
         self.x = x
         self.y = y
@@ -51,6 +54,7 @@ struct VisualRun: Codable {
         self.width = width
         self.padding = padding
         self.margin = margin
+        self.active = active
     }
 
     init(from decoder: Decoder) throws {
@@ -65,5 +69,6 @@ struct VisualRun: Codable {
         width = try container.decode(Float.self, forKey: .width)
         padding = try container.decode(Float.self, forKey: .padding)
         margin = try container.decode(Float.self, forKey: .margin)
+        active = try container.decodeIfPresent(Bool.self, forKey: .active) ?? false
     }
 }

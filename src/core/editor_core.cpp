@@ -179,7 +179,13 @@ namespace NS_SWEETEDITOR {
         while (lo < hi) {
           size_t mid = lo + (hi - lo) / 2;
           float line_y = m_text_layout_->getLineStartY(mid);
-          float h = (lines[mid].height >= 0) ? lines[mid].height : old_line_height;
+          float h;
+          if (lines[mid].height >= 0) {
+            h = lines[mid].height;
+          } else {
+            bool has_codelens = !m_decorations_->getLineCodeLens(mid).empty();
+            h = has_codelens ? old_line_height * 2 : old_line_height;
+          }
           if (line_y + h <= scroll_y) {
             lo = mid + 1;
           } else {
@@ -188,9 +194,13 @@ namespace NS_SWEETEDITOR {
         }
         anchor_line = lo < lines.size() ? lo : lines.size() - 1;
         float anchor_y = m_text_layout_->getLineStartY(anchor_line);
-        float anchor_h = (lines[anchor_line].height >= 0)
-                             ? lines[anchor_line].height
-                             : old_line_height;
+        float anchor_h;
+        if (lines[anchor_line].height >= 0) {
+          anchor_h = lines[anchor_line].height;
+        } else {
+          bool has_codelens = !m_decorations_->getLineCodeLens(anchor_line).empty();
+          anchor_h = has_codelens ? old_line_height * 2 : old_line_height;
+        }
         anchor_fraction = (anchor_h > 0)
                               ? (scroll_y - anchor_y) / anchor_h
                               : 0.0f;
@@ -209,10 +219,16 @@ namespace NS_SWEETEDITOR {
     const float wrap_text_area_width = std::max(1.0f, m_viewport_.width - m_text_layout_->getLayoutMetrics().textAreaX());
     if (use_wrap_scale_anchor) {
       auto& lines = m_document_->getLogicalLines();
-      auto estimate_wrap_height = [&](const LogicalLine& line) -> float {
+      auto estimate_wrap_height = [&](size_t line_index, const LogicalLine& line) -> float {
         if (line.is_fold_hidden) return 0.0f;
         if (line.visual_lines.empty()) {
-          const float old_height = (line.height >= 0) ? line.height : old_line_height;
+          float old_height;
+          if (line.height >= 0) {
+            old_height = line.height;
+          } else {
+            bool has_codelens = !m_decorations_->getLineCodeLens(line_index).empty();
+            old_height = has_codelens ? old_line_height * 2 : old_line_height;
+          }
           return std::max(new_line_height, old_height * wrap_scale_ratio);
         }
         float old_total_width = 0.0f;
@@ -231,7 +247,7 @@ namespace NS_SWEETEDITOR {
       };
       const size_t estimate_end = std::min(anchor_line, lines.size());
       for (size_t i = 0; i < estimate_end; ++i) {
-        lines[i].height = estimate_wrap_height(lines[i]);
+        lines[i].height = estimate_wrap_height(i, lines[i]);
       }
     }
 
@@ -367,7 +383,13 @@ namespace NS_SWEETEDITOR {
   void EditorCore::buildRenderModel(EditorRenderModel& model) {
     PERF_TIMER("buildRenderModel");
     PERF_BEGIN(compose);
-    m_text_layout_->layoutVisibleLines(model);
+    PresentationContext presentation_context;
+    presentation_context.active_hit_target = m_active_hit_target_;
+    presentation_context.has_selection = m_caret_.has_selection;
+    if (m_caret_.has_selection) {
+      presentation_context.selection_range = m_caret_.selection;
+    }
+    m_text_layout_->layoutVisibleLines(model, presentation_context);
     model.split_line_visible = m_settings_.show_split_line;
     model.current_line_render_mode = m_settings_.current_line_render_mode;
     model.gutter_sticky = m_settings_.gutter_sticky;
@@ -440,9 +462,35 @@ namespace NS_SWEETEDITOR {
     GestureIntent intent;
     GestureResult result = m_interaction_->handleGestureEvent(event, intent);
 
+    // Update active hit target on mouse move (for hover highlight on CODELENS etc.)
+    if (event.type == EventType::MOUSE_MOVE && !event.points.empty()) {
+      HitTarget new_target = m_text_layout_->hitTestDecoration(event.points[0]);
+      if (new_target.type != HitTargetType::CODELENS) {
+        new_target = {};  // Only track hover for clickable run types
+      }
+      if (new_target.type != m_active_hit_target_.type
+          || new_target.line != m_active_hit_target_.line
+          || new_target.icon_id != m_active_hit_target_.icon_id) {
+        // Active target changed — mark affected lines dirty for re-render
+        if (m_active_hit_target_.type != HitTargetType::NONE) {
+          auto& lines = m_document_->getLogicalLines();
+          if (m_active_hit_target_.line < lines.size()) {
+            lines[m_active_hit_target_.line].is_layout_dirty = true;
+          }
+        }
+        m_active_hit_target_ = new_target;
+        if (m_active_hit_target_.type != HitTargetType::NONE) {
+          auto& lines = m_document_->getLogicalLines();
+          if (m_active_hit_target_.line < lines.size()) {
+            lines[m_active_hit_target_.line].is_layout_dirty = true;
+          }
+        }
+      }
+    }
+
     if (intent.cancel_linked_editing) {
       if (m_linked_editing_session_ && m_linked_editing_session_->isActive()) {
-        TextPosition tap_pos = m_text_layout_->hitTest(result.tap_point);
+        TextPosition tap_pos = m_text_layout_->hitTestPointer(result.tap_point);
         bool in_tab_stop = false;
         for (const auto& hl : m_linked_editing_session_->getAllHighlights()) {
           if (hl.range.contains(tap_pos)) { in_tab_stop = true; break; }
@@ -1723,7 +1771,7 @@ namespace NS_SWEETEDITOR {
     PointF target_coord = m_text_layout_->getPositionScreenCoord({target_line, 0});
     float line_height = m_text_layout_->getLineHeight();
     PointF target_point = {current_screen.x, target_coord.y + line_height * 0.5f};
-    TextPosition new_pos = m_text_layout_->hitTest(target_point);
+    TextPosition new_pos = m_text_layout_->hitTestPointer(target_point);
     moveCursorTo(new_pos, extend_selection);
   }
 
@@ -1753,7 +1801,7 @@ namespace NS_SWEETEDITOR {
     PointF target_coord = m_text_layout_->getPositionScreenCoord({target_line, 0});
     float line_height = m_text_layout_->getLineHeight();
     PointF target_point = {current_screen.x, target_coord.y + line_height * 0.5f};
-    TextPosition new_pos = m_text_layout_->hitTest(target_point);
+    TextPosition new_pos = m_text_layout_->hitTestPointer(target_point);
     moveCursorTo(new_pos, extend_selection);
   }
 
@@ -2319,6 +2367,35 @@ namespace NS_SWEETEDITOR {
     normalizeScrollState();
   }
 
+  void EditorCore::setLineCodeLens(size_t line, Vector<CodeLensItem>&& items) {
+    m_decorations_->setLineCodeLens(line, std::move(items));
+    auto& lines = m_document_->getLogicalLines();
+    if (line < lines.size()) {
+      lines[line].is_layout_dirty = true;
+    }
+    m_text_layout_->invalidateContentMetrics(line);
+  }
+
+  void EditorCore::setBatchLineCodeLens(Vector<std::pair<size_t, Vector<CodeLensItem>>>&& entries) {
+    if (entries.empty()) return;
+    auto& lines = m_document_->getLogicalLines();
+    size_t min_line = entries[0].first;
+    for (auto& [line, items] : entries) {
+      m_decorations_->setLineCodeLens(line, std::move(items));
+      if (line < lines.size()) {
+        lines[line].is_layout_dirty = true;
+      }
+      if (line < min_line) min_line = line;
+    }
+    m_text_layout_->invalidateContentMetrics(min_line);
+  }
+
+  void EditorCore::clearCodeLens() {
+    m_decorations_->clearCodeLens();
+    markAllLinesDirty();
+    normalizeScrollState();
+  }
+
   void EditorCore::setLineDiagnostics(size_t line, Vector<DiagnosticSpan>&& diagnostics) {
     m_decorations_->setLineDiagnostics(line, std::move(diagnostics));
   }
@@ -2492,7 +2569,7 @@ namespace NS_SWEETEDITOR {
   }
 
   void EditorCore::placeCursorAt(const PointF& screen_point) {
-    TextPosition pos = m_text_layout_->hitTest(screen_point);
+    TextPosition pos = m_text_layout_->hitTestPointer(screen_point);
     setCursorPosition(pos);
     clearSelection();
     LOGD("EditorCore::placeCursorAt, pos = %s", pos.dump().c_str());
@@ -2501,7 +2578,7 @@ namespace NS_SWEETEDITOR {
 
   void EditorCore::selectWordAt(const PointF& screen_point) {
     if (m_document_ == nullptr) return;
-    TextPosition pos = m_text_layout_->hitTest(screen_point);
+    TextPosition pos = m_text_layout_->hitTestPointer(screen_point);
 
     size_t line = pos.line;
     const U16String& line_text = m_document_->getLineU16TextRef(line);

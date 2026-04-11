@@ -42,6 +42,7 @@ public struct DecorationType: OptionSet {
     public static let separatorGuide = DecorationType(rawValue: 1 << 8)
     public static let gutterIcon = DecorationType(rawValue: 1 << 9)
     public static let phantomText = DecorationType(rawValue: 1 << 10)
+    public static let codeLens = DecorationType(rawValue: 1 << 11)
 }
 
 public protocol DecorationReceiver: AnyObject {
@@ -165,6 +166,16 @@ public struct DecorationResult {
         }
     }
 
+    public struct CodeLensItem {
+        public let text: String
+        public let commandId: Int32
+
+        public init(text: String, commandId: Int32) {
+            self.text = text
+            self.commandId = commandId
+        }
+    }
+
     public var syntaxSpans: [Int: [SpanItem]]?
     public var semanticSpans: [Int: [SpanItem]]?
     public var inlayHints: [Int: [InlayHintItem]]?
@@ -176,6 +187,7 @@ public struct DecorationResult {
     public var foldRegions: [FoldRegionItem]?
     public var gutterIcons: [Int: [Int32]]?
     public var phantomTexts: [Int: [PhantomTextItem]]?
+    public var codeLensItems: [Int: [CodeLensItem]]?
 
     public init(
         syntaxSpans: [Int: [SpanItem]]? = nil,
@@ -188,7 +200,8 @@ public struct DecorationResult {
         separatorGuides: [SeparatorGuideItem]? = nil,
         foldRegions: [FoldRegionItem]? = nil,
         gutterIcons: [Int: [Int32]]? = nil,
-        phantomTexts: [Int: [PhantomTextItem]]? = nil
+        phantomTexts: [Int: [PhantomTextItem]]? = nil,
+        codeLensItems: [Int: [CodeLensItem]]? = nil
     ) {
         self.syntaxSpans = syntaxSpans
         self.semanticSpans = semanticSpans
@@ -201,6 +214,7 @@ public struct DecorationResult {
         self.foldRegions = foldRegions
         self.gutterIcons = gutterIcons
         self.phantomTexts = phantomTexts
+        self.codeLensItems = codeLensItems
     }
 }
 
@@ -375,6 +389,7 @@ final class DecorationProviderManager {
         var foldRegions: [DecorationResult.FoldRegionItem] = []
         var gutterIcons: [Int: [Int32]] = [:]
         var phantomTexts: [Int: [DecorationResult.PhantomTextItem]] = [:]
+        var codeLensItems: [Int: [DecorationResult.CodeLensItem]] = [:]
 
         for provider in providers {
             guard let snapshot = states[ObjectIdentifier(provider)]?.snapshot else { continue }
@@ -384,6 +399,7 @@ final class DecorationProviderManager {
             appendMap(&diagnostics, snapshot.diagnostics)
             appendMap(&gutterIcons, snapshot.gutterIcons)
             appendMap(&phantomTexts, snapshot.phantomTexts)
+            appendMap(&codeLensItems, snapshot.codeLensItems)
 
             if let v = snapshot.indentGuides { indentGuides = v }
             if let v = snapshot.bracketGuides { bracketGuides = v }
@@ -506,6 +522,14 @@ final class DecorationProviderManager {
             core.setBatchLinePhantomTexts(converted)
         }
 
+        core.clearCodeLens()
+        if !codeLensItems.isEmpty {
+            let converted = codeLensItems.mapValues { items in
+                items.map { SweetEditorCore.CodeLensPayload(text: $0.text, commandId: $0.commandId) }
+            }
+            core.setBatchLineCodeLens(converted)
+        }
+
         onApplied()
     }
 
@@ -521,6 +545,7 @@ final class DecorationProviderManager {
         if let v = patch.foldRegions { target.foldRegions = v }
         if let v = patch.gutterIcons { target.gutterIcons = v }
         if let v = patch.phantomTexts { target.phantomTexts = v }
+        if let v = patch.codeLensItems { target.codeLensItems = v }
     }
 
     private func appendMap<T>(_ target: inout [Int: [T]], _ patch: [Int: [T]]?) {

@@ -35,6 +35,11 @@ export interface PhantomText {
   text: string;
 }
 
+export interface CodeLensItem {
+  text: string;
+  commandId: number;
+}
+
 export interface GutterIcon {
   iconId: number;
 }

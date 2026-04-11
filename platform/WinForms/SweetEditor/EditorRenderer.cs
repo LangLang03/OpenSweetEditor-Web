@@ -358,7 +358,7 @@ namespace SweetEditor {
 			Color activeLineColor = GetCurrentLineAccentColor();
 			currentDrawingLineNumber = -1;
 			foreach (var line in lines) {
-				if (line.WrapIndex != 0 || line.IsPhantomLine) continue;
+				if (!line.OwnsGutterSemantics) continue;
 				int logicalLine = line.LogicalLine;
 
 				while (iconCursor < iconCount && gutterIcons![iconCursor].LogicalLine < logicalLine) {
@@ -540,9 +540,14 @@ namespace SweetEditor {
 			FontMetricsInfo metrics = visualRun.Type == VisualRunType.INLAY_HINT
 				? GetInlayFontMetrics(visualRun.Style.FontStyle, g)
 				: GetTextFontMetrics(visualRun.Style.FontStyle, g);
-			Color color = (visualRun.Style.Color != 0)
-				? Color.FromArgb(visualRun.Style.Color)
-				: currentTheme.TextColor;
+			Color color;
+			if (visualRun.Type == VisualRunType.CODELENS) {
+				color = visualRun.Active ? GetCurrentLineAccentColor() : currentTheme.InlayHintTextColor;
+			} else {
+				color = (visualRun.Style.Color != 0)
+					? Color.FromArgb(visualRun.Style.Color)
+					: currentTheme.TextColor;
+			}
 
 			float topY = visualRun.Y - metrics.Ascent;
 			int lineHeight = (int)Math.Ceiling(metrics.LineHeight);
@@ -605,6 +610,11 @@ namespace SweetEditor {
 					? Color.FromArgb(128, color)
 					: color;
 				TextRenderer.DrawText(g, drawTextContent, font, rect, drawColor, TextMeasureDrawFlags);
+				if (visualRun.Type == VisualRunType.CODELENS && visualRun.Active) {
+					float underlineY = visualRun.Y + 1f;
+					using var underlinePen = new Pen(drawColor, 1f);
+					g.DrawLine(underlinePen, visualRun.X, underlineY, visualRun.X + visualRun.Width, underlineY);
+				}
 			}
 
 			if ((visualRun.Style.FontStyle & SweetEditorControl.FONT_STYLE_STRIKETHROUGH) != 0) {

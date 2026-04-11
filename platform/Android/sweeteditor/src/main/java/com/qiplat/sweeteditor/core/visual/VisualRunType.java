@@ -17,5 +17,7 @@ public enum VisualRunType {
     /** Fold placeholder (" … " shown at end of folded region first line). */
     FOLD_PLACEHOLDER,
     /** Tab character (width computed by core based on tab_size and column position). */
-    TAB
+    TAB,
+    /** CodeLens clickable label (above code line). */
+    CODELENS
 }

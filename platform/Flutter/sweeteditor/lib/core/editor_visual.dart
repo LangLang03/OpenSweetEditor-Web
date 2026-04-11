@@ -16,7 +16,8 @@ enum VisualRunType {
   inlayHint(3),
   phantomText(4),
   foldPlaceholder(5),
-  tab(6);
+  tab(6),
+  codelens(7);
 
   const VisualRunType(this.value);
   final int value;
@@ -38,6 +39,21 @@ enum FoldState {
 
   static FoldState fromValue(int value) =>
       FoldState.values.firstWhere((e) => e.value == value, orElse: () => none);
+}
+
+/// Visual line semantic kind.
+enum VisualLineKind {
+  content(0),
+  phantom(1),
+  codelens(2);
+
+  const VisualLineKind(this.value);
+  final int value;
+
+  static VisualLineKind fromValue(int value) => VisualLineKind.values.firstWhere(
+    (e) => e.value == value,
+    orElse: () => content,
+  );
 }
 
 /// Guide direction.
@@ -127,6 +143,7 @@ class VisualRun {
     this.width = 0,
     this.padding = 0,
     this.margin = 0,
+    this.active = false,
   });
 
   final VisualRunType type;
@@ -139,6 +156,7 @@ class VisualRun {
   final double width;
   final double padding;
   final double margin;
+  final bool active;
 }
 
 /// A visual line (one wrap-row of a logical line).
@@ -148,7 +166,8 @@ class VisualLine {
     this.wrapIndex = 0,
     this.lineNumberPosition = const PointF(),
     this.runs = const <VisualRun>[],
-    this.isPhantomLine = false,
+    this.kind = VisualLineKind.content,
+    this.ownsGutterSemantics = false,
     this.foldState = FoldState.none,
   });
 
@@ -156,7 +175,8 @@ class VisualLine {
   final int wrapIndex;
   final PointF lineNumberPosition;
   final List<VisualRun> runs;
-  final bool isPhantomLine;
+  final VisualLineKind kind;
+  final bool ownsGutterSemantics;
   final FoldState foldState;
 }
 

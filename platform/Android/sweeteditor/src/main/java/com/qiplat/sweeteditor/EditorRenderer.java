@@ -378,21 +378,11 @@ final class EditorRenderer {
         if (drawPerf != null) drawPerf.mark(PerfStepRecorder.STEP_CURSOR);
 
         if (model.splitX > 0) {
-            float splitAnimatedX = animationHolder.splitAnimatedX;
-            if (splitAnimatedX <= 0) {
-                canvas.drawRect(0, 0, model.splitX, viewHeight, mBackgroundPaint);
-                drawCurrentLineDecoration(canvas, model, 0f, model.splitX);
-            } else {
-                canvas.drawRect(0, 0, splitAnimatedX, viewHeight, mBackgroundPaint);
-                drawCurrentLineDecoration(canvas, model, 0f, animationHolder.splitAnimatedX);
-            }
+            canvas.drawRect(0, 0, model.splitX, viewHeight, mBackgroundPaint);
+            drawCurrentLineDecoration(canvas, model, 0f, model.splitX);
 
             if (model.splitLineVisible) {
-                if (splitAnimatedX <= 0) {
-                    canvas.drawLine(model.splitX, 0, model.splitX, viewHeight, mSplitLinePaint);
-                } else {
-                    canvas.drawLine(splitAnimatedX, 0, splitAnimatedX, viewHeight, mSplitLinePaint);
-                }
+                canvas.drawLine(model.splitX, 0, model.splitX, viewHeight, mSplitLinePaint);
             }
         }
 
@@ -426,7 +416,7 @@ final class EditorRenderer {
             int lastColor = 0;
             for (VisualRun run : line.runs) {
                 if (run.type == VisualRunType.TEXT || run.type == VisualRunType.WHITESPACE
-                        || run.type == VisualRunType.INLAY_HINT || run.type == VisualRunType.PHANTOM_TEXT
+                        || run.type == VisualRunType.CODELENS || run.type == VisualRunType.INLAY_HINT || run.type == VisualRunType.PHANTOM_TEXT
                         || run.type == VisualRunType.FOLD_PLACEHOLDER) {
 
                     if (run.type == VisualRunType.FOLD_PLACEHOLDER) {
@@ -514,6 +504,9 @@ final class EditorRenderer {
 
                     int fontStyle = run.style != null ? run.style.fontStyle : 0;
                     int color = (run.style != null && run.style.color != 0) ? run.style.color : mTheme.textColor;
+                    if (run.type == VisualRunType.CODELENS) {
+                        color = run.active ? getActiveLineNumberColor() : mTheme.inlayHintTextColor;
+                    }
 
                     if (fontStyle != lastFontStyle) {
                         applyFontStyle(fontStyle);
@@ -540,6 +533,13 @@ final class EditorRenderer {
                         continue;
                     }
 
+                    if (run.type == VisualRunType.CODELENS) {
+                        mTextPaint.setUnderlineText(run.active);
+                        canvas.drawText(run.text, run.x, run.y, mTextPaint);
+                        mTextPaint.setUnderlineText(false);
+                        continue;
+                    }
+
                     canvas.drawText(run.text, run.x, run.y, mTextPaint);
                 }
             }
@@ -561,7 +561,7 @@ final class EditorRenderer {
         final int activeLineNumberColor = getActiveLineNumberColor();
         Path arrowPath = new Path();
         for (VisualLine line : model.lines) {
-            if (line.wrapIndex == 0 && !line.isPhantomLine && line.lineNumberPosition != null) {
+            if (line.ownsGutterSemantics && line.lineNumberPosition != null) {
                 final int logicalLine = line.logicalLine;
                 final boolean isCurrentLine = logicalLine == activeLogicalLine;
 

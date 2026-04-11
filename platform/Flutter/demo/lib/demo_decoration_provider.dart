@@ -7,6 +7,8 @@ import 'demo_file_metadata.dart';
 
 const int iconType = 1;
 const int iconAt = 2;
+const int codeLensRun = 1;
+const int codeLensDebug = 2;
 
 class DemoDecorationProvider implements DecorationProvider {
   DemoDecorationProvider(this._controller);
@@ -80,6 +82,7 @@ class DemoDecorationProvider implements DecorationProvider {
     DecorationType.indentGuide,
     DecorationType.separatorGuide,
     DecorationType.gutterIcon,
+    DecorationType.codeLens,
   };
 
   @override
@@ -97,6 +100,7 @@ class DemoDecorationProvider implements DecorationProvider {
     final inlayHints = <int, List<core.InlayHint>>{};
     final diagnostics = <int, List<core.Diagnostic>>{};
     final gutterIcons = <int, List<core.GutterIcon>>{};
+    final codeLensItems = <int, List<core.CodeLensItem>>{};
     final indentGuides = <core.IndentGuide>[];
     final foldRegions = <core.FoldRegion>[];
     final separatorGuides = <core.SeparatorGuide>[];
@@ -158,6 +162,7 @@ class DemoDecorationProvider implements DecorationProvider {
           _appendTextInlayHint(inlayHints, token);
           _appendSeparator(separatorGuides, token);
           _appendGutterIcons(gutterIcons, token);
+          _appendCodeLens(codeLensItems, token);
           firstKeywordRange = _appendDynamicDemoDecorations(
             diagnostics,
             seenDiagnostics,
@@ -214,6 +219,7 @@ class DemoDecorationProvider implements DecorationProvider {
           .foldRegions(foldRegions, ApplyMode.replaceAll)
           .separatorGuides(separatorGuides, ApplyMode.replaceAll)
           .gutterIcons(gutterIcons, ApplyMode.replaceAll)
+          .codeLensItems(codeLensItems, ApplyMode.replaceAll)
           .build(),
     );
   }
@@ -532,6 +538,29 @@ class DemoDecorationProvider implements DecorationProvider {
     gutterIcons
         .putIfAbsent(range.line, () => [])
         .add(core.GutterIcon(iconId: iconAt));
+  }
+
+  void _appendCodeLens(
+    Map<int, List<core.CodeLensItem>> codeLensItems,
+    sweetline.TokenSpan token,
+  ) {
+    if (codeLensItems.isNotEmpty) {
+      return;
+    }
+    if (token.styleId != EditorTheme.styleKeyword) {
+      return;
+    }
+    final range = _extractSingleLineTokenRange(token);
+    if (range == null) {
+      return;
+    }
+    final literal = _getTokenLiteral(range);
+    if (literal == 'class' || literal == 'struct') {
+      codeLensItems[range.line] = [
+        core.CodeLensItem(text: 'Run', commandId: codeLensRun),
+        core.CodeLensItem(text: 'Debug', commandId: codeLensDebug),
+      ];
+    }
   }
 
   _TokenRangeInfo? _extractSingleLineTokenRange(sweetline.TokenSpan token) {

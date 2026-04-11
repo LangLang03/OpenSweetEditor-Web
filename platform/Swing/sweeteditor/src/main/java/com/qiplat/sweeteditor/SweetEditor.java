@@ -453,6 +453,14 @@ public class SweetEditor extends JPanel {
         editorCore.setBatchLineGutterIcons(iconsByLine);
     }
 
+    public void setLineCodeLens(int line, List<? extends CodeLensItem> items) {
+        editorCore.setLineCodeLens(line, items);
+    }
+
+    public void setBatchLineCodeLens(Map<Integer, ? extends List<? extends CodeLensItem>> itemsByLine) {
+        editorCore.setBatchLineCodeLens(itemsByLine);
+    }
+
     public void setLineDiagnostics(int line, List<? extends Diagnostic> items) {
         editorCore.setLineDiagnostics(line, items);
     }
@@ -570,6 +578,10 @@ public class SweetEditor extends JPanel {
 
     public void clearGutterIcons() {
         editorCore.clearGutterIcons();
+    }
+
+    public void clearCodeLens() {
+        editorCore.clearCodeLens();
     }
 
     public void clearGuides() {
@@ -1117,6 +1129,12 @@ public class SweetEditor extends JPanel {
                             eventBus.publish(new FoldToggleEvent(
                                     result.hitTarget.line,
                                     hitType == HitTargetType.FOLD_GUTTER,
+                                    screenPoint));
+                            break;
+                        case CODELENS:
+                            eventBus.publish(new CodeLensClickEvent(
+                                    result.hitTarget.line,
+                                    result.hitTarget.iconId,
                                     screenPoint));
                             break;
                         default:

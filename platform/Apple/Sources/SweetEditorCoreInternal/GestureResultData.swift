@@ -8,6 +8,7 @@ enum HitTargetType: String, Codable {
     case FOLD_PLACEHOLDER
     case FOLD_GUTTER
     case INLAY_HINT_COLOR
+    case CODELENS
 }
 
 struct HitTargetData: Codable {

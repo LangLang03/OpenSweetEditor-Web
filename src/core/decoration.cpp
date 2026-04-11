@@ -11,6 +11,7 @@ namespace NS_SWEETEDITOR {
   const Vector<PhantomText> DecorationManager::kEmptyPhantomTexts;
   const Vector<GutterIcon> DecorationManager::kEmptyGutterIcons;
   const Vector<DiagnosticSpan> DecorationManager::kEmptyDiagnostics;
+  const Vector<CodeLensItem> DecorationManager::kEmptyCodeLensItems;
 
 #pragma region [Class: TextStyleRegistry]
   void TextStyleRegistry::registerTextStyle(uint32_t style_id, TextStyle&& style) {
@@ -149,6 +150,26 @@ namespace NS_SWEETEDITOR {
     return kEmptyGutterIcons;
   }
 
+  void DecorationManager::setLineCodeLens(size_t line, Vector<CodeLensItem>&& items) {
+    if (items.empty()) {
+      m_codelens_items_.erase(line);
+    } else {
+      m_codelens_items_[line] = std::move(items);
+    }
+  }
+
+  const Vector<CodeLensItem>& DecorationManager::getLineCodeLens(size_t line) const {
+    auto it = m_codelens_items_.find(line);
+    if (it != m_codelens_items_.end()) {
+      return it->second;
+    }
+    return kEmptyCodeLensItems;
+  }
+
+  void DecorationManager::clearCodeLens() {
+    m_codelens_items_.clear();
+  }
+
   void DecorationManager::setLineDiagnostics(size_t line, Vector<DiagnosticSpan>&& diagnostics) {
     if (m_diagnostics_.size() <= line) {
       m_diagnostics_.resize(line + 1);
@@ -173,6 +194,7 @@ namespace NS_SWEETEDITOR {
     if (line < m_phantom_texts_.size()) m_phantom_texts_[line].clear();
     if (line < m_diagnostics_.size()) m_diagnostics_[line].clear();
     m_gutter_icons_.erase(line);
+    m_codelens_items_.erase(line);
   }
 
   void DecorationManager::clearHighlights(SpanLayer layer) {
@@ -205,6 +227,7 @@ namespace NS_SWEETEDITOR {
     m_phantom_texts_.clear();
     m_diagnostics_.clear();
     m_gutter_icons_.clear();
+    m_codelens_items_.clear();
     m_indent_guides_.clear();
     m_bracket_guides_.clear();
     m_flow_guides_.clear();
@@ -734,6 +757,22 @@ namespace NS_SWEETEDITOR {
         new_icons[target] = std::move(icons);
       }
       m_gutter_icons_ = std::move(new_icons);
+    }
+
+    // CodeLens
+    if (p.line_delta != 0 && !m_codelens_items_.empty()) {
+      if (p.old_line_count > 0) {
+        for (size_t l = p.old_start_line + 1; l <= p.old_end_line; ++l) {
+          m_codelens_items_.erase(l);
+        }
+      }
+      HashMap<size_t, Vector<CodeLensItem>> new_items;
+      for (auto& [line, items] : m_codelens_items_) {
+        size_t target = (line <= p.old_start_line) ? line
+          : static_cast<size_t>(static_cast<int64_t>(line) + p.line_delta);
+        new_items[target] = std::move(items);
+      }
+      m_codelens_items_ = std::move(new_items);
     }
 
     // FoldRegion: adjust by line offsets and remove fully covered regions

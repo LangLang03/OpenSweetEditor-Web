@@ -122,6 +122,18 @@ class FoldToggleEvent implements EditorEvent {
   });
 }
 
+class CodeLensClickEvent implements EditorEvent {
+  final int line;
+  final int commandId;
+  final core.PointF screenPoint;
+
+  const CodeLensClickEvent({
+    required this.line,
+    required this.commandId,
+    required this.screenPoint,
+  });
+}
+
 class DocumentLoadedEvent implements EditorEvent {}
 
 class SelectionMenuItemClickEvent implements EditorEvent {

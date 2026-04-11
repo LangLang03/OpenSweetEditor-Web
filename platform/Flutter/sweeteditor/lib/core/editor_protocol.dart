@@ -305,6 +305,74 @@ class ProtocolEncoder {
     return data.buffer.asUint8List();
   }
 
+  static Uint8List packLineCodeLens(int line, List<CodeLensItem> items) {
+    final allTextBytes = <Uint8List>[];
+    var totalSize = 8; // line(4) + count(4)
+    for (final item in items) {
+      final tb = utf8.encode(item.text);
+      allTextBytes.add(tb);
+      totalSize += 8 + tb.length; // command_id(4) + text_len(4) + text
+    }
+    final buf = ByteData(totalSize);
+    var offset = 0;
+    buf.setInt32(offset, line, Endian.little);
+    offset += 4;
+    buf.setInt32(offset, items.length, Endian.little);
+    offset += 4;
+    for (var i = 0; i < items.length; i++) {
+      buf.setInt32(offset, items[i].commandId, Endian.little);
+      offset += 4;
+      final tb = allTextBytes[i];
+      buf.setInt32(offset, tb.length, Endian.little);
+      offset += 4;
+      if (tb.isNotEmpty) {
+        buf.buffer.asUint8List().setAll(offset, tb);
+        offset += tb.length;
+      }
+    }
+    return buf.buffer.asUint8List();
+  }
+
+  static Uint8List packBatchLineCodeLens(
+    Map<int, List<CodeLensItem>> itemsByLine,
+  ) {
+    final allTextBytes = <int, List<Uint8List>>{};
+    var totalSize = 4; // entry_count(4)
+    itemsByLine.forEach((line, items) {
+      totalSize += 8; // line(4) + item_count(4)
+      final lineTexts = <Uint8List>[];
+      for (final item in items) {
+        final tb = utf8.encode(item.text);
+        lineTexts.add(tb);
+        totalSize += 8 + tb.length;
+      }
+      allTextBytes[line] = lineTexts;
+    });
+    final buf = ByteData(totalSize);
+    var offset = 0;
+    buf.setInt32(offset, itemsByLine.length, Endian.little);
+    offset += 4;
+    itemsByLine.forEach((line, items) {
+      buf.setInt32(offset, line, Endian.little);
+      offset += 4;
+      buf.setInt32(offset, items.length, Endian.little);
+      offset += 4;
+      final lineTexts = allTextBytes[line]!;
+      for (var i = 0; i < items.length; i++) {
+        buf.setInt32(offset, items[i].commandId, Endian.little);
+        offset += 4;
+        final tb = lineTexts[i];
+        buf.setInt32(offset, tb.length, Endian.little);
+        offset += 4;
+        if (tb.isNotEmpty) {
+          buf.buffer.asUint8List().setAll(offset, tb);
+          offset += tb.length;
+        }
+      }
+    });
+    return buf.buffer.asUint8List();
+  }
+
   static Uint8List packLineDiagnostics(int line, List<Diagnostic> items) {
     final data = ByteData(8 + items.length * 16);
     var offset = 0;
@@ -803,6 +871,7 @@ class ProtocolDecoder {
       width: r.readFloat32(),
       padding: r.readFloat32(),
       margin: r.readFloat32(),
+      active: r.readInt32() != 0,
     );
   }
 
@@ -810,7 +879,8 @@ class ProtocolDecoder {
     final logicalLine = r.readInt32();
     final wrapIndex = r.readInt32();
     final lineNumberPosition = r.readPoint();
-    final isPhantomLine = r.readInt32() != 0;
+    final kind = VisualLineKind.fromValue(r.readInt32());
+    final ownsGutterSemantics = r.readInt32() != 0;
     final foldState = FoldState.fromValue(r.readInt32());
     final runCount = r.readInt32();
     final runs = <VisualRun>[];
@@ -822,7 +892,8 @@ class ProtocolDecoder {
       wrapIndex: wrapIndex,
       lineNumberPosition: lineNumberPosition,
       runs: runs,
-      isPhantomLine: isPhantomLine,
+      kind: kind,
+      ownsGutterSemantics: ownsGutterSemantics,
       foldState: foldState,
     );
   }

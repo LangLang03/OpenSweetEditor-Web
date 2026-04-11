@@ -587,6 +587,8 @@ public final class EditorNative {
     private static final MethodHandle SET_BATCH_LINE_PHANTOM_TEXTS = downcall("editor_set_batch_line_phantom_texts", BINARY_PAYLOAD_DESC);
     private static final MethodHandle SET_LINE_GUTTER_ICONS = downcall("editor_set_line_gutter_icons", BINARY_PAYLOAD_DESC);
     private static final MethodHandle SET_BATCH_LINE_GUTTER_ICONS = downcall("editor_set_batch_line_gutter_icons", BINARY_PAYLOAD_DESC);
+    private static final MethodHandle SET_LINE_CODELENS = downcall("editor_set_line_codelens", BINARY_PAYLOAD_DESC);
+    private static final MethodHandle SET_BATCH_LINE_CODELENS = downcall("editor_set_batch_line_codelens", BINARY_PAYLOAD_DESC);
     private static final MethodHandle SET_BATCH_LINE_SPANS = downcall("editor_set_batch_line_spans", BINARY_PAYLOAD_DESC);
     private static final MethodHandle REGISTER_BATCH_TEXT_STYLES = downcall("editor_register_batch_text_styles", BINARY_PAYLOAD_DESC);
     private static final MethodHandle SET_BATCH_LINE_DIAGNOSTICS = downcall("editor_set_batch_line_diagnostics", BINARY_PAYLOAD_DESC);
@@ -595,6 +597,8 @@ public final class EditorNative {
     private static final MethodHandle SET_FLOW_GUIDES = downcall("editor_set_flow_guides", BINARY_PAYLOAD_DESC);
     private static final MethodHandle SET_SEPARATOR_GUIDES = downcall("editor_set_separator_guides", BINARY_PAYLOAD_DESC);
     private static final MethodHandle SET_KEYMAP = downcall("editor_set_keymap", BINARY_PAYLOAD_DESC);
+    private static final MethodHandle CLEAR_CODELENS = downcall("editor_clear_codelens",
+            FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG));
 
     // ===================== Document API =====================
 
@@ -1524,6 +1528,46 @@ public final class EditorNative {
     public static void setBatchLineGutterIcons(long handle, MemorySegment payload, long size) {
         invokeVoid(() -> {
             SET_BATCH_LINE_GUTTER_ICONS.invokeExact(handle, payload, size);
+        });
+    }
+
+    // ===================== CodeLens =====================
+
+    public static void clearCodeLens(long handle) {
+        try {
+            CLEAR_CODELENS.invokeExact(handle);
+        } catch (Throwable t) {
+            throw new RuntimeException(t);
+        }
+    }
+
+    public static void setLineCodeLens(long handle, byte[] payload, Arena arena) {
+        try {
+            MemorySegment seg = arena.allocateFrom(ValueLayout.JAVA_BYTE, payload);
+            SET_LINE_CODELENS.invokeExact(handle, seg, (long) payload.length);
+        } catch (Throwable t) {
+            throw new RuntimeException(t);
+        }
+    }
+
+    public static void setLineCodeLens(long handle, MemorySegment payload, long size) {
+        invokeVoid(() -> {
+            SET_LINE_CODELENS.invokeExact(handle, payload, size);
+        });
+    }
+
+    public static void setBatchLineCodeLens(long handle, byte[] payload, Arena arena) {
+        try {
+            MemorySegment seg = arena.allocateFrom(ValueLayout.JAVA_BYTE, payload);
+            SET_BATCH_LINE_CODELENS.invokeExact(handle, seg, (long) payload.length);
+        } catch (Throwable t) {
+            throw new RuntimeException(t);
+        }
+    }
+
+    public static void setBatchLineCodeLens(long handle, MemorySegment payload, long size) {
+        invokeVoid(() -> {
+            SET_BATCH_LINE_CODELENS.invokeExact(handle, payload, size);
         });
     }
 

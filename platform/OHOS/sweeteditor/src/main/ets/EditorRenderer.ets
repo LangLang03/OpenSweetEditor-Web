@@ -219,7 +219,7 @@ export class EditorRenderer {
           continue;
         }
         if (run.type === VisualRunType.TEXT || run.type === VisualRunType.WHITESPACE
-          || run.type === VisualRunType.PHANTOM_TEXT) {
+          || run.type === VisualRunType.CODELENS || run.type === VisualRunType.PHANTOM_TEXT) {
           if (!run.text || run.text.length === 0) {
             continue;
           }
@@ -231,7 +231,10 @@ export class EditorRenderer {
 
   private drawTextRun(ctx: CanvasRenderingContext2D, run: VisualRun, textSize: number): void {
     const fontStyle = run.style ? run.style.fontStyle : 0;
-    const color = (run.style && run.style.color !== 0) ? run.style.color : this.theme.textColor;
+    let color = (run.style && run.style.color !== 0) ? run.style.color : this.theme.textColor;
+    if (run.type === VisualRunType.CODELENS) {
+      color = run.active ? this.getActiveLineNumberColor() : this.theme.inlayHintTextColor;
+    }
 
     if (run.style && run.style.backgroundColor !== 0) {
       const metrics = this.getFontMetrics(ctx, fontStyle, textSize, this.fontFamily);
@@ -247,6 +250,15 @@ export class EditorRenderer {
       ctx.fillStyle = colorToString(color);
     }
     ctx.fillText(run.text, run.x, run.y);
+    if (run.type === VisualRunType.CODELENS && run.active) {
+      const underlineY = run.y + 1;
+      ctx.beginPath();
+      ctx.strokeStyle = colorToString(color);
+      ctx.lineWidth = 1;
+      ctx.moveTo(run.x, underlineY);
+      ctx.lineTo(run.x + run.width, underlineY);
+      ctx.stroke();
+    }
   }
 
   private drawFoldPlaceholder(ctx: CanvasRenderingContext2D, run: VisualRun, textSize: number): void {
@@ -343,7 +355,7 @@ export class EditorRenderer {
     const activeColor = this.getActiveLineNumberColor();
 
     for (const line of model.visualLines) {
-      if (line.wrapIndex === 0 && !line.isPhantomLine && line.lineNumberPosition) {
+      if (line.ownsGutterSemantics && line.lineNumberPosition) {
         const logicalLine = line.logicalLine;
         const isCurrentLine = logicalLine === activeLogicalLine;
 
@@ -1030,4 +1042,3 @@ function multiplyAlpha(argb: number, alphaMultiplier: number): number {
   const outAlpha = Math.round(baseAlpha * m);
   return (outAlpha << 24) | (argb & 0x00FFFFFF);
 }
-

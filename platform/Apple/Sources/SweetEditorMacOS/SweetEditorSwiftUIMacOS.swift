@@ -9,19 +9,22 @@ public struct SweetEditorSwiftUIMacOS: NSViewRepresentable {
     public let onFoldToggle: ((SweetEditorFoldToggleEvent) -> Void)?
     public let onInlayHintClick: ((SweetEditorInlayHintClickEvent) -> Void)?
     public let onGutterIconClick: ((SweetEditorGutterIconClickEvent) -> Void)?
+    public let onCodeLensClick: ((SweetEditorCodeLensClickEvent) -> Void)?
 
     public init(
         isDarkTheme: Bool = false,
         showsPerformanceOverlay: Bool = false,
         onFoldToggle: ((SweetEditorFoldToggleEvent) -> Void)? = nil,
         onInlayHintClick: ((SweetEditorInlayHintClickEvent) -> Void)? = nil,
-        onGutterIconClick: ((SweetEditorGutterIconClickEvent) -> Void)? = nil
+        onGutterIconClick: ((SweetEditorGutterIconClickEvent) -> Void)? = nil,
+        onCodeLensClick: ((SweetEditorCodeLensClickEvent) -> Void)? = nil
     ) {
         self.isDarkTheme = isDarkTheme
         self.showsPerformanceOverlay = showsPerformanceOverlay
         self.onFoldToggle = onFoldToggle
         self.onInlayHintClick = onInlayHintClick
         self.onGutterIconClick = onGutterIconClick
+        self.onCodeLensClick = onCodeLensClick
     }
 
     public func makeCoordinator() -> Coordinator { Coordinator() }
@@ -32,6 +35,7 @@ public struct SweetEditorSwiftUIMacOS: NSViewRepresentable {
         view.onFoldToggle = onFoldToggle
         view.onInlayHintClick = onInlayHintClick
         view.onGutterIconClick = onGutterIconClick
+        view.onCodeLensClick = onCodeLensClick
         return view
     }
 
@@ -41,6 +45,7 @@ public struct SweetEditorSwiftUIMacOS: NSViewRepresentable {
         nsView.onFoldToggle = onFoldToggle
         nsView.onInlayHintClick = onInlayHintClick
         nsView.onGutterIconClick = onGutterIconClick
+        nsView.onCodeLensClick = onCodeLensClick
         requestInitialFocusIfNeeded(view: nsView, coordinator: context.coordinator)
     }
 

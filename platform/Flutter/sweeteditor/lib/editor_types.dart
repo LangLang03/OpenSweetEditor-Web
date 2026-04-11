@@ -62,12 +62,12 @@ class EditorTheme {
   int currentLineNumberColor = 0xFF9CB3D6;
   int currentLineColor = 0x163A4A66;
   int guideColor = 0x2E56617A;
-  int separatorColor = 0xFF4A8F7A;
+  int separatorLineColor = 0xFF4A8F7A;
   int splitLineColor = 0x3356617A;
   int scrollbarTrackColor = 0x48FFFFFF;
   int scrollbarThumbColor = 0xAA858585;
   int scrollbarThumbActiveColor = 0xFFBBBBBB;
-  int compositionColor = 0xFF7AA2F7;
+  int compositionUnderlineColor = 0xFF7AA2F7;
   int inlayHintBgColor = 0x223A4A66;
   int inlayHintTextColor = 0xC0AFC2E0;
   int inlayHintIconColor = 0xCC9CB0CD;
@@ -91,9 +91,8 @@ class EditorTheme {
   int completionLabelColor = 0xFFD8DEE9;
   int completionDetailColor = 0xFF7A8494;
   int selectionMenuBgColor = 0xF0252830;
-  int selectionMenuTextColor = 0xFFD7DEE9;
-  int selectionMenuBorderColor = 0x40607090;
-  int selectionMenuDividerColor = 0x1FD8DEE9;
+  int selectionMenuTextColor = 0xFFD8DEE9;
+  int selectionMenuDividerColor = 0x33D8DEE9;
   Map<int, core.TextStyle> textStyles = {};
 
   EditorTheme defineTextStyle(int styleId, core.TextStyle style) {
@@ -130,12 +129,12 @@ class EditorTheme {
       ..currentLineNumberColor = 0xFF3A5FA0
       ..currentLineColor = 0x120D3B66
       ..guideColor = 0x2229426B
-      ..separatorColor = 0xFF2F855A
+      ..separatorLineColor = 0xFF2F855A
       ..splitLineColor = 0x1F29426B
       ..scrollbarTrackColor = 0x1F2A3B55
       ..scrollbarThumbColor = 0x80446C9C
       ..scrollbarThumbActiveColor = 0xEE6A9AD0
-      ..compositionColor = 0xFF2563EB
+      ..compositionUnderlineColor = 0xFF2563EB
       ..inlayHintBgColor = 0x143B82F6
       ..inlayHintTextColor = 0xB0344A73
       ..inlayHintIconColor = 0xB04B607E
@@ -160,8 +159,7 @@ class EditorTheme {
       ..completionDetailColor = 0xFF8A94A6
       ..selectionMenuBgColor = 0xF0FAFBFD
       ..selectionMenuTextColor = 0xFF1F2937
-      ..selectionMenuBorderColor = 0x30A0A8B8
-      ..selectionMenuDividerColor = 0x1F1F2937;
+      ..selectionMenuDividerColor = 0x331F2937;
     theme.textStyles = {
       styleKeyword: const core.TextStyle(color: 0xFF3559D6, fontStyle: 1),
       styleString: const core.TextStyle(color: 0xFF0F7B6C),
@@ -169,12 +167,12 @@ class EditorTheme {
       styleNumber: const core.TextStyle(color: 0xFFB45309),
       styleBuiltin: const core.TextStyle(color: 0xFF006E7F),
       styleType: const core.TextStyle(color: 0xFF6D28D9),
-      styleClass: const core.TextStyle(color: 0xFFC2410C, fontStyle: 1),
-      styleFunction: const core.TextStyle(color: 0xFF0D9488),
+      styleClass: const core.TextStyle(color: 0xFF9A3412, fontStyle: 1),
+      styleFunction: const core.TextStyle(color: 0xFF0E7490),
       styleVariable: const core.TextStyle(color: 0xFF1F2937),
-      stylePunctuation: const core.TextStyle(color: 0xFF4B5563),
-      styleAnnotation: const core.TextStyle(color: 0xFF0891B2),
-      stylePreprocessor: const core.TextStyle(color: 0xFFDC2626),
+      stylePunctuation: const core.TextStyle(color: 0xFF6E82A0),
+      styleAnnotation: const core.TextStyle(color: 0xFF0F766E),
+      stylePreprocessor: const core.TextStyle(color: 0xFFBE123C),
     };
     return theme;
   }

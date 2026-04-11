@@ -305,9 +305,14 @@ final class EditorRenderer implements EditorCore.TextMeasureCallback {
                 ? getInlayHintFontByStyle(run.style != null ? run.style.fontStyle : 0)
                 : getFontByStyle(run.style != null ? run.style.fontStyle : 0);
 
-        Color color = (run.style != null && run.style.color != 0)
-                ? argbToColor(run.style.color)
-                : theme.textColor;
+        Color color;
+        if (run.type == VisualRunType.CODELENS) {
+            color = run.active ? theme.currentLineNumberColor : theme.inlayHintTextColor;
+        } else {
+            color = (run.style != null && run.style.color != 0)
+                    ? argbToColor(run.style.color)
+                    : theme.textColor;
+        }
 
         float ascent = getFontAscent(g, font);
         float topY = run.y - ascent;
@@ -358,6 +363,10 @@ final class EditorRenderer implements EditorCore.TextMeasureCallback {
                 g.setColor(drawColor);
                 g.setFont(font);
                 g.drawString(text, run.x, run.y);
+                if (run.type == VisualRunType.CODELENS && run.active) {
+                    float underlineY = run.y + 1.0f;
+                    g.drawLine((int) run.x, (int) underlineY, (int) (run.x + run.width), (int) underlineY);
+                }
             }
         }
 
@@ -405,7 +414,7 @@ final class EditorRenderer implements EditorCore.TextMeasureCallback {
         Color activeLineColor = getCurrentLineAccentColor();
         currentDrawingLineNumber = -1;
         for (VisualLine line : model.lines) {
-            if (line.wrapIndex != 0 || line.isPhantomLine) continue;
+            if (!line.ownsGutterSemantics) continue;
             int logicalLine = line.logicalLine;
 
             while (iconCursor < iconCount && gutterIcons.get(iconCursor).logicalLine < logicalLine) {

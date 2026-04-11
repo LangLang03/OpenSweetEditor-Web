@@ -11,6 +11,7 @@ import {
 import { TextPosition, TextRange } from './CoreFoundation';
 import {
   BracketGuide,
+  CodeLensItem,
   DiagnosticItem,
   FlowGuide,
   FoldRegion,
@@ -44,6 +45,7 @@ import {
   SelectionHandle,
   SelectionRect,
   VisualLine,
+  VisualLineKind,
   VisualRun,
   VisualRunType
 } from './CoreVisual';
@@ -298,6 +300,61 @@ export class ProtocolEncoder {
       writer.writeInt32(icons.length);
       for (const icon of icons) {
         writer.writeInt32(icon.iconId);
+      }
+    });
+    return writer.getBuffer();
+  }
+
+  static packLineCodeLens(line: number, items: CodeLensItem[]): ArrayBuffer {
+    const encoder = new util.TextEncoder();
+    const textBytesArray: Uint8Array[] = [];
+    let textBlobSize = 0;
+    for (const item of items) {
+      const bytes = encoder.encodeInto(item.text);
+      textBytesArray.push(bytes);
+      textBlobSize += bytes.length;
+    }
+    const writer = new BinaryWriter(8 + items.length * 8 + textBlobSize);
+    writer.writeInt32(line);
+    writer.writeInt32(items.length);
+    for (let i = 0; i < items.length; i++) {
+      writer.writeInt32(items[i].commandId);
+      const tb = textBytesArray[i];
+      writer.writeInt32(tb.length);
+      if (tb.length > 0) {
+        writer.writeBytes(tb);
+      }
+    }
+    return writer.getBuffer();
+  }
+
+  static packBatchLineCodeLens(itemsByLine: Map<number, CodeLensItem[]>): ArrayBuffer {
+    const encoder = new util.TextEncoder();
+    const allTextBytes: Map<number, Uint8Array[]> = new Map();
+    let totalSize = 4; // entry_count
+    itemsByLine.forEach((items, line) => {
+      totalSize += 8; // line + item_count
+      const lineTextBytes: Uint8Array[] = [];
+      for (const item of items) {
+        const bytes = encoder.encodeInto(item.text);
+        lineTextBytes.push(bytes);
+        totalSize += 8 + bytes.length; // command_id + text_len + text
+      }
+      allTextBytes.set(line, lineTextBytes);
+    });
+    const writer = new BinaryWriter(totalSize);
+    writer.writeInt32(itemsByLine.size);
+    itemsByLine.forEach((items, line) => {
+      writer.writeInt32(line);
+      writer.writeInt32(items.length);
+      const lineTextBytes = allTextBytes.get(line)!;
+      for (let i = 0; i < items.length; i++) {
+        writer.writeInt32(items[i].commandId);
+        const tb = lineTextBytes[i];
+        writer.writeInt32(tb.length);
+        if (tb.length > 0) {
+          writer.writeBytes(tb);
+        }
       }
     });
     return writer.getBuffer();
@@ -834,7 +891,8 @@ export class ProtocolDecoder {
       colorValue: reader.readInt32(),
       width: reader.readFloat32(),
       padding: reader.readFloat32(),
-      margin: reader.readFloat32()
+      margin: reader.readFloat32(),
+      active: reader.readInt32() !== 0
     };
   }
 
@@ -842,7 +900,8 @@ export class ProtocolDecoder {
     const logicalLine = reader.readInt32();
     const wrapIndex = reader.readInt32();
     const lineNumberPosition = reader.readPoint();
-    const isPhantomLine = reader.readInt32() !== 0;
+    const kind = reader.readInt32() as VisualLineKind;
+    const ownsGutterSemantics = reader.readInt32() !== 0;
     const foldState = reader.readInt32() as FoldState;
     const runCount = reader.readInt32();
     const runs: VisualRun[] = [];
@@ -854,7 +913,8 @@ export class ProtocolDecoder {
       wrapIndex,
       lineNumberPosition,
       runs,
-      isPhantomLine,
+      kind,
+      ownsGutterSemantics,
       foldState
     };
   }

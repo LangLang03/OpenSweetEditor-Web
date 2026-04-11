@@ -37,6 +37,7 @@ import {
   DiagnosticItem,
   FlowGuide,
   FoldRegion,
+  CodeLensItem,
   GutterIcon,
   IndentGuide,
   InlayHint,
@@ -50,12 +51,13 @@ import {
 import { LinkedEditingModel } from './core/CoreLinkedEditing';
 import { EditorIconProvider, EditorMetadata, EditorTheme, LanguageConfiguration } from './EditorTypes';
 import { EditorKeyMap } from './EditorKeymap';
-import { EditorSettings } from './EditorSettings';
+import { EditorSettings, EditorSettingsBridge } from './EditorSettings';
 import { SweetEditorController } from './SweetEditorController';
 import { EditorRenderer } from './EditorRenderer';
 import { EditorEventBus } from './event/EditorEventBus';
 import {
   ContextMenuEvent,
+  CodeLensClickEvent,
   CursorChangedEvent,
   DocumentLoadedEvent,
   DoubleTapEvent,
@@ -718,7 +720,123 @@ export struct SweetEditor {
     this.editorCore.setKeyMap(this.keyMap);
     this.registerImeCallbacks();
 
-    this.settings = new EditorSettings(this);
+    const settingsBridge = new EditorSettingsBridge(
+      (textSize: number): void => {
+        if (this.renderer) {
+          this.renderer.applyTextSize(textSize);
+        }
+        if (this.editorCore) {
+          this.editorCore.onFontMetricsChanged();
+        }
+        this.flush();
+      },
+      (fontFamily: string): void => {
+        if (this.renderer) {
+          this.renderer.applyFontFamily(fontFamily);
+        }
+        if (this.editorCore) {
+          this.editorCore.onFontMetricsChanged();
+        }
+        this.flush();
+      },
+      (scale: number): void => {
+        if (this.editorCore) {
+          this.editorCore.setScale(scale);
+        }
+        this.syncPlatformScale(scale);
+        this.flush();
+      },
+      (mode: FoldArrowMode): void => {
+        if (!this.editorCore) {
+          return;
+        }
+        this.editorCore.setFoldArrowMode(mode);
+      },
+      (mode: WrapMode): void => {
+        if (!this.editorCore) {
+          return;
+        }
+        this.editorCore.setWrapMode(mode);
+        this.flush();
+      },
+      (add: number, mult: number): void => {
+        if (!this.editorCore) {
+          return;
+        }
+        this.editorCore.setLineSpacing(add, mult);
+        this.flush();
+      },
+      (padding: number): void => {
+        if (!this.editorCore) {
+          return;
+        }
+        this.editorCore.setContentStartPadding(padding);
+        this.flush();
+      },
+      (show: boolean): void => {
+        if (!this.editorCore) {
+          return;
+        }
+        this.editorCore.setShowSplitLine(show);
+        this.flush();
+      },
+      (sticky: boolean): void => {
+        if (!this.editorCore) {
+          return;
+        }
+        this.editorCore.setGutterSticky(sticky);
+        this.flush();
+      },
+      (visible: boolean): void => {
+        if (!this.editorCore) {
+          return;
+        }
+        this.editorCore.setGutterVisible(visible);
+        this.flush();
+      },
+      (mode: CurrentLineRenderMode): void => {
+        if (!this.editorCore) {
+          return;
+        }
+        this.editorCore.setCurrentLineRenderMode(mode);
+        this.flush();
+      },
+      (mode: AutoIndentMode): void => {
+        if (!this.editorCore) {
+          return;
+        }
+        this.editorCore.setAutoIndentMode(mode);
+      },
+      (enabled: boolean): void => {
+        if (!this.editorCore) {
+          return;
+        }
+        this.editorCore.setBackspaceUnindent(enabled);
+      },
+      (readOnly: boolean): void => {
+        if (!this.editorCore) {
+          return;
+        }
+        this.editorCore.setReadOnly(readOnly);
+      },
+      (enabled: boolean): void => {
+        if (!this.editorCore) {
+          return;
+        }
+        this.editorCore.setCompositionEnabled(enabled);
+        this.flush();
+      },
+      (count: number): void => {
+        if (!this.editorCore) {
+          return;
+        }
+        this.editorCore.setMaxGutterIcons(count);
+      },
+      (): void => {
+        this.requestDecorationRefresh();
+      }
+    );
+    this.settings = new EditorSettings(settingsBridge);
     this.editorCore.setCompositionEnabled(this.settings.isCompositionEnabled());
     this.settings.setContentStartPadding(DEFAULT_CONTENT_START_PADDING_DP);
     this.settings.setGutterSticky(false);
@@ -842,133 +960,6 @@ export struct SweetEditor {
       );
     }
     this.flush();
-  }
-
-  applyTextSize(textSize: number): void {
-    if (this.renderer) {
-      this.renderer.applyTextSize(textSize);
-    }
-    if (this.editorCore) {
-      this.editorCore.onFontMetricsChanged();
-    }
-    this.flush();
-  }
-
-  applyFontFamily(fontFamily: string): void {
-    if (this.renderer) {
-      this.renderer.applyFontFamily(fontFamily);
-    }
-    if (this.editorCore) {
-      this.editorCore.onFontMetricsChanged();
-    }
-    this.flush();
-  }
-
-  applyScale(scale: number): void {
-    if (this.editorCore) {
-      this.editorCore.setScale(scale);
-    }
-    this.syncPlatformScale(scale);
-    this.flush();
-  }
-
-  applyFoldArrowMode(mode: FoldArrowMode): void {
-    if (!this.editorCore) {
-      return;
-    }
-    this.editorCore.setFoldArrowMode(mode);
-  }
-
-  applyWrapMode(mode: WrapMode): void {
-    if (!this.editorCore) {
-      return;
-    }
-    this.editorCore.setWrapMode(mode);
-    this.flush();
-  }
-
-  applyLineSpacing(add: number, mult: number): void {
-    if (!this.editorCore) {
-      return;
-    }
-    this.editorCore.setLineSpacing(add, mult);
-    this.flush();
-  }
-
-  applyContentStartPadding(padding: number): void {
-    if (!this.editorCore) {
-      return;
-    }
-    this.editorCore.setContentStartPadding(padding);
-    this.flush();
-  }
-
-  applyShowSplitLine(show: boolean): void {
-    if (!this.editorCore) {
-      return;
-    }
-    this.editorCore.setShowSplitLine(show);
-    this.flush();
-  }
-
-  applyGutterSticky(sticky: boolean): void {
-    if (!this.editorCore) {
-      return;
-    }
-    this.editorCore.setGutterSticky(sticky);
-    this.flush();
-  }
-
-  applyGutterVisible(visible: boolean): void {
-    if (!this.editorCore) {
-      return;
-    }
-    this.editorCore.setGutterVisible(visible);
-    this.flush();
-  }
-
-  applyCurrentLineRenderMode(mode: CurrentLineRenderMode): void {
-    if (!this.editorCore) {
-      return;
-    }
-    this.editorCore.setCurrentLineRenderMode(mode);
-    this.flush();
-  }
-
-  applyAutoIndentMode(mode: AutoIndentMode): void {
-    if (!this.editorCore) {
-      return;
-    }
-    this.editorCore.setAutoIndentMode(mode);
-  }
-
-  applyBackspaceUnindent(enabled: boolean): void {
-    if (!this.editorCore) {
-      return;
-    }
-    this.editorCore.setBackspaceUnindent(enabled);
-  }
-
-  applyReadOnly(readOnly: boolean): void {
-    if (!this.editorCore) {
-      return;
-    }
-    this.editorCore.setReadOnly(readOnly);
-  }
-
-  applyCompositionEnabled(enabled: boolean): void {
-    if (!this.editorCore) {
-      return;
-    }
-    this.editorCore.setCompositionEnabled(enabled);
-    this.flush();
-  }
-
-  applyMaxGutterIcons(count: number): void {
-    if (!this.editorCore) {
-      return;
-    }
-    this.editorCore.setMaxGutterIcons(count);
   }
 
   getVisibleLineRange(): number[] {
@@ -1395,6 +1386,20 @@ export struct SweetEditor {
     this.editorCore.setBatchLineGutterIcons(iconsByLine);
   }
 
+  setLineCodeLens(line: number, items: CodeLensItem[]): void {
+    if (!this.editorCore) {
+      return;
+    }
+    this.editorCore.setLineCodeLens(line, items);
+  }
+
+  setBatchLineCodeLens(itemsByLine: Map<number, CodeLensItem[]>): void {
+    if (!this.editorCore) {
+      return;
+    }
+    this.editorCore.setBatchLineCodeLens(itemsByLine);
+  }
+
   setLineDiagnostics(line: number, items: DiagnosticItem[]): void {
     if (!this.editorCore) {
       return;
@@ -1573,6 +1578,12 @@ export struct SweetEditor {
     }
   }
 
+  clearCodeLens(): void {
+    if (this.editorCore) {
+      this.editorCore.clearCodeLens();
+    }
+  }
+
   clearGuides(): void {
     if (this.editorCore) {
       this.editorCore.clearGuides();
@@ -1601,30 +1612,33 @@ export struct SweetEditor {
 
   setLanguageConfiguration(config: LanguageConfiguration | null): void {
     this.languageConfiguration = config;
-    if (!config || !this.editorCore) return;
+    if (!this.editorCore) {
+      return;
+    }
 
-    if (config.brackets) {
-      const opens: number[] = [];
-      const closes: number[] = [];
-      for (const pair of config.brackets) {
-        opens.push(pair.open.length > 0 ? pair.open.codePointAt(0)! : 0);
-        closes.push(pair.close.length > 0 ? pair.close.codePointAt(0)! : 0);
-      }
-      this.editorCore.setBracketPairs(opens, closes);
+    const brackets = config?.brackets ?? [];
+    const opens: number[] = [];
+    const closes: number[] = [];
+    for (const pair of brackets) {
+      opens.push(pair.open.length > 0 ? pair.open.codePointAt(0)! : 0);
+      closes.push(pair.close.length > 0 ? pair.close.codePointAt(0)! : 0);
     }
-    if (config.autoClosingPairs) {
-      const acOpens: number[] = [];
-      const acCloses: number[] = [];
-      for (const pair of config.autoClosingPairs) {
-        acOpens.push(pair.open.length > 0 ? pair.open.codePointAt(0)! : 0);
-        acCloses.push(pair.close.length > 0 ? pair.close.codePointAt(0)! : 0);
-      }
-      this.editorCore.setAutoClosingPairs(acOpens, acCloses);
+    this.editorCore.setBracketPairs(opens, closes);
+
+    const autoClosingPairs = config?.autoClosingPairs ?? [];
+    const acOpens: number[] = [];
+    const acCloses: number[] = [];
+    for (const pair of autoClosingPairs) {
+      acOpens.push(pair.open.length > 0 ? pair.open.codePointAt(0)! : 0);
+      acCloses.push(pair.close.length > 0 ? pair.close.codePointAt(0)! : 0);
     }
-    if (config.tabSize > 0) {
-      this.editorCore.setTabSize(config.tabSize);
-    }
-    this.editorCore.setInsertSpaces(config.insertSpaces);
+    this.editorCore.setAutoClosingPairs(acOpens, acCloses);
+
+    const tabSize = config && config.tabSize > 0
+      ? config.tabSize
+      : LanguageConfiguration.DEFAULT_TAB_SIZE;
+    this.editorCore.setTabSize(tabSize);
+    this.editorCore.setInsertSpaces(config ? config.insertSpaces : false);
     this.flush();
   }
 
@@ -1828,6 +1842,14 @@ export struct SweetEditor {
 
   offFoldToggle(listener: EditorEventListener<FoldToggleEvent>): void {
     this.eventBus.off('foldToggle', listener as EditorEventListener<EditorEvent>);
+  }
+
+  onCodeLensClick(listener: EditorEventListener<CodeLensClickEvent>): void {
+    this.eventBus.on('codeLensClick', listener as EditorEventListener<EditorEvent>);
+  }
+
+  offCodeLensClick(listener: EditorEventListener<CodeLensClickEvent>): void {
+    this.eventBus.off('codeLensClick', listener as EditorEventListener<EditorEvent>);
   }
 
   onDocumentLoaded(listener: EditorEventListener<DocumentLoadedEvent>): void {
@@ -2268,6 +2290,10 @@ export struct SweetEditor {
       case HitTargetType.FOLD_GUTTER:
         this.eventBus.emit('foldToggle', new FoldToggleEvent(
           ht.line, ht.type === HitTargetType.FOLD_GUTTER, screenPoint));
+        break;
+      case HitTargetType.CODELENS:
+        this.eventBus.emit('codeLensClick', new CodeLensClickEvent(
+          ht.line, ht.iconId, screenPoint));
         break;
     }
   }

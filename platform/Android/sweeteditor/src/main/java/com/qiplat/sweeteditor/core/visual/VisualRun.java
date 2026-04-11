@@ -46,4 +46,8 @@ public class VisualRun {
     /** Horizontal margin with previous/next run (InlayHint only; left and right each). */
     @SerializedName("margin")
     public float margin;
+
+    /** Whether this run is in active state (hovered/pressed). */
+    @SerializedName("active")
+    public boolean active;
 }

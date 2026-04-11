@@ -69,7 +69,8 @@ enum HitTargetType {
   gutterIcon(3),
   foldPlaceholder(4),
   foldGutter(5),
-  inlayHintColor(6);
+  inlayHintColor(6),
+  codelens(7);
 
   const HitTargetType(this.value);
   final int value;
@@ -1078,6 +1079,33 @@ class EditorCore {
     );
   }
 
+  void setLineCodeLens(int line, List<CodeLensItem> items) {
+    setLineCodeLensRaw(ProtocolEncoder.packLineCodeLens(line, items));
+  }
+
+  void setLineCodeLensRaw(Uint8List data) {
+    _ensureOpen();
+    _callWithBinaryData(
+      data,
+      (ptr, len) => bindings.editor_set_line_codelens(_handle, ptr, len),
+    );
+  }
+
+  void setBatchLineCodeLens(Map<int, List<CodeLensItem>> itemsByLine) {
+    setBatchLineCodeLensRaw(
+      ProtocolEncoder.packBatchLineCodeLens(itemsByLine),
+    );
+  }
+
+  void setBatchLineCodeLensRaw(Uint8List data) {
+    _ensureOpen();
+    _callWithBinaryData(
+      data,
+      (ptr, len) =>
+          bindings.editor_set_batch_line_codelens(_handle, ptr, len),
+    );
+  }
+
   void setLineDiagnostics(int line, List<Diagnostic> items) {
     setLineDiagnosticsRaw(ProtocolEncoder.packLineDiagnostics(line, items));
   }
@@ -1208,6 +1236,11 @@ class EditorCore {
   void clearGutterIcons() {
     _ensureOpen();
     bindings.editor_clear_gutter_icons(_handle);
+  }
+
+  void clearCodeLens() {
+    _ensureOpen();
+    bindings.editor_clear_codelens(_handle);
   }
 
   void clearGuides() {

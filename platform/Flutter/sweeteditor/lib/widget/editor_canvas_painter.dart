@@ -98,7 +98,7 @@ class EditorCanvasPainter extends ChangeNotifier implements CustomPainter {
         Offset(cd.origin.x, y),
         Offset(cd.origin.x + cd.width, y),
         Paint()
-          ..color = Color(_theme.compositionColor)
+          ..color = Color(_theme.compositionUnderlineColor)
           ..strokeWidth = 2,
       );
     }
@@ -216,6 +216,7 @@ class EditorCanvasPainter extends ChangeNotifier implements CustomPainter {
           case core.VisualRunType.text:
           case core.VisualRunType.whitespace:
           case core.VisualRunType.tab:
+          case core.VisualRunType.codelens:
             _drawTextRun(canvas, run);
           case core.VisualRunType.phantomText:
             _drawPhantomTextRun(canvas, run);
@@ -234,8 +235,19 @@ class EditorCanvasPainter extends ChangeNotifier implements CustomPainter {
     if (run.text.isEmpty) return;
     final screenX = run.x;
     final baselineY = run.y;
-
-    final style = _measurer.buildRunStyle(run.style, _theme.textColor);
+    final effectiveColor = run.type == core.VisualRunType.codelens
+        ? (run.active
+              ? (_theme.currentLineNumberColor != 0
+                    ? _theme.currentLineNumberColor
+                    : _theme.lineNumberColor)
+              : _theme.inlayHintTextColor)
+        : _theme.textColor;
+    final style = _measurer.buildRunStyle(run.style, effectiveColor).copyWith(
+      color: Color(effectiveColor),
+      decoration: run.type == core.VisualRunType.codelens && run.active
+          ? TextDecoration.underline
+          : TextDecoration.none,
+    );
     final fontMetrics = _measurer.getFontMetrics(run.style.fontStyle);
     final painter = TextPainter(
       text: TextSpan(text: run.text, style: style),
@@ -385,7 +397,7 @@ class EditorCanvasPainter extends ChangeNotifier implements CustomPainter {
   void _drawGuideSegments(Canvas canvas, core.EditorRenderModel m) {
     for (final seg in m.guideSegments) {
       final isSeparator = seg.type == core.GuideType.separator;
-      final color = isSeparator ? _theme.separatorColor : _theme.guideColor;
+      final color = isSeparator ? _theme.separatorLineColor : _theme.guideColor;
       final paint = Paint()
         ..color = Color(color)
         ..strokeWidth = 1
@@ -564,7 +576,7 @@ class EditorCanvasPainter extends ChangeNotifier implements CustomPainter {
     final activeLogicalLine = m.cursor.textPosition.line;
 
     for (final line in m.visualLines) {
-      if (line.wrapIndex != 0 || line.isPhantomLine) continue;
+      if (!line.ownsGutterSemantics) continue;
       final isCurrentLine = line.logicalLine == activeLogicalLine;
       final color = isCurrentLine
           ? _theme.currentLineNumberColor

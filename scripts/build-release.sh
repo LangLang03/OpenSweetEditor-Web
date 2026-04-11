@@ -394,14 +394,23 @@ function build_emscripten() {
   echo "============================= WebAssembly ============================="
   WASM_BUILD_DIR="$BUILD_DIR/emscripten"
   WASM_PREBUILT_DIR="$OUTPUT_DIR/wasm"
-  emcmake.bat cmake $PROJECT_DIR\
+  local emcmake_cmd=""
+  if command -v emcmake >/dev/null 2>&1; then
+    emcmake_cmd="emcmake"
+  elif command -v emcmake.bat >/dev/null 2>&1; then
+    emcmake_cmd="emcmake.bat"
+  else
+    echo "emcmake not found. Please activate Emscripten SDK environment first."
+    return 1
+  fi
+  $emcmake_cmd cmake $PROJECT_DIR\
     -B $WASM_BUILD_DIR \
     -G "Ninja" \
     -DCMAKE_CXX_FLAGS="-std=c++17" \
     -DCMAKE_BUILD_TYPE=Release \
     -DBUILD_STATIC_LIB=OFF \
-    -DBUILD_TESTING=OFF
-  cmake --build $WASM_BUILD_DIR --target $WASM_TARGET_NAME -j 24
+    -DBUILD_TESTING=OFF || return 1
+  cmake --build $WASM_BUILD_DIR --target $WASM_TARGET_NAME -j 24 || return 1
   copy_built_libraries "$WASM_BUILD_DIR/bin" "$WASM_PREBUILT_DIR"
 }
 
@@ -478,6 +487,7 @@ if [ $PLATFORM = "all" ]; then
   build_ios_xcframework
   build_osx_xcframework
   build_linux x86_64
+  build_emscripten
   build_android arm64-v8a
   build_android x86_64
   build_ohos arm64-v8a

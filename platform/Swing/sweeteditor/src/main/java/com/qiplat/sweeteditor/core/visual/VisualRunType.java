@@ -7,5 +7,6 @@ public enum VisualRunType {
     INLAY_HINT,
     PHANTOM_TEXT,
     FOLD_PLACEHOLDER,
-    TAB
+    TAB,
+    CODELENS
 }

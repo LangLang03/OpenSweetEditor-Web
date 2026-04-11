@@ -91,7 +91,7 @@ namespace NS_SWEETEDITOR {
     PointF adjusted_point = screen_point;
     adjusted_point.y -= hit_rect.bottom;
 
-    TextPosition pos = m_context_.text_layout->hitTest(adjusted_point);
+    TextPosition pos = m_context_.text_layout->hitTestTextBoundary(adjusted_point);
     TextRange selection = m_context_.caret->selection;
     TextPosition sel_start = selection.start;
     TextPosition sel_end = selection.end;
@@ -124,7 +124,7 @@ namespace NS_SWEETEDITOR {
       adjusted_point.y -= hit_bottom;
     }
 
-    TextPosition pos = m_context_.text_layout->hitTest(adjusted_point);
+    TextPosition pos = m_context_.text_layout->hitTestTextBoundary(adjusted_point);
 
     if (!m_context_.caret->has_selection) {
       m_context_.caret->setSelection({m_context_.caret->cursor, pos});
@@ -255,6 +255,8 @@ namespace NS_SWEETEDITOR {
         intent.toggle_fold = true;
         intent.fold_line = result.hit_target.line;
         intent.place_cursor = false;
+      } else if (result.hit_target.type == HitTargetType::CODELENS) {
+        intent.place_cursor = false;
       }
       break;
     case GestureType::DOUBLE_TAP:
@@ -270,7 +272,7 @@ namespace NS_SWEETEDITOR {
     }
     case GestureType::SCALE: {
       const PointF focus_screen = resolveScaleFocus(event);
-      TextPosition anchor_position = m_context_.text_layout->hitTest(focus_screen);
+          TextPosition anchor_position = m_context_.text_layout->hitTestPointer(focus_screen);
       PointF anchor_coord = m_context_.text_layout->getPositionScreenCoord(anchor_position);
       m_pending_scale_anchor_.active = true;
       m_pending_scale_anchor_.focus_screen = focus_screen;

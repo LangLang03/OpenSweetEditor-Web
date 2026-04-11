@@ -68,6 +68,14 @@ class PhantomText {
   final String text;
 }
 
+/// CodeLens item (clickable label above a code line).
+class CodeLensItem {
+  const CodeLensItem({required this.text, required this.commandId});
+
+  final String text;
+  final int commandId;
+}
+
 /// Gutter icon.
 class GutterIcon {
   const GutterIcon({required this.iconId});

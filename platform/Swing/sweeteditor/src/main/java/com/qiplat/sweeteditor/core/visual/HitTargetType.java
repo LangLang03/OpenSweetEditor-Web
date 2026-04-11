@@ -18,5 +18,7 @@ public enum HitTargetType {
     /** Hit a fold arrow in the gutter (click to toggle fold/unfold) */
     FOLD_GUTTER,
     /** Hit an InlayHint (color block type) */
-    INLAY_HINT_COLOR
+    INLAY_HINT_COLOR,
+    /** Hit a CodeLens item */
+    CODELENS
 }

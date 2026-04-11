@@ -12,6 +12,7 @@ import {
 import { KeyMap } from './CoreKeymap';
 import {
   BracketGuide,
+  CodeLensItem,
   DiagnosticItem,
   FlowGuide,
   FoldRegion,
@@ -71,7 +72,8 @@ export enum HitTargetType {
   GUTTER_ICON = 3,
   FOLD_PLACEHOLDER = 4,
   FOLD_GUTTER = 5,
-  INLAY_HINT_COLOR = 6
+  INLAY_HINT_COLOR = 6,
+  CODELENS = 7
 }
 
 export enum ScrollbarMode {
@@ -778,6 +780,36 @@ export class EditorCore {
 
   setMaxGutterIcons(count: number): void {
     native.editorSetMaxGutterIcons(this.handle, count);
+  }
+
+  // ==================== CodeLens ====================
+
+  setLineCodeLens(lineOrData: number | ArrayBuffer, itemsOrSize?: CodeLensItem[] | number): void {
+    if (lineOrData instanceof ArrayBuffer) {
+      native.editorSetLineCodeLens(this.handle, lineOrData, lineOrData.byteLength);
+      return;
+    }
+    if (!Array.isArray(itemsOrSize)) {
+      return;
+    }
+    const data = ProtocolEncoder.packLineCodeLens(lineOrData, itemsOrSize);
+    native.editorSetLineCodeLens(this.handle, data, data.byteLength);
+  }
+
+  setBatchLineCodeLens(itemsByLineOrData: Map<number, CodeLensItem[]> | ArrayBuffer, _size?: number): void {
+    if (itemsByLineOrData instanceof ArrayBuffer) {
+      native.editorSetBatchLineCodeLens(this.handle, itemsByLineOrData, itemsByLineOrData.byteLength);
+      return;
+    }
+    if (itemsByLineOrData.size === 0) {
+      return;
+    }
+    const data = ProtocolEncoder.packBatchLineCodeLens(itemsByLineOrData);
+    native.editorSetBatchLineCodeLens(this.handle, data, data.byteLength);
+  }
+
+  clearCodeLens(): void {
+    native.editorClearCodeLens(this.handle);
   }
 
   // ==================== Diagnostic Decorations ====================
