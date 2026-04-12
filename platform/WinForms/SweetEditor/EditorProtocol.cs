@@ -219,13 +219,14 @@ namespace SweetEditor {
 			for (int i = 0; i < count; i++) {
 				var tb = Encoding.UTF8.GetBytes(items[i].Text ?? string.Empty);
 				textBytes[i] = tb;
-				totalSize += 8 + tb.Length;
+				totalSize += 12 + tb.Length;
 			}
 			byte[] payload = new byte[totalSize];
 			int offset = 0;
 			WriteInt32LE(payload, ref offset, line);
 			WriteInt32LE(payload, ref offset, count);
 			for (int i = 0; i < count; i++) {
+				WriteInt32LE(payload, ref offset, items[i].Column);
 				WriteInt32LE(payload, ref offset, items[i].CommandId);
 				var tb = textBytes[i];
 				WriteInt32LE(payload, ref offset, tb.Length);
@@ -247,7 +248,7 @@ namespace SweetEditor {
 				for (int i = 0; i < items.Count; i++) {
 					var tb = Encoding.UTF8.GetBytes(items[i].Text ?? string.Empty);
 					lineTexts[i] = tb;
-					totalSize += 8 + tb.Length;
+					totalSize += 12 + tb.Length;
 				}
 				allTextBytes[kv.Key] = lineTexts;
 			}
@@ -260,6 +261,7 @@ namespace SweetEditor {
 				WriteInt32LE(payload, ref offset, items.Count);
 				var lineTexts = allTextBytes[kv.Key];
 				for (int i = 0; i < items.Count; i++) {
+					WriteInt32LE(payload, ref offset, items[i].Column);
 					WriteInt32LE(payload, ref offset, items[i].CommandId);
 					var tb = lineTexts[i];
 					WriteInt32LE(payload, ref offset, tb.Length);

@@ -513,8 +513,8 @@ public class DemoDecorationProvider implements DecorationProvider {
                 lineItems = new ArrayList<>();
                 codeLensItems.put(range.line, lineItems);
             }
-            lineItems.add(new CodeLensItem("Run", CODELENS_RUN));
-            lineItems.add(new CodeLensItem("Debug", CODELENS_DEBUG));
+            lineItems.add(new CodeLensItem(range.startColumn, "Run", CODELENS_RUN));
+            lineItems.add(new CodeLensItem(range.startColumn, "Debug", CODELENS_DEBUG));
         }
     }
 

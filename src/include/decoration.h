@@ -113,6 +113,8 @@ namespace NS_SWEETEDITOR {
 
   /// CodeLens item (clickable label above a code line)
   struct CodeLensItem {
+    /// Anchor column within the owning code line
+    int32_t column {0};
     /// Display text (UTF8), e.g. "3 references"
     U8String text;
     /// Unique command ID (platform-defined, transparently passed back on click)

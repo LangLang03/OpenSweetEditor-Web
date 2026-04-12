@@ -124,11 +124,13 @@ class FoldToggleEvent implements EditorEvent {
 
 class CodeLensClickEvent implements EditorEvent {
   final int line;
+  final int column;
   final int commandId;
   final core.PointF screenPoint;
 
   const CodeLensClickEvent({
     required this.line,
+    required this.column,
     required this.commandId,
     required this.screenPoint,
   });

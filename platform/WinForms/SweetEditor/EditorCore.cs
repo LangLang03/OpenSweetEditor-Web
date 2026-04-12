@@ -672,11 +672,13 @@ namespace SweetEditor {
 
 	/// <summary>Immutable value object representing a single CodeLens item.</summary>
 	public sealed class CodeLensItem {
+		/// <summary>Column anchor within the logical line (0-based, UTF-16 offset).</summary>
+		public int Column { get; }
 		/// <summary>Display text (e.g. "3 references")</summary>
 		public string Text { get; }
 		/// <summary>Command ID (platform-defined, passed back on click)</summary>
 		public int CommandId { get; }
-		public CodeLensItem(string text, int commandId) { Text = text; CommandId = commandId; }
+		public CodeLensItem(int column, string text, int commandId) { Column = column; Text = text; CommandId = commandId; }
 	}
 
 	/// <summary>Immutable value object describing a single gutter icon.</summary>
@@ -783,7 +785,7 @@ namespace SweetEditor {
 		/// <summary>Hit logical line (0-based)</summary>
 		[JsonPropertyName("line")]
 		public int Line { get; set; }
-		/// <summary>Hit column (0-based, meaningful only for InlayHint).</summary>
+		/// <summary>Hit column (0-based, meaningful for InlayHint and CodeLens).</summary>
 		[JsonPropertyName("column")]
 		public int Column { get; set; }
 		/// <summary>Icon ID (valid for INLAY_HINT_ICON / GUTTER_ICON).</summary>
@@ -1219,12 +1221,14 @@ namespace SweetEditor {
 	public class CodeLensClickEventArgs : EventArgs {
 		/// <summary>Hit logical line (0-based)</summary>
 		public int Line { get; }
+		/// <summary>Column anchor of the clicked CodeLens (0-based, UTF-16 offset)</summary>
+		public int Column { get; }
 		/// <summary>Command ID (from CodeLensItem)</summary>
 		public int CommandId { get; }
 		/// <summary>Tap screen position</summary>
 		public PointF ScreenPoint { get; }
-		public CodeLensClickEventArgs(int line, int commandId, PointF point) {
-			Line = line; CommandId = commandId; ScreenPoint = point;
+		public CodeLensClickEventArgs(int line, int column, int commandId, PointF point) {
+			Line = line; Column = column; CommandId = commandId; ScreenPoint = point;
 		}
 	}
 

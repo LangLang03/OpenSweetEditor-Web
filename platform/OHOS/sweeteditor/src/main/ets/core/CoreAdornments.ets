@@ -36,6 +36,7 @@ export interface PhantomText {
 }
 
 export interface CodeLensItem {
+  column: number;
   text: string;
   commandId: number;
 }

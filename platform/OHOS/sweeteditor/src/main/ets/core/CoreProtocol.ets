@@ -314,10 +314,11 @@ export class ProtocolEncoder {
       textBytesArray.push(bytes);
       textBlobSize += bytes.length;
     }
-    const writer = new BinaryWriter(8 + items.length * 8 + textBlobSize);
+    const writer = new BinaryWriter(8 + items.length * 12 + textBlobSize);
     writer.writeInt32(line);
     writer.writeInt32(items.length);
     for (let i = 0; i < items.length; i++) {
+      writer.writeInt32(items[i].column);
       writer.writeInt32(items[i].commandId);
       const tb = textBytesArray[i];
       writer.writeInt32(tb.length);
@@ -338,7 +339,7 @@ export class ProtocolEncoder {
       for (const item of items) {
         const bytes = encoder.encodeInto(item.text);
         lineTextBytes.push(bytes);
-        totalSize += 8 + bytes.length; // command_id + text_len + text
+        totalSize += 12 + bytes.length; // column + command_id + text_len + text
       }
       allTextBytes.set(line, lineTextBytes);
     });
@@ -349,6 +350,7 @@ export class ProtocolEncoder {
       writer.writeInt32(items.length);
       const lineTextBytes = allTextBytes.get(line)!;
       for (let i = 0; i < items.length; i++) {
+        writer.writeInt32(items[i].column);
         writer.writeInt32(items[i].commandId);
         const tb = lineTextBytes[i];
         writer.writeInt32(tb.length);

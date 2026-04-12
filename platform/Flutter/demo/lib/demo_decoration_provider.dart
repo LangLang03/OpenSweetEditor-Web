@@ -557,8 +557,8 @@ class DemoDecorationProvider implements DecorationProvider {
     final literal = _getTokenLiteral(range);
     if (literal == 'class' || literal == 'struct') {
       codeLensItems[range.line] = [
-        core.CodeLensItem(text: 'Run', commandId: codeLensRun),
-        core.CodeLensItem(text: 'Debug', commandId: codeLensDebug),
+        core.CodeLensItem(column: range.startColumn, text: 'Run', commandId: codeLensRun),
+        core.CodeLensItem(column: range.startColumn, text: 'Debug', commandId: codeLensDebug),
       ];
     }
   }

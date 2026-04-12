@@ -3,13 +3,12 @@ package com.qiplat.sweeteditor.core.adornment;
 import androidx.annotation.NonNull;
 
 /**
- * Immutable value object representing a single CodeLens item on a line.
- * <p>
- * CodeLens items are clickable labels rendered above a code line
- * (e.g. "3 references", "Run", "Debug"). Each item carries a command ID
- * that is transparently passed back to the platform on click.
+ * CodeLens item (clickable label above a code line).
+ * <p>Items on the same line are ordered by column ascending and displayed above that line.</p>
  */
 public final class CodeLensItem {
+    /** Column anchor within the logical line (0-based, UTF-16 offset). */
+    public final int column;
     /** Display text (e.g. "3 references") */
     @NonNull
     public final String text;
@@ -17,10 +16,12 @@ public final class CodeLensItem {
     public final int commandId;
 
     /**
+     * @param column    Column anchor within the logical line
      * @param text      Display text
      * @param commandId Command ID (platform-defined)
      */
-    public CodeLensItem(@NonNull String text, int commandId) {
+    public CodeLensItem(int column, @NonNull String text, int commandId) {
+        this.column = column;
         this.text = text;
         this.commandId = commandId;
     }

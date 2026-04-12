@@ -726,8 +726,8 @@ namespace Demo {
 				string literal = GetTokenLiteral(textLines, range);
 				if (literal == "class" || literal == "struct") {
 					codeLensItems[range.Line] = new List<CodeLensItem> {
-						new("Run", CodeLensRun),
-						new("Debug", CodeLensDebug)
+						new(range.StartColumn, "Run", CodeLensRun),
+						new(range.StartColumn, "Debug", CodeLensDebug)
 					};
 				}
 			}

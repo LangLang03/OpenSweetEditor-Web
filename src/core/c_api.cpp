@@ -2013,9 +2013,10 @@ void editor_set_line_codelens(intptr_t editor_handle, const uint8_t* data, size_
   Vector<CodeLensItem> items;
   items.reserve(item_count);
   for (uint32_t i = 0; i < item_count; ++i) {
+    int32_t column = 0;
     int32_t command_id = 0;
     uint32_t text_len = 0;
-    if (!cursor.readI32(command_id) || !cursor.readU32(text_len)) return;
+    if (!cursor.readI32(column) || !cursor.readI32(command_id) || !cursor.readU32(text_len)) return;
     U8String text;
     if (text_len > 0) {
       const uint8_t* text_ptr = nullptr;
@@ -2023,6 +2024,7 @@ void editor_set_line_codelens(intptr_t editor_handle, const uint8_t* data, size_
       text = U8String(reinterpret_cast<const char*>(text_ptr), text_len);
     }
     CodeLensItem item;
+    item.column = column;
     item.command_id = command_id;
     item.text = std::move(text);
     items.push_back(std::move(item));
@@ -2048,9 +2050,10 @@ void editor_set_batch_line_codelens(intptr_t editor_handle, const uint8_t* data,
     Vector<CodeLensItem> items;
     items.reserve(item_count);
     for (uint32_t i = 0; i < item_count; ++i) {
+      int32_t column = 0;
       int32_t command_id = 0;
       uint32_t text_len = 0;
-      if (!cursor.readI32(command_id) || !cursor.readU32(text_len)) return;
+      if (!cursor.readI32(column) || !cursor.readI32(command_id) || !cursor.readU32(text_len)) return;
       U8String text;
       if (text_len > 0) {
         const uint8_t* text_ptr = nullptr;
@@ -2058,6 +2061,7 @@ void editor_set_batch_line_codelens(intptr_t editor_handle, const uint8_t* data,
         text = U8String(reinterpret_cast<const char*>(text_ptr), text_len);
       }
       CodeLensItem item;
+      item.column = column;
       item.command_id = command_id;
       item.text = std::move(text);
       items.push_back(std::move(item));

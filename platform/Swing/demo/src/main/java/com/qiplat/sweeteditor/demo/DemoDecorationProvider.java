@@ -470,8 +470,8 @@ public class DemoDecorationProvider implements DecorationProvider {
         String literal = getTokenLiteral(textLines, range);
         if ("class".equals(literal) || "struct".equals(literal)) {
             List<CodeLensItem> lineItems = new ArrayList<>();
-            lineItems.add(new CodeLensItem("Run", CODELENS_RUN));
-            lineItems.add(new CodeLensItem("Debug", CODELENS_DEBUG));
+            lineItems.add(new CodeLensItem(range.startColumn, "Run", CODELENS_RUN));
+            lineItems.add(new CodeLensItem(range.startColumn, "Debug", CODELENS_DEBUG));
             codeLensItems.put(range.line, lineItems);
         }
     }

@@ -1109,7 +1109,7 @@ Event payloads MUST be defined per-event. Platforms MUST NOT assume or require a
 | `FoldToggleEvent` | `line: int`, `isGutter: boolean`, `screenPoint: PointF or platform-native point type` | Toggled fold line, whether the click came from gutter, and screen position |
 | `GutterIconClickEvent` | `line: int`, `iconId: int`, `screenPoint: PointF or platform-native point type` | Clicked gutter icon line, icon id, and screen position |
 | `InlayHintClickEvent` | `line: int`, `column: int`, `type: InlayType`, `intValue: int`, `screenPoint: PointF or platform-native point type` | Clicked inlay hint position, inlay type, type-specific value, and screen position |
-| `CodeLensClickEvent` | `line: int`, `commandId: int`, `screenPoint: PointF or platform-native point type` | Clicked CodeLens line, unique command id, and screen position |
+| `CodeLensClickEvent` | `line: int`, `column: int`, `commandId: int`, `screenPoint: PointF or platform-native point type` | Clicked CodeLens line/column anchor, unique command id, and screen position |
 | `LongPressEvent` | `cursorPosition: TextPosition`, `screenPoint: PointF or platform-native point type` | Long-press target position and screen position |
 | `DoubleTapEvent` | `cursorPosition: TextPosition`, `hasSelection: boolean`, `selection: TextRange?`, `screenPoint: PointF or platform-native point type` | Double-tap target position, resulting selection state, and screen position |
 | `ContextMenuEvent` | `cursorPosition: TextPosition`, `screenPoint: PointF or platform-native point type` | Context-menu target position and screen position |
@@ -1345,8 +1345,11 @@ The Core layer defines numerous decoration data types. All platforms MUST implem
 
 **`CodeLensItem`** - Clickable label shown above a code line
 
+Multiple CodeLens items on the same code line **MUST** be ordered by `column` ascending while still rendering above that code line.
+
 | Field | Type | MUST/MAY | Description |
 |---|---|---|---|
+| `column` | int | **MUST** | Column anchor within the logical line, used for ordering and click hit reporting |
 | `text` | String | **MUST** | Display label text |
 | `commandId` | int | **MUST** | Unique command identifier passed back in `CodeLensClickEvent` |
 

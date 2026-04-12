@@ -347,6 +347,7 @@ class EditorInteractionController {
         _session.eventBus.publish(
           CodeLensClickEvent(
             line: hitTarget.line,
+            column: hitTarget.column,
             commandId: hitTarget.iconId,
             screenPoint: screenPoint,
           ),

@@ -756,6 +756,7 @@ class IOSEditorView: UIView, UIKeyInput, UITextInput, UITextInputTraits, UIPoint
             onCodeLensClick?(
                 SweetEditorCodeLensClickEvent(
                     line: result.hit_target.line,
+                    column: result.hit_target.column,
                     commandId: result.hit_target.icon_id,
                     locationInView: CGPoint(x: CGFloat(result.tap_point.x), y: CGFloat(result.tap_point.y))
                 )

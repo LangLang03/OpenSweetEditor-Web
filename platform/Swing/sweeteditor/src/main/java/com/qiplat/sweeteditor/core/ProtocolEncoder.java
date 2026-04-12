@@ -393,7 +393,7 @@ final class ProtocolEncoder {
         byte[][] textBytes = new byte[count][];
         for (int i = 0; i < count; i++) {
             CodeLensItem item = items.get(i);
-            totalSize += 8; // command_id(4) + text_len(4)
+            totalSize += 12; // column(4) + command_id(4) + text_len(4)
             if (item.text != null) {
                 byte[] bytes = item.text.getBytes(StandardCharsets.UTF_8);
                 textBytes[i] = bytes;
@@ -405,6 +405,7 @@ final class ProtocolEncoder {
         payload.putInt(count);
         for (int i = 0; i < count; i++) {
             CodeLensItem item = items.get(i);
+            payload.putInt(item.column);
             payload.putInt(item.commandId);
             byte[] tb = textBytes[i];
             if (tb != null) {
@@ -435,7 +436,7 @@ final class ProtocolEncoder {
             if (items == null) continue;
             for (int j = 0; j < items.size(); j++) {
                 CodeLensItem item = items.get(j);
-                totalSize += 8; // command_id(4) + text_len(4)
+                totalSize += 12; // column(4) + command_id(4) + text_len(4)
                 if (item.text != null) {
                     byte[] bytes = item.text.getBytes(StandardCharsets.UTF_8);
                     textBytesCache[itemIdx] = bytes;
@@ -457,6 +458,7 @@ final class ProtocolEncoder {
             payload.putInt(itemCount);
             for (int j = 0; j < itemCount; j++) {
                 CodeLensItem item = items.get(j);
+                payload.putInt(item.column);
                 payload.putInt(item.commandId);
                 byte[] tb = textBytesCache[itemIdx];
                 if (tb != null) {

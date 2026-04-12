@@ -149,11 +149,13 @@ export class FoldToggleEvent implements EditorEvent {
 
 export class CodeLensClickEvent implements EditorEvent {
   readonly line: number;
+  readonly column: number;
   readonly commandId: number;
   readonly screenPoint: PointF;
 
-  constructor(line: number, commandId: number, screenPoint: PointF) {
+  constructor(line: number, column: number, commandId: number, screenPoint: PointF) {
     this.line = line;
+    this.column = column;
     this.commandId = commandId;
     this.screenPoint = screenPoint;
   }

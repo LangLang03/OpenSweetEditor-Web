@@ -1714,6 +1714,7 @@ namespace SweetEditor {
 							case HitTargetType.CODELENS:
 								CodeLensClick?.Invoke(this, new CodeLensClickEventArgs(
 									result.HitTarget.Line,
+									result.HitTarget.Column,
 									result.HitTarget.IconId,
 									sp));
 								break;

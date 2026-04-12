@@ -167,10 +167,12 @@ class SweetEditorCore {
     }
 
     struct CodeLensPayload {
+        let column: Int32
         let text: String
         let commandId: Int32
 
-        init(text: String, commandId: Int32) {
+        init(column: Int32, text: String, commandId: Int32) {
+            self.column = column
             self.text = text
             self.commandId = commandId
         }
@@ -394,10 +396,11 @@ class SweetEditorCore {
 
         func packLineCodeLens(line: Int, items: [CodeLensPayload]) -> Data {
             var payload = Data()
-            payload.reserveCapacity(8 + items.count * 16)
+            payload.reserveCapacity(8 + items.count * 20)
             appendU32(UInt32(line), to: &payload)
             appendU32(UInt32(items.count), to: &payload)
             for item in items {
+                appendI32(item.column, to: &payload)
                 appendI32(item.commandId, to: &payload)
                 appendUTF8(item.text, to: &payload)
             }
@@ -408,7 +411,7 @@ class SweetEditorCore {
             let lines = itemsByLine.keys.sorted()
             var payload = Data()
             payload.reserveCapacity(4 + lines.reduce(0) {
-                $0 + 8 + (itemsByLine[$1]?.count ?? 0) * 16
+                $0 + 8 + (itemsByLine[$1]?.count ?? 0) * 20
             })
             appendU32(UInt32(lines.count), to: &payload)
             for line in lines {
@@ -416,6 +419,7 @@ class SweetEditorCore {
                 appendU32(UInt32(line), to: &payload)
                 appendU32(UInt32(items.count), to: &payload)
                 for item in items {
+                    appendI32(item.column, to: &payload)
                     appendI32(item.commandId, to: &payload)
                     appendUTF8(item.text, to: &payload)
                 }

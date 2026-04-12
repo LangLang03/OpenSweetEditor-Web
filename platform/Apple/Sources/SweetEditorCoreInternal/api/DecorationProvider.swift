@@ -167,10 +167,12 @@ public struct DecorationResult {
     }
 
     public struct CodeLensItem {
+        public let column: Int
         public let text: String
         public let commandId: Int32
 
-        public init(text: String, commandId: Int32) {
+        public init(column: Int, text: String, commandId: Int32) {
+            self.column = column
             self.text = text
             self.commandId = commandId
         }
@@ -525,7 +527,7 @@ final class DecorationProviderManager {
         core.clearCodeLens()
         if !codeLensItems.isEmpty {
             let converted = codeLensItems.mapValues { items in
-                items.map { SweetEditorCore.CodeLensPayload(text: $0.text, commandId: $0.commandId) }
+                items.map { SweetEditorCore.CodeLensPayload(column: Int32($0.column), text: $0.text, commandId: $0.commandId) }
             }
             core.setBatchLineCodeLens(converted)
         }

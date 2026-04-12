@@ -2293,7 +2293,7 @@ export struct SweetEditor {
         break;
       case HitTargetType.CODELENS:
         this.eventBus.emit('codeLensClick', new CodeLensClickEvent(
-          ht.line, ht.iconId, screenPoint));
+          ht.line, ht.column, ht.iconId, screenPoint));
         break;
     }
   }
