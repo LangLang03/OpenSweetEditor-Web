@@ -635,7 +635,7 @@ public class SweetEditorViewMacOS: NSView, NSTextInputClient, CompletionEditorAc
         }
         let trackingArea = NSTrackingArea(
             rect: .zero,
-            options: [.activeInKeyWindow, .inVisibleRect, .mouseMoved],
+            options: [.activeInKeyWindow, .inVisibleRect, .mouseMoved, .mouseExited],
             owner: self,
             userInfo: nil
         )
@@ -964,6 +964,15 @@ public class SweetEditorViewMacOS: NSView, NSTextInputClient, CompletionEditorAc
             return
         }
         let result = editorCore.handleGestureEvent(type: .mouseMove, points: [(Float(point.x), Float(point.y))],
+                                                   modifiers: mods)
+        handleGestureResult(result)
+        rebuildAndRedraw()
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        scrollbarHoverController.reset()
+        let mods = modifiersFromEvent(event)
+        let result = editorCore.handleGestureEvent(type: .mouseMove, points: [(-1, -1)],
                                                    modifiers: mods)
         handleGestureResult(result)
         rebuildAndRedraw()

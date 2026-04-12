@@ -606,82 +606,86 @@ class _SweetEditorWidgetState extends State<SweetEditorWidget>
       focusNode: _focusNode,
       autofocus: widget.autofocus,
       onKeyEvent: _interactionController.handleKeyEvent,
-      child: Listener(
-        onPointerDown: _interactionController.onPointerDown,
-        onPointerMove: _interactionController.onPointerMove,
-        onPointerUp: (event) {
-          final result = _interactionController.onPointerUp(event);
-          _handleGestureInputResult(result);
-        },
-        onPointerSignal: _interactionController.onPointerSignal,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final newSize = constraints.biggest;
-            if (newSize != _session.viewportSize &&
-                newSize.width > 0 &&
-                newSize.height > 0) {
-              _scheduleViewportUpdate(newSize);
-            }
-
-            return ClipRect(
-              child: AnimatedBuilder(
-                animation: _overlayCoordinator.overlayListenable,
-                builder: (context, child) {
-                  final completionOverlay =
-                      _overlayCoordinator.completionOverlay.value.data;
-                  final inlineSuggestionOverlay =
-                      _overlayCoordinator.inlineSuggestionOverlay.value.data;
-                  final selectionMenuOverlay =
-                      _overlayCoordinator.selectionMenuOverlay.value.data;
-
-                  return Stack(
-                    clipBehavior: Clip.hardEdge,
-                    children: [
-                      Positioned.fill(child: child!),
-                      if (completionOverlay != null)
-                        CompletionPopupWidget(
-                          items: completionOverlay.items,
-                          selectedIndex: completionOverlay.selectedIndex,
-                          position: completionOverlay.position,
-                          themeColors: _completionPopupController.themeColors,
-                          viewportSize: newSize,
-                          onItemTap: (index) =>
-                              _completionPopupController.confirmItem(index),
-                        ),
-                      if (inlineSuggestionOverlay != null)
-                        InlineSuggestionBarWidget(
-                          x: inlineSuggestionOverlay.x,
-                          y: inlineSuggestionOverlay.y,
-                          cursorHeight: inlineSuggestionOverlay.cursorHeight,
-                          theme: _theme,
-                          onAccept: () => _inlineSuggestionController.accept(),
-                          onDismiss: () =>
-                              _inlineSuggestionController.dismiss(),
-                        ),
-                      if (selectionMenuOverlay != null &&
-                          selectionMenuOverlay.items.isNotEmpty)
-                        SelectionMenuWidget(
-                          position: _overlayCoordinator
-                              .computeSelectionMenuPosition(
-                                newSize,
-                                selectionMenuOverlay.items,
-                              ),
-                          items: selectionMenuOverlay.items,
-                          bgColor: _theme.completionBgColor,
-                          textColor: _theme.completionLabelColor,
-                          onItemTap:
-                              _interactionController.onSelectionMenuItemTap,
-                        ),
-                    ],
-                  );
-                },
-                child: SizedBox.expand(
-                  key: _editorKey,
-                  child: CustomPaint(size: newSize, painter: _painter),
-                ),
-              ),
-            );
+      child: MouseRegion(
+        onExit: (event) => _interactionController.onPointerExit(event),
+        child: Listener(
+          onPointerDown: _interactionController.onPointerDown,
+          onPointerMove: _interactionController.onPointerMove,
+          onPointerHover: _interactionController.onPointerHover,
+          onPointerUp: (event) {
+            final result = _interactionController.onPointerUp(event);
+            _handleGestureInputResult(result);
           },
+          onPointerSignal: _interactionController.onPointerSignal,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final newSize = constraints.biggest;
+              if (newSize != _session.viewportSize &&
+                  newSize.width > 0 &&
+                  newSize.height > 0) {
+                _scheduleViewportUpdate(newSize);
+              }
+
+              return ClipRect(
+                child: AnimatedBuilder(
+                  animation: _overlayCoordinator.overlayListenable,
+                  builder: (context, child) {
+                    final completionOverlay =
+                        _overlayCoordinator.completionOverlay.value.data;
+                    final inlineSuggestionOverlay =
+                        _overlayCoordinator.inlineSuggestionOverlay.value.data;
+                    final selectionMenuOverlay =
+                        _overlayCoordinator.selectionMenuOverlay.value.data;
+
+                    return Stack(
+                      clipBehavior: Clip.hardEdge,
+                      children: [
+                        Positioned.fill(child: child!),
+                        if (completionOverlay != null)
+                          CompletionPopupWidget(
+                            items: completionOverlay.items,
+                            selectedIndex: completionOverlay.selectedIndex,
+                            position: completionOverlay.position,
+                            themeColors: _completionPopupController.themeColors,
+                            viewportSize: newSize,
+                            onItemTap: (index) =>
+                                _completionPopupController.confirmItem(index),
+                          ),
+                        if (inlineSuggestionOverlay != null)
+                          InlineSuggestionBarWidget(
+                            x: inlineSuggestionOverlay.x,
+                            y: inlineSuggestionOverlay.y,
+                            cursorHeight: inlineSuggestionOverlay.cursorHeight,
+                            theme: _theme,
+                            onAccept: () => _inlineSuggestionController.accept(),
+                            onDismiss: () =>
+                                _inlineSuggestionController.dismiss(),
+                          ),
+                        if (selectionMenuOverlay != null &&
+                            selectionMenuOverlay.items.isNotEmpty)
+                          SelectionMenuWidget(
+                            position: _overlayCoordinator
+                                .computeSelectionMenuPosition(
+                                  newSize,
+                                  selectionMenuOverlay.items,
+                                ),
+                            items: selectionMenuOverlay.items,
+                            bgColor: _theme.completionBgColor,
+                            textColor: _theme.completionLabelColor,
+                            onItemTap:
+                                _interactionController.onSelectionMenuItemTap,
+                          ),
+                      ],
+                    );
+                  },
+                  child: SizedBox.expand(
+                    key: _editorKey,
+                    child: CustomPaint(size: newSize, painter: _painter),
+                  ),
+                ),
+              );
+            },
+          ),
         ),
       ),
     );

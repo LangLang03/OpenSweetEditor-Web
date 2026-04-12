@@ -816,6 +816,12 @@ class IOSEditorView: UIView, UIKeyInput, UITextInput, UITextInputTraits, UIPoint
                 points: floatPoint
             )
             rebuildAndRedraw()
+        case .ended, .cancelled:
+            _ = editorCore.handleGestureEvent(
+                type: .mouseMove,
+                points: [(-1, -1)]
+            )
+            rebuildAndRedraw()
         default:
             break
         }

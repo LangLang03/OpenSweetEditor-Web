@@ -566,8 +566,12 @@ namespace NS_SWEETEDITOR {
     TextPosition m_external_bracket_close_;
     bool m_has_external_brackets_ {false};
 
-    /// Currently active (hovered) clickable hit target (CODELENS, future hyperlinks)
-    HitTarget m_active_hit_target_;
+    /// Hovered clickable hit target (currently used by CodeLens).
+    HitTarget m_hover_hit_target_;
+    /// Pressed clickable hit target.
+    HitTarget m_press_hit_target_;
+    /// Whether the primary mouse button is currently pressed.
+    bool m_mouse_button_down_ {false};
 
     /// Max character distance for built-in bracket scan
     static constexpr size_t kMaxBracketScanChars = 10000;
@@ -601,6 +605,10 @@ namespace NS_SWEETEDITOR {
 
     /// Mark all logical lines as layout dirty
     void markAllLinesDirty(bool reset_heights = false);
+    /// Presentation-state helpers for clickable decoration hot targets.
+    void clearHoverHitTarget();
+    void clearPressHitTarget();
+    HitTarget getActiveHitTarget() const;
     /// Reset composition state (clear composing flag and text)
     void resetCompositionState();
     void normalizeScrollState();

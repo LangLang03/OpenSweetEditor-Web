@@ -74,6 +74,18 @@ namespace NS_SWEETEDITOR {
     return visual_col;
   }
 
+  static bool sameHitTarget(const HitTarget& lhs, const HitTarget& rhs) {
+    return lhs.type == rhs.type
+           && lhs.line == rhs.line
+           && lhs.column == rhs.column
+           && lhs.icon_id == rhs.icon_id
+           && lhs.color_value == rhs.color_value;
+  }
+
+  static HitTarget toHotCodeLensTarget(const HitTarget& target) {
+    return target.type == HitTargetType::CODELENS ? target : HitTarget {};
+  }
+
 #pragma region [Setup & View State]
   EditorCore::EditorCore(const SharedPtr<TextMeasurer>& measurer, const EditorOptions& options): m_measurer_(measurer), m_options_(options), m_key_resolver_(options.key_chord_timeout_ms) {
     m_decorations_ = makeShared<DecorationManager>();
@@ -131,6 +143,9 @@ namespace NS_SWEETEDITOR {
     m_interaction_->resetForDocumentLoad();
     clearMatchedBrackets();
     m_decorations_->clearAll();
+    clearHoverHitTarget();
+    clearPressHitTarget();
+    m_mouse_button_down_ = false;
 
     m_document_ = document;
     m_text_layout_->loadDocument(document);
@@ -384,7 +399,7 @@ namespace NS_SWEETEDITOR {
     PERF_TIMER("buildRenderModel");
     PERF_BEGIN(compose);
     PresentationContext presentation_context;
-    presentation_context.active_hit_target = m_active_hit_target_;
+    presentation_context.active_hit_target = getActiveHitTarget();
     presentation_context.has_selection = m_caret_.has_selection;
     if (m_caret_.has_selection) {
       presentation_context.selection_range = m_caret_.selection;
@@ -459,34 +474,64 @@ namespace NS_SWEETEDITOR {
   }
 
   GestureResult EditorCore::handleGestureEvent(const GestureEvent& event) {
+    const bool has_primary_point = !event.points.empty();
+    const PointF primary_point = has_primary_point ? event.points[0] : PointF {};
+    auto hit_test_hot_target = [&]() -> HitTarget {
+      if (!has_primary_point || m_text_layout_ == nullptr) {
+        return {};
+      }
+      return toHotCodeLensTarget(m_text_layout_->hitTestDecoration(primary_point));
+    };
+
+    if (event.type == EventType::MOUSE_DOWN) {
+      m_mouse_button_down_ = true;
+      clearHoverHitTarget();
+    } else if (event.type == EventType::MOUSE_UP) {
+      m_mouse_button_down_ = false;
+    }
+
     GestureIntent intent;
     GestureResult result = m_interaction_->handleGestureEvent(event, intent);
 
-    // Update active hit target on mouse move (for hover highlight on CODELENS etc.)
-    if (event.type == EventType::MOUSE_MOVE && !event.points.empty()) {
-      HitTarget new_target = m_text_layout_->hitTestDecoration(event.points[0]);
-      if (new_target.type != HitTargetType::CODELENS) {
-        new_target = {};  // Only track hover for clickable run types
-      }
-      if (new_target.type != m_active_hit_target_.type
-          || new_target.line != m_active_hit_target_.line
-          || new_target.icon_id != m_active_hit_target_.icon_id) {
-        // Active target changed — mark affected lines dirty for re-render
-        if (m_active_hit_target_.type != HitTargetType::NONE) {
-          auto& lines = m_document_->getLogicalLines();
-          if (m_active_hit_target_.line < lines.size()) {
-            lines[m_active_hit_target_.line].is_layout_dirty = true;
+    switch (event.type) {
+      case EventType::MOUSE_MOVE: {
+        const HitTarget hot_target = hit_test_hot_target();
+        if (m_mouse_button_down_) {
+          if (m_press_hit_target_.type != HitTargetType::NONE
+              && !sameHitTarget(hot_target, m_press_hit_target_)) {
+            clearPressHitTarget();
           }
+        } else {
+          m_hover_hit_target_ = hot_target;
         }
-        m_active_hit_target_ = new_target;
-        if (m_active_hit_target_.type != HitTargetType::NONE) {
-          auto& lines = m_document_->getLogicalLines();
-          if (m_active_hit_target_.line < lines.size()) {
-            lines[m_active_hit_target_.line].is_layout_dirty = true;
-          }
-        }
+        break;
       }
+      case EventType::MOUSE_DOWN:
+        m_press_hit_target_ = hit_test_hot_target();
+        break;
+      case EventType::MOUSE_UP:
+        clearPressHitTarget();
+        break;
+      case EventType::TOUCH_DOWN:
+        m_press_hit_target_ = hit_test_hot_target();
+        break;
+      case EventType::TOUCH_MOVE: {
+        const HitTarget hot_target = hit_test_hot_target();
+        if (m_press_hit_target_.type != HitTargetType::NONE
+            && !sameHitTarget(hot_target, m_press_hit_target_)) {
+          clearPressHitTarget();
+        }
+        break;
+      }
+      case EventType::TOUCH_UP:
+      case EventType::TOUCH_CANCEL:
+      case EventType::TOUCH_POINTER_DOWN:
+        clearPressHitTarget();
+        break;
+      default:
+        break;
     }
+
 
     if (intent.cancel_linked_editing) {
       if (m_linked_editing_session_ && m_linked_editing_session_->isActive()) {
@@ -506,19 +551,19 @@ namespace NS_SWEETEDITOR {
     if (intent.select_word) {
       selectWordAt(result.tap_point);
     }
-  if (intent.toggle_fold) {
-    toggleFoldAt(intent.fold_line);
+    if (intent.toggle_fold) {
+      toggleFoldAt(intent.fold_line);
+    }
+
+    result.cursor_position = m_caret_.cursor;
+    result.has_selection = hasSelection();
+    result.selection = m_caret_.selection;
+    result.view_scroll_x = m_view_state_.scroll_x;
+    result.view_scroll_y = m_view_state_.scroll_y;
+    result.view_scale = m_view_state_.scale;
+
+    return result;
   }
-
-  result.cursor_position = m_caret_.cursor;
-  result.has_selection = hasSelection();
-  result.selection = m_caret_.selection;
-  result.view_scroll_x = m_view_state_.scroll_x;
-  result.view_scroll_y = m_view_state_.scroll_y;
-  result.view_scale = m_view_state_.scale;
-
-  return result;
-}
 
   GestureResult EditorCore::tickFling() {
     return m_interaction_->tickFling();
@@ -2792,6 +2837,18 @@ namespace NS_SWEETEDITOR {
     if (m_text_layout_ != nullptr) {
       m_text_layout_->invalidateContentMetrics();
     }
+  }
+
+  void EditorCore::clearHoverHitTarget() {
+    m_hover_hit_target_ = {};
+  }
+
+  void EditorCore::clearPressHitTarget() {
+    m_press_hit_target_ = {};
+  }
+
+  HitTarget EditorCore::getActiveHitTarget() const {
+    return m_press_hit_target_.type != HitTargetType::NONE ? m_press_hit_target_ : m_hover_hit_target_;
   }
 
   void EditorCore::normalizeScrollState() {

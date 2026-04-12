@@ -184,6 +184,102 @@ TEST_CASE("EditorCore buildRenderModel activates only hovered CodeLens run") {
   const VisualLine& after_second_hover = findCodeLensVisualLine(model, 0);
   CHECK_FALSE(findNthCodeLensRun(after_second_hover, 0).active);
   CHECK(findNthCodeLensRun(after_second_hover, 1).active);
+
+  const float hover_exit[2] = {-1.0f, -1.0f};
+  editor.handleGestureEvent(GestureEvent::create(EventType::MOUSE_MOVE, 1, hover_exit));
+
+  model = {};
+  editor.buildRenderModel(model);
+  const VisualLine& after_hover_exit = findCodeLensVisualLine(model, 0);
+  CHECK_FALSE(findNthCodeLensRun(after_hover_exit, 0).active);
+  CHECK_FALSE(findNthCodeLensRun(after_hover_exit, 1).active);
+}
+
+TEST_CASE("EditorCore buildRenderModel keeps CodeLens active while mouse is pressed") {
+  EditorOptions options;
+  EditorCore editor(makeShared<FixedWidthTextMeasurer>(10.0f), options);
+
+  editor.loadDocument(makeShared<LineArrayDocument>("abcdef"));
+  editor.setViewport({480, 160});
+  Vector<CodeLensItem> items;
+  items.push_back({1, "3 references", 101});
+  items.push_back({4, "2 implementations", 202});
+  editor.setLineCodeLens(0, std::move(items));
+
+  EditorRenderModel model;
+  editor.buildRenderModel(model);
+  const VisualLine& codelens_line = findCodeLensVisualLine(model, 0);
+  const VisualRun& first = findNthCodeLensRun(codelens_line, 0);
+  const float press_point[2] = {
+      first.x + first.width * 0.5f,
+      first.y
+  };
+
+  editor.handleGestureEvent(GestureEvent::create(EventType::MOUSE_DOWN, 1, press_point));
+
+  model = {};
+  editor.buildRenderModel(model);
+  const VisualLine& pressed_model = findCodeLensVisualLine(model, 0);
+  CHECK(findNthCodeLensRun(pressed_model, 0).active);
+  CHECK_FALSE(findNthCodeLensRun(pressed_model, 1).active);
+
+  editor.handleGestureEvent(GestureEvent::create(EventType::MOUSE_UP, 1, press_point));
+
+  model = {};
+  editor.buildRenderModel(model);
+  const VisualLine& released_model = findCodeLensVisualLine(model, 0);
+  CHECK_FALSE(findNthCodeLensRun(released_model, 0).active);
+  CHECK_FALSE(findNthCodeLensRun(released_model, 1).active);
+}
+
+TEST_CASE("EditorCore buildRenderModel clears pressed CodeLens when touch moves away") {
+  EditorOptions options;
+  EditorCore editor(makeShared<FixedWidthTextMeasurer>(10.0f), options);
+
+  editor.loadDocument(makeShared<LineArrayDocument>("abcdef"));
+  editor.setViewport({480, 160});
+  Vector<CodeLensItem> items;
+  items.push_back({1, "3 references", 101});
+  items.push_back({4, "2 implementations", 202});
+  editor.setLineCodeLens(0, std::move(items));
+
+  EditorRenderModel model;
+  editor.buildRenderModel(model);
+  const VisualLine& codelens_line = findCodeLensVisualLine(model, 0);
+  const VisualRun& first = findNthCodeLensRun(codelens_line, 0);
+  const VisualRun& second = findNthCodeLensRun(codelens_line, 1);
+  const float first_press[2] = {
+      first.x + first.width * 0.5f,
+      first.y
+  };
+  const float move_out[2] = {
+      second.x + second.width * 0.5f,
+      second.y
+  };
+
+  editor.handleGestureEvent(GestureEvent::create(EventType::TOUCH_DOWN, 1, first_press));
+
+  model = {};
+  editor.buildRenderModel(model);
+  const VisualLine& pressed_model = findCodeLensVisualLine(model, 0);
+  CHECK(findNthCodeLensRun(pressed_model, 0).active);
+  CHECK_FALSE(findNthCodeLensRun(pressed_model, 1).active);
+
+  editor.handleGestureEvent(GestureEvent::create(EventType::TOUCH_MOVE, 1, move_out));
+
+  model = {};
+  editor.buildRenderModel(model);
+  const VisualLine& moved_model = findCodeLensVisualLine(model, 0);
+  CHECK_FALSE(findNthCodeLensRun(moved_model, 0).active);
+  CHECK_FALSE(findNthCodeLensRun(moved_model, 1).active);
+
+  editor.handleGestureEvent(GestureEvent::create(EventType::TOUCH_UP, 1, move_out));
+
+  model = {};
+  editor.buildRenderModel(model);
+  const VisualLine& released_model = findCodeLensVisualLine(model, 0);
+  CHECK_FALSE(findNthCodeLensRun(released_model, 0).active);
+  CHECK_FALSE(findNthCodeLensRun(released_model, 1).active);
 }
 
 TEST_CASE("EditorCore line-start word selection end handle can cross CodeLens virtual line") {

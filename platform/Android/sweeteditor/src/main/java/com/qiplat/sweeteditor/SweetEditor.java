@@ -307,6 +307,37 @@ public class SweetEditor extends View {
     }
 
     @Override
+    public boolean onHoverEvent(MotionEvent event) {
+        int action = event.getActionMasked();
+        if (action != MotionEvent.ACTION_HOVER_ENTER
+                && action != MotionEvent.ACTION_HOVER_MOVE
+                && action != MotionEvent.ACTION_HOVER_EXIT) {
+            return super.onHoverEvent(event);
+        }
+
+        PointF point = action == MotionEvent.ACTION_HOVER_EXIT
+                ? new PointF(-1f, -1f)
+                : new PointF(event.getX(), event.getY());
+        EditorCore.GestureResult result = mEditorCore.handleGestureEventEx(
+                EditorCore.EVENT_TYPE_MOUSE_MOVE,
+                new PointF[] {point},
+                0,
+                0,
+                0,
+                1
+        );
+        flush();
+        if (result.needsAnimation && !mScrollAnimationActive) {
+            mScrollAnimationActive = true;
+            Choreographer.getInstance().postFrameCallback(mScrollAnimationCallback);
+        } else if (!result.needsAnimation && mScrollAnimationActive) {
+            mScrollAnimationActive = false;
+            Choreographer.getInstance().removeFrameCallback(mScrollAnimationCallback);
+        }
+        return true;
+    }
+
+    @Override
     public InputConnection onCreateInputConnection(EditorInfo outAttrs) {
         outAttrs.inputType = EditorInfo.TYPE_CLASS_TEXT | EditorInfo.TYPE_TEXT_FLAG_MULTI_LINE;
         outAttrs.imeOptions = EditorInfo.IME_FLAG_NO_EXTRACT_UI | EditorInfo.IME_ACTION_NONE;

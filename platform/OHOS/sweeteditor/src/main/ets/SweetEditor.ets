@@ -327,6 +327,12 @@ export struct SweetEditor {
         .onTouch((event: TouchEvent) => {
           this.handleTouchEvent(event);
         })
+        .onMouse((event: MouseEvent) => {
+          this.handleMouseEvent(event);
+        })
+        .onHover((isHover: boolean, event: HoverEvent) => {
+          this.handleHoverEvent(isHover, event);
+        })
         .onKeyEvent((event: KeyEvent) => {
           if (event.type === KeyType.Down) {
             this.handleKeyEvent(event, true);
@@ -2152,21 +2158,69 @@ export struct SweetEditor {
     }
 
     const gestureEvent = this.convertTouchToGestureEvent(event);
-    const result = this.editorCore.handleGestureEvent(gestureEvent);
-
     const screenPoint: PointF = event.touches.length > 0
       ? { x: event.touches[0].x, y: event.touches[0].y }
       : { x: 0, y: 0 };
+    const isPointerReleased = event.type === TouchType.Up || event.type === TouchType.Cancel;
 
+    this.dispatchPointerGestureEvent(gestureEvent, screenPoint, isPointerReleased, true);
+  }
+
+  private handleMouseEvent(event: MouseEvent): void {
+    const gestureEvent = this.convertMouseToGestureEvent(event);
+    if (!gestureEvent) {
+      return;
+    }
+
+    const screenPoint: PointF = { x: event.x, y: event.y };
+    const isPointerReleased = gestureEvent.type === EventType.MOUSE_UP;
+    this.dispatchPointerGestureEvent(gestureEvent, screenPoint, isPointerReleased, false);
+  }
+
+  private handleHoverEvent(isHover: boolean, event: HoverEvent): void {
+    if (!isHover) {
+      this.dispatchPointerGestureEvent({
+        type: EventType.MOUSE_MOVE,
+        points: [{ x: -1, y: -1 }],
+        modifiers: Modifier.NONE,
+        wheelDeltaX: 0,
+        wheelDeltaY: 0,
+        directScale: 0
+      }, { x: -1, y: -1 }, false, false);
+      return;
+    }
+
+    if (typeof event.x === 'number' && typeof event.y === 'number') {
+      this.dispatchPointerGestureEvent({
+        type: EventType.MOUSE_MOVE,
+        points: [{ x: event.x, y: event.y }],
+        modifiers: Modifier.NONE,
+        wheelDeltaX: 0,
+        wheelDeltaY: 0,
+        directScale: 0
+      }, { x: event.x, y: event.y }, false, false);
+    }
+  }
+
+  private dispatchPointerGestureEvent(
+    gestureEvent: GestureEvent,
+    screenPoint: PointF,
+    isPointerReleased: boolean,
+    showSoftKeyboardOnEmptyTap: boolean
+  ): void {
+    if (!this.editorCore) {
+      return;
+    }
+
+    const result = this.editorCore.handleGestureEvent(gestureEvent);
     this.fireGestureEvents(result, screenPoint);
 
-    const isPointerReleased = event.type === TouchType.Up || event.type === TouchType.Cancel;
     if (this.selectionMenuController) {
       this.selectionMenuController.onGestureResult(result, isPointerReleased);
     }
 
     if (result.type === GestureType.TAP) {
-      if (result.hitTarget.type === HitTargetType.NONE) {
+      if (showSoftKeyboardOnEmptyTap && result.hitTarget.type === HitTargetType.NONE) {
         this.showSoftKeyboard();
       }
       this.resetCursorBlink();
@@ -2210,6 +2264,43 @@ export struct SweetEditor {
     return {
       type: eventType,
       points: points,
+      modifiers: Modifier.NONE,
+      wheelDeltaX: 0,
+      wheelDeltaY: 0,
+      directScale: 0
+    };
+  }
+
+  private convertMouseToGestureEvent(event: MouseEvent): GestureEvent | null {
+    let eventType: EventType | null = null;
+    switch (event.action) {
+      case MouseAction.Press:
+        if (event.button === MouseButton.Left) {
+          eventType = EventType.MOUSE_DOWN;
+        } else if (event.button === MouseButton.Right) {
+          eventType = EventType.MOUSE_RIGHT_DOWN;
+        }
+        break;
+      case MouseAction.Move:
+      case MouseAction.Hover:
+        eventType = EventType.MOUSE_MOVE;
+        break;
+      case MouseAction.Release:
+        if (event.button === MouseButton.Left) {
+          eventType = EventType.MOUSE_UP;
+        }
+        break;
+      default:
+        break;
+    }
+
+    if (eventType === null) {
+      return null;
+    }
+
+    return {
+      type: eventType,
+      points: [{ x: event.x, y: event.y }],
       modifiers: Modifier.NONE,
       wheelDeltaX: 0,
       wheelDeltaY: 0,
@@ -2913,4 +3004,3 @@ function colorToHex(argb: number): string {
   const b = argb & 0xFF;
   return `rgba(${r}, ${g}, ${b}, ${a.toFixed(3)})`;
 }
-

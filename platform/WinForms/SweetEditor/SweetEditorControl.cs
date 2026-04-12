@@ -1563,19 +1563,30 @@ namespace SweetEditor {
 
 		protected override void OnMouseMove(MouseEventArgs e) {
 			using var perf = StartInputPerf($"OnMouseMove({e.Button})");
-			if (e.Button == MouseButtons.Left) {
-				Modifier mods = GetCurrentModifiers();
-				GestureResult gestureResult = editorCore.HandleGestureEvent(new GestureEvent {
-					Type = EventType.MOUSE_MOVE,
-					Points = [new PointF(e.X, e.Y)],
-					Modifiers = mods,
-					DirectScale = 1
-				});
-				FireGestureEvents(gestureResult, new System.Drawing.PointF(e.X, e.Y));
-				Flush();
-				UpdateAnimationTimer(gestureResult.NeedsAnimation);
-			}
+			Modifier mods = GetCurrentModifiers();
+			GestureResult gestureResult = editorCore.HandleGestureEvent(new GestureEvent {
+				Type = EventType.MOUSE_MOVE,
+				Points = [new PointF(e.X, e.Y)],
+				Modifiers = mods,
+				DirectScale = 1
+			});
+			FireGestureEvents(gestureResult, new System.Drawing.PointF(e.X, e.Y));
+			Flush();
+			UpdateAnimationTimer(gestureResult.NeedsAnimation);
 			base.OnMouseMove(e);
+		}
+
+		protected override void OnMouseLeave(EventArgs e) {
+			GestureResult gestureResult = editorCore.HandleGestureEvent(new GestureEvent {
+				Type = EventType.MOUSE_MOVE,
+				Points = [new PointF(-1, -1)],
+				Modifiers = GetCurrentModifiers(),
+				DirectScale = 1
+			});
+			FireGestureEvents(gestureResult, new System.Drawing.PointF(-1, -1));
+			Flush();
+			UpdateAnimationTimer(gestureResult.NeedsAnimation);
+			base.OnMouseLeave(e);
 		}
 
 		protected override void OnMouseUp(MouseEventArgs e) {

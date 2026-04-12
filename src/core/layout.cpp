@@ -166,6 +166,7 @@ namespace NS_SWEETEDITOR {
             && visual_line.logical_line == presentation_context.active_hit_target.line) {
           for (VisualRun& run : visual_line.runs) {
             if (run.type == VisualRunType::CODELENS
+                && run.column == presentation_context.active_hit_target.column
                 && run.icon_id == presentation_context.active_hit_target.icon_id) {
               run.active = true;
             }
@@ -328,6 +329,10 @@ namespace NS_SWEETEDITOR {
 
   HitTarget TextLayout::hitTestDecoration(const PointF& screen_point) {
     if (m_document_ == nullptr) {
+      return {};
+    }
+    if (screen_point.x < 0.0f || screen_point.y < 0.0f
+        || screen_point.x >= m_viewport_.width || screen_point.y >= m_viewport_.height) {
       return {};
     }
     Vector<LogicalLine>& logical_lines = m_document_->getLogicalLines();
