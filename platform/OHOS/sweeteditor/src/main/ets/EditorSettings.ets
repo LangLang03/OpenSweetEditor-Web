@@ -1,65 +1,8 @@
 import { AutoIndentMode, CurrentLineRenderMode, FoldArrowMode, WrapMode } from './core/CoreFoundation';
-
-export class EditorSettingsBridge {
-  readonly applyTextSize: (size: number) => void;
-  readonly applyFontFamily: (fontFamily: string) => void;
-  readonly applyScale: (scale: number) => void;
-  readonly applyFoldArrowMode: (mode: FoldArrowMode) => void;
-  readonly applyWrapMode: (mode: WrapMode) => void;
-  readonly applyLineSpacing: (add: number, mult: number) => void;
-  readonly applyContentStartPadding: (padding: number) => void;
-  readonly applyShowSplitLine: (show: boolean) => void;
-  readonly applyGutterSticky: (sticky: boolean) => void;
-  readonly applyGutterVisible: (visible: boolean) => void;
-  readonly applyCurrentLineRenderMode: (mode: CurrentLineRenderMode) => void;
-  readonly applyAutoIndentMode: (mode: AutoIndentMode) => void;
-  readonly applyBackspaceUnindent: (enabled: boolean) => void;
-  readonly applyReadOnly: (readOnly: boolean) => void;
-  readonly applyCompositionEnabled: (enabled: boolean) => void;
-  readonly applyMaxGutterIcons: (count: number) => void;
-  readonly requestDecorationRefresh: () => void;
-
-  constructor(
-    applyTextSize: (size: number) => void,
-    applyFontFamily: (fontFamily: string) => void,
-    applyScale: (scale: number) => void,
-    applyFoldArrowMode: (mode: FoldArrowMode) => void,
-    applyWrapMode: (mode: WrapMode) => void,
-    applyLineSpacing: (add: number, mult: number) => void,
-    applyContentStartPadding: (padding: number) => void,
-    applyShowSplitLine: (show: boolean) => void,
-    applyGutterSticky: (sticky: boolean) => void,
-    applyGutterVisible: (visible: boolean) => void,
-    applyCurrentLineRenderMode: (mode: CurrentLineRenderMode) => void,
-    applyAutoIndentMode: (mode: AutoIndentMode) => void,
-    applyBackspaceUnindent: (enabled: boolean) => void,
-    applyReadOnly: (readOnly: boolean) => void,
-    applyCompositionEnabled: (enabled: boolean) => void,
-    applyMaxGutterIcons: (count: number) => void,
-    requestDecorationRefresh: () => void,
-  ) {
-    this.applyTextSize = applyTextSize;
-    this.applyFontFamily = applyFontFamily;
-    this.applyScale = applyScale;
-    this.applyFoldArrowMode = applyFoldArrowMode;
-    this.applyWrapMode = applyWrapMode;
-    this.applyLineSpacing = applyLineSpacing;
-    this.applyContentStartPadding = applyContentStartPadding;
-    this.applyShowSplitLine = applyShowSplitLine;
-    this.applyGutterSticky = applyGutterSticky;
-    this.applyGutterVisible = applyGutterVisible;
-    this.applyCurrentLineRenderMode = applyCurrentLineRenderMode;
-    this.applyAutoIndentMode = applyAutoIndentMode;
-    this.applyBackspaceUnindent = applyBackspaceUnindent;
-    this.applyReadOnly = applyReadOnly;
-    this.applyCompositionEnabled = applyCompositionEnabled;
-    this.applyMaxGutterIcons = applyMaxGutterIcons;
-    this.requestDecorationRefresh = requestDecorationRefresh;
-  }
-}
+import { SweetEditor } from './SweetEditor';
 
 export class EditorSettings {
-  private bridge: EditorSettingsBridge;
+  private editor: SweetEditor | null = null;
   private textSize: number = 28;
   private fontFamily: string = 'monospace';
   private scale: number = 1.0;
@@ -80,13 +23,20 @@ export class EditorSettings {
   private decorationScrollRefreshMinIntervalMs: number = 16;
   private decorationOverscanViewportMultiplier: number = 1.5;
 
-  constructor(bridge: EditorSettingsBridge) {
-    this.bridge = bridge;
+  bind(editor: SweetEditor): void {
+    this.editor = editor;
+    this.applyAll();
+  }
+
+  unbind(editor: SweetEditor): void {
+    if (this.editor === editor) {
+      this.editor = null;
+    }
   }
 
   setEditorTextSize(size: number): void {
     this.textSize = size;
-    this.bridge.applyTextSize(size);
+    this.editor?.applySettingsTextSize(size);
   }
 
   getEditorTextSize(): number {
@@ -95,7 +45,7 @@ export class EditorSettings {
 
   setFontFamily(fontFamily: string): void {
     this.fontFamily = fontFamily;
-    this.bridge.applyFontFamily(fontFamily);
+    this.editor?.applySettingsFontFamily(fontFamily);
   }
 
   getFontFamily(): string {
@@ -104,7 +54,7 @@ export class EditorSettings {
 
   setScale(scale: number): void {
     this.scale = scale;
-    this.bridge.applyScale(scale);
+    this.editor?.applySettingsScale(scale);
   }
 
   getScale(): number {
@@ -113,7 +63,7 @@ export class EditorSettings {
 
   setFoldArrowMode(mode: FoldArrowMode): void {
     this.foldArrowMode = mode;
-    this.bridge.applyFoldArrowMode(mode);
+    this.editor?.applySettingsFoldArrowMode(mode);
   }
 
   getFoldArrowMode(): FoldArrowMode {
@@ -122,7 +72,7 @@ export class EditorSettings {
 
   setWrapMode(mode: WrapMode): void {
     this.wrapMode = mode;
-    this.bridge.applyWrapMode(mode);
+    this.editor?.applySettingsWrapMode(mode);
   }
 
   getWrapMode(): WrapMode {
@@ -132,7 +82,7 @@ export class EditorSettings {
   setLineSpacing(add: number, mult: number): void {
     this.lineSpacingAdd = add;
     this.lineSpacingMult = mult;
-    this.bridge.applyLineSpacing(add, mult);
+    this.editor?.applySettingsLineSpacing(add, mult);
   }
 
   getLineSpacingAdd(): number {
@@ -145,7 +95,7 @@ export class EditorSettings {
 
   setContentStartPadding(padding: number): void {
     this.contentStartPadding = Math.max(0, padding);
-    this.bridge.applyContentStartPadding(this.contentStartPadding);
+    this.editor?.applySettingsContentStartPadding(this.contentStartPadding);
   }
 
   getContentStartPadding(): number {
@@ -154,7 +104,7 @@ export class EditorSettings {
 
   setShowSplitLine(show: boolean): void {
     this.showSplitLine = show;
-    this.bridge.applyShowSplitLine(show);
+    this.editor?.applySettingsShowSplitLine(show);
   }
 
   isShowSplitLine(): boolean {
@@ -163,7 +113,7 @@ export class EditorSettings {
 
   setGutterSticky(sticky: boolean): void {
     this.gutterSticky = sticky;
-    this.bridge.applyGutterSticky(sticky);
+    this.editor?.applySettingsGutterSticky(sticky);
   }
 
   isGutterSticky(): boolean {
@@ -172,7 +122,7 @@ export class EditorSettings {
 
   setGutterVisible(visible: boolean): void {
     this.gutterVisible = visible;
-    this.bridge.applyGutterVisible(visible);
+    this.editor?.applySettingsGutterVisible(visible);
   }
 
   isGutterVisible(): boolean {
@@ -181,7 +131,7 @@ export class EditorSettings {
 
   setCurrentLineRenderMode(mode: CurrentLineRenderMode): void {
     this.currentLineRenderMode = mode;
-    this.bridge.applyCurrentLineRenderMode(mode);
+    this.editor?.applySettingsCurrentLineRenderMode(mode);
   }
 
   getCurrentLineRenderMode(): CurrentLineRenderMode {
@@ -190,7 +140,7 @@ export class EditorSettings {
 
   setAutoIndentMode(mode: AutoIndentMode): void {
     this.autoIndentMode = mode;
-    this.bridge.applyAutoIndentMode(mode);
+    this.editor?.applySettingsAutoIndentMode(mode);
   }
 
   getAutoIndentMode(): AutoIndentMode {
@@ -199,7 +149,7 @@ export class EditorSettings {
 
   setBackspaceUnindent(enabled: boolean): void {
     this.backspaceUnindent = enabled;
-    this.bridge.applyBackspaceUnindent(enabled);
+    this.editor?.applySettingsBackspaceUnindent(enabled);
   }
 
   isBackspaceUnindent(): boolean {
@@ -208,7 +158,7 @@ export class EditorSettings {
 
   setReadOnly(readOnly: boolean): void {
     this.readOnly = readOnly;
-    this.bridge.applyReadOnly(readOnly);
+    this.editor?.applySettingsReadOnly(readOnly);
   }
 
   isReadOnly(): boolean {
@@ -217,7 +167,7 @@ export class EditorSettings {
 
   setCompositionEnabled(enabled: boolean): void {
     this.compositionEnabled = enabled;
-    this.bridge.applyCompositionEnabled(enabled);
+    this.editor?.applySettingsCompositionEnabled(enabled);
   }
 
   isCompositionEnabled(): boolean {
@@ -226,7 +176,7 @@ export class EditorSettings {
 
   setMaxGutterIcons(count: number): void {
     this.maxGutterIcons = count;
-    this.bridge.applyMaxGutterIcons(count);
+    this.editor?.applySettingsMaxGutterIcons(count);
   }
 
   getMaxGutterIcons(): number {
@@ -235,7 +185,7 @@ export class EditorSettings {
 
   setDecorationScrollRefreshMinIntervalMs(intervalMs: number): void {
     this.decorationScrollRefreshMinIntervalMs = Math.max(0, intervalMs);
-    this.bridge.requestDecorationRefresh();
+    this.editor?.requestDecorationRefresh();
   }
 
   getDecorationScrollRefreshMinIntervalMs(): number {
@@ -244,11 +194,34 @@ export class EditorSettings {
 
   setDecorationOverscanViewportMultiplier(multiplier: number): void {
     this.decorationOverscanViewportMultiplier = Math.max(0, multiplier);
-    this.bridge.requestDecorationRefresh();
+    this.editor?.requestDecorationRefresh();
   }
 
   getDecorationOverscanViewportMultiplier(): number {
     return this.decorationOverscanViewportMultiplier;
   }
-}
 
+  private applyAll(): void {
+    const editor = this.editor;
+    if (!editor) {
+      return;
+    }
+    editor.applySettingsTextSize(this.textSize);
+    editor.applySettingsFontFamily(this.fontFamily);
+    editor.applySettingsScale(this.scale);
+    editor.applySettingsFoldArrowMode(this.foldArrowMode);
+    editor.applySettingsWrapMode(this.wrapMode);
+    editor.applySettingsLineSpacing(this.lineSpacingAdd, this.lineSpacingMult);
+    editor.applySettingsContentStartPadding(this.contentStartPadding);
+    editor.applySettingsShowSplitLine(this.showSplitLine);
+    editor.applySettingsGutterSticky(this.gutterSticky);
+    editor.applySettingsGutterVisible(this.gutterVisible);
+    editor.applySettingsCurrentLineRenderMode(this.currentLineRenderMode);
+    editor.applySettingsAutoIndentMode(this.autoIndentMode);
+    editor.applySettingsBackspaceUnindent(this.backspaceUnindent);
+    editor.applySettingsReadOnly(this.readOnly);
+    editor.applySettingsCompositionEnabled(this.compositionEnabled);
+    editor.applySettingsMaxGutterIcons(this.maxGutterIcons);
+    editor.requestDecorationRefresh();
+  }
+}

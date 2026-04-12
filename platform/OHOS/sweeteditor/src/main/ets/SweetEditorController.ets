@@ -60,6 +60,7 @@ export class SweetEditorController {
   private metadata: EditorMetadata | null = null;
   private iconProvider: EditorIconProvider | null = null;
   private keyMap: EditorKeyMap = EditorKeyMap.defaultKeyMap();
+  private settings: EditorSettings = new EditorSettings();
 
   bind(api: SweetEditor): void {
     this.api = api;
@@ -93,6 +94,7 @@ export class SweetEditorController {
           this.detachEventListener(api, type, listener);
         }
       });
+      this.settings.unbind(api);
       this.api = null;
     }
   }
@@ -117,8 +119,8 @@ export class SweetEditorController {
     return this.api ? this.api.getDocument() : this.document;
   }
 
-  getSettings(): EditorSettings | null {
-    return this.api ? this.api.getSettings() : null;
+  getSettings(): EditorSettings {
+    return this.settings;
   }
 
   applyTheme(theme: EditorTheme): void {

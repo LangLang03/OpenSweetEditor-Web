@@ -51,7 +51,7 @@ import {
 import { LinkedEditingModel } from './core/CoreLinkedEditing';
 import { EditorIconProvider, EditorMetadata, EditorTheme, LanguageConfiguration } from './EditorTypes';
 import { EditorKeyMap } from './EditorKeymap';
-import { EditorSettings, EditorSettingsBridge } from './EditorSettings';
+import { EditorSettings } from './EditorSettings';
 import { SweetEditorController } from './SweetEditorController';
 import { EditorRenderer } from './EditorRenderer';
 import { EditorEventBus } from './event/EditorEventBus';
@@ -726,126 +726,15 @@ export struct SweetEditor {
     this.editorCore.setKeyMap(this.keyMap);
     this.registerImeCallbacks();
 
-    const settingsBridge = new EditorSettingsBridge(
-      (textSize: number): void => {
-        if (this.renderer) {
-          this.renderer.applyTextSize(textSize);
-        }
-        if (this.editorCore) {
-          this.editorCore.onFontMetricsChanged();
-        }
-        this.flush();
-      },
-      (fontFamily: string): void => {
-        if (this.renderer) {
-          this.renderer.applyFontFamily(fontFamily);
-        }
-        if (this.editorCore) {
-          this.editorCore.onFontMetricsChanged();
-        }
-        this.flush();
-      },
-      (scale: number): void => {
-        if (this.editorCore) {
-          this.editorCore.setScale(scale);
-        }
-        this.syncPlatformScale(scale);
-        this.flush();
-      },
-      (mode: FoldArrowMode): void => {
-        if (!this.editorCore) {
-          return;
-        }
-        this.editorCore.setFoldArrowMode(mode);
-      },
-      (mode: WrapMode): void => {
-        if (!this.editorCore) {
-          return;
-        }
-        this.editorCore.setWrapMode(mode);
-        this.flush();
-      },
-      (add: number, mult: number): void => {
-        if (!this.editorCore) {
-          return;
-        }
-        this.editorCore.setLineSpacing(add, mult);
-        this.flush();
-      },
-      (padding: number): void => {
-        if (!this.editorCore) {
-          return;
-        }
-        this.editorCore.setContentStartPadding(padding);
-        this.flush();
-      },
-      (show: boolean): void => {
-        if (!this.editorCore) {
-          return;
-        }
-        this.editorCore.setShowSplitLine(show);
-        this.flush();
-      },
-      (sticky: boolean): void => {
-        if (!this.editorCore) {
-          return;
-        }
-        this.editorCore.setGutterSticky(sticky);
-        this.flush();
-      },
-      (visible: boolean): void => {
-        if (!this.editorCore) {
-          return;
-        }
-        this.editorCore.setGutterVisible(visible);
-        this.flush();
-      },
-      (mode: CurrentLineRenderMode): void => {
-        if (!this.editorCore) {
-          return;
-        }
-        this.editorCore.setCurrentLineRenderMode(mode);
-        this.flush();
-      },
-      (mode: AutoIndentMode): void => {
-        if (!this.editorCore) {
-          return;
-        }
-        this.editorCore.setAutoIndentMode(mode);
-      },
-      (enabled: boolean): void => {
-        if (!this.editorCore) {
-          return;
-        }
-        this.editorCore.setBackspaceUnindent(enabled);
-      },
-      (readOnly: boolean): void => {
-        if (!this.editorCore) {
-          return;
-        }
-        this.editorCore.setReadOnly(readOnly);
-      },
-      (enabled: boolean): void => {
-        if (!this.editorCore) {
-          return;
-        }
-        this.editorCore.setCompositionEnabled(enabled);
-        this.flush();
-      },
-      (count: number): void => {
-        if (!this.editorCore) {
-          return;
-        }
-        this.editorCore.setMaxGutterIcons(count);
-      },
-      (): void => {
-        this.requestDecorationRefresh();
-      }
-    );
-    this.settings = new EditorSettings(settingsBridge);
+    if (this.controller) {
+      this.settings = this.controller.getSettings();
+    } else {
+      this.settings = new EditorSettings();
+      this.settings.setContentStartPadding(DEFAULT_CONTENT_START_PADDING_DP);
+      this.settings.setGutterSticky(false);
+    }
+    this.settings.bind(this);
     this.editorCore.setCompositionEnabled(this.settings.isCompositionEnabled());
-    this.settings.setContentStartPadding(DEFAULT_CONTENT_START_PADDING_DP);
-    this.settings.setGutterSticky(false);
 
     this.editorCore.registerBatchTextStyles(this.theme.textStyles);
 
@@ -933,6 +822,120 @@ export struct SweetEditor {
 
   getSettings(): EditorSettings | null {
     return this.settings;
+  }
+
+  applySettingsTextSize(size: number): void {
+    if (this.renderer) {
+      this.renderer.applyTextSize(size);
+    }
+    if (this.editorCore) {
+      this.editorCore.onFontMetricsChanged();
+    }
+    this.flush();
+  }
+
+  applySettingsFontFamily(fontFamily: string): void {
+    if (this.renderer) {
+      this.renderer.applyFontFamily(fontFamily);
+    }
+    if (this.editorCore) {
+      this.editorCore.onFontMetricsChanged();
+    }
+    this.flush();
+  }
+
+  applySettingsScale(scale: number): void {
+    if (this.editorCore) {
+      this.editorCore.setScale(scale);
+    }
+    this.syncPlatformScale(scale);
+    this.flush();
+  }
+
+  applySettingsFoldArrowMode(mode: FoldArrowMode): void {
+    if (this.editorCore) {
+      this.editorCore.setFoldArrowMode(mode);
+    }
+  }
+
+  applySettingsWrapMode(mode: WrapMode): void {
+    if (this.editorCore) {
+      this.editorCore.setWrapMode(mode);
+      this.flush();
+    }
+  }
+
+  applySettingsLineSpacing(add: number, mult: number): void {
+    if (this.editorCore) {
+      this.editorCore.setLineSpacing(add, mult);
+      this.flush();
+    }
+  }
+
+  applySettingsContentStartPadding(padding: number): void {
+    if (this.editorCore) {
+      this.editorCore.setContentStartPadding(padding);
+      this.flush();
+    }
+  }
+
+  applySettingsShowSplitLine(show: boolean): void {
+    if (this.editorCore) {
+      this.editorCore.setShowSplitLine(show);
+      this.flush();
+    }
+  }
+
+  applySettingsGutterSticky(sticky: boolean): void {
+    if (this.editorCore) {
+      this.editorCore.setGutterSticky(sticky);
+      this.flush();
+    }
+  }
+
+  applySettingsGutterVisible(visible: boolean): void {
+    if (this.editorCore) {
+      this.editorCore.setGutterVisible(visible);
+      this.flush();
+    }
+  }
+
+  applySettingsCurrentLineRenderMode(mode: CurrentLineRenderMode): void {
+    if (this.editorCore) {
+      this.editorCore.setCurrentLineRenderMode(mode);
+      this.flush();
+    }
+  }
+
+  applySettingsAutoIndentMode(mode: AutoIndentMode): void {
+    if (this.editorCore) {
+      this.editorCore.setAutoIndentMode(mode);
+    }
+  }
+
+  applySettingsBackspaceUnindent(enabled: boolean): void {
+    if (this.editorCore) {
+      this.editorCore.setBackspaceUnindent(enabled);
+    }
+  }
+
+  applySettingsReadOnly(readOnly: boolean): void {
+    if (this.editorCore) {
+      this.editorCore.setReadOnly(readOnly);
+    }
+  }
+
+  applySettingsCompositionEnabled(enabled: boolean): void {
+    if (this.editorCore) {
+      this.editorCore.setCompositionEnabled(enabled);
+      this.flush();
+    }
+  }
+
+  applySettingsMaxGutterIcons(count: number): void {
+    if (this.editorCore) {
+      this.editorCore.setMaxGutterIcons(count);
+    }
   }
 
   getTheme(): EditorTheme {
