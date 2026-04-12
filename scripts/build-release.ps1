@@ -119,6 +119,30 @@ function Resolve-WslDistroName {
     throw "WSL distribution '$RequestedName' was not found. Installed distros: $installed"
 }
 
+function Resolve-WslBuildDistroName {
+    param(
+        [Parameter(Mandatory = $true)][string]$WslPath,
+        [string]$RequestedName = ""
+    )
+
+    if ($RequestedName) {
+        return Resolve-WslDistroName -WslPath $WslPath -RequestedName $RequestedName
+    }
+
+    $distros = @(Get-WslDistros -WslPath $WslPath)
+    if ($distros.Count -eq 0) {
+        throw "No WSL distributions are installed."
+    }
+
+    $preferred = @($distros | Where-Object { $_ -notmatch '^docker-desktop(?:-data)?$' })
+    if ($preferred.Count -eq 0) {
+        $installed = $distros -join ", "
+        throw "No usable WSL build distribution found. Installed distros: $installed"
+    }
+
+    return $preferred[0]
+}
+
 function Convert-ToWslPath {
     param([Parameter(Mandatory = $true)][string]$Path)
 
@@ -333,7 +357,11 @@ function Build-Ohos {
 }
 
 function Build-LinuxWsl {
-    param([Parameter(Mandatory = $true)][string]$Arch)
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateSet("x86_64", "aarch64")]
+        [string]$Arch
+    )
 
     if (-not $UseWsl) {
         throw "Linux builds require -UseWsl."
@@ -348,31 +376,38 @@ function Build-LinuxWsl {
     $projectDirWsl = Convert-ToWslPath -Path $ProjectDir
     $linuxBuildDirWsl = Convert-ToWslPath -Path $linuxBuildDir
     $linuxPrebuiltDirWsl = Convert-ToWslPath -Path $linuxPrebuiltDir
+    $linuxToolchainFileWsl = Convert-ToWslPath -Path (Join-Path $ProjectDir "scripts\cmake\linux-aarch64-toolchain.cmake")
 
     Write-Section "Linux $Arch (WSL)"
-    $resolvedWslDistro = ""
+    $resolvedWslDistro = Resolve-WslBuildDistroName -WslPath $wsl -RequestedName $WslDistro
     if ($WslDistro) {
-        $resolvedWslDistro = Resolve-WslDistroName -WslPath $wsl -RequestedName $WslDistro
         if ($resolvedWslDistro -ieq $WslDistro) {
             Write-Host "Distro: $resolvedWslDistro"
         } else {
             Write-Host "Distro: $resolvedWslDistro (resolved from $WslDistro)"
         }
+    } else {
+        Write-Host "Distro: $resolvedWslDistro (auto-selected)"
+    }
+
+    $cmakeConfigureCommand = "cmake '$projectDirWsl' -B '$linuxBuildDirWsl' -G 'Ninja' -DCMAKE_CXX_FLAGS='-std=c++17 -fPIC' -DCMAKE_BUILD_TYPE=Release -DBUILD_STATIC_LIB=OFF -DBUILD_TESTING=OFF"
+    if ($Arch -eq "aarch64") {
+        $cmakeConfigureCommand += " -DCMAKE_TOOLCHAIN_FILE='$linuxToolchainFileWsl'"
     }
 
     $bashLines = @(
         'set -euo pipefail'
         "mkdir -p '$linuxPrebuiltDirWsl'"
-        "cmake '$projectDirWsl' -B '$linuxBuildDirWsl' -G 'Ninja' -DCMAKE_CXX_FLAGS='-std=c++17 -fPIC' -DCMAKE_BUILD_TYPE=Release -DBUILD_STATIC_LIB=OFF -DBUILD_TESTING=OFF"
+        if ($Arch -eq "aarch64") { "command -v aarch64-linux-gnu-gcc >/dev/null 2>&1 || { echo 'Missing aarch64-linux-gnu-gcc. Install gcc-aarch64-linux-gnu.' >&2; exit 1; }" } else { $null }
+        if ($Arch -eq "aarch64") { "command -v aarch64-linux-gnu-g++ >/dev/null 2>&1 || { echo 'Missing aarch64-linux-gnu-g++. Install g++-aarch64-linux-gnu.' >&2; exit 1; }" } else { $null }
+        $cmakeConfigureCommand
         "cmake --build '$linuxBuildDirWsl' --target '$TargetName' -j 12"
         "find '$linuxBuildDirWsl/lib' -type f \( -name '*.dll' -o -name '*.so' -o -name '*.dylib' -o -name '*.wasm' -o -name '*.js' \) -exec cp -f {} '$linuxPrebuiltDirWsl/' \;"
-    )
+    ) | Where-Object { $_ }
     $bashCommand = $bashLines -join "`n"
 
     $arguments = @()
-    if ($resolvedWslDistro) {
-        $arguments += @("-d", $resolvedWslDistro)
-    }
+    $arguments += @("-d", $resolvedWslDistro)
     $arguments += @("--", "bash", "-lc", $bashCommand)
 
     Invoke-External -FilePath $wsl -Arguments $arguments
@@ -390,6 +425,7 @@ switch ($Platform) {
         Build-Emscripten
         if ($UseWsl) {
             Build-LinuxWsl -Arch "x86_64"
+            Build-LinuxWsl -Arch "aarch64"
         }
     }
     "windows" {
@@ -408,5 +444,6 @@ switch ($Platform) {
     }
     "linux" {
         Build-LinuxWsl -Arch "x86_64"
+        Build-LinuxWsl -Arch "aarch64"
     }
 }
