@@ -490,8 +490,8 @@ export class DemoDecorationProvider implements DecorationProvider {
     const literal = DemoDecorationProvider.getTokenLiteral(editorDocument, range);
     if (literal === 'class' || literal === 'struct') {
       codeLensItems.set(range.line, [
-        { column: range.startColumn, text: 'Run', commandId: CODELENS_RUN },
-        { column: range.startColumn, text: 'Debug', commandId: CODELENS_DEBUG }
+        { column: range.startColumn, text: '▶ Run', commandId: CODELENS_RUN },
+        { column: range.startColumn, text: '◎ Debug', commandId: CODELENS_DEBUG }
       ]);
     }
   }

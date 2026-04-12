@@ -379,10 +379,10 @@ struct Index {
 
   private describeCodeLensCommand(commandId: number): string {
     if (commandId === CODELENS_RUN_COMMAND_ID) {
-      return 'Run';
+      return '▶ Run';
     }
     if (commandId === CODELENS_DEBUG_COMMAND_ID) {
-      return 'Debug';
+      return '◎ Debug';
     }
     return `Command#${commandId}`;
   }

@@ -185,8 +185,8 @@ namespace Demo {
 
 		private static string DescribeCodeLensCommand(int commandId) {
 			return commandId switch {
-				CODELENS_RUN => "Run",
-				CODELENS_DEBUG => "Debug",
+				CODELENS_RUN => "▶ Run",
+				CODELENS_DEBUG => "◎ Debug",
 				_ => $"Command#{commandId}",
 			};
 		}
@@ -726,8 +726,8 @@ namespace Demo {
 				string literal = GetTokenLiteral(textLines, range);
 				if (literal == "class" || literal == "struct") {
 					codeLensItems[range.Line] = new List<CodeLensItem> {
-						new(range.StartColumn, "Run", CodeLensRun),
-						new(range.StartColumn, "Debug", CodeLensDebug)
+						new(range.StartColumn, "▶ Run", CodeLensRun),
+						new(range.StartColumn, "◎ Debug", CodeLensDebug)
 					};
 				}
 			}
