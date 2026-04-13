@@ -806,6 +806,11 @@ public class SweetEditor extends JPanel {
     private void setupEventListeners() {
         addMouseListener(new MouseAdapter() {
             @Override
+            public void mouseEntered(MouseEvent e) {
+                handleGesture(MOUSE_MOVE, e.getX(), e.getY(), getModifiers(e), 0, 0, 1);
+            }
+
+            @Override
             public void mousePressed(MouseEvent e) {
                 requestFocusInWindow();
                 int mods = getModifiers(e);
@@ -1078,6 +1083,9 @@ public class SweetEditor extends JPanel {
             if (result != null && result.type == GestureType.SCALE) {
                 // C++ core already applied scale during gesture handling; only sync platform fonts/measurer.
                 syncPlatformScale(result.viewScale);
+            }
+            if (result != null) {
+                updateMouseCursor(result.pointerCursorType);
             }
             resetCursorBlink();
             flush();
@@ -1435,12 +1443,31 @@ public class SweetEditor extends JPanel {
         }
         renderModel = editorCore.buildRenderModel();
         renderModelDirty = false;
+        if (renderModel != null) {
+            updateMouseCursor(renderModel.pointerCursorType);
+        }
         updateVisibleLineRangeCache(renderModel);
         if (buildPerf != null) {
             buildPerf.mark(PerfStepRecorder.STEP_BUILD);
             buildPerf.finish();
             renderer.getPerfOverlay().recordBuild(buildPerf, renderer.getMeasurePerfStats().buildSummary());
         }
+    }
+
+    private void updateMouseCursor(PointerCursorType pointerCursorType) {
+        int awtCursor;
+        switch (pointerCursorType) {
+            case HAND:
+                awtCursor = java.awt.Cursor.HAND_CURSOR;
+                break;
+            case DEFAULT:
+                awtCursor = java.awt.Cursor.DEFAULT_CURSOR;
+                break;
+            default:
+                awtCursor = java.awt.Cursor.TEXT_CURSOR;
+                break;
+        }
+        setCursor(java.awt.Cursor.getPredefinedCursor(awtCursor));
     }
 
     private void updateCompletionPopupCursorAnchor() {

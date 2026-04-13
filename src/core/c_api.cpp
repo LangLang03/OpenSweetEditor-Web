@@ -297,6 +297,7 @@ static const uint8_t* editorRenderModelToBinary(const EditorRenderModel& model, 
 
   appendBool(buffer, model.gutter_sticky);
   appendBool(buffer, model.gutter_visible);
+  appendI32(buffer, static_cast<int32_t>(model.pointer_cursor_type));
 
   return allocBinaryPayload(buffer.data(), buffer.size(), out_size);
 }
@@ -379,6 +380,7 @@ static const uint8_t* gestureResultToBinary(const GestureResult& result, size_t*
   appendI32(buffer, result.needs_fling ? 1 : 0);
   appendI32(buffer, result.needs_animation ? 1 : 0);
   appendI32(buffer, result.is_handle_drag ? 1 : 0);
+  appendI32(buffer, static_cast<int32_t>(result.pointer_cursor_type));
   return allocBinaryPayload(buffer.data(), buffer.size(), out_size);
 }
 

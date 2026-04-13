@@ -47,6 +47,7 @@ namespace NS_SWEETEDITOR {
 
     void markScrollbarInteraction();
     void computeScrollbarModels(ScrollbarModel& vertical, ScrollbarModel& horizontal) const;
+    bool isPointInScrollbar(const PointF& point) const;
 
     PendingScaleAnchor takePendingScaleAnchor();
     void resetScaleState();
@@ -68,7 +69,7 @@ namespace NS_SWEETEDITOR {
       int64_t last_tick_time {0};
     };
 
-    void fillGestureResult(GestureResult& result) const;
+    void fillInteractionGestureState(GestureResult& result) const;
     PointF resolveScaleFocus(const GestureEvent& event) const;
     bool handleScrollbarGesture(const GestureEvent& event, GestureResult& result);
     HandleDragTarget hitTestHandle(const PointF& screen_point) const;

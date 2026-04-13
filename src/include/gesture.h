@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <limits>
 #include "foundation.h"
+#include "visual.h"
 
 namespace NS_SWEETEDITOR {
 
@@ -218,6 +219,8 @@ namespace NS_SWEETEDITOR {
     /// Whether this gesture event is part of a selection handle drag.
     /// True while the user is dragging a selection handle (start or end).
     bool is_handle_drag {false};
+    /// Pointer cursor hint for the current mouse location.
+    PointerCursorType pointer_cursor_type {PointerCursorType::TEXT};
   };
 
   /// Gesture handler class

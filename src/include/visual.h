@@ -93,6 +93,13 @@ namespace NS_SWEETEDITOR {
     CODELENS = 2,
   };
 
+  /// Pointer cursor hint for desktop platforms
+  enum struct PointerCursorType : uint8_t {
+    DEFAULT = 0,
+    TEXT = 1,
+    HAND = 2,
+  };
+
   /// Visual rendered line data
   struct VisualLine {
     /// Logical line index
@@ -269,6 +276,8 @@ namespace NS_SWEETEDITOR {
     bool gutter_sticky {true};
     /// Whether gutter area is visible
     bool gutter_visible {true};
+    /// Pointer cursor hint for the current mouse location
+    PointerCursorType pointer_cursor_type {PointerCursorType::TEXT};
 
     U8String dump() const;
     U8String toJson() const;

@@ -53,6 +53,9 @@ final class ProtocolDecoder {
         if (data.remaining() >= 4) {
             model.gutterVisible = data.getInt() != 0;
         }
+        if (data.remaining() >= 4) {
+            model.pointerCursorType = readPointerCursorType(data);
+        }
         return model;
     }
 
@@ -148,6 +151,12 @@ final class ProtocolDecoder {
         if (data.remaining() >= 4) {
             result.needsAnimation = data.getInt() != 0;
         }
+        if (data.remaining() >= 4) {
+            data.getInt();
+            if (data.remaining() >= 4) {
+                result.pointerCursorType = readPointerCursorType(data);
+            }
+        }
         return result;
     }
 
@@ -232,6 +241,10 @@ final class ProtocolDecoder {
 
     private static GuideStyle readGuideStyle(ByteBuffer data) {
         return enumByOrdinal(data.getInt(), GuideStyle.values(), GuideStyle.SOLID);
+    }
+
+    private static PointerCursorType readPointerCursorType(ByteBuffer data) {
+        return enumByOrdinal(data.getInt(), PointerCursorType.values(), PointerCursorType.TEXT);
     }
 
     private static VisualRun readVisualRun(ByteBuffer data) {

@@ -1276,6 +1276,7 @@ namespace SweetEditor {
 			this.BackColor = currentTheme.BackgroundColor;
 			this.ForeColor = currentTheme.TextColor;
 			this.Font = renderer.RegularFont;
+			this.Cursor = Cursors.IBeam;
 			this.TabStop = true;
 			if (IsDesignMode()) {
 				return;
@@ -1545,6 +1546,7 @@ namespace SweetEditor {
 					Modifiers = mods,
 					DirectScale = 1
 				});
+				UpdateMouseCursor(gestureResult.PointerCursorType);
 				FireGestureEvents(gestureResult, new System.Drawing.PointF(e.X, e.Y));
 				Flush();
 				UpdateAnimationTimer(gestureResult.NeedsAnimation);
@@ -1555,6 +1557,7 @@ namespace SweetEditor {
 					Modifiers = mods,
 					DirectScale = 1
 				});
+				UpdateMouseCursor(gestureResult.PointerCursorType);
 				FireGestureEvents(gestureResult, new System.Drawing.PointF(e.X, e.Y));
 				Flush();
 			}
@@ -1570,10 +1573,25 @@ namespace SweetEditor {
 				Modifiers = mods,
 				DirectScale = 1
 			});
+			UpdateMouseCursor(gestureResult.PointerCursorType);
 			FireGestureEvents(gestureResult, new System.Drawing.PointF(e.X, e.Y));
 			Flush();
 			UpdateAnimationTimer(gestureResult.NeedsAnimation);
 			base.OnMouseMove(e);
+		}
+
+		protected override void OnMouseEnter(EventArgs e) {
+			System.Drawing.Point clientPoint = PointToClient(MousePosition);
+			GestureResult gestureResult = editorCore.HandleGestureEvent(new GestureEvent {
+				Type = EventType.MOUSE_MOVE,
+				Points = [new PointF(clientPoint.X, clientPoint.Y)],
+				Modifiers = GetCurrentModifiers(),
+				DirectScale = 1
+			});
+			UpdateMouseCursor(gestureResult.PointerCursorType);
+			Flush();
+			UpdateAnimationTimer(gestureResult.NeedsAnimation);
+			base.OnMouseEnter(e);
 		}
 
 		protected override void OnMouseLeave(EventArgs e) {
@@ -1583,6 +1601,7 @@ namespace SweetEditor {
 				Modifiers = GetCurrentModifiers(),
 				DirectScale = 1
 			});
+			UpdateMouseCursor(gestureResult.PointerCursorType);
 			FireGestureEvents(gestureResult, new System.Drawing.PointF(-1, -1));
 			Flush();
 			UpdateAnimationTimer(gestureResult.NeedsAnimation);
@@ -1599,6 +1618,7 @@ namespace SweetEditor {
 					Modifiers = mods,
 					DirectScale = 1
 				});
+				UpdateMouseCursor(gestureResult.PointerCursorType);
 				FireGestureEvents(gestureResult, new System.Drawing.PointF(e.X, e.Y));
 				UpdateAnimationTimer(gestureResult.NeedsAnimation);
 			}
@@ -1616,6 +1636,7 @@ namespace SweetEditor {
 				WheelDeltaY = deltaY,
 				DirectScale = 1
 			});
+			UpdateMouseCursor(gestureResult.PointerCursorType);
 			FireGestureEvents(gestureResult, new System.Drawing.PointF(e.X, e.Y));
 			Flush();
 			base.OnMouseWheel(e);
@@ -1877,6 +1898,9 @@ namespace SweetEditor {
 			renderer.PerfMeasureStats.Reset();
 			renderModel = editorCore.BuildRenderModel();
 			renderModelDirty = false;
+			if (renderModel.HasValue) {
+				UpdateMouseCursor(renderModel.Value.PointerCursorType);
+			}
 			UpdateVisibleLineRangeCache(renderModel);
 			perf.Mark(PerfStepRecorder.StepBuild);
 			perf.Mark(PerfStepRecorder.StepMetrics);
@@ -1893,6 +1917,14 @@ namespace SweetEditor {
 				model.Cursor.Position.X,
 				model.Cursor.Position.Y,
 				model.Cursor.Height);
+		}
+
+		private void UpdateMouseCursor(PointerCursorType pointerCursorType) {
+			Cursor = pointerCursorType switch {
+				PointerCursorType.HAND => Cursors.Hand,
+				PointerCursorType.DEFAULT => Cursors.Default,
+				_ => Cursors.IBeam,
+			};
 		}
 
 		private void UpdateVisibleLineRangeCache(EditorRenderModel? model) {

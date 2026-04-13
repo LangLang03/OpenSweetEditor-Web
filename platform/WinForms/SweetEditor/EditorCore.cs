@@ -777,6 +777,16 @@ namespace SweetEditor {
 	}
 
 	/// <summary>
+	/// Pointer cursor type hint returned by the core.
+	/// </summary>
+	[JsonConverter(typeof(JsonStringEnumConverter))]
+	public enum PointerCursorType {
+		DEFAULT = 0,
+		TEXT = 1,
+		HAND = 2,
+	}
+
+	/// <summary>
 	/// Tap hit target info (filled by the C++ layer during TAP gesture handling).
 	/// </summary>
 	public struct HitTarget {
@@ -845,10 +855,15 @@ namespace SweetEditor {
 		[JsonPropertyName("needs_animation")]
 		public bool NeedsAnimation { get; set; }
 
+		/// <summary>Pointer cursor type hint for the current mouse location.</summary>
+		[JsonPropertyName("pointer_cursor_type")]
+		public PointerCursorType PointerCursorType { get; set; }
+
 		/// <summary>Creates the default gesture result.</summary>
 		public GestureResult() {
 			Type = GestureType.UNDEFINED;
 			TapPoint = new PointF();
+			PointerCursorType = global::SweetEditor.PointerCursorType.TEXT;
 		}
 
 		/// <summary>Creates a gesture result with the specified type and position.</summary>
@@ -857,6 +872,7 @@ namespace SweetEditor {
 		public GestureResult(GestureType type, PointF position) {
 			Type = type;
 			TapPoint = position;
+			PointerCursorType = global::SweetEditor.PointerCursorType.TEXT;
 		}
 
 	}
@@ -1409,6 +1425,9 @@ namespace SweetEditor {
 		/// <summary>Whether gutter area is visible.</summary>
 		[JsonPropertyName("gutter_visible")]
 		public bool GutterVisible { get; set; }
+		/// <summary>Pointer cursor type hint for the current mouse location.</summary>
+		[JsonPropertyName("pointer_cursor_type")]
+		public PointerCursorType PointerCursorType { get; set; }
 	}
 
 	/// <summary>

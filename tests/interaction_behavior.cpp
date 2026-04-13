@@ -65,7 +65,6 @@ TEST_CASE("EditorInteraction track tap jumps vertical scrollbar position") {
 
   CHECK(result.type == GestureType::SCROLL);
   CHECK(view_state.scroll_y > 0.0f);
-  CHECK(result.view_scroll_y == Catch::Approx(view_state.scroll_y));
 }
 
 TEST_CASE("EditorInteraction thumb drag updates vertical scroll offset") {

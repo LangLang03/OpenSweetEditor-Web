@@ -313,6 +313,8 @@ EDITOR_API void editor_set_scrollbar_config(intptr_t editor_handle,
 ///             - f32 width
 ///             - f32 height
 ///         32. i32 gutter_sticky (0=scrolls with content, 1=fixed)
+///         33. i32 gutter_visible (0=hidden, 1=visible)
+///         34. i32 pointer_cursor_type (0=DEFAULT, 1=TEXT, 2=HAND)
 ///         Call free_binary_data after use; returns NULL on failure
 EDITOR_API const uint8_t* build_editor_render_model(intptr_t editor_handle, size_t* out_size);
 
@@ -360,6 +362,8 @@ EDITOR_API const uint8_t* get_layout_metrics(intptr_t editor_handle, size_t* out
 ///        editor_tick_fling; 0 = platform should stop the callback)
 ///    i32 needs_animation (1 = any animation still active; platform can use a single
 ///        frame callback calling editor_tick_animations instead of separate tick calls)
+///    i32 is_handle_drag
+///    i32 pointer_cursor_type (0=DEFAULT, 1=TEXT, 2=HAND)
 ///
 /// Handle gesture event
 /// @param type Event type

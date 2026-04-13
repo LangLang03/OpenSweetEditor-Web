@@ -86,6 +86,19 @@ namespace NS_SWEETEDITOR {
     return target.type == HitTargetType::CODELENS ? target : HitTarget {};
   }
 
+  static bool isMousePointerEvent(EventType type) {
+    switch (type) {
+      case EventType::MOUSE_DOWN:
+      case EventType::MOUSE_MOVE:
+      case EventType::MOUSE_UP:
+      case EventType::MOUSE_WHEEL:
+      case EventType::MOUSE_RIGHT_DOWN:
+        return true;
+      default:
+        return false;
+    }
+  }
+
 #pragma region [Setup & View State]
   EditorCore::EditorCore(const SharedPtr<TextMeasurer>& measurer, const EditorOptions& options): m_measurer_(measurer), m_options_(options), m_key_resolver_(options.key_chord_timeout_ms) {
     m_decorations_ = makeShared<DecorationManager>();
@@ -146,6 +159,7 @@ namespace NS_SWEETEDITOR {
     clearHoverHitTarget();
     clearPressHitTarget();
     m_mouse_button_down_ = false;
+    m_pointer_cursor_type_ = PointerCursorType::TEXT;
 
     m_document_ = document;
     m_text_layout_->loadDocument(document);
@@ -439,6 +453,7 @@ namespace NS_SWEETEDITOR {
                                                    m_has_external_brackets_,
                                                    line_height);
     m_render_composer_->buildScrollbarModel(model, *m_interaction_);
+    model.pointer_cursor_type = m_pointer_cursor_type_;
   }
 
   ViewState EditorCore::getViewState() const {
@@ -475,13 +490,19 @@ namespace NS_SWEETEDITOR {
 
   GestureResult EditorCore::handleGestureEvent(const GestureEvent& event) {
     const bool has_primary_point = !event.points.empty();
-    const PointF primary_point = has_primary_point ? event.points[0] : PointF {};
-    auto hit_test_hot_target = [&]() -> HitTarget {
-      if (!has_primary_point || m_text_layout_ == nullptr) {
-        return {};
+    PointerProbeResult primary_probe;
+    bool primary_probe_ready = false;
+    auto get_primary_probe = [&]() -> const PointerProbeResult& {
+      if (!primary_probe_ready) {
+        primary_probe = has_primary_point ? probePointer(event.points[0]) : PointerProbeResult {};
+        primary_probe_ready = true;
       }
-      return toHotCodeLensTarget(m_text_layout_->hitTestDecoration(primary_point));
+      return primary_probe;
     };
+
+    if (isMousePointerEvent(event.type) && has_primary_point) {
+      m_pointer_cursor_type_ = get_primary_probe().cursor_type;
+    }
 
     if (event.type == EventType::MOUSE_DOWN) {
       m_mouse_button_down_ = true;
@@ -495,7 +516,7 @@ namespace NS_SWEETEDITOR {
 
     switch (event.type) {
       case EventType::MOUSE_MOVE: {
-        const HitTarget hot_target = hit_test_hot_target();
+        const HitTarget hot_target = get_primary_probe().hot_target;
         if (m_mouse_button_down_) {
           if (m_press_hit_target_.type != HitTargetType::NONE
               && !sameHitTarget(hot_target, m_press_hit_target_)) {
@@ -507,16 +528,16 @@ namespace NS_SWEETEDITOR {
         break;
       }
       case EventType::MOUSE_DOWN:
-        m_press_hit_target_ = hit_test_hot_target();
+        m_press_hit_target_ = get_primary_probe().hot_target;
         break;
       case EventType::MOUSE_UP:
         clearPressHitTarget();
         break;
       case EventType::TOUCH_DOWN:
-        m_press_hit_target_ = hit_test_hot_target();
+        m_press_hit_target_ = get_primary_probe().hot_target;
         break;
       case EventType::TOUCH_MOVE: {
-        const HitTarget hot_target = hit_test_hot_target();
+        const HitTarget hot_target = get_primary_probe().hot_target;
         if (m_press_hit_target_.type != HitTargetType::NONE
             && !sameHitTarget(hot_target, m_press_hit_target_)) {
           clearPressHitTarget();
@@ -555,26 +576,26 @@ namespace NS_SWEETEDITOR {
       toggleFoldAt(intent.fold_line);
     }
 
-    result.cursor_position = m_caret_.cursor;
-    result.has_selection = hasSelection();
-    result.selection = m_caret_.selection;
-    result.view_scroll_x = m_view_state_.scroll_x;
-    result.view_scroll_y = m_view_state_.scroll_y;
-    result.view_scale = m_view_state_.scale;
-
+    finalizeGestureResult(result);
     return result;
   }
 
   GestureResult EditorCore::tickFling() {
-    return m_interaction_->tickFling();
+    GestureResult result = m_interaction_->tickFling();
+    finalizeGestureResult(result);
+    return result;
   }
 
   GestureResult EditorCore::tickEdgeScroll() {
-    return m_interaction_->tickEdgeScroll();
+    GestureResult result = m_interaction_->tickEdgeScroll();
+    finalizeGestureResult(result);
+    return result;
   }
 
   GestureResult EditorCore::tickAnimations() {
-    return m_interaction_->tickAnimations();
+    GestureResult result = m_interaction_->tickAnimations();
+    finalizeGestureResult(result);
+    return result;
   }
 
   void EditorCore::stopFling() {
@@ -2849,6 +2870,45 @@ namespace NS_SWEETEDITOR {
 
   HitTarget EditorCore::getActiveHitTarget() const {
     return m_press_hit_target_.type != HitTargetType::NONE ? m_press_hit_target_ : m_hover_hit_target_;
+  }
+
+  EditorCore::PointerProbeResult EditorCore::probePointer(const PointF& point) const {
+    PointerProbeResult result;
+    if (point.x < 0.0f || point.y < 0.0f
+        || point.x >= m_viewport_.width || point.y >= m_viewport_.height) {
+      result.cursor_type = PointerCursorType::DEFAULT;
+      return result;
+    }
+    if (m_text_layout_ == nullptr) {
+      result.cursor_type = PointerCursorType::TEXT;
+      return result;
+    }
+
+    if (m_interaction_->isPointInScrollbar(point)) {
+      result.cursor_type = PointerCursorType::DEFAULT;
+      return result;
+    }
+
+    result.hot_target = toHotCodeLensTarget(m_text_layout_->hitTestDecoration(point));
+    if (result.hot_target.type == HitTargetType::CODELENS) {
+      result.cursor_type = PointerCursorType::HAND;
+      return result;
+    }
+
+    result.cursor_type = point.x >= m_text_layout_->getLayoutMetrics().textAreaX()
+                           ? PointerCursorType::TEXT
+                           : PointerCursorType::DEFAULT;
+    return result;
+  }
+
+  void EditorCore::finalizeGestureResult(GestureResult& result) const {
+    result.cursor_position = m_caret_.cursor;
+    result.has_selection = hasSelection();
+    result.selection = m_caret_.selection;
+    result.view_scroll_x = m_view_state_.scroll_x;
+    result.view_scroll_y = m_view_state_.scroll_y;
+    result.view_scale = m_view_state_.scale;
+    result.pointer_cursor_type = m_pointer_cursor_type_;
   }
 
   void EditorCore::normalizeScrollState() {

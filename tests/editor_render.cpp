@@ -1,5 +1,6 @@
 #include <catch2/catch_amalgamated.hpp>
 #include <algorithm>
+#include <string>
 #include "editor_core.h"
 #include "test_measurer.h"
 
@@ -280,6 +281,81 @@ TEST_CASE("EditorCore buildRenderModel clears pressed CodeLens when touch moves 
   const VisualLine& released_model = findCodeLensVisualLine(model, 0);
   CHECK_FALSE(findNthCodeLensRun(released_model, 0).active);
   CHECK_FALSE(findNthCodeLensRun(released_model, 1).active);
+}
+
+TEST_CASE("EditorCore exposes pointer cursor type for text, CodeLens, gutter and scrollbar") {
+  EditorOptions options;
+  EditorCore editor(makeShared<FixedWidthTextMeasurer>(10.0f), options);
+  ScrollbarConfig scrollbar;
+  scrollbar.mode = ScrollbarMode::ALWAYS;
+  editor.setScrollbarConfig(scrollbar);
+
+  std::string text;
+  for (int i = 0; i < 20; ++i) {
+    text += "abcdef\n";
+  }
+
+  editor.loadDocument(makeShared<LineArrayDocument>(text));
+  editor.setViewport({480, 160});
+  Vector<CodeLensItem> items;
+  items.push_back({1, "3 references", 101});
+  editor.setLineCodeLens(0, std::move(items));
+
+  EditorRenderModel model;
+  editor.buildRenderModel(model);
+  CHECK(model.pointer_cursor_type == PointerCursorType::TEXT);
+  REQUIRE(model.vertical_scrollbar.visible);
+
+  const VisualLine& codelens_line = findCodeLensVisualLine(model, 0);
+  const VisualRun& codelens_run = findNthCodeLensRun(codelens_line, 0);
+  const float code_lens_point[2] = {
+      codelens_run.x + codelens_run.width * 0.5f,
+      codelens_run.y
+  };
+  const GestureResult hover_codelens = editor.handleGestureEvent(
+      GestureEvent::create(EventType::MOUSE_MOVE, 1, code_lens_point));
+  CHECK(hover_codelens.pointer_cursor_type == PointerCursorType::HAND);
+
+  model = {};
+  editor.buildRenderModel(model);
+  CHECK(model.pointer_cursor_type == PointerCursorType::HAND);
+
+  const CursorRect text_rect = editor.getPositionScreenRect({0, 2});
+  const float text_point[2] = {
+      text_rect.x + 1.0f,
+      text_rect.y + text_rect.height * 0.5f
+  };
+  const GestureResult hover_text = editor.handleGestureEvent(
+      GestureEvent::create(EventType::MOUSE_MOVE, 1, text_point));
+  CHECK(hover_text.pointer_cursor_type == PointerCursorType::TEXT);
+
+  model = {};
+  editor.buildRenderModel(model);
+  CHECK(model.pointer_cursor_type == PointerCursorType::TEXT);
+
+  const float gutter_point[2] = {
+      1.0f,
+      text_rect.y + text_rect.height * 0.5f
+  };
+  const GestureResult hover_gutter = editor.handleGestureEvent(
+      GestureEvent::create(EventType::MOUSE_MOVE, 1, gutter_point));
+  CHECK(hover_gutter.pointer_cursor_type == PointerCursorType::DEFAULT);
+
+  model = {};
+  editor.buildRenderModel(model);
+  CHECK(model.pointer_cursor_type == PointerCursorType::DEFAULT);
+
+  const float scrollbar_point[2] = {
+      model.vertical_scrollbar.track.origin.x + model.vertical_scrollbar.track.width * 0.5f,
+      model.vertical_scrollbar.track.origin.y + model.vertical_scrollbar.track.height * 0.5f
+  };
+  const GestureResult hover_scrollbar = editor.handleGestureEvent(
+      GestureEvent::create(EventType::MOUSE_MOVE, 1, scrollbar_point));
+  CHECK(hover_scrollbar.pointer_cursor_type == PointerCursorType::DEFAULT);
+
+  model = {};
+  editor.buildRenderModel(model);
+  CHECK(model.pointer_cursor_type == PointerCursorType::DEFAULT);
 }
 
 TEST_CASE("EditorCore line-start word selection end handle can cross CodeLens virtual line") {

@@ -526,6 +526,11 @@ namespace NS_SWEETEDITOR {
 #pragma endregion
 
   private:
+    struct PointerProbeResult {
+      HitTarget hot_target;
+      PointerCursorType cursor_type {PointerCursorType::TEXT};
+    };
+
     SharedPtr<TextMeasurer> m_measurer_;
     EditorOptions m_options_;
     EditorSettings m_settings_;
@@ -572,6 +577,8 @@ namespace NS_SWEETEDITOR {
     HitTarget m_press_hit_target_;
     /// Whether the primary mouse button is currently pressed.
     bool m_mouse_button_down_ {false};
+    /// Current pointer cursor type for the last observed mouse location.
+    PointerCursorType m_pointer_cursor_type_ {PointerCursorType::TEXT};
 
     /// Max character distance for built-in bracket scan
     static constexpr size_t kMaxBracketScanChars = 10000;
@@ -609,6 +616,8 @@ namespace NS_SWEETEDITOR {
     void clearHoverHitTarget();
     void clearPressHitTarget();
     HitTarget getActiveHitTarget() const;
+    PointerProbeResult probePointer(const PointF& point) const;
+    void finalizeGestureResult(GestureResult& result) const;
     /// Reset composition state (clear composing flag and text)
     void resetCompositionState();
     void normalizeScrollState();

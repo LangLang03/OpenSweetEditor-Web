@@ -571,6 +571,10 @@ namespace SweetEditor {
 			return Enum.IsDefined(typeof(HitTargetType), value) ? (HitTargetType)value : HitTargetType.NONE;
 		}
 
+		internal static PointerCursorType ToPointerCursorType(int value) {
+			return Enum.IsDefined(typeof(PointerCursorType), value) ? (PointerCursorType)value : PointerCursorType.TEXT;
+		}
+
 		internal static VisualRunType ToVisualRunType(int value) {
 			return Enum.IsDefined(typeof(VisualRunType), value) ? (VisualRunType)value : VisualRunType.TEXT;
 		}
@@ -879,6 +883,7 @@ namespace SweetEditor {
 				VerticalScrollbar = default,
 				HorizontalScrollbar = default,
 				GutterSticky = true,
+				PointerCursorType = global::SweetEditor.PointerCursorType.TEXT,
 			};
 		}
 
@@ -1040,6 +1045,9 @@ namespace SweetEditor {
 				if (TryReadInt32(data, ref offset, out int gutterVisibleRaw)) {
 					model.GutterVisible = gutterVisibleRaw != 0;
 				}
+				if (TryReadInt32(data, ref offset, out int pointerCursorTypeRaw)) {
+					model.PointerCursorType = ToPointerCursorType(pointerCursorTypeRaw);
+				}
 				return model;
 			} finally {
 				NativeMethods.FreeBinaryData(payloadPtr);
@@ -1191,6 +1199,11 @@ namespace SweetEditor {
 				}
 				if (TryReadInt32(data, ref offset, out int needsAnimationInt)) {
 					result.NeedsAnimation = needsAnimationInt != 0;
+				}
+				if (TryReadInt32(data, ref offset, out int _)) {
+					if (TryReadInt32(data, ref offset, out int pointerCursorTypeInt)) {
+						result.PointerCursorType = ToPointerCursorType(pointerCursorTypeInt);
+					}
 				}
 				return result;
 			} finally {
