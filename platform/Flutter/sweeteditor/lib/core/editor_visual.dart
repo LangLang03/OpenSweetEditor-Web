@@ -298,14 +298,12 @@ class DiagnosticDecoration {
     required this.width,
     required this.height,
     required this.severity,
-    required this.color,
   });
 
   final PointF origin;
   final double width;
   final double height;
   final int severity;
-  final int color;
 }
 
 /// Linked editing rect.

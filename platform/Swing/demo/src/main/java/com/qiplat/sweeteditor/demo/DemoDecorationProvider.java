@@ -289,12 +289,12 @@ public class DemoDecorationProvider implements DecorationProvider {
             int fixmeIndex = upper.indexOf("FIXME");
             if (fixmeIndex >= 0) {
                 appendDiagnostic(diagnostics, seenDiagnostics, diagnosticCount,
-                        range.line, range.startColumn + fixmeIndex, 5, 0, 0);
+                        range.line, range.startColumn + fixmeIndex, 5, 0);
             }
             int todoIndex = upper.indexOf("TODO");
             if (todoIndex >= 0) {
                 appendDiagnostic(diagnostics, seenDiagnostics, diagnosticCount,
-                        range.line, range.startColumn + todoIndex, 4, 1, 0);
+                        range.line, range.startColumn + todoIndex, 4, 1);
             }
             return firstKeywordRange;
         }
@@ -305,7 +305,7 @@ public class DemoDecorationProvider implements DecorationProvider {
 
         if (token.styleId() == EditorTheme.STYLE_ANNOTATION) {
             appendDiagnostic(diagnostics, seenDiagnostics, diagnosticCount,
-                    range.line, range.startColumn, range.length(), 3, 0);
+                    range.line, range.startColumn, range.length(), 3);
         }
         return firstKeywordRange;
     }
@@ -316,20 +316,19 @@ public class DemoDecorationProvider implements DecorationProvider {
                                          int line,
                                          int column,
                                          int length,
-                                         int severity,
-                                         int color) {
+                                         int severity) {
         if (diagnosticCount[0] >= MAX_DYNAMIC_DIAGNOSTICS) {
             return;
         }
         if (line < 0 || column < 0 || length <= 0) {
             return;
         }
-        String key = line + ":" + column + ":" + length + ":" + severity + ":" + color;
+        String key = line + ":" + column + ":" + length + ":" + severity;
         if (!seenDiagnostics.add(key)) {
             return;
         }
         diagnostics.computeIfAbsent(line, ignored -> new ArrayList<>())
-                .add(new Diagnostic(column, length, severity, color));
+                .add(new Diagnostic(column, length, severity));
         diagnosticCount[0]++;
     }
 
@@ -341,7 +340,7 @@ public class DemoDecorationProvider implements DecorationProvider {
             return;
         }
         appendDiagnostic(diagnostics, seenDiagnostics, diagnosticCount,
-                firstKeywordRange.line, firstKeywordRange.startColumn, firstKeywordRange.length(), 3, 0);
+                firstKeywordRange.line, firstKeywordRange.startColumn, firstKeywordRange.length(), 3);
     }
 
     private void appendStyleSpan(Map<Integer, List<StyleSpan>> syntaxSpans, TokenSpan token) {

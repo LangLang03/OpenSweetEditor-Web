@@ -457,11 +457,10 @@ extension SweetEditorCore {
         guard let origin = readPointData(&reader),
               let width = reader.readFloat(),
               let height = reader.readFloat(),
-              let severity = reader.readInt32(),
-              let color = reader.readInt32() else {
+              let severity = reader.readInt32() else {
             return nil
         }
-        return DiagnosticDecoration(origin: origin, width: width, height: height, severity: severity, color: color)
+        return DiagnosticDecoration(origin: origin, width: width, height: height, severity: severity)
     }
 
     fileprivate func readLinkedEditingRect(_ reader: inout BinaryReader) -> LinkedEditingRect? {

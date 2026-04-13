@@ -319,7 +319,6 @@ external void editor_set_scrollbar_config(
 /// - f32 width
 /// - f32 height
 /// - i32 severity
-/// - i32 color
 /// 25. i32 max_gutter_icons
 /// 26. i32 linked_editing_rect_count
 /// 27. LinkedEditingRect[linked_editing_rect_count] linked_editing_rects

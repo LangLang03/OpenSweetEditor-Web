@@ -124,16 +124,15 @@ public final class ProtocolEncoder {
         return payload;
     }
 
-    static ByteBuffer packLineDiagnostics(int line, @NonNull int[] columns, @NonNull int[] lengths, @NonNull int[] severities, @NonNull int[] colors) {
-        int count = Math.min(Math.min(columns.length, lengths.length), Math.min(severities.length, colors.length));
-        ByteBuffer payload = ByteBuffer.allocateDirect(8 + count * 16).order(ByteOrder.LITTLE_ENDIAN);
+    static ByteBuffer packLineDiagnostics(int line, @NonNull int[] columns, @NonNull int[] lengths, @NonNull int[] severities) {
+        int count = Math.min(columns.length, Math.min(lengths.length, severities.length));
+        ByteBuffer payload = ByteBuffer.allocateDirect(8 + count * 12).order(ByteOrder.LITTLE_ENDIAN);
         payload.putInt(line);
         payload.putInt(count);
         for (int i = 0; i < count; i++) {
             payload.putInt(columns[i]);
             payload.putInt(lengths[i]);
             payload.putInt(severities[i]);
-            payload.putInt(colors[i]);
         }
         payload.flip();
         return payload;
@@ -148,7 +147,7 @@ public final class ProtocolEncoder {
      */
     public static ByteBuffer packLineDiagnostics(int line, @NonNull java.util.List<? extends Diagnostic> items) {
         int count = items.size();
-        ByteBuffer payload = ByteBuffer.allocateDirect(8 + count * 16).order(ByteOrder.LITTLE_ENDIAN);
+        ByteBuffer payload = ByteBuffer.allocateDirect(8 + count * 12).order(ByteOrder.LITTLE_ENDIAN);
         payload.putInt(line);
         payload.putInt(count);
         for (int i = 0; i < count; i++) {
@@ -156,7 +155,6 @@ public final class ProtocolEncoder {
             payload.putInt(item.column);
             payload.putInt(item.length);
             payload.putInt(item.severity);
-            payload.putInt(item.color);
         }
         payload.flip();
         return payload;
@@ -807,7 +805,7 @@ public final class ProtocolEncoder {
             List<? extends Diagnostic> diags = diagsByLine.valueAt(i);
             if (diags != null) totalDiagCount += diags.size();
         }
-        ByteBuffer payload = ByteBuffer.allocateDirect(4 + entryCount * 8 + totalDiagCount * 16)
+        ByteBuffer payload = ByteBuffer.allocateDirect(4 + entryCount * 8 + totalDiagCount * 12)
                 .order(ByteOrder.LITTLE_ENDIAN);
         payload.putInt(entryCount);
         for (int i = 0; i < entryCount; i++) {
@@ -821,7 +819,6 @@ public final class ProtocolEncoder {
                 payload.putInt(item.column);
                 payload.putInt(item.length);
                 payload.putInt(item.severity);
-                payload.putInt(item.color);
             }
         }
         payload.flip();

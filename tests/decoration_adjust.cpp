@@ -19,9 +19,9 @@ TEST_CASE("DecorationManager adjustForEdit shifts same-line point and span decor
   manager.setLinePhantomTexts(0, {PhantomText{4, "ghost"}});
 
   Vector<DiagnosticSpan> diagnostics;
-  diagnostics.push_back({0, 2, DiagnosticSeverity::DIAG_WARNING, 0});
-  diagnostics.push_back({1, 3, DiagnosticSeverity::DIAG_ERROR, 0});
-  diagnostics.push_back({3, 2, DiagnosticSeverity::DIAG_INFO, 0});
+  diagnostics.push_back({0, 2, DiagnosticSeverity::DIAG_WARNING});
+  diagnostics.push_back({1, 3, DiagnosticSeverity::DIAG_ERROR});
+  diagnostics.push_back({3, 2, DiagnosticSeverity::DIAG_INFO});
   manager.setLineDiagnostics(0, std::move(diagnostics));
 
   // Insert 3 columns at (0,2).

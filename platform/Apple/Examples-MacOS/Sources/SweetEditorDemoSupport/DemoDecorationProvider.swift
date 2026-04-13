@@ -336,19 +336,17 @@ public final class DemoDecorationProvider: DecorationProvider {
 
             if let column = column(of: "std::sqrt", in: line) {
                 result[lineIndex, default: []].append(
-                    .init(column: Int32(column), length: 9, severity: 1, color: 0))
+                    .init(column: Int32(column), length: 9, severity: 1))
             }
 
             if line.contains("return "), let column = column(of: "return", in: line) {
                 result[lineIndex, default: []].append(
-                    .init(column: Int32(column), length: 6, severity: 2, color: 0))
+                    .init(column: Int32(column), length: 6, severity: 2))
             }
 
             if let column = column(of: "lineCount", in: line) {
                 result[lineIndex, default: []].append(
-                    .init(
-                        column: Int32(column), length: 9, severity: 3,
-                        color: Int32(bitPattern: 0xFFFF_8C00)))
+                    .init(column: Int32(column), length: 9, severity: 3))
             }
         }
 

@@ -148,7 +148,7 @@ namespace NS_SWEETEDITOR {
     {GuideStyle::DOUBLE, "DOUBLE"},
   })
   NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CompositionDecoration, active, rect)
-  NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(DiagnosticDecoration, rect, severity, color)
+  NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(DiagnosticDecoration, rect, severity)
   NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GuideSegment, direction, type, style, start, end, arrow_end)
   NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(LinkedEditingRect, rect, is_active)
   NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GutterIconRenderItem, logical_line, icon_id, rect)

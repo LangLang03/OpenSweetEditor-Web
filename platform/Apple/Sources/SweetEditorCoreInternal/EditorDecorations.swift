@@ -16,13 +16,11 @@ public struct EditorDiagnosticItem {
     public let column: Int32
     public let length: Int32
     public let severity: Int32
-    public let color: Int32
 
-    public init(column: Int32, length: Int32, severity: Int32, color: Int32) {
+    public init(column: Int32, length: Int32, severity: Int32) {
         self.column = column
         self.length = length
         self.severity = severity
-        self.color = color
     }
 }
 

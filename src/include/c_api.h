@@ -286,7 +286,6 @@ EDITOR_API void editor_set_scrollbar_config(intptr_t editor_handle,
 ///             - f32 width
 ///             - f32 height
 ///             - i32 severity
-///             - i32 color
 ///         25. i32 max_gutter_icons
 ///         26. i32 linked_editing_rect_count
 ///         27. LinkedEditingRect[linked_editing_rect_count] linked_editing_rects
@@ -824,14 +823,14 @@ EDITOR_API void editor_clear_codelens(intptr_t editor_handle);
 /// Set diagnostic decoration ranges for specified line (compact binary)
 /// @param data payload(LE):
 ///             u32 line, u32 diag_count, then repeat for diag_count groups
-///             [u32 column, u32 length, i32 severity, i32 color]
+///             [u32 column, u32 length, i32 severity]
 /// @param size payload byte length
 EDITOR_API void editor_set_line_diagnostics(intptr_t editor_handle, const uint8_t* data, size_t size);
 
 /// Batch set diagnostic decorations for multiple lines (compact binary, fixed length)
 /// @param data payload(LE):
 ///             u32 entry_count,
-///             [u32 line, u32 diag_count, [u32 column, u32 length, i32 severity, i32 color] x diag_count] x entry_count
+///             [u32 line, u32 diag_count, [u32 column, u32 length, i32 severity] x diag_count] x entry_count
 /// @param size payload byte length
 EDITOR_API void editor_set_batch_line_diagnostics(intptr_t editor_handle, const uint8_t* data, size_t size);
 

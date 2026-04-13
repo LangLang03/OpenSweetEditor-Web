@@ -88,13 +88,11 @@ public struct DecorationResult {
         public let column: Int32
         public let length: Int32
         public let severity: Int32
-        public let color: Int32
 
-        public init(column: Int32, length: Int32, severity: Int32, color: Int32) {
+        public init(column: Int32, length: Int32, severity: Int32) {
             self.column = column
             self.length = length
             self.severity = severity
-            self.color = color
         }
     }
 
@@ -449,8 +447,7 @@ final class DecorationProviderManager {
                     SweetEditorCore.DiagnosticItem(
                         column: $0.column,
                         length: $0.length,
-                        severity: $0.severity,
-                        color: $0.color
+                        severity: $0.severity
                     )
                 }
             }

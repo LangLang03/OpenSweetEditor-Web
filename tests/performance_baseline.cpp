@@ -97,7 +97,7 @@ TEST_CASE("Performance baseline: render model with guide and diagnostic decorati
   editor.setFlowGuides({FlowGuide{{10, 4}, {790, 8}}});
   editor.setSeparatorGuides({SeparatorGuide{300, SeparatorStyle::SINGLE, 20, 4}});
   for (size_t line = 0; line < 800; line += 20) {
-    editor.setLineDiagnostics(line, {{4, 8, DiagnosticSeverity::DIAG_WARNING, static_cast<int32_t>(0xFFFFAA00)}});
+    editor.setLineDiagnostics(line, {{4, 8, DiagnosticSeverity::DIAG_WARNING}});
   }
 
   BENCHMARK("BuildRenderModel_WithDecorations") {

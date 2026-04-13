@@ -1795,6 +1795,7 @@ public class SweetEditor extends View {
                         case CODELENS:
                             mEventBus.publish(new CodeLensClickEvent(
                                     result.hitTarget.line,
+                                    result.hitTarget.column,
                                     result.hitTarget.iconId,
                                     screenPoint));
                             break;

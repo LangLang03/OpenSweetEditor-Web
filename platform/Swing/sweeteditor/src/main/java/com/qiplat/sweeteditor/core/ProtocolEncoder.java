@@ -100,7 +100,7 @@ final class ProtocolEncoder {
 
     static byte[] packLineDiagnostics(int line, List<? extends Diagnostic> items) {
         int count = items.size();
-        ByteBuffer payload = ByteBuffer.allocate(8 + count * 16).order(ByteOrder.LITTLE_ENDIAN);
+        ByteBuffer payload = ByteBuffer.allocate(8 + count * 12).order(ByteOrder.LITTLE_ENDIAN);
         payload.putInt(line);
         payload.putInt(count);
         for (int i = 0; i < count; i++) {
@@ -108,7 +108,6 @@ final class ProtocolEncoder {
             payload.putInt(item.column);
             payload.putInt(item.length);
             payload.putInt(item.severity);
-            payload.putInt(item.color);
         }
         return payload.array();
     }
@@ -120,7 +119,7 @@ final class ProtocolEncoder {
         for (var entry : diagsByLine.entrySet()) {
             if (entry.getValue() != null) totalDiagCount += entry.getValue().size();
         }
-        ByteBuffer payload = ByteBuffer.allocate(4 + entryCount * 8 + totalDiagCount * 16)
+        ByteBuffer payload = ByteBuffer.allocate(4 + entryCount * 8 + totalDiagCount * 12)
                 .order(ByteOrder.LITTLE_ENDIAN);
         payload.putInt(entryCount);
         var sortedEntries = diagsByLine.entrySet().stream()
@@ -136,7 +135,6 @@ final class ProtocolEncoder {
                 payload.putInt(item.column);
                 payload.putInt(item.length);
                 payload.putInt(item.severity);
-                payload.putInt(item.color);
             }
         }
         return payload.array();

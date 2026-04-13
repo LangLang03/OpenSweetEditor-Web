@@ -215,7 +215,6 @@ static void appendGuideSegment(std::vector<uint8_t>& buffer, const GuideSegment&
 static void appendDiagnosticDecoration(std::vector<uint8_t>& buffer, const DiagnosticDecoration& decoration) {
   appendRect(buffer, decoration.rect);
   appendI32(buffer, decoration.severity);
-  appendI32(buffer, decoration.color);
 }
 
 static void appendLinkedEditingRect(std::vector<uint8_t>& buffer, const LinkedEditingRect& rect) {
@@ -1697,7 +1696,7 @@ void editor_set_line_diagnostics(intptr_t editor_handle, const uint8_t* data, si
   }
 
   size_t diagnostics_bytes = 0;
-  if (mulOverflow(static_cast<size_t>(diag_count), sizeof(uint32_t) * 4, diagnostics_bytes) ||
+  if (mulOverflow(static_cast<size_t>(diag_count), sizeof(uint32_t) * 3, diagnostics_bytes) ||
       cursor.remaining() != diagnostics_bytes) {
     return;
   }
@@ -1708,15 +1707,13 @@ void editor_set_line_diagnostics(intptr_t editor_handle, const uint8_t* data, si
     uint32_t column = 0;
     uint32_t length = 0;
     int32_t severity = 0;
-    int32_t color = 0;
-    if (!cursor.readU32(column) || !cursor.readU32(length) || !cursor.readI32(severity) || !cursor.readI32(color)) {
+    if (!cursor.readU32(column) || !cursor.readU32(length) || !cursor.readI32(severity)) {
       return;
     }
     DiagnosticSpan ds;
     ds.column = column;
     ds.length = length;
     ds.severity = static_cast<DiagnosticSeverity>(severity);
-    ds.color = color;
     diagnostics.push_back(ds);
   }
   editor_core->setLineDiagnostics(static_cast<size_t>(line), std::move(diagnostics));
@@ -1743,14 +1740,12 @@ void editor_set_batch_line_diagnostics(intptr_t editor_handle, const uint8_t* da
       uint32_t column = 0;
       uint32_t length = 0;
       int32_t severity = 0;
-      int32_t color = 0;
       if (!cursor.readU32(column) || !cursor.readU32(length) ||
-          !cursor.readI32(severity) || !cursor.readI32(color)) return;
+          !cursor.readI32(severity)) return;
       DiagnosticSpan ds;
       ds.column = column;
       ds.length = length;
       ds.severity = static_cast<DiagnosticSeverity>(severity);
-      ds.color = color;
       diagnostics.push_back(ds);
     }
     entries.emplace_back(static_cast<size_t>(line), std::move(diagnostics));

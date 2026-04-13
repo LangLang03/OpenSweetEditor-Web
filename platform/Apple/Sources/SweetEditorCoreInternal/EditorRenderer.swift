@@ -416,15 +416,11 @@ struct EditorRenderer {
 
     static func drawDiagnosticDecoration(context: CGContext, decoration: DiagnosticDecoration) {
         let color: CGColor
-        if decoration.color != 0 {
-            color = cgColorFromARGB(decoration.color)
-        } else {
-            switch decoration.severity {
-            case 0: color = theme.diagnosticErrorColor
-            case 1: color = theme.diagnosticWarningColor
-            case 2: color = theme.diagnosticInfoColor
-            default: color = theme.diagnosticHintColor
-            }
+        switch decoration.severity {
+        case 0: color = theme.diagnosticErrorColor
+        case 1: color = theme.diagnosticWarningColor
+        case 2: color = theme.diagnosticInfoColor
+        default: color = theme.diagnosticHintColor
         }
 
         let startX = CGFloat(decoration.origin.x)

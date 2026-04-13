@@ -551,9 +551,7 @@ namespace SweetEditor {
 		public int Length { get; }
 		/// <summary>Severity (0=error, 1=warning, 2=info, 3=hint)</summary>
 		public int Severity { get; }
-		/// <summary>Underline/marker color (ARGB)</summary>
-		public int Color { get; }
-		public DiagnosticItem(int column, int length, int severity, int color) { Column = column; Length = length; Severity = severity; Color = color; }
+		public DiagnosticItem(int column, int length, int severity) { Column = column; Length = length; Severity = severity; }
 	}
 
 	/// <summary>Immutable value object describing a foldable region.</summary>
@@ -1341,9 +1339,6 @@ namespace SweetEditor {
 		/// <summary>Severity level (0=ERROR, 1=WARNING, 2=INFO, 3=HINT)</summary>
 		[JsonPropertyName("severity")]
 		public int Severity { get; set; }
-		/// <summary>Color value (ARGB), 0 means use the default color for this severity.</summary>
-		[JsonPropertyName("color")]
-		public int Color { get; set; }
 	}
 
 	/// <summary>

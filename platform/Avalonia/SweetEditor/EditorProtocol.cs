@@ -275,7 +275,7 @@ namespace SweetEditor {
 
 		internal static byte[] PackLineDiagnostics(int line, IList<DiagnosticItem> items) {
 			int count = items.Count;
-			byte[] payload = new byte[8 + count * 16];
+			byte[] payload = new byte[8 + count * 12];
 			int offset = 0;
 			WriteInt32LE(payload, ref offset, line);
 			WriteInt32LE(payload, ref offset, count);
@@ -284,7 +284,6 @@ namespace SweetEditor {
 				WriteInt32LE(payload, ref offset, d.Column);
 				WriteInt32LE(payload, ref offset, d.Length);
 				WriteInt32LE(payload, ref offset, d.Severity);
-				WriteInt32LE(payload, ref offset, d.Color);
 			}
 			return payload;
 		}
@@ -292,7 +291,7 @@ namespace SweetEditor {
 		internal static byte[] PackBatchLineDiagnostics(Dictionary<int, IList<DiagnosticItem>> diagsByLine) {
 			int totalDiags = 0;
 			foreach (var kv in diagsByLine) totalDiags += kv.Value.Count;
-			byte[] payload = new byte[4 + diagsByLine.Count * 8 + totalDiags * 16];
+			byte[] payload = new byte[4 + diagsByLine.Count * 8 + totalDiags * 12];
 			int offset = 0;
 			WriteInt32LE(payload, ref offset, diagsByLine.Count);
 			foreach (var kv in diagsByLine) {
@@ -304,7 +303,6 @@ namespace SweetEditor {
 					WriteInt32LE(payload, ref offset, d.Column);
 					WriteInt32LE(payload, ref offset, d.Length);
 					WriteInt32LE(payload, ref offset, d.Severity);
-					WriteInt32LE(payload, ref offset, d.Color);
 				}
 			}
 			return payload;
@@ -313,7 +311,7 @@ namespace SweetEditor {
 		internal static byte[] PackBatchLineDiagnostics(Dictionary<int, List<DiagnosticItem>> diagsByLine) {
 			int totalDiags = 0;
 			foreach (var kv in diagsByLine) totalDiags += kv.Value.Count;
-			byte[] payload = new byte[4 + diagsByLine.Count * 8 + totalDiags * 16];
+			byte[] payload = new byte[4 + diagsByLine.Count * 8 + totalDiags * 12];
 			int offset = 0;
 			WriteInt32LE(payload, ref offset, diagsByLine.Count);
 			foreach (var kv in diagsByLine) {
@@ -325,7 +323,6 @@ namespace SweetEditor {
 					WriteInt32LE(payload, ref offset, d.Column);
 					WriteInt32LE(payload, ref offset, d.Length);
 					WriteInt32LE(payload, ref offset, d.Severity);
-					WriteInt32LE(payload, ref offset, d.Color);
 				}
 			}
 			return payload;
@@ -873,8 +870,7 @@ namespace SweetEditor {
 			if (!TryReadPointF(data, ref offset, out PointF origin) ||
 				!TryReadFloat(data, ref offset, out float width) ||
 				!TryReadFloat(data, ref offset, out float height) ||
-				!TryReadInt32(data, ref offset, out int severity) ||
-				!TryReadInt32(data, ref offset, out int color)) {
+				!TryReadInt32(data, ref offset, out int severity)) {
 				return false;
 			}
 			decoration = new DiagnosticDecoration {
@@ -882,7 +878,6 @@ namespace SweetEditor {
 				Width = width,
 				Height = height,
 				Severity = severity,
-				Color = color,
 			};
 			return true;
 		}
@@ -1072,7 +1067,7 @@ namespace SweetEditor {
 				if (!TryReadInt32(data, ref offset, out int diagnosticCount) || diagnosticCount < 0) {
 					return model;
 				}
-				if (!TrySkipBytes(data, ref offset, diagnosticCount * 24)) {
+				if (!TrySkipBytes(data, ref offset, diagnosticCount * 20)) {
 					return model;
 				}
 

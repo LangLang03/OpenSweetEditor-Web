@@ -659,22 +659,18 @@ export class EditorRenderer {
         continue;
       }
       let color: number;
-      if (diag.color !== 0) {
-        color = diag.color;
-      } else {
-        switch (diag.severity) {
-          case 0:
-            color = this.theme.diagnosticErrorColor;
-            break;
-          case 1:
-            color = this.theme.diagnosticWarningColor;
-            break;
-          case 2:
-            color = this.theme.diagnosticInfoColor;
-            break;
-          default:
-            color = this.theme.diagnosticHintColor; break;
-        }
+      switch (diag.severity) {
+        case 0:
+          color = this.theme.diagnosticErrorColor;
+          break;
+        case 1:
+          color = this.theme.diagnosticWarningColor;
+          break;
+        case 2:
+          color = this.theme.diagnosticInfoColor;
+          break;
+        default:
+          color = this.theme.diagnosticHintColor; break;
       }
 
       ctx.save();

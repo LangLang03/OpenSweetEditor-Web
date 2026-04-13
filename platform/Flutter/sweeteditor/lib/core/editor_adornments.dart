@@ -99,13 +99,11 @@ class Diagnostic {
     required this.column,
     required this.length,
     required this.severity,
-    required this.color,
   });
 
   final int column;
   final int length;
   final int severity;
-  final int color;
 }
 
 /// Fold region.

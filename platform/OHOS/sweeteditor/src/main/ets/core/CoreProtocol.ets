@@ -365,7 +365,7 @@ export class ProtocolEncoder {
   static packBatchLineDiagnostics(diagsByLine: Map<number, DiagnosticItem[]>): ArrayBuffer {
     let totalDiags = 0;
     diagsByLine.forEach(items => totalDiags += items.length);
-    const writer = new BinaryWriter(4 + diagsByLine.size * 8 + totalDiags * 16);
+    const writer = new BinaryWriter(4 + diagsByLine.size * 8 + totalDiags * 12);
     writer.writeInt32(diagsByLine.size);
     diagsByLine.forEach((items, line) => {
       writer.writeInt32(line);
@@ -374,7 +374,6 @@ export class ProtocolEncoder {
         writer.writeInt32(d.column);
         writer.writeInt32(d.length);
         writer.writeInt32(d.severity);
-        writer.writeInt32(d.color);
       }
     });
     return writer.getBuffer();
@@ -444,14 +443,13 @@ export class ProtocolEncoder {
   }
 
   static packLineDiagnostics(line: number, items: DiagnosticItem[]): ArrayBuffer {
-    const writer = new BinaryWriter(8 + items.length * 16);
+    const writer = new BinaryWriter(8 + items.length * 12);
     writer.writeInt32(line);
     writer.writeInt32(items.length);
     for (const d of items) {
       writer.writeInt32(d.column);
       writer.writeInt32(d.length);
       writer.writeInt32(d.severity);
-      writer.writeInt32(d.color);
     }
     return writer.getBuffer();
   }
@@ -988,8 +986,7 @@ export class ProtocolDecoder {
       origin: reader.readPoint(),
       width: reader.readFloat32(),
       height: reader.readFloat32(),
-      severity: reader.readInt32(),
-      color: reader.readInt32()
+      severity: reader.readInt32()
     };
   }
 

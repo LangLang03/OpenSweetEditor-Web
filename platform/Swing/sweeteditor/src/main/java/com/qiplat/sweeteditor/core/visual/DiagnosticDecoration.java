@@ -7,5 +7,4 @@ public class DiagnosticDecoration {
     @SerializedName("width") public float width;
     @SerializedName("height") public float height;
     @SerializedName("severity") public int severity;
-    @SerializedName("color") public int color;
 }

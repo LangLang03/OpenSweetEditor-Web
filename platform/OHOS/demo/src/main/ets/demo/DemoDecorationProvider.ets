@@ -269,7 +269,6 @@ export class DemoDecorationProvider implements DecorationProvider {
           range.line,
           range.startColumn + fixmeIndex,
           5,
-          0,
           0
         );
       }
@@ -282,8 +281,7 @@ export class DemoDecorationProvider implements DecorationProvider {
           range.line,
           range.startColumn + todoIndex,
           4,
-          1,
-          0
+          1
         );
       }
       return firstKeywordRange;
@@ -301,8 +299,7 @@ export class DemoDecorationProvider implements DecorationProvider {
         range.line,
         range.startColumn,
         range.length(),
-        3,
-        0
+        3
       );
     }
     return firstKeywordRange;
@@ -502,12 +499,11 @@ export class DemoDecorationProvider implements DecorationProvider {
     line: number,
     column: number,
     length: number,
-    severity: number,
-    color: number): void {
+    severity: number): void {
     if (diagnosticCount[0] >= MAX_DYNAMIC_DIAGNOSTICS || line < 0 || column < 0 || length <= 0) {
       return;
     }
-    const key = `${line}:${column}:${length}:${severity}:${color}`;
+    const key = `${line}:${column}:${length}:${severity}`;
     if (seenDiagnostics.has(key)) {
       return;
     }
@@ -520,8 +516,7 @@ export class DemoDecorationProvider implements DecorationProvider {
     lineItems.push({
       column,
       length,
-      severity,
-      color
+      severity
     });
     diagnosticCount[0]++;
   }
@@ -540,8 +535,7 @@ export class DemoDecorationProvider implements DecorationProvider {
       firstKeywordRange.line,
       firstKeywordRange.startColumn,
       firstKeywordRange.length(),
-      3,
-      0
+      3
     );
   }
 

@@ -49,7 +49,6 @@ export interface DiagnosticItem {
   column: number;
   length: number;
   severity: number;
-  color: number;
 }
 
 export interface FoldRegion {
@@ -79,4 +78,3 @@ export interface SeparatorGuide {
   count: number;
   textEndColumn: number;
 }
-

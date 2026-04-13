@@ -640,7 +640,7 @@ namespace NS_SWEETEDITOR {
             spans.push_back(s);
           } else if (span.column + span.length > p.old_end_col) {
             uint32_t tail = (span.column + span.length) - static_cast<uint32_t>(p.old_end_col);
-            spans.push_back({static_cast<uint32_t>(p.new_end_col), tail, span.severity, span.color});
+            spans.push_back({static_cast<uint32_t>(p.new_end_col), tail, span.severity});
           }
         }
       }

@@ -692,16 +692,14 @@ namespace SweetEditor {
 		}
 
 		private void DrawDiagnosticDecorations(Graphics g, EditorRenderModel model) {
-			if (model.DiagnosticDecorations == null || model.DiagnosticDecorations.Count == 0) return;
-			foreach (var diag in model.DiagnosticDecorations) {
-				var color = diag.Color != 0
-					? System.Drawing.Color.FromArgb(diag.Color)
-					: diag.Severity switch {
-						0 => System.Drawing.Color.FromArgb(255, 255, 0, 0),
-						1 => System.Drawing.Color.FromArgb(255, 255, 204, 0),
-						2 => System.Drawing.Color.FromArgb(255, 97, 181, 237),
-						_ => System.Drawing.Color.FromArgb(178, 153, 153, 153),
-					};
+		if (model.DiagnosticDecorations == null || model.DiagnosticDecorations.Count == 0) return;
+		foreach (var diag in model.DiagnosticDecorations) {
+			var color = diag.Severity switch {
+				0 => System.Drawing.Color.FromArgb(255, 255, 0, 0),
+				1 => System.Drawing.Color.FromArgb(255, 255, 204, 0),
+				2 => System.Drawing.Color.FromArgb(255, 97, 181, 237),
+				_ => System.Drawing.Color.FromArgb(178, 153, 153, 153),
+			};
 
 				float startX = diag.Origin.X;
 				float endX = startX + diag.Width;

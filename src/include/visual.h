@@ -187,7 +187,6 @@ namespace NS_SWEETEDITOR {
   struct DiagnosticDecoration {
     Rect rect;
     int32_t severity {0};
-    int32_t color {0};
   };
 
   /// Gutter icon render item (fully resolved geometry for one icon)

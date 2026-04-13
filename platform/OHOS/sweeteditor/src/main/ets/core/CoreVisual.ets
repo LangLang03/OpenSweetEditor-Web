@@ -129,7 +129,6 @@ export interface DiagnosticDecoration {
   width: number;
   height: number;
   severity: number;
-  color: number;
 }
 
 export interface LinkedEditingRect {

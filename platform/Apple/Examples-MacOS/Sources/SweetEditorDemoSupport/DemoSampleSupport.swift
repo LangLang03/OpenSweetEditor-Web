@@ -192,39 +192,39 @@ public enum DemoSampleSupport {
 
         if let line = findLine(containing: "float x = 0;", in: lines),
            let column = findColumn(of: "0", in: lines[line]) {
-            diagnosticsByLine[line, default: []].append(.init(column: Int32(column), length: 1, severity: 1, color: 0))
+            diagnosticsByLine[line, default: []].append(.init(column: Int32(column), length: 1, severity: 1))
         }
 
         if let line = findLine(containing: "float distance(const Point& other) const {", in: lines),
            let column = findColumn(of: "distance", in: lines[line]) {
-            diagnosticsByLine[line, default: []].append(.init(column: Int32(column), length: Int32("distance".count), severity: 3, color: 0))
+            diagnosticsByLine[line, default: []].append(.init(column: Int32(column), length: Int32("distance".count), severity: 3))
         }
 
         if let line = findLine(containing: "void insertText(size_t line, size_t column, const std::string& text) {", in: lines),
            let column = findColumn(of: "insertText", in: lines[line]) {
-            diagnosticsByLine[line, default: []].append(.init(column: Int32(column), length: Int32("insertText".count), severity: 0, color: 0))
+            diagnosticsByLine[line, default: []].append(.init(column: Int32(column), length: Int32("insertText".count), severity: 0))
         }
 
         if let line = findLine(containing: "target.insert(column, text);", in: lines),
            let column = findColumn(of: "insert", in: lines[line]) {
-            diagnosticsByLine[line, default: []].append(.init(column: Int32(column), length: Int32("insert".count), severity: 0, color: 0))
+            diagnosticsByLine[line, default: []].append(.init(column: Int32(column), length: Int32("insert".count), severity: 0))
         }
 
         if let line = findLine(containing: "TextBuffer buffer(\"Hello, World!\\nThis is a test.\\nLine three here.\");", in: lines),
            let column = findColumn(of: "\"Hello, World!\\nThis is a test.\\nLine three here.\"", in: lines[line]) {
-            diagnosticsByLine[line, default: []].append(.init(column: Int32(column), length: Int32("\"Hello, World!\\nThis is a test.\\nLine three here.\"".count), severity: 2, color: 0))
+            diagnosticsByLine[line, default: []].append(.init(column: Int32(column), length: Int32("\"Hello, World!\\nThis is a test.\\nLine three here.\"".count), severity: 2))
         }
 
         if let line = findLine(containing: "Point a{", in: lines),
            let column = findColumn(of: "a{", in: lines[line]) {
-            diagnosticsByLine[line, default: []].append(.init(column: Int32(column), length: 1, severity: 1, color: Int32(bitPattern: 0xFFFF8C00)))
+            diagnosticsByLine[line, default: []].append(.init(column: Int32(column), length: 1, severity: 1))
         }
 
         if let line = findLine(containing: "Rect rect{{0, 0}, 10, 10};", in: lines),
            let rectColumn = findColumn(of: "rect", in: lines[line]),
            let initColumn = findColumn(of: "{0, 0}", in: lines[line]) {
-            diagnosticsByLine[line, default: []].append(.init(column: Int32(rectColumn), length: Int32("rect".count), severity: 3, color: 0))
-            diagnosticsByLine[line, default: []].append(.init(column: Int32(initColumn), length: Int32("{0, 0}".count), severity: 1, color: 0))
+            diagnosticsByLine[line, default: []].append(.init(column: Int32(rectColumn), length: Int32("rect".count), severity: 3))
+            diagnosticsByLine[line, default: []].append(.init(column: Int32(initColumn), length: Int32("{0, 0}".count), severity: 1))
         }
 
         return diagnosticsByLine.keys.sorted().map {

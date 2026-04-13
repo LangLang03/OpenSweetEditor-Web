@@ -139,8 +139,6 @@ namespace NS_SWEETEDITOR {
     uint32_t length {0};
     /// Severity level
     DiagnosticSeverity severity {DiagnosticSeverity::DIAG_ERROR};
-    /// Custom color (ARGB), 0 means use severity default color
-    int32_t color {0};
   };
 
 #pragma endregion

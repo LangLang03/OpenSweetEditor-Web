@@ -381,8 +381,7 @@ class IOSEditorView: UIView, UIKeyInput, UITextInput, UITextInputTraits, UIPoint
                     SweetEditorCore.DiagnosticItem(
                         column: $0.column,
                         length: $0.length,
-                        severity: $0.severity,
-                        color: $0.color
+                        severity: $0.severity
                     )
                 }
                 diagnosticsByLine[lineDiagnostics.line, default: []].append(contentsOf: mapped)
