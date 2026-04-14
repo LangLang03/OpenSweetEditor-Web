@@ -11,6 +11,7 @@ import com.qiplat.sweeteditor.core.adornment.SeparatorGuide;
 import com.qiplat.sweeteditor.core.adornment.InlayHint;
 import com.qiplat.sweeteditor.core.adornment.SpanLayer;
 import com.qiplat.sweeteditor.core.adornment.CodeLensItem;
+import com.qiplat.sweeteditor.core.adornment.LinkSpan;
 import com.qiplat.sweeteditor.core.adornment.PhantomText;
 import com.qiplat.sweeteditor.core.adornment.StyleSpan;
 import com.qiplat.sweeteditor.core.foundation.TextChange;
@@ -206,6 +207,7 @@ public final class DecorationProviderManager {
         Map<Integer, List<GutterIcon>> gutterIcons = new HashMap<>();
         Map<Integer, List<PhantomText>> phantomTexts = new HashMap<>();
         Map<Integer, List<CodeLensItem>> codeLensItems = new HashMap<>();
+        Map<Integer, List<LinkSpan>> links = new HashMap<>();
         DecorationResult.ApplyMode syntaxMode = DecorationResult.ApplyMode.MERGE;
         DecorationResult.ApplyMode semanticMode = DecorationResult.ApplyMode.MERGE;
         DecorationResult.ApplyMode inlayMode = DecorationResult.ApplyMode.MERGE;
@@ -218,6 +220,7 @@ public final class DecorationProviderManager {
         DecorationResult.ApplyMode gutterMode = DecorationResult.ApplyMode.MERGE;
         DecorationResult.ApplyMode phantomMode = DecorationResult.ApplyMode.MERGE;
         DecorationResult.ApplyMode codeLensMode = DecorationResult.ApplyMode.MERGE;
+        DecorationResult.ApplyMode linksMode = DecorationResult.ApplyMode.MERGE;
 
         for (DecorationProvider provider : providers) {
             ProviderState state = providerStates.get(provider);
@@ -251,6 +254,10 @@ public final class DecorationProviderManager {
             codeLensMode = mergeMode(codeLensMode, r.getCodeLensItemsMode());
             if (r.getCodeLensItems() != null) {
                 appendMapOfList(codeLensItems, r.getCodeLensItems());
+            }
+            linksMode = mergeMode(linksMode, r.getLinksMode());
+            if (r.getLinks() != null) {
+                appendMapOfList(links, r.getLinks());
             }
 
             indentMode = mergeMode(indentMode, r.getIndentGuidesMode());
@@ -305,6 +312,9 @@ public final class DecorationProviderManager {
 
         applyCodeLensMode(codeLensMode);
         editor.setBatchLineCodeLens(codeLensItems);
+
+        applyLinksMode(linksMode);
+        editor.setBatchLineLinks(links);
 
         editor.flush();
     }
@@ -363,6 +373,14 @@ public final class DecorationProviderManager {
             editor.clearCodeLens();
         } else if (mode == DecorationResult.ApplyMode.REPLACE_RANGE) {
             clearCodeLensRange(lastVisibleStartLine, lastVisibleEndLine);
+        }
+    }
+
+    private void applyLinksMode(DecorationResult.ApplyMode mode) {
+        if (mode == DecorationResult.ApplyMode.REPLACE_ALL) {
+            editor.clearLinks();
+        } else if (mode == DecorationResult.ApplyMode.REPLACE_RANGE) {
+            clearLinksRange(lastVisibleStartLine, lastVisibleEndLine);
         }
     }
 
@@ -432,6 +450,12 @@ public final class DecorationProviderManager {
         Map<Integer, List<CodeLensItem>> empty = buildEmptyRangeMap(startLine, endLine);
         if (empty.isEmpty()) return;
         editor.setBatchLineCodeLens(empty);
+    }
+
+    private void clearLinksRange(int startLine, int endLine) {
+        Map<Integer, List<LinkSpan>> empty = buildEmptyRangeMap(startLine, endLine);
+        if (empty.isEmpty()) return;
+        editor.setBatchLineLinks(empty);
     }
 
     private static <T> Map<Integer, List<T>> buildEmptyRangeMap(int startLine, int endLine) {
@@ -589,6 +613,13 @@ public final class DecorationProviderManager {
         } else if (patch.getCodeLensItemsMode() != DecorationResult.ApplyMode.MERGE) {
             target.setCodeLensItems(null);
             target.setCodeLensItemsMode(patch.getCodeLensItemsMode());
+        }
+        if (patch.getLinks() != null) {
+            target.setLinks(patch.getLinks());
+            target.setLinksMode(patch.getLinksMode());
+        } else if (patch.getLinksMode() != DecorationResult.ApplyMode.MERGE) {
+            target.setLinks(null);
+            target.setLinksMode(patch.getLinksMode());
         }
     }
 

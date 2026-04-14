@@ -461,6 +461,18 @@ public class SweetEditor extends JPanel {
         editorCore.setBatchLineCodeLens(itemsByLine);
     }
 
+    public void setLineLinks(int line, List<? extends LinkSpan> links) {
+        editorCore.setLineLinks(line, links);
+    }
+
+    public void setBatchLineLinks(Map<Integer, ? extends List<? extends LinkSpan>> linksByLine) {
+        editorCore.setBatchLineLinks(linksByLine);
+    }
+
+    public String getLinkTargetAt(int line, int column) {
+        return editorCore.getLinkTargetAt(line, column);
+    }
+
     public void setLineDiagnostics(int line, List<? extends Diagnostic> items) {
         editorCore.setLineDiagnostics(line, items);
     }
@@ -582,6 +594,10 @@ public class SweetEditor extends JPanel {
 
     public void clearCodeLens() {
         editorCore.clearCodeLens();
+    }
+
+    public void clearLinks() {
+        editorCore.clearLinks();
     }
 
     public void clearGuides() {
@@ -1154,6 +1170,13 @@ public class SweetEditor extends JPanel {
                                     result.hitTarget.line,
                                     result.hitTarget.column,
                                     result.hitTarget.iconId,
+                                    screenPoint));
+                            break;
+                        case LINK:
+                            eventBus.publish(new LinkClickEvent(
+                                    result.hitTarget.line,
+                                    result.hitTarget.column,
+                                    getLinkTargetAt(result.hitTarget.line, result.hitTarget.column),
                                     screenPoint));
                             break;
                         default:

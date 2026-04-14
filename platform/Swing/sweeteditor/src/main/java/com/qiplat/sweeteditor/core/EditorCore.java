@@ -838,6 +838,47 @@ public class EditorCore {
         EditorNative.clearCodeLens(nativeHandle);
     }
 
+    // ===================== Links =====================
+
+    /** Set link spans for a specific line */
+    public void setLineLinks(int line, List<? extends LinkSpan> links) {
+        if (links == null) return;
+        try (Arena tempArena = Arena.ofConfined()) {
+            byte[] payload = ProtocolEncoder.packLineLinks(line, links);
+            EditorNative.setLineLinks(nativeHandle, payload, tempArena);
+        }
+    }
+
+    /** Set link spans for a specific line (zero-copy overload) */
+    public void setLineLinks(MemorySegment payload, long size) {
+        EditorNative.setLineLinks(nativeHandle, payload, size);
+    }
+
+    /** Batch set link spans for multiple lines */
+    public void setBatchLineLinks(Map<Integer, ? extends List<? extends LinkSpan>> linksByLine) {
+        if (linksByLine == null || linksByLine.isEmpty()) return;
+        byte[] payload = ProtocolEncoder.packBatchLineLinks(linksByLine);
+        if (payload == null) return;
+        try (Arena tempArena = Arena.ofConfined()) {
+            EditorNative.setBatchLineLinks(nativeHandle, payload, tempArena);
+        }
+    }
+
+    /** Batch set link spans for multiple lines (zero-copy overload) */
+    public void setBatchLineLinks(MemorySegment payload, long size) {
+        EditorNative.setBatchLineLinks(nativeHandle, payload, size);
+    }
+
+    /** Clears all link spans */
+    public void clearLinks() {
+        EditorNative.clearLinks(nativeHandle);
+    }
+
+    /** Returns the link target at the given position, or null if no link exists there */
+    public String getLinkTargetAt(int line, int column) {
+        return EditorNative.getLinkTargetAt(nativeHandle, line, column);
+    }
+
     // ===================== Diagnostics =====================
 
     /** Set diagnostic decorations for a specific line (model overload) */

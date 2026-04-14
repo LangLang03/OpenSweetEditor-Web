@@ -26,6 +26,7 @@ import java.util.List;
 final class EditorRenderer implements EditorCore.TextMeasureCallback {
 
     private static final FontRenderContext FALLBACK_FRC = new FontRenderContext(null, true, true);
+    private static final Color TEMP_LINK_COLOR = argbToColor(0xFF4C9DFF);
 
     private EditorTheme theme;
 
@@ -308,6 +309,8 @@ final class EditorRenderer implements EditorCore.TextMeasureCallback {
         Color color;
         if (run.type == VisualRunType.CODELENS) {
             color = run.active ? theme.currentLineNumberColor : theme.inlayHintTextColor;
+        } else if (run.type == VisualRunType.LINK) {
+            color = TEMP_LINK_COLOR;
         } else {
             color = (run.style != null && run.style.color != 0)
                     ? argbToColor(run.style.color)
@@ -363,7 +366,7 @@ final class EditorRenderer implements EditorCore.TextMeasureCallback {
                 g.setColor(drawColor);
                 g.setFont(font);
                 g.drawString(text, run.x, run.y);
-                if (run.type == VisualRunType.CODELENS && run.active) {
+                if ((run.type == VisualRunType.CODELENS || run.type == VisualRunType.LINK) && run.active) {
                     float underlineY = run.y + 1.0f;
                     g.drawLine((int) run.x, (int) underlineY, (int) (run.x + run.width), (int) underlineY);
                 }
