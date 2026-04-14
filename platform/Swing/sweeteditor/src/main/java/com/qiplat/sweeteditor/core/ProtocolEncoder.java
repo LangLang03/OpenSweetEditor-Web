@@ -100,7 +100,7 @@ final class ProtocolEncoder {
 
     static byte[] packLineDiagnostics(int line, List<? extends Diagnostic> items) {
         int count = items.size();
-        ByteBuffer payload = ByteBuffer.allocate(8 + count * 16).order(ByteOrder.LITTLE_ENDIAN);
+        ByteBuffer payload = ByteBuffer.allocate(8 + count * 12).order(ByteOrder.LITTLE_ENDIAN);
         payload.putInt(line);
         payload.putInt(count);
         for (int i = 0; i < count; i++) {
@@ -108,7 +108,6 @@ final class ProtocolEncoder {
             payload.putInt(item.column);
             payload.putInt(item.length);
             payload.putInt(item.severity);
-            payload.putInt(item.color);
         }
         return payload.array();
     }
@@ -120,7 +119,7 @@ final class ProtocolEncoder {
         for (var entry : diagsByLine.entrySet()) {
             if (entry.getValue() != null) totalDiagCount += entry.getValue().size();
         }
-        ByteBuffer payload = ByteBuffer.allocate(4 + entryCount * 8 + totalDiagCount * 16)
+        ByteBuffer payload = ByteBuffer.allocate(4 + entryCount * 8 + totalDiagCount * 12)
                 .order(ByteOrder.LITTLE_ENDIAN);
         payload.putInt(entryCount);
         var sortedEntries = diagsByLine.entrySet().stream()
@@ -136,7 +135,6 @@ final class ProtocolEncoder {
                 payload.putInt(item.column);
                 payload.putInt(item.length);
                 payload.putInt(item.severity);
-                payload.putInt(item.color);
             }
         }
         return payload.array();
@@ -393,7 +391,7 @@ final class ProtocolEncoder {
         byte[][] textBytes = new byte[count][];
         for (int i = 0; i < count; i++) {
             CodeLensItem item = items.get(i);
-            totalSize += 8; // command_id(4) + text_len(4)
+            totalSize += 12; // column(4) + command_id(4) + text_len(4)
             if (item.text != null) {
                 byte[] bytes = item.text.getBytes(StandardCharsets.UTF_8);
                 textBytes[i] = bytes;
@@ -405,6 +403,7 @@ final class ProtocolEncoder {
         payload.putInt(count);
         for (int i = 0; i < count; i++) {
             CodeLensItem item = items.get(i);
+            payload.putInt(item.column);
             payload.putInt(item.commandId);
             byte[] tb = textBytes[i];
             if (tb != null) {
@@ -435,7 +434,7 @@ final class ProtocolEncoder {
             if (items == null) continue;
             for (int j = 0; j < items.size(); j++) {
                 CodeLensItem item = items.get(j);
-                totalSize += 8; // command_id(4) + text_len(4)
+                totalSize += 12; // column(4) + command_id(4) + text_len(4)
                 if (item.text != null) {
                     byte[] bytes = item.text.getBytes(StandardCharsets.UTF_8);
                     textBytesCache[itemIdx] = bytes;
@@ -457,6 +456,7 @@ final class ProtocolEncoder {
             payload.putInt(itemCount);
             for (int j = 0; j < itemCount; j++) {
                 CodeLensItem item = items.get(j);
+                payload.putInt(item.column);
                 payload.putInt(item.commandId);
                 byte[] tb = textBytesCache[itemIdx];
                 if (tb != null) {

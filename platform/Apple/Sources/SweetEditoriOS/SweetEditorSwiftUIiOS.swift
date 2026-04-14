@@ -31,6 +31,11 @@ public final class SweetEditorViewiOS: UIView {
         set { editorView.onCodeLensClick = newValue }
     }
 
+    public var onLinkClick: ((SweetEditorLinkClickEvent) -> Void)? {
+        get { editorView.onLinkClick }
+        set { editorView.onLinkClick = newValue }
+    }
+
     public var editorIconProvider: EditorIconProvider? {
         get { editorView.editorIconProvider }
         set { editorView.editorIconProvider = newValue }
@@ -112,6 +117,18 @@ public final class SweetEditorViewiOS: UIView {
 
     public func setBatchLineCodeLens(_ itemsByLine: [Int: [SweetEditorCore.CodeLensPayload]]) {
         editorView.setBatchLineCodeLens(itemsByLine)
+    }
+
+    public func setLineLinks(line: Int, links: [SweetEditorCore.LinkSpan]) {
+        editorView.setLineLinks(line: line, links: links)
+    }
+
+    public func setBatchLineLinks(_ linksByLine: [Int: [SweetEditorCore.LinkSpan]]) {
+        editorView.setBatchLineLinks(linksByLine)
+    }
+
+    public func getLinkTargetAt(line: Int, column: Int) -> String {
+        editorView.getLinkTargetAt(line: line, column: column)
     }
 
     /// Compatibility wrapper for callers not yet migrated to `settings`.
@@ -211,6 +228,10 @@ public final class SweetEditorViewiOS: UIView {
         editorView.clearCodeLens()
     }
 
+    public func clearLinks() {
+        editorView.clearLinks()
+    }
+
     public func clearGuides() {
         editorView.clearGuides()
     }
@@ -278,19 +299,22 @@ public struct SweetEditorSwiftUIViewiOS: UIViewRepresentable {
     public let onInlayHintClick: ((SweetEditorInlayHintClickEvent) -> Void)?
     public let onGutterIconClick: ((SweetEditorGutterIconClickEvent) -> Void)?
     public let onCodeLensClick: ((SweetEditorCodeLensClickEvent) -> Void)?
+    public let onLinkClick: ((SweetEditorLinkClickEvent) -> Void)?
 
     public init(
         isDarkTheme: Bool = false,
         onFoldToggle: ((SweetEditorFoldToggleEvent) -> Void)? = nil,
         onInlayHintClick: ((SweetEditorInlayHintClickEvent) -> Void)? = nil,
         onGutterIconClick: ((SweetEditorGutterIconClickEvent) -> Void)? = nil,
-        onCodeLensClick: ((SweetEditorCodeLensClickEvent) -> Void)? = nil
+        onCodeLensClick: ((SweetEditorCodeLensClickEvent) -> Void)? = nil,
+        onLinkClick: ((SweetEditorLinkClickEvent) -> Void)? = nil
     ) {
         self.isDarkTheme = isDarkTheme
         self.onFoldToggle = onFoldToggle
         self.onInlayHintClick = onInlayHintClick
         self.onGutterIconClick = onGutterIconClick
         self.onCodeLensClick = onCodeLensClick
+        self.onLinkClick = onLinkClick
     }
 
     public func makeUIView(context: Context) -> SweetEditorViewiOS {
@@ -299,6 +323,7 @@ public struct SweetEditorSwiftUIViewiOS: UIViewRepresentable {
         view.onInlayHintClick = onInlayHintClick
         view.onGutterIconClick = onGutterIconClick
         view.onCodeLensClick = onCodeLensClick
+        view.onLinkClick = onLinkClick
         return view
     }
 
@@ -308,6 +333,7 @@ public struct SweetEditorSwiftUIViewiOS: UIViewRepresentable {
         uiView.onInlayHintClick = onInlayHintClick
         uiView.onGutterIconClick = onGutterIconClick
         uiView.onCodeLensClick = onCodeLensClick
+        uiView.onLinkClick = onLinkClick
     }
 }
 #endif

@@ -6,9 +6,9 @@
 > This document describes the current repository code state (2026-03). If the document and source code are different, use the source code.
 >
 > Constraint levels:
-> - **MUST** 鈥?all platforms must comply; violation is a bug.
-> - **SHOULD** 鈥?recommended; deviation requires documented justification.
-> - **MAY** 鈥?optional; platform decides based on its own needs.
+> - **MUST** — all platforms must comply; violation is a bug.
+> - **SHOULD** — recommended; deviation requires documented justification.
+> - **MAY** — optional; platform decides based on its own needs.
 
 ---
 
@@ -162,9 +162,9 @@ The following lists all public methods that `EditorCore` and `SweetEditor` MUST 
 
 **General naming variant rules:**
 - Canonical names use Java/ArkTS camelCase as the baseline
-- PascalCase languages (e.g. C#, Go): all method names use PascalCase (e.g. `setDocument` 鈫?`SetDocument`); this rule applies to all methods and is not repeated per row
+- PascalCase languages (e.g. C#, Go): all method names use PascalCase (e.g. `setDocument` → `SetDocument`); this rule applies to all methods and is not repeated per row
 - Each language MAY adapt parameter naming and calling style per its own conventions (e.g. Swift argument labels, Go export rules, Dart named parameters)
-- The "Allowed Variants" column below only lists variants with **substantive differences** from the canonical name (e.g. getter as property, different method name semantics); `鈥擿 means no substantive difference
+- The "Allowed Variants" column below only lists variants with **substantive differences** from the canonical name (e.g. getter as property, different method name semantics); `—` means no substantive difference
 
 ### 3.0 API Carrier Rules (MUST)
 
@@ -231,256 +231,256 @@ controller.applyTheme(EditorTheme.dark());
 | Function | Canonical Name | Allowed Variants |
 |---|---|---|
 | **Configuration** | | |
-| Load document | `loadDocument(doc)` | 鈥?|
-| Set viewport | `setViewport(w, h)` | 鈥?|
-| Font metrics changed | `onFontMetricsChanged()` | 鈥?|
-| Fold arrow mode | `setFoldArrowMode(mode)` | 鈥?|
-| Wrap mode | `setWrapMode(mode)` | 鈥?|
-| Tab size | `setTabSize(size)` | 鈥?|
-| Insert spaces | `setInsertSpaces(enabled)` | 鈥?|
-| Scale | `setScale(scale)` | 鈥?|
-| Line spacing | `setLineSpacing(add, mult)` | 鈥?|
-| Content start padding | `setContentStartPadding(padding)` | 鈥?|
-| Show split line | `setShowSplitLine(show)` | 鈥?|
-| Current line render mode | `setCurrentLineRenderMode(mode)` | 鈥?|
-| Gutter sticky | `setGutterSticky(sticky)` | 鈥?|
-| Gutter visible | `setGutterVisible(visible)` | 鈥?|
-| Handle config | `setHandleConfig(...)` | 鈥?|
-| Scrollbar config | `setScrollbarConfig(...)` | 鈥?|
+| Load document | `loadDocument(doc)` | — |
+| Set viewport | `setViewport(w, h)` | — |
+| Font metrics changed | `onFontMetricsChanged()` | — |
+| Fold arrow mode | `setFoldArrowMode(mode)` | — |
+| Wrap mode | `setWrapMode(mode)` | — |
+| Tab size | `setTabSize(size)` | — |
+| Insert spaces | `setInsertSpaces(enabled)` | — |
+| Scale | `setScale(scale)` | — |
+| Line spacing | `setLineSpacing(add, mult)` | — |
+| Content start padding | `setContentStartPadding(padding)` | — |
+| Show split line | `setShowSplitLine(show)` | — |
+| Current line render mode | `setCurrentLineRenderMode(mode)` | — |
+| Gutter sticky | `setGutterSticky(sticky)` | — |
+| Gutter visible | `setGutterVisible(visible)` | — |
+| Handle config | `setHandleConfig(...)` | — |
+| Scrollbar config | `setScrollbarConfig(...)` | — |
 | **Render Model** | | |
-| Build render model | `buildRenderModel()` | 鈥?|
+| Build render model | `buildRenderModel()` | — |
 | Get layout metrics | `getLayoutMetrics()` | property: `layoutMetrics` / `LayoutMetrics { get; }` |
 | **Gesture / Keyboard** | | |
-| Handle gesture event | `handleGestureEvent(...)` | 鈥?|
-| Handle gesture event (extended) | `handleGestureEventEx(...)` | 鈥?|
-| Edge scroll tick | `tickEdgeScroll()` | 鈥?|
-| Fling tick | `tickFling()` | 鈥?|
-| Animation tick | `tickAnimations()` | 鈥?|
-| Handle key event | `handleKeyEvent(...)` | 鈥?|
-| Set key map | `setKeyMap(keyMap)` | 鈥?|
+| Handle gesture event | `handleGestureEvent(...)` | — |
+| Handle gesture event (extended) | `handleGestureEventEx(...)` | — |
+| Edge scroll tick | `tickEdgeScroll()` | — |
+| Fling tick | `tickFling()` | — |
+| Animation tick | `tickAnimations()` | — |
+| Handle key event | `handleKeyEvent(...)` | — |
+| Set key map | `setKeyMap(keyMap)` | — |
 | **Text Editing** | | |
-| Insert text | `insertText(text)` | 鈥?|
-| Replace text | `replaceText(range, text)` | 鈥?|
-| Delete text | `deleteText(range)` | 鈥?|
-| Backspace | `backspace()` | 鈥?|
-| Delete forward | `deleteForward()` | 鈥?|
-| Move line up | `moveLineUp()` | 鈥?|
-| Move line down | `moveLineDown()` | 鈥?|
-| Copy line up | `copyLineUp()` | 鈥?|
-| Copy line down | `copyLineDown()` | 鈥?|
-| Delete line | `deleteLine()` | 鈥?|
-| Insert line above | `insertLineAbove()` | 鈥?|
-| Insert line below | `insertLineBelow()` | 鈥?|
+| Insert text | `insertText(text)` | — |
+| Replace text | `replaceText(range, text)` | — |
+| Delete text | `deleteText(range)` | — |
+| Backspace | `backspace()` | — |
+| Delete forward | `deleteForward()` | — |
+| Move line up | `moveLineUp()` | — |
+| Move line down | `moveLineDown()` | — |
+| Copy line up | `copyLineUp()` | — |
+| Copy line down | `copyLineDown()` | — |
+| Delete line | `deleteLine()` | — |
+| Insert line above | `insertLineAbove()` | — |
+| Insert line below | `insertLineBelow()` | — |
 | **Undo / Redo** | | |
-| Undo | `undo()` | 鈥?|
-| Redo | `redo()` | 鈥?|
-| Can undo | `canUndo()` | 鈥?|
-| Can redo | `canRedo()` | 鈥?|
+| Undo | `undo()` | — |
+| Redo | `redo()` | — |
+| Can undo | `canUndo()` | — |
+| Can redo | `canRedo()` | — |
 | **Cursor / Selection** | | |
-| Set cursor position | `setCursorPosition(line, col)` | 鈥?|
+| Set cursor position | `setCursorPosition(line, col)` | — |
 | Get cursor position | `getCursorPosition()` | property: `cursorPosition` / `CursorPosition { get; }` |
-| Select all | `selectAll()` | 鈥?|
-| Set selection | `setSelection(sL, sC, eL, eC)` | 鈥?|
+| Select all | `selectAll()` | — |
+| Set selection | `setSelection(sL, sC, eL, eC)` | — |
 | Get selection | `getSelection()` | property: `selection` / `Selection { get; }` |
 | Get selected text | `getSelectedText()` | property: `selectedText` / `SelectedText { get; }` |
 | Word range at cursor | `getWordRangeAtCursor()` | property: `wordRangeAtCursor` / `WordRangeAtCursor { get; }` |
 | Word at cursor | `getWordAtCursor()` | property: `wordAtCursor` / `WordAtCursor { get; }` |
-| Move cursor left | `moveCursorLeft(extend)` | 鈥?|
-| Move cursor right | `moveCursorRight(extend)` | 鈥?|
-| Move cursor up | `moveCursorUp(extend)` | 鈥?|
-| Move cursor down | `moveCursorDown(extend)` | 鈥?|
-| Move cursor to line start | `moveCursorToLineStart(extend)` | 鈥?|
-| Move cursor to line end | `moveCursorToLineEnd(extend)` | 鈥?|
+| Move cursor left | `moveCursorLeft(extend)` | — |
+| Move cursor right | `moveCursorRight(extend)` | — |
+| Move cursor up | `moveCursorUp(extend)` | — |
+| Move cursor down | `moveCursorDown(extend)` | — |
+| Move cursor to line start | `moveCursorToLineStart(extend)` | — |
+| Move cursor to line end | `moveCursorToLineEnd(extend)` | — |
 | **IME** | | |
-| Composition start | `compositionStart()` | 鈥?|
-| Composition update | `compositionUpdate(text)` | 鈥?|
-| Composition end | `compositionEnd(committed)` | 鈥?|
-| Composition cancel | `compositionCancel()` | 鈥?|
+| Composition start | `compositionStart()` | — |
+| Composition update | `compositionUpdate(text)` | — |
+| Composition end | `compositionEnd(committed)` | — |
+| Composition cancel | `compositionCancel()` | — |
 | Is composing | `isComposing()` | property: `isComposing` / `IsComposing { get; }` |
-| Set composition enabled | `setCompositionEnabled(enabled)` | 鈥?|
+| Set composition enabled | `setCompositionEnabled(enabled)` | — |
 | Is composition enabled | `isCompositionEnabled()` | property: `isCompositionEnabled` / `IsCompositionEnabled { get; }` |
 | **Read-only / Indent** | | |
-| Set read-only | `setReadOnly(readOnly)` | 鈥?|
+| Set read-only | `setReadOnly(readOnly)` | — |
 | Is read-only | `isReadOnly()` | property: `isReadOnly` / `IsReadOnly { get; }` |
-| Set auto indent mode | `setAutoIndentMode(mode)` | 鈥?|
+| Set auto indent mode | `setAutoIndentMode(mode)` | — |
 | Get auto indent mode | `getAutoIndentMode()` | property: `autoIndentMode` / `AutoIndentMode { get; }` |
-| Set backspace unindent | `setBackspaceUnindent(enabled)` | 鈥?|
+| Set backspace unindent | `setBackspaceUnindent(enabled)` | — |
 | **Navigation / Scroll** | | |
-| Scroll to line | `scrollToLine(line, behavior)` | 鈥?|
-| Go to position | `gotoPosition(line, col)` | 鈥?|
-| Ensure cursor visible | `ensureCursorVisible()` | 鈥?|
-| Set scroll | `setScroll(x, y)` | 鈥?|
+| Scroll to line | `scrollToLine(line, behavior)` | — |
+| Go to position | `gotoPosition(line, col)` | — |
+| Ensure cursor visible | `ensureCursorVisible()` | — |
+| Set scroll | `setScroll(x, y)` | — |
 | Get scroll metrics | `getScrollMetrics()` | property: `scrollMetrics` / `ScrollMetrics { get; }` |
-| Get position rect | `getPositionRect(line, col)` | 鈥?|
+| Get position rect | `getPositionRect(line, col)` | — |
 | Get cursor rect | `getCursorRect()` | property: `cursorRect` / `CursorRect { get; }` |
 | **Style / Highlight** | | |
-| Register text style | `registerTextStyle(id, color, bg, fontStyle)` | 鈥?|
-| Batch register styles | `registerBatchTextStyles(data)` | 鈥?|
-| Set line spans | `setLineSpans(line, layer, spans)` | 鈥?|
-| Batch set line spans | `setBatchLineSpans(layer, entries)` | 鈥?|
-| Clear line spans | `clearLineSpans(line, layer)` | 鈥?|
-| Clear highlights by layer | `clearHighlights(layer)` | 鈥?|
-| Clear all highlights | `clearHighlights()` | 鈥?|
+| Register text style | `registerTextStyle(id, color, bg, fontStyle)` | — |
+| Batch register styles | `registerBatchTextStyles(data)` | — |
+| Set line spans | `setLineSpans(line, layer, spans)` | — |
+| Batch set line spans | `setBatchLineSpans(layer, entries)` | — |
+| Clear line spans | `clearLineSpans(line, layer)` | — |
+| Clear highlights by layer | `clearHighlights(layer)` | — |
+| Clear all highlights | `clearHighlights()` | — |
 | **Inlay Hint** | | |
-| Set line inlay hints | `setLineInlayHints(line, hints)` | 鈥?|
-| Batch set inlay hints | `setBatchLineInlayHints(entries)` | 鈥?|
-| Clear inlay hints | `clearInlayHints()` | 鈥?|
+| Set line inlay hints | `setLineInlayHints(line, hints)` | — |
+| Batch set inlay hints | `setBatchLineInlayHints(entries)` | — |
+| Clear inlay hints | `clearInlayHints()` | — |
 | **Phantom Text** | | |
-| Set line phantom texts | `setLinePhantomTexts(line, phantoms)` | 鈥?|
-| Batch set phantom texts | `setBatchLinePhantomTexts(entries)` | 鈥?|
-| Clear phantom texts | `clearPhantomTexts()` | 鈥?|
+| Set line phantom texts | `setLinePhantomTexts(line, phantoms)` | — |
+| Batch set phantom texts | `setBatchLinePhantomTexts(entries)` | — |
+| Clear phantom texts | `clearPhantomTexts()` | — |
 | **Gutter Icon** | | |
-| Set line gutter icons | `setLineGutterIcons(line, icons)` | 鈥?|
-| Batch set gutter icons | `setBatchLineGutterIcons(entries)` | 鈥?|
-| Set max gutter icons | `setMaxGutterIcons(count)` | 鈥?|
-| Clear gutter icons | `clearGutterIcons()` | 鈥?|
+| Set line gutter icons | `setLineGutterIcons(line, icons)` | — |
+| Batch set gutter icons | `setBatchLineGutterIcons(entries)` | — |
+| Set max gutter icons | `setMaxGutterIcons(count)` | — |
+| Clear gutter icons | `clearGutterIcons()` | — |
 | **CodeLens** | | |
 | Set line CodeLens | `setLineCodeLens(line, items)` | — |
 | Batch set CodeLens | `setBatchLineCodeLens(entries)` | — |
 | Clear CodeLens | `clearCodeLens()` | — |
 | **Diagnostic** | | |
-| Set line diagnostics | `setLineDiagnostics(line, items)` | 鈥?|
-| Batch set diagnostics | `setBatchLineDiagnostics(entries)` | 鈥?|
-| Clear diagnostics | `clearDiagnostics()` | 鈥?|
+| Set line diagnostics | `setLineDiagnostics(line, items)` | — |
+| Batch set diagnostics | `setBatchLineDiagnostics(entries)` | — |
+| Clear diagnostics | `clearDiagnostics()` | — |
 | **Guide** | | |
-| Set indent guides | `setIndentGuides(guides)` | 鈥?|
-| Set bracket guides | `setBracketGuides(guides)` | 鈥?|
-| Set flow guides | `setFlowGuides(guides)` | 鈥?|
-| Set separator guides | `setSeparatorGuides(guides)` | 鈥?|
-| Clear guides | `clearGuides()` | 鈥?|
+| Set indent guides | `setIndentGuides(guides)` | — |
+| Set bracket guides | `setBracketGuides(guides)` | — |
+| Set flow guides | `setFlowGuides(guides)` | — |
+| Set separator guides | `setSeparatorGuides(guides)` | — |
+| Clear guides | `clearGuides()` | — |
 | **Bracket** | | |
-| Set bracket pairs | `setBracketPairs(open, close)` | 鈥?|
-| Set auto-closing pairs | `setAutoClosingPairs(open, close)` | 鈥?|
-| Set matched brackets | `setMatchedBrackets(oL, oC, cL, cC)` | 鈥?|
-| Clear matched brackets | `clearMatchedBrackets()` | 鈥?|
+| Set bracket pairs | `setBracketPairs(open, close)` | — |
+| Set auto-closing pairs | `setAutoClosingPairs(open, close)` | — |
+| Set matched brackets | `setMatchedBrackets(oL, oC, cL, cC)` | — |
+| Clear matched brackets | `clearMatchedBrackets()` | — |
 | **Folding** | | |
-| Set fold regions | `setFoldRegions(regions)` | 鈥?|
+| Set fold regions | `setFoldRegions(regions)` | — |
 | Toggle fold | `toggleFoldAt(line)` | Swift: `toggleFold(at:)` |
 | Fold | `foldAt(line)` | Swift: `fold(at:)` |
 | Unfold | `unfoldAt(line)` | Swift: `unfold(at:)` |
-| Fold all | `foldAll()` | 鈥?|
-| Unfold all | `unfoldAll()` | 鈥?|
-| Is line visible | `isLineVisible(line)` | 鈥?|
+| Fold all | `foldAll()` | — |
+| Unfold all | `unfoldAll()` | — |
+| Is line visible | `isLineVisible(line)` | — |
 | **Clear** | | |
-| Clear all decorations | `clearAllDecorations()` | 鈥?|
+| Clear all decorations | `clearAllDecorations()` | — |
 | **Linked Editing** | | |
-| Insert snippet | `insertSnippet(template)` | 鈥?|
-| Start linked editing | `startLinkedEditing(model)` | 鈥?|
+| Insert snippet | `insertSnippet(template)` | — |
+| Start linked editing | `startLinkedEditing(model)` | — |
 | Is in linked editing | `isInLinkedEditing()` | property: `isInLinkedEditing` / `IsInLinkedEditing { get; }` |
-| Next tab stop | `linkedEditingNext()` | 鈥?|
-| Previous tab stop | `linkedEditingPrev()` | 鈥?|
-| Cancel linked editing | `cancelLinkedEditing()` | 鈥?|
+| Next tab stop | `linkedEditingNext()` | — |
+| Previous tab stop | `linkedEditingPrev()` | — |
+| Cancel linked editing | `cancelLinkedEditing()` | — |
 
-> Payload-level APIs (e.g. `setLineSpans`, `setBatchLineSpans`) 鈥?all platforms MUST provide high-level typed wrappers (e.g. `setLineSpans(line, layer, spans: List<StyleSpan>)`). Platforms SHOULD additionally expose raw/binary payload APIs when the host language has a natural public binary carrier (e.g. `ByteBuffer`, `NSData`, `byte[]`, `Uint8List`). If both typed and payload APIs are exposed, their parameter semantics and final Core behavior MUST be identical. Payload encoding format remains platform-defined.
+> Payload-level APIs (e.g. `setLineSpans`, `setBatchLineSpans`) — all platforms MUST provide high-level typed wrappers (e.g. `setLineSpans(line, layer, spans: List<StyleSpan>)`). Platforms SHOULD additionally expose raw/binary payload APIs when the host language has a natural public binary carrier (e.g. `ByteBuffer`, `NSData`, `byte[]`, `Uint8List`). If both typed and payload APIs are exposed, their parameter semantics and final Core behavior MUST be identical. Payload encoding format remains platform-defined.
 
 ### 3.2 `SweetEditor` Public API
 
 | Function | Canonical Name | Allowed Variants |
 |---|---|---|
 | **Document / Theme** | | |
-| Load document | `loadDocument(doc)` | 鈥?|
+| Load document | `loadDocument(doc)` | — |
 | Get document | `getDocument()` | property: `document` / `Document { get; }` |
-| Apply theme | `applyTheme(theme)` | 鈥?|
+| Apply theme | `applyTheme(theme)` | — |
 | Get theme | `getTheme()` | property: `theme` / `Theme { get; }` |
 | **Configuration** | | |
 | Get settings | `getSettings()` | property: `settings` / `Settings { get; }` |
 | Get key map *(SHOULD)* | `getKeyMap()` | property: `keyMap` / `KeyMap { get; }` |
-| Set key map | `setKeyMap(keyMap)` | 鈥?|
-| Icon provider | `setEditorIconProvider(provider)` | 鈥?|
+| Set key map | `setKeyMap(keyMap)` | — |
+| Icon provider | `setEditorIconProvider(provider)` | — |
 | **Text Editing** | | |
-| Insert text | `insertText(text)` | 鈥?|
-| Replace text | `replaceText(range, text)` | 鈥?|
-| Delete text | `deleteText(range)` | 鈥?|
-| Move line up | `moveLineUp()` | 鈥?|
-| Move line down | `moveLineDown()` | 鈥?|
-| Copy line up | `copyLineUp()` | 鈥?|
-| Copy line down | `copyLineDown()` | 鈥?|
-| Delete line | `deleteLine()` | 鈥?|
-| Insert line above | `insertLineAbove()` | 鈥?|
-| Insert line below | `insertLineBelow()` | 鈥?|
+| Insert text | `insertText(text)` | — |
+| Replace text | `replaceText(range, text)` | — |
+| Delete text | `deleteText(range)` | — |
+| Move line up | `moveLineUp()` | — |
+| Move line down | `moveLineDown()` | — |
+| Copy line up | `copyLineUp()` | — |
+| Copy line down | `copyLineDown()` | — |
+| Delete line | `deleteLine()` | — |
+| Insert line above | `insertLineAbove()` | — |
+| Insert line below | `insertLineBelow()` | — |
 | **Undo / Redo** | | |
-| Undo | `undo()` | 鈥?|
-| Redo | `redo()` | 鈥?|
-| Can undo | `canUndo()` | 鈥?|
-| Can redo | `canRedo()` | 鈥?|
+| Undo | `undo()` | — |
+| Redo | `redo()` | — |
+| Can undo | `canUndo()` | — |
+| Can redo | `canRedo()` | — |
 | **Clipboard (MAY)** | | |
-| Copy | `copyToClipboard()` | 鈥?|
-| Paste | `pasteFromClipboard()` | 鈥?|
-| Cut | `cutToClipboard()` | 鈥?|
+| Copy | `copyToClipboard()` | — |
+| Paste | `pasteFromClipboard()` | — |
+| Cut | `cutToClipboard()` | — |
 | **Cursor / Selection** | | |
-| Select all | `selectAll()` | 鈥?|
+| Select all | `selectAll()` | — |
 | Get selected text | `getSelectedText()` | property: `selectedText` / `SelectedText { get; }` |
-| Set selection | `setSelection(sL, sC, eL, eC)` | 鈥?|
+| Set selection | `setSelection(sL, sC, eL, eC)` | — |
 | Get selection | `getSelection()` | property: `selection` / `Selection { get; }` |
-| Set cursor | `setCursorPosition(pos)` | 鈥?|
+| Set cursor | `setCursorPosition(pos)` | — |
 | Get cursor | `getCursorPosition()` | property: `cursorPosition` / `CursorPosition { get; }` |
 | Word range at cursor | `getWordRangeAtCursor()` | property: `wordRangeAtCursor` / `WordRangeAtCursor { get; }` |
 | Word at cursor | `getWordAtCursor()` | property: `wordAtCursor` / `WordAtCursor { get; }` |
 | **Navigation / Scroll** | | |
-| Go to position | `gotoPosition(line, col)` | 鈥?|
-| Scroll to line | `scrollToLine(line, behavior)` | 鈥?|
-| Set scroll | `setScroll(x, y)` | 鈥?|
+| Go to position | `gotoPosition(line, col)` | — |
+| Scroll to line | `scrollToLine(line, behavior)` | — |
+| Set scroll | `setScroll(x, y)` | — |
 | Get scroll metrics | `getScrollMetrics()` | property: `scrollMetrics` / `ScrollMetrics { get; }` |
-| Get position rect | `getPositionRect(line, col)` | 鈥?|
+| Get position rect | `getPositionRect(line, col)` | — |
 | Get cursor rect | `getCursorRect()` | property: `cursorRect` / `CursorRect { get; }` |
 | **Folding** | | |
 | Toggle fold | `toggleFoldAt(line)` | Swift: `toggleFold(at:)` |
-| Fold line | `foldAt(line)` | 鈥?|
-| Unfold line | `unfoldAt(line)` | 鈥?|
-| Is line visible | `isLineVisible(line)` | 鈥?|
-| Fold all | `foldAll()` | 鈥?|
-| Unfold all | `unfoldAll()` | 鈥?|
+| Fold line | `foldAt(line)` | — |
+| Unfold line | `unfoldAt(line)` | — |
+| Is line visible | `isLineVisible(line)` | — |
+| Fold all | `foldAll()` | — |
+| Unfold all | `unfoldAll()` | — |
 | **Language / Metadata** | | |
-| Set language config | `setLanguageConfiguration(config)` | 鈥?|
+| Set language config | `setLanguageConfiguration(config)` | — |
 | Get language config | `getLanguageConfiguration()` | property: `languageConfiguration` / `LanguageConfiguration { get; }` |
-| Set metadata | `setMetadata(metadata)` | 鈥?|
+| Set metadata | `setMetadata(metadata)` | — |
 | Get metadata | `getMetadata()` | property: `metadata` / `Metadata { get; }` |
 | **Provider Management** | | |
 | Add decoration provider | `addDecorationProvider(provider)` | `attachDecorationProvider(provider)` |
 | Remove decoration provider | `removeDecorationProvider(provider)` | `detachDecorationProvider(provider)` |
-| Request decoration refresh | `requestDecorationRefresh()` | 鈥?|
+| Request decoration refresh | `requestDecorationRefresh()` | — |
 | Add completion provider | `addCompletionProvider(provider)` | `attachCompletionProvider(provider)` |
 | Remove completion provider | `removeCompletionProvider(provider)` | `detachCompletionProvider(provider)` |
 | Add newline provider | `addNewLineActionProvider(provider)` | `attachNewLineActionProvider(provider)` |
 | Remove newline provider | `removeNewLineActionProvider(provider)` | `detachNewLineActionProvider(provider)` |
 | **Completion** | | |
-| Trigger completion | `triggerCompletion()` | 鈥?|
-| Show completion items | `showCompletionItems(items)` | 鈥?|
-| Dismiss completion | `dismissCompletion()` | 鈥?|
+| Trigger completion | `triggerCompletion()` | — |
+| Show completion items | `showCompletionItems(items)` | — |
+| Dismiss completion | `dismissCompletion()` | — |
 | Configure completion item rendering | `setCompletionItemRenderer(renderer)` | `setCompletionItemViewFactory(factory)`, `setCompletionCellRenderer(renderer)`, or other platform-idiomatic rendering customization APIs |
 | **Style** | | |
-| Register text style | `registerTextStyle(id, ...)` | 鈥?|
-| Register batch text styles | `registerBatchTextStyles(stylesById)` | 鈥?|
+| Register text style | `registerTextStyle(id, ...)` | — |
+| Register batch text styles | `registerBatchTextStyles(stylesById)` | — |
 | **Decoration / Adornment Write** | | |
-| Set line spans | `setLineSpans(line, layer, spans)` | 鈥?|
-| Set batch line spans | `setBatchLineSpans(layer, spansByLine)` | 鈥?|
-| Set line inlay hints | `setLineInlayHints(line, hints)` | 鈥?|
-| Set batch line inlay hints | `setBatchLineInlayHints(hintsByLine)` | 鈥?|
-| Set line phantom texts | `setLinePhantomTexts(line, phantoms)` | 鈥?|
-| Set batch line phantom texts | `setBatchLinePhantomTexts(phantomsByLine)` | 鈥?|
-| Set line gutter icons | `setLineGutterIcons(line, icons)` | 鈥?|
-| Set batch line gutter icons | `setBatchLineGutterIcons(iconsByLine)` | 鈥?|
+| Set line spans | `setLineSpans(line, layer, spans)` | — |
+| Set batch line spans | `setBatchLineSpans(layer, spansByLine)` | — |
+| Set line inlay hints | `setLineInlayHints(line, hints)` | — |
+| Set batch line inlay hints | `setBatchLineInlayHints(hintsByLine)` | — |
+| Set line phantom texts | `setLinePhantomTexts(line, phantoms)` | — |
+| Set batch line phantom texts | `setBatchLinePhantomTexts(phantomsByLine)` | — |
+| Set line gutter icons | `setLineGutterIcons(line, icons)` | — |
+| Set batch line gutter icons | `setBatchLineGutterIcons(iconsByLine)` | — |
 | Set line CodeLens | `setLineCodeLens(line, items)` | — |
 | Set batch line CodeLens | `setBatchLineCodeLens(itemsByLine)` | — |
-| Set line diagnostics | `setLineDiagnostics(line, items)` | 鈥?|
-| Set batch line diagnostics | `setBatchLineDiagnostics(diagsByLine)` | 鈥?|
-| Set indent guides | `setIndentGuides(guides)` | 鈥?|
-| Set bracket guides | `setBracketGuides(guides)` | 鈥?|
-| Set flow guides | `setFlowGuides(guides)` | 鈥?|
-| Set separator guides | `setSeparatorGuides(guides)` | 鈥?|
-| Set fold regions | `setFoldRegions(regions)` | 鈥?|
+| Set line diagnostics | `setLineDiagnostics(line, items)` | — |
+| Set batch line diagnostics | `setBatchLineDiagnostics(diagsByLine)` | — |
+| Set indent guides | `setIndentGuides(guides)` | — |
+| Set bracket guides | `setBracketGuides(guides)` | — |
+| Set flow guides | `setFlowGuides(guides)` | — |
+| Set separator guides | `setSeparatorGuides(guides)` | — |
+| Set fold regions | `setFoldRegions(regions)` | — |
 | **Decoration / Adornment Clear** | | |
-| Clear highlights | `clearHighlights()` | 鈥?|
-| Clear highlights by layer | `clearHighlights(layer)` | 鈥?|
-| Clear inlay hints | `clearInlayHints()` | 鈥?|
-| Clear phantom texts | `clearPhantomTexts()` | 鈥?|
-| Clear gutter icons | `clearGutterIcons()` | 鈥?|
+| Clear highlights | `clearHighlights()` | — |
+| Clear highlights by layer | `clearHighlights(layer)` | — |
+| Clear inlay hints | `clearInlayHints()` | — |
+| Clear phantom texts | `clearPhantomTexts()` | — |
+| Clear gutter icons | `clearGutterIcons()` | — |
 | Clear CodeLens | `clearCodeLens()` | — |
-| Clear guides | `clearGuides()` | 鈥?|
-| Clear diagnostics | `clearDiagnostics()` | 鈥?|
-| Clear all decorations | `clearAllDecorations()` | 鈥?|
+| Clear guides | `clearGuides()` | — |
+| Clear diagnostics | `clearDiagnostics()` | — |
+| Clear all decorations | `clearAllDecorations()` | — |
 | **Flush** | | |
-| Flush | `flush()` | 鈥?|
+| Flush | `flush()` | — |
 | **Query** | | |
 | Visible line range | `getVisibleLineRange()` | property: `visibleLineRange` / `VisibleLineRange { get; }` |
 | Total line count | `getTotalLineCount()` | property: `totalLineCount` / `TotalLineCount { get; }` |
@@ -663,7 +663,7 @@ interface NewLineActionProvider {
 The Manager iterates all Providers in registration order and returns the first non-null `NewLineAction`. If all Providers return null, the default newline behavior is used.
 ## 5. `CompletionItem` Field Definitions (MUST)
 
-`CompletionItem` is the core data type of the completion system. Application priority on commit: `textEdit` 鈫?`insertText` 鈫?`label`.
+`CompletionItem` is the core data type of the completion system. Application priority on commit: `textEdit` → `insertText` → `label`.
 
 | Field | Type | MUST/MAY | Description |
 |---|---|---|---|
@@ -1105,11 +1105,11 @@ Event payloads MUST be defined per-event. Platforms MUST NOT assume or require a
 | `SelectionChangedEvent` | `hasSelection: boolean`, `selection: TextRange?`, `cursorPosition: TextPosition` | Current selection state and cursor position |
 | `ScrollChangedEvent` | `scrollX: float`, `scrollY: float` | Current view scroll offset |
 | `ScaleChangedEvent` | `scale: float` | Current editor scale |
-| `DocumentLoadedEvent` | 鈥?| No payload fields are required |
+| `DocumentLoadedEvent` | — | No payload fields are required |
 | `FoldToggleEvent` | `line: int`, `isGutter: boolean`, `screenPoint: PointF or platform-native point type` | Toggled fold line, whether the click came from gutter, and screen position |
 | `GutterIconClickEvent` | `line: int`, `iconId: int`, `screenPoint: PointF or platform-native point type` | Clicked gutter icon line, icon id, and screen position |
 | `InlayHintClickEvent` | `line: int`, `column: int`, `type: InlayType`, `intValue: int`, `screenPoint: PointF or platform-native point type` | Clicked inlay hint position, inlay type, type-specific value, and screen position |
-| `CodeLensClickEvent` | `line: int`, `commandId: int`, `screenPoint: PointF or platform-native point type` | Clicked CodeLens line, unique command id, and screen position |
+| `CodeLensClickEvent` | `line: int`, `column: int`, `commandId: int`, `screenPoint: PointF or platform-native point type` | Clicked CodeLens line/column anchor, unique command id, and screen position |
 | `LongPressEvent` | `cursorPosition: TextPosition`, `screenPoint: PointF or platform-native point type` | Long-press target position and screen position |
 | `DoubleTapEvent` | `cursorPosition: TextPosition`, `hasSelection: boolean`, `selection: TextRange?`, `screenPoint: PointF or platform-native point type` | Double-tap target position, resulting selection state, and screen position |
 | `ContextMenuEvent` | `cursorPosition: TextPosition`, `screenPoint: PointF or platform-native point type` | Context-menu target position and screen position |
@@ -1300,7 +1300,7 @@ The Core layer defines numerous decoration data types. All platforms MUST implem
 
 ### 17.2 Shared Data Types
 
-**`TextChange`** 鈥?Incremental text change
+**`TextChange`** — Incremental text change
 
 | Field | Type | MUST/MAY | Description |
 |---|---|---|---|
@@ -1309,7 +1309,7 @@ The Core layer defines numerous decoration data types. All platforms MUST implem
 
 ### 17.3 Adornment Data Types
 
-**`StyleSpan`** 鈥?Inline highlight range
+**`StyleSpan`** — Inline highlight range
 
 | Field | Type | MUST/MAY | Description |
 |---|---|---|---|
@@ -1317,7 +1317,7 @@ The Core layer defines numerous decoration data types. All platforms MUST implem
 | `length` | int | **MUST** | Character length |
 | `styleId` | int | **MUST** | Style ID registered via `registerTextStyle()` |
 
-**`TextStyle`** 鈥?Text style definition
+**`TextStyle`** — Text style definition
 
 | Field | Type | MUST/MAY | Description |
 |---|---|---|---|
@@ -1325,7 +1325,7 @@ The Core layer defines numerous decoration data types. All platforms MUST implem
 | `backgroundColor` | int | **MUST** | Background color (ARGB), 0 means transparent |
 | `fontStyle` | int | **MUST** | Font style bit flags: `BOLD=1`, `ITALIC=2`, `STRIKETHROUGH=4` |
 
-**`InlayHint`** 鈥?Inline embedded hint
+**`InlayHint`** — Inline embedded hint
 
 | Field | Type | MUST/MAY | Description |
 |---|---|---|---|
@@ -1336,7 +1336,7 @@ The Core layer defines numerous decoration data types. All platforms MUST implem
 
 > Platforms SHOULD provide convenience factory methods: `TextHint(column, text)`, `IconHint(column, iconId)`, `ColorHint(column, color)`.
 
-**`PhantomText`** 鈥?Ghost text
+**`PhantomText`** — Ghost text
 
 | Field | Type | MUST/MAY | Description |
 |---|---|---|---|
@@ -1345,18 +1345,21 @@ The Core layer defines numerous decoration data types. All platforms MUST implem
 
 **`CodeLensItem`** - Clickable label shown above a code line
 
+Multiple CodeLens items on the same code line **MUST** be ordered by `column` ascending while still rendering above that code line.
+
 | Field | Type | MUST/MAY | Description |
 |---|---|---|---|
+| `column` | int | **MUST** | Column anchor within the logical line, used for ordering and click hit reporting |
 | `text` | String | **MUST** | Display label text |
 | `commandId` | int | **MUST** | Unique command identifier passed back in `CodeLensClickEvent` |
 
-**`GutterIcon`** 鈥?Gutter area icon
+**`GutterIcon`** — Gutter area icon
 
 | Field | Type | MUST/MAY | Description |
 |---|---|---|---|
 | `iconId` | int | **MUST** | Icon resource ID (resolved and rendered by the platform's `EditorIconProvider`) |
 
-**`Diagnostic`** 鈥?Diagnostic information
+**`Diagnostic`** — Diagnostic information
 
 | Field | Type | MUST/MAY | Description |
 |---|---|---|---|
@@ -1367,21 +1370,21 @@ The Core layer defines numerous decoration data types. All platforms MUST implem
 
 > `Diagnostic` in this standard is a minimal diagnostic decoration model. It is intended for diagnostic rendering and lightweight interactions, not as a full IDE diagnostic object.
 
-**`FoldRegion`** 鈥?Foldable region
+**`FoldRegion`** — Foldable region
 
 | Field | Type | MUST/MAY | Description |
 |---|---|---|---|
 | `startLine` | int | **MUST** | Fold region start line (0-based, this line remains visible) |
 | `endLine` | int | **MUST** | Fold region end line (0-based, inclusive) |
 
-**`IndentGuide`** 鈥?Indentation guide line
+**`IndentGuide`** — Indentation guide line
 
 | Field | Type | MUST/MAY | Description |
 |---|---|---|---|
 | `start` | TextPosition | **MUST** | Start position |
 | `end` | TextPosition | **MUST** | End position |
 
-**`BracketGuide`** 鈥?Bracket pair guide line
+**`BracketGuide`** — Bracket pair guide line
 
 | Field | Type | MUST/MAY | Description |
 |---|---|---|---|
@@ -1389,14 +1392,14 @@ The Core layer defines numerous decoration data types. All platforms MUST implem
 | `end` | TextPosition | **MUST** | End bracket position |
 | `children` | List\<TextPosition\> | **MUST** | Child node position list |
 
-**`FlowGuide`** 鈥?Control flow guide line
+**`FlowGuide`** — Control flow guide line
 
 | Field | Type | MUST/MAY | Description |
 |---|---|---|---|
 | `start` | TextPosition | **MUST** | Start position |
 | `end` | TextPosition | **MUST** | End position |
 
-**`SeparatorGuide`** 鈥?Separator line
+**`SeparatorGuide`** — Separator line
 
 | Field | Type | MUST/MAY | Description |
 |---|---|---|---|
@@ -1573,7 +1576,7 @@ The following numbers are reference targets for release builds on representative
 | Rule | Constraint Level | Description |
 |---|---|---|
 | Unit tests | **SHOULD** | Each platform SHOULD provide unit tests for Core-layer data types (e.g., `EditorSettings` default value validation, `EditorTheme` factory method validation) |
-| Integration tests | **MAY** | MAY provide widget-level integration tests (e.g., create widget 鈫?load document 鈫?verify line count) |
+| Integration tests | **MAY** | MAY provide widget-level integration tests (e.g., create widget → load document → verify line count) |
 | Test framework | **SHOULD** | Use the platform's idiomatic test framework (Android: JUnit/Espresso, Apple: XCTest, C#: xUnit/NUnit, OHOS: Hypium) |
 
 ### 21.3 Cross-Platform Consistency Verification
@@ -1613,7 +1616,7 @@ Accessibility support is at the MAY level, but implementations SHOULD follow the
 |---|---|---|
 | High contrast | **MAY** | MAY provide a high-contrast theme or respond to system high-contrast settings |
 | Font scaling | **SHOULD** | SHOULD respond to system font scaling settings (via `setScale()` or `setEditorTextSize()`) |
-| Cursor visibility | **SHOULD** | The cursor SHOULD have sufficient visual contrast, and blink frequency SHOULD be between 0.5鈥?Hz |
+| Cursor visibility | **SHOULD** | The cursor SHOULD have sufficient visual contrast, and blink frequency SHOULD be between 0.5–2 Hz |
 
 ---
 
@@ -1627,9 +1630,9 @@ Platform package version numbers MUST maintain alignment with the C++ Core versi
 
 | Segment | Constraint | Rule | Example (Core `1.0.0`) |
 |---|---|---|---|
-| `a` (major) | **MUST** | Platform package major version MUST match the Core major version and MUST NOT exceed it | Package `1.x.x` 鉁? `2.0.0` 鉂?|
-| `b` (minor) | **SHOULD** | Platform package minor version SHOULD NOT exceed Core minor version `+9`; exceeding requires documented justification | Core `1.0.0` 鈫?package `1.9.x` is the recommended ceiling |
-| `c` (patch) | **MAY** | Platform package patch version may increment freely for platform-specific bugfixes | `1.0.15` 鉁?|
+| `a` (major) | **MUST** | Platform package major version MUST match the Core major version and MUST NOT exceed it | Package `1.x.x` ✅; `2.0.0` ❌ |
+| `b` (minor) | **SHOULD** | Platform package minor version SHOULD NOT exceed Core minor version `+9`; exceeding requires documented justification | Core `1.0.0` → package `1.9.x` is the recommended ceiling |
+| `c` (patch) | **MAY** | Platform package patch version may increment freely for platform-specific bugfixes | `1.0.15` ✅ |
 
 - When Core releases a new major version (e.g. `2.0.0`), all platform packages MUST upgrade their major version within the same release cycle.
 - Platform packages MAY independently release patch versions (`c` increment) while the Core version remains unchanged, for platform-specific fixes.

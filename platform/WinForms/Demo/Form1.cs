@@ -185,8 +185,8 @@ namespace Demo {
 
 		private static string DescribeCodeLensCommand(int commandId) {
 			return commandId switch {
-				CODELENS_RUN => "Run",
-				CODELENS_DEBUG => "Debug",
+				CODELENS_RUN => "▶ Run",
+				CODELENS_DEBUG => "◎ Debug",
 				_ => $"Command#{commandId}",
 			};
 		}
@@ -726,8 +726,8 @@ namespace Demo {
 				string literal = GetTokenLiteral(textLines, range);
 				if (literal == "class" || literal == "struct") {
 					codeLensItems[range.Line] = new List<CodeLensItem> {
-						new("Run", CodeLensRun),
-						new("Debug", CodeLensDebug)
+						new(range.StartColumn, "▶ Run", CodeLensRun),
+						new(range.StartColumn, "◎ Debug", CodeLensDebug)
 					};
 				}
 			}
@@ -768,12 +768,12 @@ namespace Demo {
 					int fixmeIndex = literal.IndexOf("FIXME", StringComparison.OrdinalIgnoreCase);
 					if (fixmeIndex >= 0) {
 						AppendDiagnostic(diagnostics, seenDiagnostics, ref diagnosticCount,
-							range.Line, range.StartColumn + fixmeIndex, 5, 0, 0);
+							range.Line, range.StartColumn + fixmeIndex, 5, 0);
 					}
 					int todoIndex = literal.IndexOf("TODO", StringComparison.OrdinalIgnoreCase);
 					if (todoIndex >= 0) {
 						AppendDiagnostic(diagnostics, seenDiagnostics, ref diagnosticCount,
-							range.Line, range.StartColumn + todoIndex, 4, 1, 0);
+							range.Line, range.StartColumn + todoIndex, 4, 1);
 					}
 					return firstKeywordRange;
 				}
@@ -782,14 +782,14 @@ namespace Demo {
 					int? color = ParseColorLiteral(literal);
 					if (color.HasValue) {
 						AppendDiagnostic(diagnostics, seenDiagnostics, ref diagnosticCount,
-							range.Line, range.StartColumn, range.Length, 2, color.Value);
+							range.Line, range.StartColumn, range.Length, 2);
 					}
 					return firstKeywordRange;
 				}
 
 				if (token.StyleId == (int) EditorTheme.STYLE_ANNOTATION) {
 					AppendDiagnostic(diagnostics, seenDiagnostics, ref diagnosticCount,
-						range.Line, range.StartColumn, range.Length, 3, 0);
+						range.Line, range.StartColumn, range.Length, 3);
 				}
 				return firstKeywordRange;
 			}
@@ -801,19 +801,18 @@ namespace Demo {
 				int line,
 				int column,
 				int length,
-				int severity,
-				int color) {
+				int severity) {
 				if (diagnosticCount >= MaxDynamicDiagnostics) {
 					return;
 				}
 				if (line < 0 || column < 0 || length <= 0) {
 					return;
 				}
-				string key = $"{line}:{column}:{length}:{severity}:{color}";
+				string key = $"{line}:{column}:{length}:{severity}";
 				if (!seenDiagnostics.Add(key)) {
 					return;
 				}
-				GetOrCreate(diagnostics, line).Add(new Diagnostic(column, length, severity, color));
+				GetOrCreate(diagnostics, line).Add(new Diagnostic(column, length, severity));
 				diagnosticCount++;
 			}
 
@@ -832,8 +831,7 @@ namespace Demo {
 					firstKeywordRange.Line,
 					firstKeywordRange.StartColumn,
 					firstKeywordRange.Length,
-					3,
-					0);
+					3);
 			}
 
 			private static int? ParseColorLiteral(string literal) {
@@ -967,4 +965,3 @@ namespace Demo {
 		}
 	}
 }
-

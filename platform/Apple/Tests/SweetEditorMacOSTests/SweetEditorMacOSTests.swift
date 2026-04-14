@@ -113,7 +113,7 @@ final class SweetEditorMacOSTests: XCTestCase {
 
         core.setLineDiagnostics(
             line: 0,
-            items: [SweetEditorCore.DiagnosticItem(column: 0, length: 2, severity: 0, color: 0)]
+            items: [SweetEditorCore.DiagnosticItem(column: 0, length: 2, severity: 0)]
         )
         let before = core.buildRenderModel()
         XCTAssertGreaterThan(before?.diagnostic_decorations.count ?? 0, 0)
@@ -303,8 +303,8 @@ final class SweetEditorMacOSTests: XCTestCase {
         view.setBatchLineGutterIcons([0: [SweetEditorCore.GutterIcon(iconId: 2)]])
         view.setMaxGutterIcons(2)
 
-        view.setLineDiagnostics(line: 0, items: [SweetEditorCore.DiagnosticItem(column: 0, length: 1, severity: 0, color: 0)])
-        view.setBatchLineDiagnostics([0: [SweetEditorCore.DiagnosticItem(column: 1, length: 1, severity: 1, color: 0)]])
+        view.setLineDiagnostics(line: 0, items: [SweetEditorCore.DiagnosticItem(column: 0, length: 1, severity: 0)])
+        view.setBatchLineDiagnostics([0: [SweetEditorCore.DiagnosticItem(column: 1, length: 1, severity: 1)]])
 
         view.setIndentGuides([
             SweetEditorCore.IndentGuidePayload(startLine: 0, startColumn: 0, endLine: 1, endColumn: 0),

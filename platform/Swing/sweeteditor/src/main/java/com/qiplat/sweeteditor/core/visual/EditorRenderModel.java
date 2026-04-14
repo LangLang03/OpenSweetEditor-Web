@@ -29,4 +29,5 @@ public class EditorRenderModel {
     @SerializedName("horizontal_scrollbar") public ScrollbarModel horizontalScrollbar;
     @SerializedName("gutter_sticky") public boolean gutterSticky = true;
     @SerializedName("gutter_visible") public boolean gutterVisible = true;
+    @SerializedName("pointer_cursor_type") public PointerCursorType pointerCursorType = PointerCursorType.TEXT;
 }

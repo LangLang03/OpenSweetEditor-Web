@@ -18,4 +18,5 @@ public class GestureResult {
     @SerializedName("needs_edge_scroll") public boolean needsEdgeScroll;
     @SerializedName("needs_fling") public boolean needsFling;
     @SerializedName("needs_animation") public boolean needsAnimation;
+    @SerializedName("pointer_cursor_type") public PointerCursorType pointerCursorType = PointerCursorType.TEXT;
 }

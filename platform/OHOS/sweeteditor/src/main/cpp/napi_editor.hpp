@@ -869,6 +869,14 @@ public:
     return setBinaryData(env, info, editor_set_batch_line_codelens);
   }
 
+  static napi_value setLineLinks(napi_env env, napi_callback_info info) {
+    return setBinaryData(env, info, editor_set_line_links);
+  }
+
+  static napi_value setBatchLineLinks(napi_env env, napi_callback_info info) {
+    return setBinaryData(env, info, editor_set_batch_line_links);
+  }
+
   static napi_value setLineDiagnostics(napi_env env, napi_callback_info info) {
     return setBinaryData(env, info, editor_set_line_diagnostics);
   }
@@ -973,6 +981,16 @@ public:
     napi_value args[1];
     napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
     editor_clear_codelens(static_cast<intptr_t>(napi_get_handle(env, args[0])));
+    napi_value undefined;
+    napi_get_undefined(env, &undefined);
+    return undefined;
+  }
+
+  static napi_value clearLinks(napi_env env, napi_callback_info info) {
+    size_t argc = 1;
+    napi_value args[1];
+    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+    editor_clear_links(static_cast<intptr_t>(napi_get_handle(env, args[0])));
     napi_value undefined;
     napi_get_undefined(env, &undefined);
     return undefined;
@@ -1393,6 +1411,19 @@ public:
     if (editor == nullptr) return napi_create_string_value(env, "");
     U8String word = editor->getWordAtCursor();
     return napi_create_string_value(env, word.c_str());
+  }
+
+  static napi_value getLinkTargetAt(napi_env env, napi_callback_info info) {
+    size_t argc = 3;
+    napi_value args[3];
+    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+    int64_t handle = napi_get_handle(env, args[0]);
+    SharedPtr<EditorCore> editor = getCPtrHolderValue<EditorCore>(handle);
+    if (editor == nullptr) return napi_create_string_value(env, "");
+    U8String target = editor->getLinkTargetAt(
+      static_cast<size_t>(napi_get_int32(env, args[1])),
+      static_cast<size_t>(napi_get_int32(env, args[2])));
+    return napi_create_string_value(env, target.c_str());
   }
 
   static napi_value scrollToLine(napi_env env, napi_callback_info info) {

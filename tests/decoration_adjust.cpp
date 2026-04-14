@@ -17,11 +17,12 @@ TEST_CASE("DecorationManager adjustForEdit shifts same-line point and span decor
 
   manager.setLineInlayHints(0, {InlayHint{InlayType::TEXT, 1, "lhs"}, InlayHint{InlayType::TEXT, 3, "rhs"}});
   manager.setLinePhantomTexts(0, {PhantomText{4, "ghost"}});
+  manager.setLineLinks(0, {{1, 3, "doc://lhs"}, {5, 2, "doc://rhs"}});
 
   Vector<DiagnosticSpan> diagnostics;
-  diagnostics.push_back({0, 2, DiagnosticSeverity::DIAG_WARNING, 0});
-  diagnostics.push_back({1, 3, DiagnosticSeverity::DIAG_ERROR, 0});
-  diagnostics.push_back({3, 2, DiagnosticSeverity::DIAG_INFO, 0});
+  diagnostics.push_back({0, 2, DiagnosticSeverity::DIAG_WARNING});
+  diagnostics.push_back({1, 3, DiagnosticSeverity::DIAG_ERROR});
+  diagnostics.push_back({3, 2, DiagnosticSeverity::DIAG_INFO});
   manager.setLineDiagnostics(0, std::move(diagnostics));
 
   // Insert 3 columns at (0,2).
@@ -80,6 +81,13 @@ TEST_CASE("DecorationManager adjustForEdit updates fold regions and line-based d
   REQUIRE(phantom_line5.size() == 1);
   CHECK(phantom_line5[0].column == 1);
   CHECK(manager.getLinePhantomTexts(6).empty());
+
+  const auto& links_line4 = manager.getLineLinks(4);
+  REQUIRE(links_line4.size() == 1);
+  CHECK(links_line4[0].column == 2);
+  CHECK(links_line4[0].length == 4);
+  CHECK(links_line4[0].target == "doc://tail");
+  CHECK(manager.getLineLinks(5).empty());
 
   CHECK(manager.getLineGutterIcons(2).size() == 1);
   CHECK(manager.getLineGutterIcons(5).size() == 1);

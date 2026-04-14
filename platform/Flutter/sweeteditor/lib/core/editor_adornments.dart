@@ -70,8 +70,9 @@ class PhantomText {
 
 /// CodeLens item (clickable label above a code line).
 class CodeLensItem {
-  const CodeLensItem({required this.text, required this.commandId});
+  const CodeLensItem({required this.column, required this.text, required this.commandId});
 
+  final int column;
   final String text;
   final int commandId;
 }
@@ -98,13 +99,11 @@ class Diagnostic {
     required this.column,
     required this.length,
     required this.severity,
-    required this.color,
   });
 
   final int column;
   final int length;
   final int severity;
-  final int color;
 }
 
 /// Fold region.

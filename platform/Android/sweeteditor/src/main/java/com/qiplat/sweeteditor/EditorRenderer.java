@@ -913,23 +913,19 @@ final class EditorRenderer {
         for (DiagnosticDecoration diag : decorations) {
             if (diag.origin == null) continue;
             int color;
-            if (diag.color != 0) {
-                color = diag.color;
-            } else {
-                switch (diag.severity) {
-                    case 0:
-                        color = mTheme.diagnosticErrorColor;
-                        break;
-                    case 1:
-                        color = mTheme.diagnosticWarningColor;
-                        break;
-                    case 2:
-                        color = mTheme.diagnosticInfoColor;
-                        break;
-                    default:
-                        color = mTheme.diagnosticHintColor;
-                        break;
-                }
+            switch (diag.severity) {
+                case 0:
+                    color = mTheme.diagnosticErrorColor;
+                    break;
+                case 1:
+                    color = mTheme.diagnosticWarningColor;
+                    break;
+                case 2:
+                    color = mTheme.diagnosticInfoColor;
+                    break;
+                default:
+                    color = mTheme.diagnosticHintColor;
+                    break;
             }
             mDiagnosticPaint.setColor(color);
 

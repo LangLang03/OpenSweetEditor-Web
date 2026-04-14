@@ -9,12 +9,15 @@ import com.qiplat.sweeteditor.core.visual.PointF;
 public final class CodeLensClickEvent extends EditorEvent {
     /** Line number where the CodeLens is located (0-based) */
     public final int line;
+    /** Column anchor of the clicked CodeLens (0-based, UTF-16 offset) */
+    public final int column;
     /** Command ID */
     public final int commandId;
     public final PointF screenPoint;
 
-    public CodeLensClickEvent(int line, int commandId, PointF screenPoint) {
+    public CodeLensClickEvent(int line, int column, int commandId, PointF screenPoint) {
         this.line = line;
+        this.column = column;
         this.commandId = commandId;
         this.screenPoint = screenPoint;
     }

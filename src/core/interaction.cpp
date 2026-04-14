@@ -32,13 +32,7 @@ namespace NS_SWEETEDITOR {
         m_fling_(makeUnique<FlingAnimator>(context.touch_config)) {
   }
 
-  void EditorInteraction::fillGestureResult(GestureResult& result) const {
-    result.cursor_position = m_context_.caret->cursor;
-    result.has_selection = m_context_.caret->has_selection;
-    result.selection = m_context_.caret->selection;
-    result.view_scroll_x = m_context_.view_state->scroll_x;
-    result.view_scroll_y = m_context_.view_state->scroll_y;
-    result.view_scale = m_context_.view_state->scale;
+  void EditorInteraction::fillInteractionGestureState(GestureResult& result) const {
     result.is_handle_drag = (m_dragging_handle_ != HandleDragTarget::NONE);
   }
 
@@ -204,8 +198,7 @@ namespace NS_SWEETEDITOR {
           dragHandleTo(m_dragging_handle_, event.points[0]);
           m_context_.text_layout->setViewState(*m_context_.view_state);
           gesture_result.type = GestureType::DRAG_SELECT;
-          gesture_result.is_handle_drag = true;
-          fillGestureResult(gesture_result);
+          fillInteractionGestureState(gesture_result);
           gesture_result.needs_edge_scroll = m_edge_scroll_.active;
           gesture_result.needs_animation = m_edge_scroll_.active;
           return gesture_result;
@@ -219,7 +212,7 @@ namespace NS_SWEETEDITOR {
         m_context_.view_state->scroll_x = std::round(m_context_.view_state->scroll_x);
         m_context_.view_state->scroll_y = std::round(m_context_.view_state->scroll_y);
         m_context_.text_layout->normalizeViewState(*m_context_.view_state);
-        fillGestureResult(gesture_result);
+        fillInteractionGestureState(gesture_result);
         return gesture_result;
       }
     }
@@ -236,7 +229,7 @@ namespace NS_SWEETEDITOR {
 
     if (m_dragging_handle_ != HandleDragTarget::NONE) {
       m_context_.text_layout->setViewState(*m_context_.view_state);
-      fillGestureResult(result);
+      fillInteractionGestureState(result);
       return result;
     }
 
@@ -255,7 +248,8 @@ namespace NS_SWEETEDITOR {
         intent.toggle_fold = true;
         intent.fold_line = result.hit_target.line;
         intent.place_cursor = false;
-      } else if (result.hit_target.type == HitTargetType::CODELENS) {
+      } else if (result.hit_target.type == HitTargetType::CODELENS
+                 || result.hit_target.type == HitTargetType::LINK) {
         intent.place_cursor = false;
       }
       break;
@@ -323,7 +317,7 @@ namespace NS_SWEETEDITOR {
       m_context_.text_layout->normalizeViewState(*m_context_.view_state);
     }
 
-    fillGestureResult(result);
+    fillInteractionGestureState(result);
     if (result.type == GestureType::DRAG_SELECT) {
       result.needs_edge_scroll = m_edge_scroll_.active;
     }
@@ -339,7 +333,7 @@ namespace NS_SWEETEDITOR {
     result.type = GestureType::DRAG_SELECT;
 
     if (!m_edge_scroll_.active) {
-      fillGestureResult(result);
+      fillInteractionGestureState(result);
       result.needs_edge_scroll = false;
       result.needs_animation = m_fling_->isActive();
       return result;
@@ -361,7 +355,7 @@ namespace NS_SWEETEDITOR {
       dragSelectTo(m_edge_scroll_.last_screen_point, m_edge_scroll_.is_mouse);
     }
 
-    fillGestureResult(result);
+    fillInteractionGestureState(result);
     result.needs_edge_scroll = m_edge_scroll_.active;
     result.needs_animation = m_edge_scroll_.active || m_fling_->isActive();
     return result;
@@ -372,7 +366,7 @@ namespace NS_SWEETEDITOR {
     result.type = GestureType::SCROLL;
 
     if (!m_fling_->isActive()) {
-      fillGestureResult(result);
+      fillInteractionGestureState(result);
       result.needs_fling = false;
       result.needs_animation = m_edge_scroll_.active;
       return result;
@@ -388,7 +382,7 @@ namespace NS_SWEETEDITOR {
     m_context_.text_layout->normalizeViewState(*m_context_.view_state);
     markScrollbarInteraction();
 
-    fillGestureResult(result);
+    fillInteractionGestureState(result);
     result.needs_fling = still_active;
     result.needs_animation = m_edge_scroll_.active || still_active;
     return result;
@@ -409,13 +403,11 @@ namespace NS_SWEETEDITOR {
         result = fling_result;
       } else {
         result.needs_fling = fling_result.needs_fling;
-        result.view_scroll_x = fling_result.view_scroll_x;
-        result.view_scroll_y = fling_result.view_scroll_y;
       }
     }
 
     if (!did_edge_scroll && !m_fling_->isActive()) {
-      fillGestureResult(result);
+      fillInteractionGestureState(result);
     }
 
     result.needs_animation = m_edge_scroll_.active || m_fling_->isActive();
@@ -572,6 +564,29 @@ namespace NS_SWEETEDITOR {
     }
   }
 
+  bool EditorInteraction::isPointInScrollbar(const PointF& point) const {
+    ScrollbarModel vertical;
+    ScrollbarModel horizontal;
+    computeScrollbarModels(vertical, horizontal);
+    const float thumb_hit_padding = m_context_.settings->scrollbar.thumb_hit_padding;
+
+    if (vertical.visible
+        && (pointInRect(point, vertical.track)
+            || (m_context_.settings->scrollbar.thumb_draggable
+                && pointInRect(point, vertical.thumb, thumb_hit_padding)))) {
+      return true;
+    }
+
+    if (horizontal.visible
+        && (pointInRect(point, horizontal.track)
+            || (m_context_.settings->scrollbar.thumb_draggable
+                && pointInRect(point, horizontal.thumb, thumb_hit_padding)))) {
+      return true;
+    }
+
+    return false;
+  }
+
   bool EditorInteraction::handleScrollbarGesture(const GestureEvent& event,
                                                  GestureResult& result) {
     if (m_context_.text_layout == nullptr || !m_context_.viewport->valid()) {
@@ -584,7 +599,7 @@ namespace NS_SWEETEDITOR {
 
     const auto consume = [&](GestureType type) {
       result.type = type;
-      fillGestureResult(result);
+      fillInteractionGestureState(result);
       return true;
     };
 

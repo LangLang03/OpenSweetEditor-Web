@@ -219,13 +219,14 @@ namespace SweetEditor {
 			for (int i = 0; i < count; i++) {
 				var tb = Encoding.UTF8.GetBytes(items[i].Text ?? string.Empty);
 				textBytes[i] = tb;
-				totalSize += 8 + tb.Length;
+				totalSize += 12 + tb.Length;
 			}
 			byte[] payload = new byte[totalSize];
 			int offset = 0;
 			WriteInt32LE(payload, ref offset, line);
 			WriteInt32LE(payload, ref offset, count);
 			for (int i = 0; i < count; i++) {
+				WriteInt32LE(payload, ref offset, items[i].Column);
 				WriteInt32LE(payload, ref offset, items[i].CommandId);
 				var tb = textBytes[i];
 				WriteInt32LE(payload, ref offset, tb.Length);
@@ -247,7 +248,7 @@ namespace SweetEditor {
 				for (int i = 0; i < items.Count; i++) {
 					var tb = Encoding.UTF8.GetBytes(items[i].Text ?? string.Empty);
 					lineTexts[i] = tb;
-					totalSize += 8 + tb.Length;
+					totalSize += 12 + tb.Length;
 				}
 				allTextBytes[kv.Key] = lineTexts;
 			}
@@ -260,8 +261,75 @@ namespace SweetEditor {
 				WriteInt32LE(payload, ref offset, items.Count);
 				var lineTexts = allTextBytes[kv.Key];
 				for (int i = 0; i < items.Count; i++) {
+					WriteInt32LE(payload, ref offset, items[i].Column);
 					WriteInt32LE(payload, ref offset, items[i].CommandId);
 					var tb = lineTexts[i];
+					WriteInt32LE(payload, ref offset, tb.Length);
+					if (tb.Length > 0) {
+						Buffer.BlockCopy(tb, 0, payload, offset, tb.Length);
+						offset += tb.Length;
+					}
+				}
+			}
+			return payload;
+		}
+
+		#endregion
+
+		#region Links
+
+		internal static byte[] PackLineLinks(int line, IList<LinkSpan> links) {
+			int count = links.Count;
+			int totalSize = 8;
+			var targetBytes = new byte[count][];
+			for (int i = 0; i < count; i++) {
+				var tb = Encoding.UTF8.GetBytes(links[i].Target ?? string.Empty);
+				targetBytes[i] = tb;
+				totalSize += 12 + tb.Length;
+			}
+			byte[] payload = new byte[totalSize];
+			int offset = 0;
+			WriteInt32LE(payload, ref offset, line);
+			WriteInt32LE(payload, ref offset, count);
+			for (int i = 0; i < count; i++) {
+				WriteInt32LE(payload, ref offset, links[i].Column);
+				WriteInt32LE(payload, ref offset, links[i].Length);
+				var tb = targetBytes[i];
+				WriteInt32LE(payload, ref offset, tb.Length);
+				if (tb.Length > 0) {
+					Buffer.BlockCopy(tb, 0, payload, offset, tb.Length);
+					offset += tb.Length;
+				}
+			}
+			return payload;
+		}
+
+		internal static byte[] PackBatchLineLinks(Dictionary<int, IList<LinkSpan>> linksByLine) {
+			int totalSize = 4;
+			var allTargetBytes = new Dictionary<int, byte[][]>();
+			foreach (var kv in linksByLine) {
+				var links = kv.Value;
+				totalSize += 8;
+				var lineTargets = new byte[links.Count][];
+				for (int i = 0; i < links.Count; i++) {
+					var tb = Encoding.UTF8.GetBytes(links[i].Target ?? string.Empty);
+					lineTargets[i] = tb;
+					totalSize += 12 + tb.Length;
+				}
+				allTargetBytes[kv.Key] = lineTargets;
+			}
+			byte[] payload = new byte[totalSize];
+			int offset = 0;
+			WriteInt32LE(payload, ref offset, linksByLine.Count);
+			foreach (var kv in linksByLine) {
+				WriteInt32LE(payload, ref offset, kv.Key);
+				var links = kv.Value;
+				WriteInt32LE(payload, ref offset, links.Count);
+				var lineTargets = allTargetBytes[kv.Key];
+				for (int i = 0; i < links.Count; i++) {
+					WriteInt32LE(payload, ref offset, links[i].Column);
+					WriteInt32LE(payload, ref offset, links[i].Length);
+					var tb = lineTargets[i];
 					WriteInt32LE(payload, ref offset, tb.Length);
 					if (tb.Length > 0) {
 						Buffer.BlockCopy(tb, 0, payload, offset, tb.Length);
@@ -278,7 +346,7 @@ namespace SweetEditor {
 
 		internal static byte[] PackLineDiagnostics(int line, IList<Diagnostic> items) {
 			int count = items.Count;
-			byte[] payload = new byte[8 + count * 16];
+			byte[] payload = new byte[8 + count * 12];
 			int offset = 0;
 			WriteInt32LE(payload, ref offset, line);
 			WriteInt32LE(payload, ref offset, count);
@@ -287,7 +355,6 @@ namespace SweetEditor {
 				WriteInt32LE(payload, ref offset, d.Column);
 				WriteInt32LE(payload, ref offset, d.Length);
 				WriteInt32LE(payload, ref offset, d.Severity);
-				WriteInt32LE(payload, ref offset, d.Color);
 			}
 			return payload;
 		}
@@ -295,7 +362,7 @@ namespace SweetEditor {
 		internal static byte[] PackBatchLineDiagnostics(Dictionary<int, IList<Diagnostic>> diagsByLine) {
 			int totalDiags = 0;
 			foreach (var kv in diagsByLine) totalDiags += kv.Value.Count;
-			byte[] payload = new byte[4 + diagsByLine.Count * 8 + totalDiags * 16];
+			byte[] payload = new byte[4 + diagsByLine.Count * 8 + totalDiags * 12];
 			int offset = 0;
 			WriteInt32LE(payload, ref offset, diagsByLine.Count);
 			foreach (var kv in diagsByLine) {
@@ -307,7 +374,6 @@ namespace SweetEditor {
 					WriteInt32LE(payload, ref offset, d.Column);
 					WriteInt32LE(payload, ref offset, d.Length);
 					WriteInt32LE(payload, ref offset, d.Severity);
-					WriteInt32LE(payload, ref offset, d.Color);
 				}
 			}
 			return payload;
@@ -569,6 +635,10 @@ namespace SweetEditor {
 			return Enum.IsDefined(typeof(HitTargetType), value) ? (HitTargetType)value : HitTargetType.NONE;
 		}
 
+		internal static PointerCursorType ToPointerCursorType(int value) {
+			return Enum.IsDefined(typeof(PointerCursorType), value) ? (PointerCursorType)value : PointerCursorType.TEXT;
+		}
+
 		internal static VisualRunType ToVisualRunType(int value) {
 			return Enum.IsDefined(typeof(VisualRunType), value) ? (VisualRunType)value : VisualRunType.TEXT;
 		}
@@ -787,8 +857,7 @@ namespace SweetEditor {
 			if (!TryReadPointF(data, ref offset, out PointF origin) ||
 				!TryReadFloat(data, ref offset, out float width) ||
 				!TryReadFloat(data, ref offset, out float height) ||
-				!TryReadInt32(data, ref offset, out int severity) ||
-				!TryReadInt32(data, ref offset, out int color)) {
+				!TryReadInt32(data, ref offset, out int severity)) {
 				return false;
 			}
 			decoration = new DiagnosticDecoration {
@@ -796,7 +865,6 @@ namespace SweetEditor {
 				Width = width,
 				Height = height,
 				Severity = severity,
-				Color = color,
 			};
 			return true;
 		}
@@ -877,6 +945,7 @@ namespace SweetEditor {
 				VerticalScrollbar = default,
 				HorizontalScrollbar = default,
 				GutterSticky = true,
+				PointerCursorType = global::SweetEditor.PointerCursorType.TEXT,
 			};
 		}
 
@@ -1038,6 +1107,9 @@ namespace SweetEditor {
 				if (TryReadInt32(data, ref offset, out int gutterVisibleRaw)) {
 					model.GutterVisible = gutterVisibleRaw != 0;
 				}
+				if (TryReadInt32(data, ref offset, out int pointerCursorTypeRaw)) {
+					model.PointerCursorType = ToPointerCursorType(pointerCursorTypeRaw);
+				}
 				return model;
 			} finally {
 				NativeMethods.FreeBinaryData(payloadPtr);
@@ -1189,6 +1261,11 @@ namespace SweetEditor {
 				}
 				if (TryReadInt32(data, ref offset, out int needsAnimationInt)) {
 					result.NeedsAnimation = needsAnimationInt != 0;
+				}
+				if (TryReadInt32(data, ref offset, out int _)) {
+					if (TryReadInt32(data, ref offset, out int pointerCursorTypeInt)) {
+						result.PointerCursorType = ToPointerCursorType(pointerCursorTypeInt);
+					}
 				}
 				return result;
 			} finally {

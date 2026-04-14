@@ -124,16 +124,15 @@ public final class ProtocolEncoder {
         return payload;
     }
 
-    static ByteBuffer packLineDiagnostics(int line, @NonNull int[] columns, @NonNull int[] lengths, @NonNull int[] severities, @NonNull int[] colors) {
-        int count = Math.min(Math.min(columns.length, lengths.length), Math.min(severities.length, colors.length));
-        ByteBuffer payload = ByteBuffer.allocateDirect(8 + count * 16).order(ByteOrder.LITTLE_ENDIAN);
+    static ByteBuffer packLineDiagnostics(int line, @NonNull int[] columns, @NonNull int[] lengths, @NonNull int[] severities) {
+        int count = Math.min(columns.length, Math.min(lengths.length, severities.length));
+        ByteBuffer payload = ByteBuffer.allocateDirect(8 + count * 12).order(ByteOrder.LITTLE_ENDIAN);
         payload.putInt(line);
         payload.putInt(count);
         for (int i = 0; i < count; i++) {
             payload.putInt(columns[i]);
             payload.putInt(lengths[i]);
             payload.putInt(severities[i]);
-            payload.putInt(colors[i]);
         }
         payload.flip();
         return payload;
@@ -148,7 +147,7 @@ public final class ProtocolEncoder {
      */
     public static ByteBuffer packLineDiagnostics(int line, @NonNull java.util.List<? extends Diagnostic> items) {
         int count = items.size();
-        ByteBuffer payload = ByteBuffer.allocateDirect(8 + count * 16).order(ByteOrder.LITTLE_ENDIAN);
+        ByteBuffer payload = ByteBuffer.allocateDirect(8 + count * 12).order(ByteOrder.LITTLE_ENDIAN);
         payload.putInt(line);
         payload.putInt(count);
         for (int i = 0; i < count; i++) {
@@ -156,7 +155,6 @@ public final class ProtocolEncoder {
             payload.putInt(item.column);
             payload.putInt(item.length);
             payload.putInt(item.severity);
-            payload.putInt(item.color);
         }
         payload.flip();
         return payload;
@@ -693,7 +691,7 @@ public final class ProtocolEncoder {
      * Pack the CodeLensItem list for a given line into a binary ByteBuffer.
      * <p>
      * Format (LE): u32 line, u32 item_count,
-     * then repeat item_count times: [i32 command_id, u32 text_len, u8[text_len] text_utf8]
+     * then repeat item_count times: [i32 column, i32 command_id, u32 text_len, u8[text_len] text_utf8]
      */
     public static ByteBuffer packLineCodeLens(int line, @NonNull List<? extends CodeLensItem> items) {
         int count = items.size();
@@ -701,7 +699,7 @@ public final class ProtocolEncoder {
         byte[][] textBytes = new byte[count][];
         for (int i = 0; i < count; i++) {
             CodeLensItem item = items.get(i);
-            totalSize += 8; // command_id(4) + text_len(4)
+            totalSize += 12; // column(4) + command_id(4) + text_len(4)
             if (item.text != null) {
                 byte[] bytes = item.text.getBytes(StandardCharsets.UTF_8);
                 textBytes[i] = bytes;
@@ -713,6 +711,7 @@ public final class ProtocolEncoder {
         payload.putInt(count);
         for (int i = 0; i < count; i++) {
             CodeLensItem item = items.get(i);
+            payload.putInt(item.column);
             payload.putInt(item.commandId);
             byte[] tb = textBytes[i];
             if (tb != null) {
@@ -731,7 +730,7 @@ public final class ProtocolEncoder {
      * <p>
      * Format (LE): u32 entry_count,
      * [u32 line, u32 item_count,
-     *  [i32 command_id, u32 text_len, u8[text_len] text_utf8] x item_count] x entry_count
+     *  [i32 column, i32 command_id, u32 text_len, u8[text_len] text_utf8] x item_count] x entry_count
      */
     @Nullable
     public static ByteBuffer packBatchLineCodeLens(@Nullable SparseArray<? extends List<? extends CodeLensItem>> itemsByLine) {
@@ -752,7 +751,7 @@ public final class ProtocolEncoder {
             if (items == null) continue;
             for (int j = 0; j < items.size(); j++) {
                 CodeLensItem item = items.get(j);
-                totalSize += 8; // command_id(4) + text_len(4)
+                totalSize += 12; // column(4) + command_id(4) + text_len(4)
                 if (item.text != null) {
                     byte[] bytes = item.text.getBytes(StandardCharsets.UTF_8);
                     textBytesCache[itemIdx] = bytes;
@@ -772,6 +771,7 @@ public final class ProtocolEncoder {
             payload.putInt(itemCount);
             for (int j = 0; j < itemCount; j++) {
                 CodeLensItem item = items.get(j);
+                payload.putInt(item.column);
                 payload.putInt(item.commandId);
                 byte[] tb = textBytesCache[itemIdx];
                 if (tb != null) {
@@ -805,7 +805,7 @@ public final class ProtocolEncoder {
             List<? extends Diagnostic> diags = diagsByLine.valueAt(i);
             if (diags != null) totalDiagCount += diags.size();
         }
-        ByteBuffer payload = ByteBuffer.allocateDirect(4 + entryCount * 8 + totalDiagCount * 16)
+        ByteBuffer payload = ByteBuffer.allocateDirect(4 + entryCount * 8 + totalDiagCount * 12)
                 .order(ByteOrder.LITTLE_ENDIAN);
         payload.putInt(entryCount);
         for (int i = 0; i < entryCount; i++) {
@@ -819,7 +819,6 @@ public final class ProtocolEncoder {
                 payload.putInt(item.column);
                 payload.putInt(item.length);
                 payload.putInt(item.severity);
-                payload.putInt(item.color);
             }
         }
         payload.flip();

@@ -28,7 +28,9 @@ namespace NS_SWEETEDITOR {
     /// Tab character (width computed by core based on tab_size and column position)
     TAB,
     /// CodeLens clickable label (above code line)
-    CODELENS
+    CODELENS,
+    /// Clickable document link embedded in content text
+    LINK
   };
 
   /// Data for each rendered text run
@@ -91,6 +93,13 @@ namespace NS_SWEETEDITOR {
     PHANTOM = 1,
     /// CodeLens virtual line above a code line
     CODELENS = 2,
+  };
+
+  /// Pointer cursor hint for desktop platforms
+  enum struct PointerCursorType : uint8_t {
+    DEFAULT = 0,
+    TEXT = 1,
+    HAND = 2,
   };
 
   /// Visual rendered line data
@@ -180,7 +189,6 @@ namespace NS_SWEETEDITOR {
   struct DiagnosticDecoration {
     Rect rect;
     int32_t severity {0};
-    int32_t color {0};
   };
 
   /// Gutter icon render item (fully resolved geometry for one icon)
@@ -269,6 +277,8 @@ namespace NS_SWEETEDITOR {
     bool gutter_sticky {true};
     /// Whether gutter area is visible
     bool gutter_visible {true};
+    /// Pointer cursor hint for the current mouse location
+    PointerCursorType pointer_cursor_type {PointerCursorType::TEXT};
 
     U8String dump() const;
     U8String toJson() const;

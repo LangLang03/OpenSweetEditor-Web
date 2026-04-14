@@ -806,6 +806,11 @@ public class SweetEditor extends JPanel {
     private void setupEventListeners() {
         addMouseListener(new MouseAdapter() {
             @Override
+            public void mouseEntered(MouseEvent e) {
+                handleGesture(MOUSE_MOVE, e.getX(), e.getY(), getModifiers(e), 0, 0, 1);
+            }
+
+            @Override
             public void mousePressed(MouseEvent e) {
                 requestFocusInWindow();
                 int mods = getModifiers(e);
@@ -822,6 +827,11 @@ public class SweetEditor extends JPanel {
                     handleGesture(MOUSE_UP, e.getX(), e.getY(), getModifiers(e), 0, 0, 1);
                 }
             }
+            @Override
+            public void mouseExited(MouseEvent e) {
+                handleGesture(MOUSE_MOVE, -1, -1, getModifiers(e), 0, 0, 1);
+            }
+
         });
 
         addMouseMotionListener(new MouseMotionAdapter() {
@@ -831,6 +841,11 @@ public class SweetEditor extends JPanel {
                     handleGesture(MOUSE_MOVE, e.getX(), e.getY(), getModifiers(e), 0, 0, 1);
                 }
             }
+            @Override
+            public void mouseMoved(MouseEvent e) {
+                handleGesture(MOUSE_MOVE, e.getX(), e.getY(), getModifiers(e), 0, 0, 1);
+            }
+
         });
 
         addMouseWheelListener(e -> {
@@ -1069,6 +1084,9 @@ public class SweetEditor extends JPanel {
                 // C++ core already applied scale during gesture handling; only sync platform fonts/measurer.
                 syncPlatformScale(result.viewScale);
             }
+            if (result != null) {
+                updateMouseCursor(result.pointerCursorType);
+            }
             resetCursorBlink();
             flush();
             if (result != null) {
@@ -1134,6 +1152,7 @@ public class SweetEditor extends JPanel {
                         case CODELENS:
                             eventBus.publish(new CodeLensClickEvent(
                                     result.hitTarget.line,
+                                    result.hitTarget.column,
                                     result.hitTarget.iconId,
                                     screenPoint));
                             break;
@@ -1424,12 +1443,31 @@ public class SweetEditor extends JPanel {
         }
         renderModel = editorCore.buildRenderModel();
         renderModelDirty = false;
+        if (renderModel != null) {
+            updateMouseCursor(renderModel.pointerCursorType);
+        }
         updateVisibleLineRangeCache(renderModel);
         if (buildPerf != null) {
             buildPerf.mark(PerfStepRecorder.STEP_BUILD);
             buildPerf.finish();
             renderer.getPerfOverlay().recordBuild(buildPerf, renderer.getMeasurePerfStats().buildSummary());
         }
+    }
+
+    private void updateMouseCursor(PointerCursorType pointerCursorType) {
+        int awtCursor;
+        switch (pointerCursorType) {
+            case HAND:
+                awtCursor = java.awt.Cursor.HAND_CURSOR;
+                break;
+            case DEFAULT:
+                awtCursor = java.awt.Cursor.DEFAULT_CURSOR;
+                break;
+            default:
+                awtCursor = java.awt.Cursor.TEXT_CURSOR;
+                break;
+        }
+        setCursor(java.awt.Cursor.getPredefinedCursor(awtCursor));
     }
 
     private void updateCompletionPopupCursorAnchor() {

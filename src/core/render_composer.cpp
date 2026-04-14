@@ -270,7 +270,6 @@ namespace NS_SWEETEDITOR {
         DiagnosticDecoration dd;
         dd.rect = {{x_start, y + top_padding}, x_end - x_start, font_height};
         dd.severity = static_cast<int32_t>(ds.severity);
-        dd.color = ds.color;
         model.diagnostic_decorations.push_back(dd);
       }
     }

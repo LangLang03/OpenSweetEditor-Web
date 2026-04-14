@@ -316,10 +316,10 @@ public class MainActivity extends AppCompatActivity {
     @NonNull
     private String describeCodeLensCommand(int commandId) {
         if (commandId == DemoDecorationProvider.CODELENS_RUN) {
-            return "Run";
+            return "▶ Run";
         }
         if (commandId == DemoDecorationProvider.CODELENS_DEBUG) {
-            return "Debug";
+            return "◎ Debug";
         }
         return "Command#" + commandId;
     }

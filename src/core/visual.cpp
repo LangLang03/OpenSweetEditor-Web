@@ -78,6 +78,8 @@ namespace NS_SWEETEDITOR {
       return "TAB";
     case VisualRunType::CODELENS:
       return "CODELENS";
+    case VisualRunType::LINK:
+      return "LINK";
     default:
       return "UNDEFINED";
     }

@@ -100,7 +100,6 @@ class SweetEditorCore {
         let column: Int32
         let length: Int32
         let severity: Int32
-        let color: Int32
     }
 
     struct IndentGuidePayload {
@@ -148,13 +147,11 @@ class SweetEditorCore {
         let column: Int32
         let length: Int32
         let severity: Int32
-        let color: Int32
 
-        init(column: Int32, length: Int32, severity: Int32, color: Int32) {
+        init(column: Int32, length: Int32, severity: Int32) {
             self.column = column
             self.length = length
             self.severity = severity
-            self.color = color
         }
     }
 
@@ -167,12 +164,26 @@ class SweetEditorCore {
     }
 
     struct CodeLensPayload {
+        let column: Int32
         let text: String
         let commandId: Int32
 
-        init(text: String, commandId: Int32) {
+        init(column: Int32, text: String, commandId: Int32) {
+            self.column = column
             self.text = text
             self.commandId = commandId
+        }
+    }
+
+    struct LinkSpan {
+        let column: Int
+        let length: Int
+        let target: String
+
+        init(column: Int, length: Int, target: String) {
+            self.column = column
+            self.length = length
+            self.target = target
         }
     }
 
@@ -394,10 +405,11 @@ class SweetEditorCore {
 
         func packLineCodeLens(line: Int, items: [CodeLensPayload]) -> Data {
             var payload = Data()
-            payload.reserveCapacity(8 + items.count * 16)
+            payload.reserveCapacity(8 + items.count * 20)
             appendU32(UInt32(line), to: &payload)
             appendU32(UInt32(items.count), to: &payload)
             for item in items {
+                appendI32(item.column, to: &payload)
                 appendI32(item.commandId, to: &payload)
                 appendUTF8(item.text, to: &payload)
             }
@@ -408,7 +420,7 @@ class SweetEditorCore {
             let lines = itemsByLine.keys.sorted()
             var payload = Data()
             payload.reserveCapacity(4 + lines.reduce(0) {
-                $0 + 8 + (itemsByLine[$1]?.count ?? 0) * 16
+                $0 + 8 + (itemsByLine[$1]?.count ?? 0) * 20
             })
             appendU32(UInt32(lines.count), to: &payload)
             for line in lines {
@@ -416,6 +428,7 @@ class SweetEditorCore {
                 appendU32(UInt32(line), to: &payload)
                 appendU32(UInt32(items.count), to: &payload)
                 for item in items {
+                    appendI32(item.column, to: &payload)
                     appendI32(item.commandId, to: &payload)
                     appendUTF8(item.text, to: &payload)
                 }
@@ -423,22 +436,55 @@ class SweetEditorCore {
             return payload
         }
 
-        func packLineDiagnostics(line: Int, diagnostics: [(column: Int32, length: Int32, severity: Int32, color: Int32)]) -> Data {
+        func packLineLinks(line: Int, links: [LinkSpan]) -> Data {
             var payload = Data()
-            payload.reserveCapacity(8 + diagnostics.count * 16)
+            payload.reserveCapacity(8 + links.reduce(0) { $0 + 12 + ($1.target.lengthOfBytes(using: .utf8)) })
+            appendU32(UInt32(line), to: &payload)
+            appendU32(UInt32(links.count), to: &payload)
+            for link in links {
+                appendU32(UInt32(link.column), to: &payload)
+                appendU32(UInt32(link.length), to: &payload)
+                appendUTF8(link.target, to: &payload)
+            }
+            return payload
+        }
+
+        func packBatchLineLinks(_ linksByLine: [Int: [LinkSpan]]) -> Data {
+            let lines = linksByLine.keys.sorted()
+            var payload = Data()
+            payload.reserveCapacity(4 + lines.reduce(0) { partial, line in
+                let links = linksByLine[line] ?? []
+                return partial + 8 + links.reduce(0) { $0 + 12 + ($1.target.lengthOfBytes(using: .utf8)) }
+            })
+            appendU32(UInt32(lines.count), to: &payload)
+            for line in lines {
+                let links = linksByLine[line] ?? []
+                appendU32(UInt32(line), to: &payload)
+                appendU32(UInt32(links.count), to: &payload)
+                for link in links {
+                    appendU32(UInt32(link.column), to: &payload)
+                    appendU32(UInt32(link.length), to: &payload)
+                    appendUTF8(link.target, to: &payload)
+                }
+            }
+            return payload
+        }
+
+        func packLineDiagnostics(line: Int, diagnostics: [(column: Int32, length: Int32, severity: Int32)]) -> Data {
+            var payload = Data()
+            payload.reserveCapacity(8 + diagnostics.count * 12)
             appendU32(UInt32(line), to: &payload)
             appendU32(UInt32(diagnostics.count), to: &payload)
             for diagnostic in diagnostics {
                 appendI32(diagnostic.column, to: &payload)
                 appendI32(diagnostic.length, to: &payload)
                 appendI32(diagnostic.severity, to: &payload)
-                appendI32(diagnostic.color, to: &payload)
             }
             return payload
         }
 
         func packLineDiagnostics(line: Int, items: [DiagnosticItem]) -> Data {
-            let diagnostics = items.map { (column: $0.column, length: $0.length, severity: $0.severity, color: $0.color) }
+            let diagnostics = items.map { (column: $0.column, length: $0.length, severity: $0.severity) }
             return packLineDiagnostics(line: line, diagnostics: diagnostics)
         }
 
@@ -446,7 +492,7 @@ class SweetEditorCore {
             let lines = diagnosticsByLine.keys.sorted()
             var payload = Data()
             payload.reserveCapacity(4 + lines.reduce(0) {
-                $0 + 8 + (diagnosticsByLine[$1]?.count ?? 0) * 16
+                $0 + 8 + (diagnosticsByLine[$1]?.count ?? 0) * 12
             })
             appendU32(UInt32(lines.count), to: &payload)
             for line in lines {
@@ -457,7 +503,6 @@ class SweetEditorCore {
                     appendI32(diagnostic.column, to: &payload)
                     appendI32(diagnostic.length, to: &payload)
                     appendI32(diagnostic.severity, to: &payload)
-                    appendI32(diagnostic.color, to: &payload)
                 }
             }
             return payload
@@ -466,7 +511,7 @@ class SweetEditorCore {
         func packBatchLineDiagnostics(_ diagnosticsByLine: [Int: [DiagnosticItem]]) -> Data {
             let payloads = diagnosticsByLine.mapValues { items in
                 items.map {
-                    DiagnosticPayload(column: $0.column, length: $0.length, severity: $0.severity, color: $0.color)
+                    DiagnosticPayload(column: $0.column, length: $0.length, severity: $0.severity)
                 }
             }
             return packBatchLineDiagnostics(payloads)
@@ -1411,20 +1456,9 @@ class SweetEditorCore {
     /// Sets diagnostic decorations for a specific line (wavy/underline).
     /// - Parameters:
     ///   - line: Line number (0-based).
-    ///   - diagnostics: Array of diagnostic ranges, each as `(column, length, severity, color)`.
-    ///     severity: 0=ERROR, 1=WARNING, 2=INFO, 3=HINT
-    ///     color: ARGB color value; use 0 to apply severity default color.
     func setLineDiagnostics(line: Int, items: [DiagnosticItem]) {
         let payload = protocolEncoder.packLineDiagnostics(line: line, items: items)
         setLineDiagnostics(payload: payload)
-    }
-
-    @available(*, deprecated, message: "Use setLineDiagnostics(line:items:) with DiagnosticItem model")
-    func setLineDiagnostics(line: Int, diagnostics: [(column: Int32, length: Int32, severity: Int32, color: Int32)]) {
-        let mapped = diagnostics.map {
-            DiagnosticItem(column: $0.column, length: $0.length, severity: $0.severity, color: $0.color)
-        }
-        setLineDiagnostics(line: line, items: mapped)
     }
 
     func setLineDiagnostics(payload: Data) {
@@ -1633,6 +1667,49 @@ class SweetEditorCore {
     func clearCodeLens() {
         performCoreCall {
             editor_clear_codelens(handle)
+        }
+    }
+
+    // MARK: - Links
+
+    func setLineLinks(line: Int, links: [LinkSpan]) {
+        let payload = protocolEncoder.packLineLinks(line: line, links: links)
+        setLineLinks(payload: payload)
+    }
+
+    func setLineLinks(payload: Data) {
+        performCoreCall {
+            withPayload(payload) { ptr, size in
+                editor_set_line_links(handle, ptr, size)
+            }
+        }
+    }
+
+    func setBatchLineLinks(_ linksByLine: [Int: [LinkSpan]]) {
+        if linksByLine.isEmpty { return }
+        let payload = protocolEncoder.packBatchLineLinks(linksByLine)
+        setBatchLineLinks(payload: payload)
+    }
+
+    func setBatchLineLinks(payload: Data) {
+        performCoreCall {
+            withPayload(payload) { ptr, size in
+                editor_set_batch_line_links(handle, ptr, size)
+            }
+        }
+    }
+
+    func clearLinks() {
+        performCoreCall {
+            editor_clear_links(handle)
+        }
+    }
+
+    func getLinkTargetAt(line: Int, column: Int) -> String {
+        return performCoreCall {
+            guard let ptr = editor_get_link_target_at(handle, line, column) else { return "" }
+            defer { free_u8_string(Int(bitPattern: ptr)) }
+            return String(cString: ptr)
         }
     }
 

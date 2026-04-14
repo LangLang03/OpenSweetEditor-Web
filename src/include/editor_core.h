@@ -441,6 +441,18 @@ namespace NS_SWEETEDITOR {
     /// Clear all CodeLens items
     void clearCodeLens();
 
+    /// Set link ranges for a given line (replace whole line)
+    void setLineLinks(size_t line, Vector<LinkSpan>&& links);
+
+    /// Batch set link ranges for multiple lines
+    void setBatchLineLinks(Vector<std::pair<size_t, Vector<LinkSpan>>>&& entries);
+
+    /// Clear all link ranges
+    void clearLinks();
+
+    /// Resolve link target by logical line and column inside that link
+    U8String getLinkTargetAt(size_t line, size_t column) const;
+
     /// Set diagnostic decorations for given line (wavy underline/underline)
     /// @param line Line number
     /// @param diagnostics Diagnostic span list
@@ -526,6 +538,11 @@ namespace NS_SWEETEDITOR {
 #pragma endregion
 
   private:
+    struct PointerProbeResult {
+      HitTarget hot_target;
+      PointerCursorType cursor_type {PointerCursorType::TEXT};
+    };
+
     SharedPtr<TextMeasurer> m_measurer_;
     EditorOptions m_options_;
     EditorSettings m_settings_;
@@ -566,8 +583,14 @@ namespace NS_SWEETEDITOR {
     TextPosition m_external_bracket_close_;
     bool m_has_external_brackets_ {false};
 
-    /// Currently active (hovered) clickable hit target (CODELENS, future hyperlinks)
-    HitTarget m_active_hit_target_;
+    /// Hovered clickable hit target (currently used by CodeLens).
+    HitTarget m_hover_hit_target_;
+    /// Pressed clickable hit target.
+    HitTarget m_press_hit_target_;
+    /// Whether the primary mouse button is currently pressed.
+    bool m_mouse_button_down_ {false};
+    /// Current pointer cursor type for the last observed mouse location.
+    PointerCursorType m_pointer_cursor_type_ {PointerCursorType::TEXT};
 
     /// Max character distance for built-in bracket scan
     static constexpr size_t kMaxBracketScanChars = 10000;
@@ -601,6 +624,12 @@ namespace NS_SWEETEDITOR {
 
     /// Mark all logical lines as layout dirty
     void markAllLinesDirty(bool reset_heights = false);
+    /// Presentation-state helpers for clickable decoration hot targets.
+    void clearHoverHitTarget();
+    void clearPressHitTarget();
+    HitTarget getActiveHitTarget() const;
+    PointerProbeResult probePointer(const PointF& point) const;
+    void finalizeGestureResult(GestureResult& result) const;
     /// Reset composition state (clear composing flag and text)
     void resetCompositionState();
     void normalizeScrollState();

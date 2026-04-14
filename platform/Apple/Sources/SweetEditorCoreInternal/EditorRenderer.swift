@@ -5,6 +5,7 @@ struct EditorRenderer {
     // MARK: - Theme (mutable, call applyTheme to switch)
 
     static var theme: EditorTheme = .light()
+    private static let linkColor = CGColor(srgbRed: 0x4C / 255.0, green: 0x9D / 255.0, blue: 0xFF / 255.0, alpha: 1.0)
 
     /// Switches theme and returns the new background color for view-layer updates.
     /// Also re-registers syntax highlight styles to the C++ core.
@@ -269,6 +270,8 @@ struct EditorRenderer {
         let textColor: CGColor
         if run.type == .CODELENS {
             textColor = run.active ? t.currentLineNumberColor : t.inlayHintTextColor
+        } else if run.type == .LINK {
+            textColor = linkColor
         } else if run.style.color != 0 {
             textColor = cgColorFromARGB(run.style.color)
         } else {
@@ -377,7 +380,7 @@ struct EditorRenderer {
             context.strokePath()
         }
 
-        if run.type == .CODELENS, run.active {
+        if (run.type == .CODELENS || run.type == .LINK), run.active {
             let underlineY = CGFloat(run.y) + max(1.0, descent * 0.25)
             context.setStrokeColor(textColor)
             context.setLineWidth(1.0)
@@ -416,15 +419,11 @@ struct EditorRenderer {
 
     static func drawDiagnosticDecoration(context: CGContext, decoration: DiagnosticDecoration) {
         let color: CGColor
-        if decoration.color != 0 {
-            color = cgColorFromARGB(decoration.color)
-        } else {
-            switch decoration.severity {
-            case 0: color = theme.diagnosticErrorColor
-            case 1: color = theme.diagnosticWarningColor
-            case 2: color = theme.diagnosticInfoColor
-            default: color = theme.diagnosticHintColor
-            }
+        switch decoration.severity {
+        case 0: color = theme.diagnosticErrorColor
+        case 1: color = theme.diagnosticWarningColor
+        case 2: color = theme.diagnosticInfoColor
+        default: color = theme.diagnosticHintColor
         }
 
         let startX = CGFloat(decoration.origin.x)

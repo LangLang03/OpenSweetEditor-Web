@@ -166,6 +166,7 @@ namespace NS_SWEETEDITOR {
             && visual_line.logical_line == presentation_context.active_hit_target.line) {
           for (VisualRun& run : visual_line.runs) {
             if (run.type == VisualRunType::CODELENS
+                && run.column == presentation_context.active_hit_target.column
                 && run.icon_id == presentation_context.active_hit_target.icon_id) {
               run.active = true;
             }
@@ -330,6 +331,10 @@ namespace NS_SWEETEDITOR {
     if (m_document_ == nullptr) {
       return {};
     }
+    if (screen_point.x < 0.0f || screen_point.y < 0.0f
+        || screen_point.x >= m_viewport_.width || screen_point.y >= m_viewport_.height) {
+      return {};
+    }
     Vector<LogicalLine>& logical_lines = m_document_->getLogicalLines();
     if (logical_lines.empty()) {
       return {};
@@ -433,7 +438,14 @@ namespace NS_SWEETEDITOR {
         }
       } else if (run.type == VisualRunType::CODELENS) {
         if (click_x >= run_x && click_x < run_right) {
-          return {HitTargetType::CODELENS, hit_line, 0, run.icon_id};
+          return {HitTargetType::CODELENS, hit_line, run.column, run.icon_id};
+        }
+      } else if (run.type == VisualRunType::LINK) {
+        if (click_x >= run_x && click_x < run_right) {
+          const LinkSpan* link = m_decoration_manager_->findLinkAt(hit_line, run.column);
+          if (link != nullptr) {
+            return {HitTargetType::LINK, hit_line, link->column, 0};
+          }
         }
       }
 
@@ -469,7 +481,8 @@ namespace NS_SWEETEDITOR {
         bool found = false;
         float vl_x = 0;
         for (const VisualRun& run : vl.runs) {
-          if (run.type != VisualRunType::TEXT && run.type != VisualRunType::TAB) {
+          if (run.type != VisualRunType::TEXT && run.type != VisualRunType::LINK && run.type != VisualRunType::TAB) {
+
             vl_x += run.width;
             continue;
           }
@@ -980,45 +993,9 @@ namespace NS_SWEETEDITOR {
     float line_height = getLineHeight();
     const float base_start_y = start_y;  // Save original start_y for phantom continuation y calculation
 
-    // CodeLens: prepend virtual line above the real code line
-    const auto& codelens_items = m_decoration_manager_->getLineCodeLens(line_index);
-    if (!codelens_items.empty()) {
-      VisualLine codelens_vl = {line_index, 0};
-      codelens_vl.line_number_position = {m_layout_metrics_.line_number_margin, start_y};
-      codelens_vl.kind = VisualLineKind::CODELENS;
-
-      float run_x = 0;
-      for (size_t ci = 0; ci < codelens_items.size(); ++ci) {
-        if (ci > 0) {
-          // Insert " | " separator run (plain TEXT, not clickable)
-          VisualRun sep;
-          sep.type = VisualRunType::TEXT;
-          sep.column = 0;
-          sep.length = 0;
-          sep.x = run_x;
-
-          static const U16String kSepText = {CHAR16(' '), CHAR16('|'), CHAR16(' ')};
-          sep.text = kSepText;
-          sep.width = measureWidth(sep.text, FONT_STYLE_NORMAL);
-          run_x += sep.width;
-          codelens_vl.runs.push_back(std::move(sep));
-        }
-        // Insert CODELENS run
-        VisualRun cl_run;
-        cl_run.type = VisualRunType::CODELENS;
-        cl_run.column = 0;
-        cl_run.length = 0;
-        cl_run.x = run_x;
-
-        cl_run.icon_id = codelens_items[ci].command_id;
-        U16String cl_u16;
-        StrUtil::convertUTF8ToUTF16(codelens_items[ci].text, cl_u16);
-        cl_run.text = std::move(cl_u16);
-        cl_run.width = cl_run.text.empty() ? 0 : measureWidth(cl_run.text, FONT_STYLE_NORMAL);
-        run_x += cl_run.width;
-        codelens_vl.runs.push_back(std::move(cl_run));
-      }
-      out_visual_lines.push_back(std::move(codelens_vl));
+    const auto& line_codelens_items = m_decoration_manager_->getLineCodeLens(line_index);
+    const bool has_codelens = !line_codelens_items.empty();
+    if (has_codelens) {
       start_y += line_height;
     }
 
@@ -1026,17 +1003,111 @@ namespace NS_SWEETEDITOR {
     Vector<VisualRun> all_runs;
     buildLineRuns(line_index, line_text, all_runs);
 
-    // Handle original line based on wrap mode
-    const size_t codelens_line_count = codelens_items.empty() ? 0 : 1;
+    // Build content lines first so CodeLens anchors can reuse current visual-column geometry.
+    Vector<VisualLine> content_visual_lines;
+    const size_t codelens_line_count = has_codelens ? 1 : 0;
     if (m_wrap_mode_ == WrapMode::NONE) {
       VisualLine visual_line = {line_index, codelens_line_count};
       visual_line.line_number_position = {m_layout_metrics_.line_number_margin, start_y};
       visual_line.kind = VisualLineKind::CONTENT;
       visual_line.owns_gutter_semantics = true;
       visual_line.runs = std::move(all_runs);
-      out_visual_lines.push_back(std::move(visual_line));
+      content_visual_lines.push_back(std::move(visual_line));
     } else {
-      wrapLineRuns(line_index, start_y, line_height, all_runs, out_visual_lines, codelens_line_count);
+      wrapLineRuns(line_index, start_y, line_height, all_runs, content_visual_lines, codelens_line_count);
+    }
+
+    if (has_codelens) {
+      Vector<CodeLensItem> codelens_items = line_codelens_items;
+      std::stable_sort(codelens_items.begin(), codelens_items.end(),
+                       [](const CodeLensItem& lhs, const CodeLensItem& rhs) {
+                         return lhs.column < rhs.column;
+                       });
+
+      auto resolveCodeLensAnchorX = [&](int32_t column) -> float {
+        const size_t safe_column = column <= 0
+            ? 0
+            : std::min(static_cast<size_t>(column), line_text.length());
+
+        float line_end_x = 0;
+        bool has_line_end = false;
+        for (const VisualLine& vl : content_visual_lines) {
+          size_t vl_col_min = SIZE_MAX;
+          size_t vl_col_max = 0;
+          float vl_width = 0;
+          const bool has_text = getVisualLineTextColumnExtent(vl, vl_col_min, vl_col_max, vl_width);
+          if (!has_text) {
+            continue;
+          }
+          if (safe_column >= vl_col_min && safe_column < vl_col_max) {
+            float anchor_x = 0;
+            if (columnToVisualLineX(vl, safe_column, false, anchor_x)) {
+              return anchor_x;
+            }
+          }
+          if (safe_column == line_text.length() && safe_column == vl_col_max) {
+            float anchor_x = 0;
+            if (columnToVisualLineX(vl, safe_column, true, anchor_x)) {
+              line_end_x = anchor_x;
+              has_line_end = true;
+            }
+          }
+        }
+        return has_line_end ? line_end_x : 0.0f;
+      };
+
+      VisualLine codelens_vl = {line_index, 0};
+      codelens_vl.line_number_position = {m_layout_metrics_.line_number_margin, base_start_y};
+      codelens_vl.kind = VisualLineKind::CODELENS;
+
+      static const U16String kSepText = {CHAR16(' '), CHAR16('|'), CHAR16(' ')};
+      const float sep_width = measureWidth(kSepText, FONT_STYLE_NORMAL);
+      float run_x = 0;
+      for (size_t ci = 0; ci < codelens_items.size(); ++ci) {
+        const CodeLensItem& codelens_item = codelens_items[ci];
+        if (ci > 0) {
+          VisualRun sep;
+          sep.type = VisualRunType::TEXT;
+          sep.column = 0;
+          sep.length = 0;
+          sep.x = run_x;
+          sep.text = kSepText;
+          sep.width = sep_width;
+          run_x += sep.width;
+          codelens_vl.runs.push_back(std::move(sep));
+        }
+
+        const float anchor_x = std::max(0.0f, resolveCodeLensAnchorX(codelens_item.column));
+        if (anchor_x > run_x) {
+          VisualRun spacer;
+          spacer.type = VisualRunType::WHITESPACE;
+          spacer.column = codelens_item.column <= 0 ? 0 : static_cast<size_t>(codelens_item.column);
+          spacer.length = 0;
+          spacer.x = run_x;
+          spacer.width = anchor_x - run_x;
+          run_x = anchor_x;
+          codelens_vl.runs.push_back(std::move(spacer));
+        }
+
+        VisualRun cl_run;
+        cl_run.type = VisualRunType::CODELENS;
+        cl_run.column = codelens_item.column <= 0 ? 0 : static_cast<size_t>(codelens_item.column);
+        cl_run.length = 0;
+        cl_run.x = run_x;
+        cl_run.icon_id = codelens_item.command_id;
+        U16String cl_u16;
+        StrUtil::convertUTF8ToUTF16(codelens_item.text, cl_u16);
+        cl_run.text = std::move(cl_u16);
+        cl_run.width = cl_run.text.empty() ? 0 : measureWidth(cl_run.text, FONT_STYLE_NORMAL);
+        run_x += cl_run.width;
+        codelens_vl.runs.push_back(std::move(cl_run));
+      }
+
+      out_visual_lines.push_back(std::move(codelens_vl));
+    }
+
+    for (auto& visual_line : content_visual_lines) {
+      out_visual_lines.push_back(std::move(visual_line));
     }
 
     // Handle cross-line phantom text continuation (2nd, 3rd... lines), each segment also wraps
@@ -1860,10 +1931,11 @@ namespace NS_SWEETEDITOR {
                                        float& out_x) {
     float vl_x = 0;
     for (const VisualRun& run : visual_line.runs) {
-      if (run.type != VisualRunType::TEXT && run.type != VisualRunType::TAB) {
+      if (run.type != VisualRunType::TEXT && run.type != VisualRunType::LINK && run.type != VisualRunType::TAB) {
         vl_x += run.width;
         continue;
       }
+
 
       size_t run_start = run.column;
       size_t run_end = run.column + run.length;

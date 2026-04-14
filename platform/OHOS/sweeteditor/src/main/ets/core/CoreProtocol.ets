@@ -19,6 +19,7 @@ import {
   IndentGuide,
   InlayHint,
   InlayType,
+  LinkSpan,
   PhantomText,
   SeparatorGuide,
   StyleSpan,
@@ -314,10 +315,11 @@ export class ProtocolEncoder {
       textBytesArray.push(bytes);
       textBlobSize += bytes.length;
     }
-    const writer = new BinaryWriter(8 + items.length * 8 + textBlobSize);
+    const writer = new BinaryWriter(8 + items.length * 12 + textBlobSize);
     writer.writeInt32(line);
     writer.writeInt32(items.length);
     for (let i = 0; i < items.length; i++) {
+      writer.writeInt32(items[i].column);
       writer.writeInt32(items[i].commandId);
       const tb = textBytesArray[i];
       writer.writeInt32(tb.length);
@@ -338,7 +340,7 @@ export class ProtocolEncoder {
       for (const item of items) {
         const bytes = encoder.encodeInto(item.text);
         lineTextBytes.push(bytes);
-        totalSize += 8 + bytes.length; // command_id + text_len + text
+        totalSize += 12 + bytes.length; // column + command_id + text_len + text
       }
       allTextBytes.set(line, lineTextBytes);
     });
@@ -349,8 +351,66 @@ export class ProtocolEncoder {
       writer.writeInt32(items.length);
       const lineTextBytes = allTextBytes.get(line)!;
       for (let i = 0; i < items.length; i++) {
+        writer.writeInt32(items[i].column);
         writer.writeInt32(items[i].commandId);
         const tb = lineTextBytes[i];
+        writer.writeInt32(tb.length);
+        if (tb.length > 0) {
+          writer.writeBytes(tb);
+        }
+      }
+    });
+    return writer.getBuffer();
+  }
+
+  static packLineLinks(line: number, links: LinkSpan[]): ArrayBuffer {
+    const encoder = new util.TextEncoder();
+    const targetBytesArray: Uint8Array[] = [];
+    let targetBlobSize = 0;
+    for (const link of links) {
+      const bytes = encoder.encodeInto(link.target);
+      targetBytesArray.push(bytes);
+      targetBlobSize += bytes.length;
+    }
+    const writer = new BinaryWriter(8 + links.length * 12 + targetBlobSize);
+    writer.writeInt32(line);
+    writer.writeInt32(links.length);
+    for (let i = 0; i < links.length; i++) {
+      writer.writeInt32(links[i].column);
+      writer.writeInt32(links[i].length);
+      const tb = targetBytesArray[i];
+      writer.writeInt32(tb.length);
+      if (tb.length > 0) {
+        writer.writeBytes(tb);
+      }
+    }
+    return writer.getBuffer();
+  }
+
+  static packBatchLineLinks(linksByLine: Map<number, LinkSpan[]>): ArrayBuffer {
+    const encoder = new util.TextEncoder();
+    const allTargetBytes: Map<number, Uint8Array[]> = new Map();
+    let totalSize = 4;
+    linksByLine.forEach((links, line) => {
+      totalSize += 8;
+      const lineTargetBytes: Uint8Array[] = [];
+      for (const link of links) {
+        const bytes = encoder.encodeInto(link.target);
+        lineTargetBytes.push(bytes);
+        totalSize += 12 + bytes.length;
+      }
+      allTargetBytes.set(line, lineTargetBytes);
+    });
+    const writer = new BinaryWriter(totalSize);
+    writer.writeInt32(linksByLine.size);
+    linksByLine.forEach((links, line) => {
+      writer.writeInt32(line);
+      writer.writeInt32(links.length);
+      const lineTargetBytes = allTargetBytes.get(line)!;
+      for (let i = 0; i < links.length; i++) {
+        writer.writeInt32(links[i].column);
+        writer.writeInt32(links[i].length);
+        const tb = lineTargetBytes[i];
         writer.writeInt32(tb.length);
         if (tb.length > 0) {
           writer.writeBytes(tb);
@@ -363,7 +423,7 @@ export class ProtocolEncoder {
   static packBatchLineDiagnostics(diagsByLine: Map<number, DiagnosticItem[]>): ArrayBuffer {
     let totalDiags = 0;
     diagsByLine.forEach(items => totalDiags += items.length);
-    const writer = new BinaryWriter(4 + diagsByLine.size * 8 + totalDiags * 16);
+    const writer = new BinaryWriter(4 + diagsByLine.size * 8 + totalDiags * 12);
     writer.writeInt32(diagsByLine.size);
     diagsByLine.forEach((items, line) => {
       writer.writeInt32(line);
@@ -372,7 +432,6 @@ export class ProtocolEncoder {
         writer.writeInt32(d.column);
         writer.writeInt32(d.length);
         writer.writeInt32(d.severity);
-        writer.writeInt32(d.color);
       }
     });
     return writer.getBuffer();
@@ -442,14 +501,13 @@ export class ProtocolEncoder {
   }
 
   static packLineDiagnostics(line: number, items: DiagnosticItem[]): ArrayBuffer {
-    const writer = new BinaryWriter(8 + items.length * 16);
+    const writer = new BinaryWriter(8 + items.length * 12);
     writer.writeInt32(line);
     writer.writeInt32(items.length);
     for (const d of items) {
       writer.writeInt32(d.column);
       writer.writeInt32(d.length);
       writer.writeInt32(d.severity);
-      writer.writeInt32(d.color);
     }
     return writer.getBuffer();
   }
@@ -986,8 +1044,7 @@ export class ProtocolDecoder {
       origin: reader.readPoint(),
       width: reader.readFloat32(),
       height: reader.readFloat32(),
-      severity: reader.readInt32(),
-      color: reader.readInt32()
+      severity: reader.readInt32()
     };
   }
 

@@ -43,6 +43,7 @@ public struct DecorationType: OptionSet {
     public static let gutterIcon = DecorationType(rawValue: 1 << 9)
     public static let phantomText = DecorationType(rawValue: 1 << 10)
     public static let codeLens = DecorationType(rawValue: 1 << 11)
+    public static let link = DecorationType(rawValue: 1 << 12)
 }
 
 public protocol DecorationReceiver: AnyObject {
@@ -88,13 +89,11 @@ public struct DecorationResult {
         public let column: Int32
         public let length: Int32
         public let severity: Int32
-        public let color: Int32
 
-        public init(column: Int32, length: Int32, severity: Int32, color: Int32) {
+        public init(column: Int32, length: Int32, severity: Int32) {
             self.column = column
             self.length = length
             self.severity = severity
-            self.color = color
         }
     }
 
@@ -167,12 +166,26 @@ public struct DecorationResult {
     }
 
     public struct CodeLensItem {
+        public let column: Int
         public let text: String
         public let commandId: Int32
 
-        public init(text: String, commandId: Int32) {
+        public init(column: Int, text: String, commandId: Int32) {
+            self.column = column
             self.text = text
             self.commandId = commandId
+        }
+    }
+
+    public struct LinkSpanItem {
+        public let column: Int
+        public let length: Int
+        public let target: String
+
+        public init(column: Int, length: Int, target: String) {
+            self.column = column
+            self.length = length
+            self.target = target
         }
     }
 
@@ -188,6 +201,7 @@ public struct DecorationResult {
     public var gutterIcons: [Int: [Int32]]?
     public var phantomTexts: [Int: [PhantomTextItem]]?
     public var codeLensItems: [Int: [CodeLensItem]]?
+    public var links: [Int: [LinkSpanItem]]?
 
     public init(
         syntaxSpans: [Int: [SpanItem]]? = nil,
@@ -201,7 +215,8 @@ public struct DecorationResult {
         foldRegions: [FoldRegionItem]? = nil,
         gutterIcons: [Int: [Int32]]? = nil,
         phantomTexts: [Int: [PhantomTextItem]]? = nil,
-        codeLensItems: [Int: [CodeLensItem]]? = nil
+        codeLensItems: [Int: [CodeLensItem]]? = nil,
+        links: [Int: [LinkSpanItem]]? = nil
     ) {
         self.syntaxSpans = syntaxSpans
         self.semanticSpans = semanticSpans
@@ -215,6 +230,7 @@ public struct DecorationResult {
         self.gutterIcons = gutterIcons
         self.phantomTexts = phantomTexts
         self.codeLensItems = codeLensItems
+        self.links = links
     }
 }
 
@@ -390,6 +406,7 @@ final class DecorationProviderManager {
         var gutterIcons: [Int: [Int32]] = [:]
         var phantomTexts: [Int: [DecorationResult.PhantomTextItem]] = [:]
         var codeLensItems: [Int: [DecorationResult.CodeLensItem]] = [:]
+        var links: [Int: [DecorationResult.LinkSpanItem]] = [:]
 
         for provider in providers {
             guard let snapshot = states[ObjectIdentifier(provider)]?.snapshot else { continue }
@@ -400,6 +417,7 @@ final class DecorationProviderManager {
             appendMap(&gutterIcons, snapshot.gutterIcons)
             appendMap(&phantomTexts, snapshot.phantomTexts)
             appendMap(&codeLensItems, snapshot.codeLensItems)
+            appendMap(&links, snapshot.links)
 
             if let v = snapshot.indentGuides { indentGuides = v }
             if let v = snapshot.bracketGuides { bracketGuides = v }
@@ -447,8 +465,7 @@ final class DecorationProviderManager {
                     SweetEditorCore.DiagnosticItem(
                         column: $0.column,
                         length: $0.length,
-                        severity: $0.severity,
-                        color: $0.color
+                        severity: $0.severity
                     )
                 }
             }
@@ -525,9 +542,17 @@ final class DecorationProviderManager {
         core.clearCodeLens()
         if !codeLensItems.isEmpty {
             let converted = codeLensItems.mapValues { items in
-                items.map { SweetEditorCore.CodeLensPayload(text: $0.text, commandId: $0.commandId) }
+                items.map { SweetEditorCore.CodeLensPayload(column: Int32($0.column), text: $0.text, commandId: $0.commandId) }
             }
             core.setBatchLineCodeLens(converted)
+        }
+
+        core.clearLinks()
+        if !links.isEmpty {
+            let converted = links.mapValues { items in
+                items.map { SweetEditorCore.LinkSpan(column: $0.column, length: $0.length, target: $0.target) }
+            }
+            core.setBatchLineLinks(converted)
         }
 
         onApplied()
@@ -546,6 +571,7 @@ final class DecorationProviderManager {
         if let v = patch.gutterIcons { target.gutterIcons = v }
         if let v = patch.phantomTexts { target.phantomTexts = v }
         if let v = patch.codeLensItems { target.codeLensItems = v }
+        if let v = patch.links { target.links = v }
     }
 
     private func appendMap<T>(_ target: inout [Int: [T]], _ patch: [Int: [T]]?) {

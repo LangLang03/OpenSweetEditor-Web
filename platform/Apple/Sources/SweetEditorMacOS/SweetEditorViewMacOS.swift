@@ -12,6 +12,7 @@ public class SweetEditorViewMacOS: NSView, NSTextInputClient, CompletionEditorAc
     public var onInlayHintClick: ((SweetEditorInlayHintClickEvent) -> Void)?
     public var onGutterIconClick: ((SweetEditorGutterIconClickEvent) -> Void)?
     public var onCodeLensClick: ((SweetEditorCodeLensClickEvent) -> Void)?
+    public var onLinkClick: ((SweetEditorLinkClickEvent) -> Void)?
     public var editorIconProvider: EditorIconProvider?
     public var scrollbarHoverRevealEnabled: Bool {
         get { scrollbarPolicy.hoverRevealEnabled }
@@ -266,6 +267,20 @@ public class SweetEditorViewMacOS: NSView, NSTextInputClient, CompletionEditorAc
         rebuildAndRedraw()
     }
 
+    public func setLineLinks(line: Int, links: [SweetEditorCore.LinkSpan]) {
+        editorCore.setLineLinks(line: line, links: links)
+        rebuildAndRedraw()
+    }
+
+    public func setBatchLineLinks(_ linksByLine: [Int: [SweetEditorCore.LinkSpan]]) {
+        editorCore.setBatchLineLinks(linksByLine)
+        rebuildAndRedraw()
+    }
+
+    public func getLinkTargetAt(line: Int, column: Int) -> String {
+        editorCore.getLinkTargetAt(line: line, column: column)
+    }
+
     /// Compatibility wrapper for callers not yet migrated to `settings`.
     public func setMaxGutterIcons(_ count: UInt32) {
         settings.setMaxGutterIcons(count)
@@ -366,6 +381,11 @@ public class SweetEditorViewMacOS: NSView, NSTextInputClient, CompletionEditorAc
         rebuildAndRedraw()
     }
 
+    public func clearLinks() {
+        editorCore.clearLinks()
+        rebuildAndRedraw()
+    }
+
     public func clearGuides() {
         editorCore.clearGuides()
         rebuildAndRedraw()
@@ -411,8 +431,7 @@ public class SweetEditorViewMacOS: NSView, NSTextInputClient, CompletionEditorAc
                     SweetEditorCore.DiagnosticItem(
                         column: $0.column,
                         length: $0.length,
-                        severity: $0.severity,
-                        color: $0.color
+                        severity: $0.severity
                     )
                 }
                 diagnosticsByLine[lineDiagnostics.line, default: []].append(contentsOf: mapped)
@@ -443,6 +462,16 @@ public class SweetEditorViewMacOS: NSView, NSTextInputClient, CompletionEditorAc
         }
         if !phantomsByLine.isEmpty {
             editorCore.setBatchLinePhantomTexts(phantomsByLine)
+        }
+
+        var linksByLine: [Int: [SweetEditorCore.LinkSpan]] = [:]
+        for item in decorations.links {
+            linksByLine[item.line, default: []].append(
+                SweetEditorCore.LinkSpan(column: item.column, length: item.length, target: item.target)
+            )
+        }
+        if !linksByLine.isEmpty {
+            editorCore.setBatchLineLinks(linksByLine)
         }
     }
 
@@ -635,7 +664,7 @@ public class SweetEditorViewMacOS: NSView, NSTextInputClient, CompletionEditorAc
         }
         let trackingArea = NSTrackingArea(
             rect: .zero,
-            options: [.activeInKeyWindow, .inVisibleRect, .mouseMoved],
+            options: [.activeInKeyWindow, .inVisibleRect, .mouseMoved, .mouseEnteredAndExited],
             owner: self,
             userInfo: nil
         )
@@ -969,6 +998,15 @@ public class SweetEditorViewMacOS: NSView, NSTextInputClient, CompletionEditorAc
         rebuildAndRedraw()
     }
 
+    override func mouseExited(with event: NSEvent) {
+        scrollbarHoverController.reset()
+        let mods = modifiersFromEvent(event)
+        let result = editorCore.handleGestureEvent(type: .mouseMove, points: [(-1, -1)],
+                                                   modifiers: mods)
+        handleGestureResult(result)
+        rebuildAndRedraw()
+    }
+
     override func mouseUp(with event: NSEvent) {
         resetCursorBlink()
         let point = convert(event.locationInWindow, from: nil)
@@ -1092,7 +1130,17 @@ public class SweetEditorViewMacOS: NSView, NSTextInputClient, CompletionEditorAc
             onCodeLensClick?(
                 SweetEditorCodeLensClickEvent(
                     line: result.hit_target.line,
+                    column: result.hit_target.column,
                     commandId: result.hit_target.icon_id,
+                    locationInView: CGPoint(x: CGFloat(result.tap_point.x), y: CGFloat(result.tap_point.y))
+                )
+            )
+        case .LINK:
+            onLinkClick?(
+                SweetEditorLinkClickEvent(
+                    line: result.hit_target.line,
+                    column: result.hit_target.column,
+                    target: getLinkTargetAt(line: result.hit_target.line, column: result.hit_target.column),
                     locationInView: CGPoint(x: CGFloat(result.tap_point.x), y: CGFloat(result.tap_point.y))
                 )
             )

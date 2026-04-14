@@ -21,8 +21,4 @@ public class DiagnosticDecoration {
     /** Severity level (0=ERROR, 1=WARNING, 2=INFO, 3=HINT) */
     @SerializedName("severity")
     public int severity;
-
-    /** Color value (ARGB), 0 means use default color for severity */
-    @SerializedName("color")
-    public int color;
 }

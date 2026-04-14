@@ -61,6 +61,28 @@ class EditorInteractionController {
     );
   }
 
+  core.GestureResult? onPointerHover(PointerHoverEvent event) {
+    final gestureEvent = core.GestureEvent(
+      type: core.EventType.mouseMove,
+      points: [
+        core.PointF(x: event.localPosition.dx, y: event.localPosition.dy),
+      ],
+    );
+    return _processGestureResult(
+      _session.editorCore?.handleGestureEvent(gestureEvent),
+    );
+  }
+
+  core.GestureResult? onPointerExit(PointerExitEvent event) {
+    final gestureEvent = core.GestureEvent(
+      type: core.EventType.mouseMove,
+      points: const [core.PointF(x: -1, y: -1)],
+    );
+    return _processGestureResult(
+      _session.editorCore?.handleGestureEvent(gestureEvent),
+    );
+  }
+
   core.GestureResult? onPointerUp(PointerUpEvent event) {
     final isTouch = event.kind == PointerDeviceKind.touch;
     final gestureEvent = core.GestureEvent(
@@ -347,6 +369,7 @@ class EditorInteractionController {
         _session.eventBus.publish(
           CodeLensClickEvent(
             line: hitTarget.line,
+            column: hitTarget.column,
             commandId: hitTarget.iconId,
             screenPoint: screenPoint,
           ),

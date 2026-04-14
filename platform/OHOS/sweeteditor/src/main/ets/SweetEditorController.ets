@@ -10,6 +10,7 @@ import {
   GutterIcon,
   IndentGuide,
   InlayHint,
+  LinkSpan,
   PhantomText,
   SeparatorGuide,
   SpanLayer,
@@ -31,6 +32,7 @@ import {
   FoldToggleEvent,
   GutterIconClickEvent,
   InlayHintClickEvent,
+  LinkClickEvent,
   LongPressEvent,
   ScaleChangedEvent,
   ScrollChangedEvent,
@@ -60,6 +62,7 @@ export class SweetEditorController {
   private metadata: EditorMetadata | null = null;
   private iconProvider: EditorIconProvider | null = null;
   private keyMap: EditorKeyMap = EditorKeyMap.defaultKeyMap();
+  private settings: EditorSettings = new EditorSettings();
 
   bind(api: SweetEditor): void {
     this.api = api;
@@ -88,11 +91,12 @@ export class SweetEditorController {
 
   unbind(api: SweetEditor): void {
     if (this.api === api) {
-      this.eventListeners.forEach((listeners, type) => {
+      this.eventListeners.forEach((listeners, type): void => {
         for (const listener of listeners) {
           this.detachEventListener(api, type, listener);
         }
       });
+      this.settings.unbind(api);
       this.api = null;
     }
   }
@@ -117,8 +121,8 @@ export class SweetEditorController {
     return this.api ? this.api.getDocument() : this.document;
   }
 
-  getSettings(): EditorSettings | null {
-    return this.api ? this.api.getSettings() : null;
+  getSettings(): EditorSettings {
+    return this.settings;
   }
 
   applyTheme(theme: EditorTheme): void {
@@ -396,6 +400,18 @@ export class SweetEditorController {
 
   setBatchLineCodeLens(itemsByLine: Map<number, CodeLensItem[]>): void {
     this.run((api) => api.setBatchLineCodeLens(itemsByLine));
+  }
+
+  setLineLinks(line: number, links: LinkSpan[]): void {
+    this.run((api) => api.setLineLinks(line, links));
+  }
+
+  setBatchLineLinks(linksByLine: Map<number, LinkSpan[]>): void {
+    this.run((api) => api.setBatchLineLinks(linksByLine));
+  }
+
+  getLinkTargetAt(line: number, column: number): string {
+    return this.api ? this.api.getLinkTargetAt(line, column) : '';
   }
 
   setLineDiagnostics(line: number, items: DiagnosticItem[]): void {
@@ -694,7 +710,7 @@ export class SweetEditorController {
   }
 
   private attachStoredEventListeners(api: SweetEditor): void {
-    this.eventListeners.forEach((listeners, type) => {
+    this.eventListeners.forEach((listeners, type): void => {
       for (const listener of listeners) {
         this.attachEventListener(api, type, listener);
       }
@@ -735,6 +751,9 @@ export class SweetEditorController {
         break;
       case 'codeLensClick':
         api.onCodeLensClick(listener as EditorEventListener<CodeLensClickEvent>);
+        break;
+      case 'linkClick':
+        api.onLinkClick(listener as EditorEventListener<LinkClickEvent>);
         break;
       case 'foldToggle':
         api.onFoldToggle(listener as EditorEventListener<FoldToggleEvent>);
@@ -782,6 +801,9 @@ export class SweetEditorController {
         break;
       case 'codeLensClick':
         api.offCodeLensClick(listener as EditorEventListener<CodeLensClickEvent>);
+        break;
+      case 'linkClick':
+        api.offLinkClick(listener as EditorEventListener<LinkClickEvent>);
         break;
       case 'foldToggle':
         api.offFoldToggle(listener as EditorEventListener<FoldToggleEvent>);

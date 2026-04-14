@@ -626,7 +626,7 @@ final class EditorRenderer implements EditorCore.TextMeasureCallback {
     private void drawDiagnosticDecorations(Graphics2D g, EditorRenderModel model) {
         if (model.diagnosticDecorations == null || model.diagnosticDecorations.isEmpty()) return;
         for (DiagnosticDecoration diag : model.diagnosticDecorations) {
-            Color c = diag.color != 0 ? argbToColor(diag.color) : switch (diag.severity) {
+            Color c = switch (diag.severity) {
                 case 0 -> theme.diagnosticErrorColor;
                 case 1 -> theme.diagnosticWarningColor;
                 case 2 -> theme.diagnosticInfoColor;

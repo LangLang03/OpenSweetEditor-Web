@@ -311,7 +311,7 @@ class ProtocolEncoder {
     for (final item in items) {
       final tb = utf8.encode(item.text);
       allTextBytes.add(tb);
-      totalSize += 8 + tb.length; // command_id(4) + text_len(4) + text
+      totalSize += 12 + tb.length; // column(4) + command_id(4) + text_len(4) + text
     }
     final buf = ByteData(totalSize);
     var offset = 0;
@@ -320,6 +320,8 @@ class ProtocolEncoder {
     buf.setInt32(offset, items.length, Endian.little);
     offset += 4;
     for (var i = 0; i < items.length; i++) {
+      buf.setInt32(offset, items[i].column, Endian.little);
+      offset += 4;
       buf.setInt32(offset, items[i].commandId, Endian.little);
       offset += 4;
       final tb = allTextBytes[i];
@@ -344,7 +346,7 @@ class ProtocolEncoder {
       for (final item in items) {
         final tb = utf8.encode(item.text);
         lineTexts.add(tb);
-        totalSize += 8 + tb.length;
+        totalSize += 12 + tb.length;
       }
       allTextBytes[line] = lineTexts;
     });
@@ -359,6 +361,8 @@ class ProtocolEncoder {
       offset += 4;
       final lineTexts = allTextBytes[line]!;
       for (var i = 0; i < items.length; i++) {
+        buf.setInt32(offset, items[i].column, Endian.little);
+        offset += 4;
         buf.setInt32(offset, items[i].commandId, Endian.little);
         offset += 4;
         final tb = lineTexts[i];
@@ -374,7 +378,7 @@ class ProtocolEncoder {
   }
 
   static Uint8List packLineDiagnostics(int line, List<Diagnostic> items) {
-    final data = ByteData(8 + items.length * 16);
+    final data = ByteData(8 + items.length * 12);
     var offset = 0;
     data.setInt32(offset, line, Endian.little);
     offset += 4;
@@ -387,8 +391,6 @@ class ProtocolEncoder {
       offset += 4;
       data.setInt32(offset, d.severity, Endian.little);
       offset += 4;
-      data.setInt32(offset, d.color, Endian.little);
-      offset += 4;
     }
     return data.buffer.asUint8List();
   }
@@ -398,7 +400,7 @@ class ProtocolEncoder {
   ) {
     var totalDiags = 0;
     diagsByLine.forEach((_, items) => totalDiags += items.length);
-    final data = ByteData(4 + diagsByLine.length * 8 + totalDiags * 16);
+    final data = ByteData(4 + diagsByLine.length * 8 + totalDiags * 12);
     var offset = 0;
     data.setInt32(offset, diagsByLine.length, Endian.little);
     offset += 4;
@@ -413,8 +415,6 @@ class ProtocolEncoder {
         data.setInt32(offset, d.length, Endian.little);
         offset += 4;
         data.setInt32(offset, d.severity, Endian.little);
-        offset += 4;
-        data.setInt32(offset, d.color, Endian.little);
         offset += 4;
       }
     });
@@ -970,7 +970,6 @@ class ProtocolDecoder {
       width: r.readFloat32(),
       height: r.readFloat32(),
       severity: r.readInt32(),
-      color: r.readInt32(),
     );
   }
 

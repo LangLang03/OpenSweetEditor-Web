@@ -14,7 +14,8 @@ export enum VisualRunType {
   PHANTOM_TEXT = 4,
   FOLD_PLACEHOLDER = 5,
   TAB = 6,
-  CODELENS = 7
+  CODELENS = 7,
+  LINK = 8
 }
 
 export enum FoldState {
@@ -129,7 +130,6 @@ export interface DiagnosticDecoration {
   width: number;
   height: number;
   severity: number;
-  color: number;
 }
 
 export interface LinkedEditingRect {

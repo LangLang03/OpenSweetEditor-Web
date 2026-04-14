@@ -19,6 +19,7 @@ namespace SweetEditor {
 		private const float BaseInlayHintFontSize = 9.5f;
 		private const string DefaultTextFontFamily = "Consolas";
 		private const string BaseInlayHintFontFamily = "Segoe UI";
+		private const int TemporaryLinkColor = unchecked((int)0xFF4C9DFF);
 
 		internal float baseTextFontSize = DefaultTextFontSize;
 		internal string baseTextFontFamily = DefaultTextFontFamily;
@@ -543,6 +544,8 @@ namespace SweetEditor {
 			Color color;
 			if (visualRun.Type == VisualRunType.CODELENS) {
 				color = visualRun.Active ? GetCurrentLineAccentColor() : currentTheme.InlayHintTextColor;
+			} else if (visualRun.Type == VisualRunType.LINK) {
+				color = Color.FromArgb(TemporaryLinkColor);
 			} else {
 				color = (visualRun.Style.Color != 0)
 					? Color.FromArgb(visualRun.Style.Color)
@@ -610,7 +613,7 @@ namespace SweetEditor {
 					? Color.FromArgb(128, color)
 					: color;
 				TextRenderer.DrawText(g, drawTextContent, font, rect, drawColor, TextMeasureDrawFlags);
-				if (visualRun.Type == VisualRunType.CODELENS && visualRun.Active) {
+				if ((visualRun.Type == VisualRunType.CODELENS || visualRun.Type == VisualRunType.LINK) && visualRun.Active) {
 					float underlineY = visualRun.Y + 1f;
 					using var underlinePen = new Pen(drawColor, 1f);
 					g.DrawLine(underlinePen, visualRun.X, underlineY, visualRun.X + visualRun.Width, underlineY);
@@ -692,16 +695,14 @@ namespace SweetEditor {
 		}
 
 		private void DrawDiagnosticDecorations(Graphics g, EditorRenderModel model) {
-			if (model.DiagnosticDecorations == null || model.DiagnosticDecorations.Count == 0) return;
-			foreach (var diag in model.DiagnosticDecorations) {
-				var color = diag.Color != 0
-					? System.Drawing.Color.FromArgb(diag.Color)
-					: diag.Severity switch {
-						0 => System.Drawing.Color.FromArgb(255, 255, 0, 0),
-						1 => System.Drawing.Color.FromArgb(255, 255, 204, 0),
-						2 => System.Drawing.Color.FromArgb(255, 97, 181, 237),
-						_ => System.Drawing.Color.FromArgb(178, 153, 153, 153),
-					};
+		if (model.DiagnosticDecorations == null || model.DiagnosticDecorations.Count == 0) return;
+		foreach (var diag in model.DiagnosticDecorations) {
+			var color = diag.Severity switch {
+				0 => System.Drawing.Color.FromArgb(255, 255, 0, 0),
+				1 => System.Drawing.Color.FromArgb(255, 255, 204, 0),
+				2 => System.Drawing.Color.FromArgb(255, 97, 181, 237),
+				_ => System.Drawing.Color.FromArgb(178, 153, 153, 153),
+			};
 
 				float startX = diag.Origin.X;
 				float endX = startX + diag.Width;

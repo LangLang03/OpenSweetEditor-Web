@@ -1,5 +1,6 @@
 #include <catch2/catch_amalgamated.hpp>
 #include <algorithm>
+#include <string>
 #include "editor_core.h"
 #include "test_measurer.h"
 
@@ -23,6 +24,21 @@ namespace {
     }
     REQUIRE(false);
     return line.runs.front();
+  }
+
+  Vector<const VisualRun*> findRunsOfType(const EditorRenderModel& model,
+                                          size_t logical_line,
+                                          VisualRunType type) {
+    Vector<const VisualRun*> runs;
+    for (const VisualLine& line : model.lines) {
+      if (line.logical_line != logical_line) continue;
+      for (const VisualRun& run : line.runs) {
+        if (run.type == type) {
+          runs.push_back(&run);
+        }
+      }
+    }
+    return runs;
   }
 }
 
@@ -119,7 +135,7 @@ TEST_CASE("EditorCore handleGestureEvent tap on CodeLens keeps cursor unchanged"
   editor.setViewport({400, 160});
   editor.setCursorPosition({0, 3});
   Vector<CodeLensItem> items;
-  items.push_back({"3 references", 101});
+  items.push_back({2, "3 references", 101});
   editor.setLineCodeLens(0, std::move(items));
 
   EditorRenderModel model;
@@ -135,6 +151,7 @@ TEST_CASE("EditorCore handleGestureEvent tap on CodeLens keeps cursor unchanged"
       GestureEvent::create(EventType::MOUSE_DOWN, 1, point));
 
   CHECK(result.hit_target.type == HitTargetType::CODELENS);
+  CHECK(result.hit_target.column == 2);
   CHECK(result.hit_target.icon_id == 101);
   CHECK(result.cursor_position == (TextPosition{0, 3}));
   CHECK(editor.getCursorPosition() == (TextPosition{0, 3}));
@@ -147,8 +164,8 @@ TEST_CASE("EditorCore buildRenderModel activates only hovered CodeLens run") {
   editor.loadDocument(makeShared<LineArrayDocument>("abcdef"));
   editor.setViewport({480, 160});
   Vector<CodeLensItem> items;
-  items.push_back({"3 references", 101});
-  items.push_back({"2 implementations", 202});
+  items.push_back({1, "3 references", 101});
+  items.push_back({4, "2 implementations", 202});
   editor.setLineCodeLens(0, std::move(items));
 
   EditorRenderModel model;
@@ -183,6 +200,246 @@ TEST_CASE("EditorCore buildRenderModel activates only hovered CodeLens run") {
   const VisualLine& after_second_hover = findCodeLensVisualLine(model, 0);
   CHECK_FALSE(findNthCodeLensRun(after_second_hover, 0).active);
   CHECK(findNthCodeLensRun(after_second_hover, 1).active);
+
+  const float hover_exit[2] = {-1.0f, -1.0f};
+  editor.handleGestureEvent(GestureEvent::create(EventType::MOUSE_MOVE, 1, hover_exit));
+
+  model = {};
+  editor.buildRenderModel(model);
+  const VisualLine& after_hover_exit = findCodeLensVisualLine(model, 0);
+  CHECK_FALSE(findNthCodeLensRun(after_hover_exit, 0).active);
+  CHECK_FALSE(findNthCodeLensRun(after_hover_exit, 1).active);
+}
+
+TEST_CASE("EditorCore buildRenderModel keeps CodeLens active while mouse is pressed") {
+  EditorOptions options;
+  EditorCore editor(makeShared<FixedWidthTextMeasurer>(10.0f), options);
+
+  editor.loadDocument(makeShared<LineArrayDocument>("abcdef"));
+  editor.setViewport({480, 160});
+  Vector<CodeLensItem> items;
+  items.push_back({1, "3 references", 101});
+  items.push_back({4, "2 implementations", 202});
+  editor.setLineCodeLens(0, std::move(items));
+
+  EditorRenderModel model;
+  editor.buildRenderModel(model);
+  const VisualLine& codelens_line = findCodeLensVisualLine(model, 0);
+  const VisualRun& first = findNthCodeLensRun(codelens_line, 0);
+  const float press_point[2] = {
+      first.x + first.width * 0.5f,
+      first.y
+  };
+
+  editor.handleGestureEvent(GestureEvent::create(EventType::MOUSE_DOWN, 1, press_point));
+
+  model = {};
+  editor.buildRenderModel(model);
+  const VisualLine& pressed_model = findCodeLensVisualLine(model, 0);
+  CHECK(findNthCodeLensRun(pressed_model, 0).active);
+  CHECK_FALSE(findNthCodeLensRun(pressed_model, 1).active);
+
+  editor.handleGestureEvent(GestureEvent::create(EventType::MOUSE_UP, 1, press_point));
+
+  model = {};
+  editor.buildRenderModel(model);
+  const VisualLine& released_model = findCodeLensVisualLine(model, 0);
+  CHECK_FALSE(findNthCodeLensRun(released_model, 0).active);
+  CHECK_FALSE(findNthCodeLensRun(released_model, 1).active);
+}
+
+TEST_CASE("EditorCore buildRenderModel clears pressed CodeLens when touch moves away") {
+  EditorOptions options;
+  EditorCore editor(makeShared<FixedWidthTextMeasurer>(10.0f), options);
+
+  editor.loadDocument(makeShared<LineArrayDocument>("abcdef"));
+  editor.setViewport({480, 160});
+  Vector<CodeLensItem> items;
+  items.push_back({1, "3 references", 101});
+  items.push_back({4, "2 implementations", 202});
+  editor.setLineCodeLens(0, std::move(items));
+
+  EditorRenderModel model;
+  editor.buildRenderModel(model);
+  const VisualLine& codelens_line = findCodeLensVisualLine(model, 0);
+  const VisualRun& first = findNthCodeLensRun(codelens_line, 0);
+  const VisualRun& second = findNthCodeLensRun(codelens_line, 1);
+  const float first_press[2] = {
+      first.x + first.width * 0.5f,
+      first.y
+  };
+  const float move_out[2] = {
+      second.x + second.width * 0.5f,
+      second.y
+  };
+
+  editor.handleGestureEvent(GestureEvent::create(EventType::TOUCH_DOWN, 1, first_press));
+
+  model = {};
+  editor.buildRenderModel(model);
+  const VisualLine& pressed_model = findCodeLensVisualLine(model, 0);
+  CHECK(findNthCodeLensRun(pressed_model, 0).active);
+  CHECK_FALSE(findNthCodeLensRun(pressed_model, 1).active);
+
+  editor.handleGestureEvent(GestureEvent::create(EventType::TOUCH_MOVE, 1, move_out));
+
+  model = {};
+  editor.buildRenderModel(model);
+  const VisualLine& moved_model = findCodeLensVisualLine(model, 0);
+  CHECK_FALSE(findNthCodeLensRun(moved_model, 0).active);
+  CHECK_FALSE(findNthCodeLensRun(moved_model, 1).active);
+
+  editor.handleGestureEvent(GestureEvent::create(EventType::TOUCH_UP, 1, move_out));
+
+  model = {};
+  editor.buildRenderModel(model);
+  const VisualLine& released_model = findCodeLensVisualLine(model, 0);
+  CHECK_FALSE(findNthCodeLensRun(released_model, 0).active);
+  CHECK_FALSE(findNthCodeLensRun(released_model, 1).active);
+}
+
+TEST_CASE("EditorCore exposes pointer cursor type for text, CodeLens, gutter and scrollbar") {
+  EditorOptions options;
+  EditorCore editor(makeShared<FixedWidthTextMeasurer>(10.0f), options);
+  ScrollbarConfig scrollbar;
+  scrollbar.mode = ScrollbarMode::ALWAYS;
+  editor.setScrollbarConfig(scrollbar);
+
+  std::string text;
+  for (int i = 0; i < 20; ++i) {
+    text += "abcdef\n";
+  }
+
+  editor.loadDocument(makeShared<LineArrayDocument>(text));
+  editor.setViewport({480, 160});
+  Vector<CodeLensItem> items;
+  items.push_back({1, "3 references", 101});
+  editor.setLineCodeLens(0, std::move(items));
+
+  EditorRenderModel model;
+  editor.buildRenderModel(model);
+  CHECK(model.pointer_cursor_type == PointerCursorType::TEXT);
+  REQUIRE(model.vertical_scrollbar.visible);
+
+  const VisualLine& codelens_line = findCodeLensVisualLine(model, 0);
+  const VisualRun& codelens_run = findNthCodeLensRun(codelens_line, 0);
+  const float code_lens_point[2] = {
+      codelens_run.x + codelens_run.width * 0.5f,
+      codelens_run.y
+  };
+  const GestureResult hover_codelens = editor.handleGestureEvent(
+      GestureEvent::create(EventType::MOUSE_MOVE, 1, code_lens_point));
+  CHECK(hover_codelens.pointer_cursor_type == PointerCursorType::HAND);
+
+  model = {};
+  editor.buildRenderModel(model);
+  CHECK(model.pointer_cursor_type == PointerCursorType::HAND);
+
+  const CursorRect text_rect = editor.getPositionScreenRect({0, 2});
+  const float text_point[2] = {
+      text_rect.x + 1.0f,
+      text_rect.y + text_rect.height * 0.5f
+  };
+  const GestureResult hover_text = editor.handleGestureEvent(
+      GestureEvent::create(EventType::MOUSE_MOVE, 1, text_point));
+  CHECK(hover_text.pointer_cursor_type == PointerCursorType::TEXT);
+
+  model = {};
+  editor.buildRenderModel(model);
+  CHECK(model.pointer_cursor_type == PointerCursorType::TEXT);
+
+  const float gutter_point[2] = {
+      1.0f,
+      text_rect.y + text_rect.height * 0.5f
+  };
+  const GestureResult hover_gutter = editor.handleGestureEvent(
+      GestureEvent::create(EventType::MOUSE_MOVE, 1, gutter_point));
+  CHECK(hover_gutter.pointer_cursor_type == PointerCursorType::DEFAULT);
+
+  model = {};
+  editor.buildRenderModel(model);
+  CHECK(model.pointer_cursor_type == PointerCursorType::DEFAULT);
+
+  const float scrollbar_point[2] = {
+      model.vertical_scrollbar.track.origin.x + model.vertical_scrollbar.track.width * 0.5f,
+      model.vertical_scrollbar.track.origin.y + model.vertical_scrollbar.track.height * 0.5f
+  };
+  const GestureResult hover_scrollbar = editor.handleGestureEvent(
+      GestureEvent::create(EventType::MOUSE_MOVE, 1, scrollbar_point));
+  CHECK(hover_scrollbar.pointer_cursor_type == PointerCursorType::DEFAULT);
+
+  model = {};
+  editor.buildRenderModel(model);
+  CHECK(model.pointer_cursor_type == PointerCursorType::DEFAULT);
+}
+
+TEST_CASE("EditorCore handleGestureEvent tap on LINK keeps cursor unchanged and resolves target") {
+  EditorOptions options;
+  EditorCore editor(makeShared<FixedWidthTextMeasurer>(10.0f), options);
+
+  editor.loadDocument(makeShared<LineArrayDocument>("prefixLinkSuffix"));
+  editor.setViewport({420, 160});
+  editor.setCursorPosition({0, 2});
+  Vector<LinkSpan> links;
+  links.push_back({6, 4, "doc://link"});
+  editor.setLineLinks(0, std::move(links));
+
+  EditorRenderModel model;
+  editor.buildRenderModel(model);
+  const auto link_runs = findRunsOfType(model, 0, VisualRunType::LINK);
+  REQUIRE(link_runs.size() == 1);
+  const float point[2] = {
+      link_runs.front()->x + link_runs.front()->width * 0.5f,
+      link_runs.front()->y
+  };
+
+  const GestureResult result = editor.handleGestureEvent(
+      GestureEvent::create(EventType::MOUSE_DOWN, 1, point));
+
+  CHECK(result.hit_target.type == HitTargetType::LINK);
+  CHECK(result.hit_target.line == 0);
+  CHECK(result.hit_target.column == 6);
+  CHECK(editor.getLinkTargetAt(result.hit_target.line, result.hit_target.column) == "doc://link");
+  CHECK(result.cursor_position == (TextPosition{0, 2}));
+  CHECK(editor.getCursorPosition() == (TextPosition{0, 2}));
+}
+
+TEST_CASE("EditorCore buildRenderModel activates wrapped LINK runs together") {
+  EditorOptions options;
+  EditorCore editor(makeShared<FixedWidthTextMeasurer>(10.0f), options);
+
+  editor.loadDocument(makeShared<LineArrayDocument>("abLongWrappedLinkTail"));
+  editor.setViewport({95, 220});
+  editor.setWrapMode(WrapMode::CHAR_BREAK);
+  Vector<LinkSpan> links;
+  links.push_back({2, 15, "doc://wrapped"});
+  editor.setLineLinks(0, std::move(links));
+
+  EditorRenderModel model;
+  editor.buildRenderModel(model);
+  auto initial_link_runs = findRunsOfType(model, 0, VisualRunType::LINK);
+  REQUIRE(initial_link_runs.size() >= 2);
+  for (const VisualRun* run : initial_link_runs) {
+    CHECK_FALSE(run->active);
+  }
+
+  const VisualRun* hover_target = initial_link_runs.back();
+  const float hover_point[2] = {
+      hover_target->x + hover_target->width * 0.5f,
+      hover_target->y
+  };
+  const GestureResult hover = editor.handleGestureEvent(
+      GestureEvent::create(EventType::MOUSE_MOVE, 1, hover_point));
+  CHECK(hover.hit_target.type == HitTargetType::LINK);
+  CHECK(hover.pointer_cursor_type == PointerCursorType::HAND);
+
+  model = {};
+  editor.buildRenderModel(model);
+  auto active_link_runs = findRunsOfType(model, 0, VisualRunType::LINK);
+  REQUIRE(active_link_runs.size() >= 2);
+  for (const VisualRun* run : active_link_runs) {
+    CHECK(run->active);
+  }
 }
 
 TEST_CASE("EditorCore line-start word selection end handle can cross CodeLens virtual line") {
@@ -193,7 +450,7 @@ TEST_CASE("EditorCore line-start word selection end handle can cross CodeLens vi
   editor.setViewport({420, 200});
   editor.setSelection({{1, 0}, {1, 4}});
   Vector<CodeLensItem> items;
-  items.push_back({"3 references", 101});
+  items.push_back({0, "3 references", 101});
   editor.setLineCodeLens(1, std::move(items));
 
   EditorRenderModel model;

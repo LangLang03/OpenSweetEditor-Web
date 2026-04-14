@@ -516,9 +516,12 @@ class EditorCanvasPainter extends ChangeNotifier implements CustomPainter {
       final x = diag.origin.x;
       final y = diag.origin.y + diag.height;
       final w = diag.width;
-      final color = Color(
-        diag.color != 0 ? diag.color : _theme.diagnosticErrorColor,
-      );
+      final color = switch (diag.severity) {
+        0 => Color(_theme.diagnosticErrorColor),
+        1 => Color(_theme.diagnosticWarningColor),
+        2 => Color(_theme.diagnosticInfoColor),
+        _ => Color(_theme.diagnosticHintColor),
+      };
 
       // severity: 0=error, 1=warning, 2=info, 3=hint
       if (diag.severity >= 3) {

@@ -32,7 +32,6 @@ struct DiagnosticDecoration: Codable {
     let width: Float
     let height: Float
     let severity: Int32
-    let color: Int32
 }
 
 struct LinkedEditingRect: Codable {

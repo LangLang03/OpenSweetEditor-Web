@@ -36,8 +36,15 @@ export interface PhantomText {
 }
 
 export interface CodeLensItem {
+  column: number;
   text: string;
   commandId: number;
+}
+
+export interface LinkSpan {
+  column: number;
+  length: number;
+  target: string;
 }
 
 export interface GutterIcon {
@@ -48,7 +55,6 @@ export interface DiagnosticItem {
   column: number;
   length: number;
   severity: number;
-  color: number;
 }
 
 export interface FoldRegion {
@@ -78,4 +84,3 @@ export interface SeparatorGuide {
   count: number;
   textEndColumn: number;
 }
-

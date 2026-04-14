@@ -113,10 +113,22 @@ namespace NS_SWEETEDITOR {
 
   /// CodeLens item (clickable label above a code line)
   struct CodeLensItem {
+    /// Anchor column within the owning code line
+    int32_t column {0};
     /// Display text (UTF8), e.g. "3 references"
     U8String text;
     /// Unique command ID (platform-defined, transparently passed back on click)
     int32_t command_id {0};
+  };
+
+  /// Clickable document link range embedded in source text
+  struct LinkSpan {
+    /// Start column in the line
+    uint32_t column {0};
+    /// Character length of the link range
+    uint32_t length {0};
+    /// Link target (URL, file URI, or platform-defined document target)
+    U8String target;
   };
 
 #pragma region Diagnostic (Diagnostic Decorations)
@@ -137,8 +149,6 @@ namespace NS_SWEETEDITOR {
     uint32_t length {0};
     /// Severity level
     DiagnosticSeverity severity {DiagnosticSeverity::DIAG_ERROR};
-    /// Custom color (ARGB), 0 means use severity default color
-    int32_t color {0};
   };
 
 #pragma endregion
@@ -224,6 +234,18 @@ namespace NS_SWEETEDITOR {
 
     /// Clear all CodeLens items
     void clearCodeLens();
+
+    /// Set link ranges for a given line (replace whole line, empty vector removes links on this line)
+    void setLineLinks(size_t line, Vector<LinkSpan>&& links);
+
+    /// Get link ranges for a given line
+    const Vector<LinkSpan>& getLineLinks(size_t line) const;
+
+    /// Clear all link ranges
+    void clearLinks();
+
+    /// Find link span covering the specified logical line and column
+    const LinkSpan* findLinkAt(size_t line, size_t column) const;
 
     /// Get highlight spans for a given line and layer (sorted by column ascending)
     const Vector<StyleSpan>& getLineSpans(size_t line, SpanLayer layer) const;
@@ -340,6 +362,7 @@ namespace NS_SWEETEDITOR {
     Vector<Vector<PhantomText>> m_phantom_texts_;
     HashMap<size_t, Vector<GutterIcon>> m_gutter_icons_;
     HashMap<size_t, Vector<CodeLensItem>> m_codelens_items_;
+    HashMap<size_t, Vector<LinkSpan>> m_links_;
     Vector<Vector<DiagnosticSpan>> m_diagnostics_;
 
     Vector<IndentGuide> m_indent_guides_;
@@ -354,6 +377,7 @@ namespace NS_SWEETEDITOR {
     static const Vector<GutterIcon> kEmptyGutterIcons;
     static const Vector<DiagnosticSpan> kEmptyDiagnostics;
     static const Vector<CodeLensItem> kEmptyCodeLensItems;
+    static const Vector<LinkSpan> kEmptyLinks;
   };
 }
 

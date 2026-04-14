@@ -215,7 +215,6 @@ static void appendGuideSegment(std::vector<uint8_t>& buffer, const GuideSegment&
 static void appendDiagnosticDecoration(std::vector<uint8_t>& buffer, const DiagnosticDecoration& decoration) {
   appendRect(buffer, decoration.rect);
   appendI32(buffer, decoration.severity);
-  appendI32(buffer, decoration.color);
 }
 
 static void appendLinkedEditingRect(std::vector<uint8_t>& buffer, const LinkedEditingRect& rect) {
@@ -297,6 +296,7 @@ static const uint8_t* editorRenderModelToBinary(const EditorRenderModel& model, 
 
   appendBool(buffer, model.gutter_sticky);
   appendBool(buffer, model.gutter_visible);
+  appendI32(buffer, static_cast<int32_t>(model.pointer_cursor_type));
 
   return allocBinaryPayload(buffer.data(), buffer.size(), out_size);
 }
@@ -379,6 +379,7 @@ static const uint8_t* gestureResultToBinary(const GestureResult& result, size_t*
   appendI32(buffer, result.needs_fling ? 1 : 0);
   appendI32(buffer, result.needs_animation ? 1 : 0);
   appendI32(buffer, result.is_handle_drag ? 1 : 0);
+  appendI32(buffer, static_cast<int32_t>(result.pointer_cursor_type));
   return allocBinaryPayload(buffer.data(), buffer.size(), out_size);
 }
 
@@ -1695,7 +1696,7 @@ void editor_set_line_diagnostics(intptr_t editor_handle, const uint8_t* data, si
   }
 
   size_t diagnostics_bytes = 0;
-  if (mulOverflow(static_cast<size_t>(diag_count), sizeof(uint32_t) * 4, diagnostics_bytes) ||
+  if (mulOverflow(static_cast<size_t>(diag_count), sizeof(uint32_t) * 3, diagnostics_bytes) ||
       cursor.remaining() != diagnostics_bytes) {
     return;
   }
@@ -1706,15 +1707,13 @@ void editor_set_line_diagnostics(intptr_t editor_handle, const uint8_t* data, si
     uint32_t column = 0;
     uint32_t length = 0;
     int32_t severity = 0;
-    int32_t color = 0;
-    if (!cursor.readU32(column) || !cursor.readU32(length) || !cursor.readI32(severity) || !cursor.readI32(color)) {
+    if (!cursor.readU32(column) || !cursor.readU32(length) || !cursor.readI32(severity)) {
       return;
     }
     DiagnosticSpan ds;
     ds.column = column;
     ds.length = length;
     ds.severity = static_cast<DiagnosticSeverity>(severity);
-    ds.color = color;
     diagnostics.push_back(ds);
   }
   editor_core->setLineDiagnostics(static_cast<size_t>(line), std::move(diagnostics));
@@ -1741,14 +1740,12 @@ void editor_set_batch_line_diagnostics(intptr_t editor_handle, const uint8_t* da
       uint32_t column = 0;
       uint32_t length = 0;
       int32_t severity = 0;
-      int32_t color = 0;
       if (!cursor.readU32(column) || !cursor.readU32(length) ||
-          !cursor.readI32(severity) || !cursor.readI32(color)) return;
+          !cursor.readI32(severity)) return;
       DiagnosticSpan ds;
       ds.column = column;
       ds.length = length;
       ds.severity = static_cast<DiagnosticSeverity>(severity);
-      ds.color = color;
       diagnostics.push_back(ds);
     }
     entries.emplace_back(static_cast<size_t>(line), std::move(diagnostics));
@@ -2013,9 +2010,10 @@ void editor_set_line_codelens(intptr_t editor_handle, const uint8_t* data, size_
   Vector<CodeLensItem> items;
   items.reserve(item_count);
   for (uint32_t i = 0; i < item_count; ++i) {
+    int32_t column = 0;
     int32_t command_id = 0;
     uint32_t text_len = 0;
-    if (!cursor.readI32(command_id) || !cursor.readU32(text_len)) return;
+    if (!cursor.readI32(column) || !cursor.readI32(command_id) || !cursor.readU32(text_len)) return;
     U8String text;
     if (text_len > 0) {
       const uint8_t* text_ptr = nullptr;
@@ -2023,6 +2021,7 @@ void editor_set_line_codelens(intptr_t editor_handle, const uint8_t* data, size_
       text = U8String(reinterpret_cast<const char*>(text_ptr), text_len);
     }
     CodeLensItem item;
+    item.column = column;
     item.command_id = command_id;
     item.text = std::move(text);
     items.push_back(std::move(item));
@@ -2048,9 +2047,10 @@ void editor_set_batch_line_codelens(intptr_t editor_handle, const uint8_t* data,
     Vector<CodeLensItem> items;
     items.reserve(item_count);
     for (uint32_t i = 0; i < item_count; ++i) {
+      int32_t column = 0;
       int32_t command_id = 0;
       uint32_t text_len = 0;
-      if (!cursor.readI32(command_id) || !cursor.readU32(text_len)) return;
+      if (!cursor.readI32(column) || !cursor.readI32(command_id) || !cursor.readU32(text_len)) return;
       U8String text;
       if (text_len > 0) {
         const uint8_t* text_ptr = nullptr;
@@ -2058,6 +2058,7 @@ void editor_set_batch_line_codelens(intptr_t editor_handle, const uint8_t* data,
         text = U8String(reinterpret_cast<const char*>(text_ptr), text_len);
       }
       CodeLensItem item;
+      item.column = column;
       item.command_id = command_id;
       item.text = std::move(text);
       items.push_back(std::move(item));
@@ -2071,6 +2072,85 @@ void editor_clear_codelens(intptr_t editor_handle) {
   SharedPtr<EditorCore> editor_core = getCPtrHolderValue<EditorCore>(editor_handle);
   if (editor_core == nullptr) return;
   editor_core->clearCodeLens();
+}
+
+void editor_set_line_links(intptr_t editor_handle, const uint8_t* data, size_t size) {
+  SharedPtr<EditorCore> editor_core = getCPtrHolderValue<EditorCore>(editor_handle);
+  if (editor_core == nullptr || data == nullptr) return;
+
+  ByteCursor cursor(data, size);
+  uint32_t line = 0;
+  uint32_t link_count = 0;
+  if (!cursor.readU32(line) || !cursor.readU32(link_count)) return;
+
+  Vector<LinkSpan> links;
+  links.reserve(link_count);
+  for (uint32_t i = 0; i < link_count; ++i) {
+    uint32_t column = 0;
+    uint32_t length = 0;
+    uint32_t target_len = 0;
+    if (!cursor.readU32(column) || !cursor.readU32(length) || !cursor.readU32(target_len)) return;
+    U8String target;
+    if (target_len > 0) {
+      const uint8_t* target_ptr = nullptr;
+      if (!cursor.readBytes(target_ptr, target_len)) return;
+      target = U8String(reinterpret_cast<const char*>(target_ptr), target_len);
+    }
+    links.push_back({column, length, std::move(target)});
+  }
+  editor_core->setLineLinks(static_cast<size_t>(line), std::move(links));
+}
+
+void editor_set_batch_line_links(intptr_t editor_handle, const uint8_t* data, size_t size) {
+  SharedPtr<EditorCore> editor_core = getCPtrHolderValue<EditorCore>(editor_handle);
+  if (editor_core == nullptr || data == nullptr) return;
+
+  ByteCursor cursor(data, size);
+  uint32_t entry_count = 0;
+  if (!cursor.readU32(entry_count)) return;
+
+  Vector<std::pair<size_t, Vector<LinkSpan>>> entries;
+  entries.reserve(entry_count);
+  for (uint32_t e = 0; e < entry_count; ++e) {
+    uint32_t line = 0;
+    uint32_t link_count = 0;
+    if (!cursor.readU32(line) || !cursor.readU32(link_count)) return;
+
+    Vector<LinkSpan> links;
+    links.reserve(link_count);
+    for (uint32_t i = 0; i < link_count; ++i) {
+      uint32_t column = 0;
+      uint32_t length = 0;
+      uint32_t target_len = 0;
+      if (!cursor.readU32(column) || !cursor.readU32(length) || !cursor.readU32(target_len)) return;
+      U8String target;
+      if (target_len > 0) {
+        const uint8_t* target_ptr = nullptr;
+        if (!cursor.readBytes(target_ptr, target_len)) return;
+        target = U8String(reinterpret_cast<const char*>(target_ptr), target_len);
+      }
+      links.push_back({column, length, std::move(target)});
+    }
+    entries.emplace_back(static_cast<size_t>(line), std::move(links));
+  }
+  editor_core->setBatchLineLinks(std::move(entries));
+}
+
+void editor_clear_links(intptr_t editor_handle) {
+  SharedPtr<EditorCore> editor_core = getCPtrHolderValue<EditorCore>(editor_handle);
+  if (editor_core == nullptr) return;
+  editor_core->clearLinks();
+}
+
+const char* editor_get_link_target_at(intptr_t editor_handle, size_t line, size_t column) {
+  SharedPtr<EditorCore> editor_core = getCPtrHolderValue<EditorCore>(editor_handle);
+  U8String target;
+  if (editor_core != nullptr) {
+    target = editor_core->getLinkTargetAt(line, column);
+  }
+  char* result = new char[target.size() + 1];
+  std::strcpy(result, target.c_str());
+  return result;
 }
 
 void editor_clear_guides(intptr_t editor_handle) {

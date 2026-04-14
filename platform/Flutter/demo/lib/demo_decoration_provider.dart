@@ -266,7 +266,6 @@ class DemoDecorationProvider implements DecorationProvider {
           column: range.startColumn + fixmeIndex,
           length: 5,
           severity: 0,
-          color: 0,
         );
       }
       final todoIndex = upper.indexOf('TODO');
@@ -279,7 +278,6 @@ class DemoDecorationProvider implements DecorationProvider {
           column: range.startColumn + todoIndex,
           length: 4,
           severity: 1,
-          color: 0,
         );
       }
       return firstKeywordRange;
@@ -298,7 +296,6 @@ class DemoDecorationProvider implements DecorationProvider {
         column: range.startColumn,
         length: range.length,
         severity: 3,
-        color: 0,
       );
     }
     return firstKeywordRange;
@@ -312,7 +309,6 @@ class DemoDecorationProvider implements DecorationProvider {
     required int column,
     required int length,
     required int severity,
-    required int color,
   }) {
     if (diagnosticCount[0] >= _maxDynamicDiagnostics ||
         line < 0 ||
@@ -320,7 +316,7 @@ class DemoDecorationProvider implements DecorationProvider {
         length <= 0) {
       return;
     }
-    final key = '$line:$column:$length:$severity:$color';
+    final key = '$line:$column:$length:$severity';
     if (!seenDiagnostics.add(key)) {
       return;
     }
@@ -331,7 +327,6 @@ class DemoDecorationProvider implements DecorationProvider {
             column: column,
             length: length,
             severity: severity,
-            color: color,
           ),
         );
     diagnosticCount[0]++;
@@ -354,7 +349,6 @@ class DemoDecorationProvider implements DecorationProvider {
       column: firstKeywordRange.startColumn,
       length: firstKeywordRange.length,
       severity: 3,
-      color: 0,
     );
   }
 
@@ -557,8 +551,8 @@ class DemoDecorationProvider implements DecorationProvider {
     final literal = _getTokenLiteral(range);
     if (literal == 'class' || literal == 'struct') {
       codeLensItems[range.line] = [
-        core.CodeLensItem(text: 'Run', commandId: codeLensRun),
-        core.CodeLensItem(text: 'Debug', commandId: codeLensDebug),
+        core.CodeLensItem(column: range.startColumn, text: '▶ Run', commandId: codeLensRun),
+        core.CodeLensItem(column: range.startColumn, text: '◎ Debug', commandId: codeLensDebug),
       ];
     }
   }

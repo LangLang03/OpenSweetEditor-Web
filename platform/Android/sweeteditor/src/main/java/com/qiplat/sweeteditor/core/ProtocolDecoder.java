@@ -449,7 +449,6 @@ final class ProtocolDecoder {
         decoration.width = data.getFloat();
         decoration.height = data.getFloat();
         decoration.severity = data.getInt();
-        decoration.color = data.getInt();
         return decoration;
     }
 

@@ -65,7 +65,6 @@ enum DemoDecorationResolver {
             containing: "colors = {",
             token: "colors",
             severity: 1,
-            color: 0,
             lines: lines,
             diagnosticsByLine: &diagnosticsByLine
         )
@@ -73,7 +72,6 @@ enum DemoDecorationResolver {
             containing: "delay(100)",
             token: "delay",
             severity: 2,
-            color: 0,
             lines: lines,
             diagnosticsByLine: &diagnosticsByLine
         )
@@ -81,7 +79,6 @@ enum DemoDecorationResolver {
             containing: "error(\"something went wrong\")",
             token: "error",
             severity: 3,
-            color: 0,
             lines: lines,
             diagnosticsByLine: &diagnosticsByLine
         )
@@ -95,7 +92,6 @@ enum DemoDecorationResolver {
         containing needle: String,
         token: String,
         severity: Int32,
-        color: Int32,
         lines: [String],
         diagnosticsByLine: inout [Int: [EditorDiagnosticItem]]
     ) {
@@ -108,8 +104,7 @@ enum DemoDecorationResolver {
             EditorDiagnosticItem(
                 column: Int32(column),
                 length: Int32(token.count),
-                severity: severity,
-                color: color
+                severity: severity
             )
         )
     }

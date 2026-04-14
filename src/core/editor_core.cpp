@@ -74,6 +74,33 @@ namespace NS_SWEETEDITOR {
     return visual_col;
   }
 
+  static bool sameHitTarget(const HitTarget& lhs, const HitTarget& rhs) {
+    return lhs.type == rhs.type
+           && lhs.line == rhs.line
+           && lhs.column == rhs.column
+           && lhs.icon_id == rhs.icon_id
+           && lhs.color_value == rhs.color_value;
+  }
+
+  static HitTarget toHotInteractiveTarget(const HitTarget& target) {
+    return (target.type == HitTargetType::CODELENS || target.type == HitTargetType::LINK)
+             ? target
+             : HitTarget {};
+  }
+
+  static bool isMousePointerEvent(EventType type) {
+    switch (type) {
+      case EventType::MOUSE_DOWN:
+      case EventType::MOUSE_MOVE:
+      case EventType::MOUSE_UP:
+      case EventType::MOUSE_WHEEL:
+      case EventType::MOUSE_RIGHT_DOWN:
+        return true;
+      default:
+        return false;
+    }
+  }
+
 #pragma region [Setup & View State]
   EditorCore::EditorCore(const SharedPtr<TextMeasurer>& measurer, const EditorOptions& options): m_measurer_(measurer), m_options_(options), m_key_resolver_(options.key_chord_timeout_ms) {
     m_decorations_ = makeShared<DecorationManager>();
@@ -131,6 +158,10 @@ namespace NS_SWEETEDITOR {
     m_interaction_->resetForDocumentLoad();
     clearMatchedBrackets();
     m_decorations_->clearAll();
+    clearHoverHitTarget();
+    clearPressHitTarget();
+    m_mouse_button_down_ = false;
+    m_pointer_cursor_type_ = PointerCursorType::TEXT;
 
     m_document_ = document;
     m_text_layout_->loadDocument(document);
@@ -384,7 +415,7 @@ namespace NS_SWEETEDITOR {
     PERF_TIMER("buildRenderModel");
     PERF_BEGIN(compose);
     PresentationContext presentation_context;
-    presentation_context.active_hit_target = m_active_hit_target_;
+    presentation_context.active_hit_target = getActiveHitTarget();
     presentation_context.has_selection = m_caret_.has_selection;
     if (m_caret_.has_selection) {
       presentation_context.selection_range = m_caret_.selection;
@@ -424,6 +455,7 @@ namespace NS_SWEETEDITOR {
                                                    m_has_external_brackets_,
                                                    line_height);
     m_render_composer_->buildScrollbarModel(model, *m_interaction_);
+    model.pointer_cursor_type = m_pointer_cursor_type_;
   }
 
   ViewState EditorCore::getViewState() const {
@@ -459,34 +491,70 @@ namespace NS_SWEETEDITOR {
   }
 
   GestureResult EditorCore::handleGestureEvent(const GestureEvent& event) {
+    const bool has_primary_point = !event.points.empty();
+    PointerProbeResult primary_probe;
+    bool primary_probe_ready = false;
+    auto get_primary_probe = [&]() -> const PointerProbeResult& {
+      if (!primary_probe_ready) {
+        primary_probe = has_primary_point ? probePointer(event.points[0]) : PointerProbeResult {};
+        primary_probe_ready = true;
+      }
+      return primary_probe;
+    };
+
+    if (isMousePointerEvent(event.type) && has_primary_point) {
+      m_pointer_cursor_type_ = get_primary_probe().cursor_type;
+    }
+
+    if (event.type == EventType::MOUSE_DOWN) {
+      m_mouse_button_down_ = true;
+      clearHoverHitTarget();
+    } else if (event.type == EventType::MOUSE_UP) {
+      m_mouse_button_down_ = false;
+    }
+
     GestureIntent intent;
     GestureResult result = m_interaction_->handleGestureEvent(event, intent);
 
-    // Update active hit target on mouse move (for hover highlight on CODELENS etc.)
-    if (event.type == EventType::MOUSE_MOVE && !event.points.empty()) {
-      HitTarget new_target = m_text_layout_->hitTestDecoration(event.points[0]);
-      if (new_target.type != HitTargetType::CODELENS) {
-        new_target = {};  // Only track hover for clickable run types
-      }
-      if (new_target.type != m_active_hit_target_.type
-          || new_target.line != m_active_hit_target_.line
-          || new_target.icon_id != m_active_hit_target_.icon_id) {
-        // Active target changed — mark affected lines dirty for re-render
-        if (m_active_hit_target_.type != HitTargetType::NONE) {
-          auto& lines = m_document_->getLogicalLines();
-          if (m_active_hit_target_.line < lines.size()) {
-            lines[m_active_hit_target_.line].is_layout_dirty = true;
+    switch (event.type) {
+      case EventType::MOUSE_MOVE: {
+        const HitTarget hot_target = get_primary_probe().hot_target;
+        if (m_mouse_button_down_) {
+          if (m_press_hit_target_.type != HitTargetType::NONE
+              && !sameHitTarget(hot_target, m_press_hit_target_)) {
+            clearPressHitTarget();
           }
+        } else {
+          m_hover_hit_target_ = hot_target;
         }
-        m_active_hit_target_ = new_target;
-        if (m_active_hit_target_.type != HitTargetType::NONE) {
-          auto& lines = m_document_->getLogicalLines();
-          if (m_active_hit_target_.line < lines.size()) {
-            lines[m_active_hit_target_.line].is_layout_dirty = true;
-          }
-        }
+        break;
       }
+      case EventType::MOUSE_DOWN:
+        m_press_hit_target_ = get_primary_probe().hot_target;
+        break;
+      case EventType::MOUSE_UP:
+        clearPressHitTarget();
+        break;
+      case EventType::TOUCH_DOWN:
+        m_press_hit_target_ = get_primary_probe().hot_target;
+        break;
+      case EventType::TOUCH_MOVE: {
+        const HitTarget hot_target = get_primary_probe().hot_target;
+        if (m_press_hit_target_.type != HitTargetType::NONE
+            && !sameHitTarget(hot_target, m_press_hit_target_)) {
+          clearPressHitTarget();
+        }
+        break;
+      }
+      case EventType::TOUCH_UP:
+      case EventType::TOUCH_CANCEL:
+      case EventType::TOUCH_POINTER_DOWN:
+        clearPressHitTarget();
+        break;
+      default:
+        break;
     }
+
 
     if (intent.cancel_linked_editing) {
       if (m_linked_editing_session_ && m_linked_editing_session_->isActive()) {
@@ -506,30 +574,30 @@ namespace NS_SWEETEDITOR {
     if (intent.select_word) {
       selectWordAt(result.tap_point);
     }
-  if (intent.toggle_fold) {
-    toggleFoldAt(intent.fold_line);
+    if (intent.toggle_fold) {
+      toggleFoldAt(intent.fold_line);
+    }
+
+    finalizeGestureResult(result);
+    return result;
   }
 
-  result.cursor_position = m_caret_.cursor;
-  result.has_selection = hasSelection();
-  result.selection = m_caret_.selection;
-  result.view_scroll_x = m_view_state_.scroll_x;
-  result.view_scroll_y = m_view_state_.scroll_y;
-  result.view_scale = m_view_state_.scale;
-
-  return result;
-}
-
   GestureResult EditorCore::tickFling() {
-    return m_interaction_->tickFling();
+    GestureResult result = m_interaction_->tickFling();
+    finalizeGestureResult(result);
+    return result;
   }
 
   GestureResult EditorCore::tickEdgeScroll() {
-    return m_interaction_->tickEdgeScroll();
+    GestureResult result = m_interaction_->tickEdgeScroll();
+    finalizeGestureResult(result);
+    return result;
   }
 
   GestureResult EditorCore::tickAnimations() {
-    return m_interaction_->tickAnimations();
+    GestureResult result = m_interaction_->tickAnimations();
+    finalizeGestureResult(result);
+    return result;
   }
 
   void EditorCore::stopFling() {
@@ -2396,6 +2464,40 @@ namespace NS_SWEETEDITOR {
     normalizeScrollState();
   }
 
+  void EditorCore::setLineLinks(size_t line, Vector<LinkSpan>&& links) {
+    m_decorations_->setLineLinks(line, std::move(links));
+    auto& lines = m_document_->getLogicalLines();
+    if (line < lines.size()) {
+      lines[line].is_layout_dirty = true;
+    }
+    m_text_layout_->invalidateContentMetrics(line);
+  }
+
+  void EditorCore::setBatchLineLinks(Vector<std::pair<size_t, Vector<LinkSpan>>>&& entries) {
+    if (entries.empty()) return;
+    auto& lines = m_document_->getLogicalLines();
+    size_t min_line = entries[0].first;
+    for (auto& [line, links] : entries) {
+      m_decorations_->setLineLinks(line, std::move(links));
+      if (line < lines.size()) {
+        lines[line].is_layout_dirty = true;
+      }
+      if (line < min_line) min_line = line;
+    }
+    m_text_layout_->invalidateContentMetrics(min_line);
+  }
+
+  void EditorCore::clearLinks() {
+    m_decorations_->clearLinks();
+    markAllLinesDirty();
+    normalizeScrollState();
+  }
+
+  U8String EditorCore::getLinkTargetAt(size_t line, size_t column) const {
+    const LinkSpan* link = m_decorations_->findLinkAt(line, column);
+    return link != nullptr ? link->target : U8String {};
+  }
+
   void EditorCore::setLineDiagnostics(size_t line, Vector<DiagnosticSpan>&& diagnostics) {
     m_decorations_->setLineDiagnostics(line, std::move(diagnostics));
   }
@@ -2795,6 +2897,57 @@ namespace NS_SWEETEDITOR {
     if (m_text_layout_ != nullptr) {
       m_text_layout_->invalidateContentMetrics();
     }
+  }
+
+  void EditorCore::clearHoverHitTarget() {
+    m_hover_hit_target_ = {};
+  }
+
+  void EditorCore::clearPressHitTarget() {
+    m_press_hit_target_ = {};
+  }
+
+  HitTarget EditorCore::getActiveHitTarget() const {
+    return m_press_hit_target_.type != HitTargetType::NONE ? m_press_hit_target_ : m_hover_hit_target_;
+  }
+
+  EditorCore::PointerProbeResult EditorCore::probePointer(const PointF& point) const {
+    PointerProbeResult result;
+    if (point.x < 0.0f || point.y < 0.0f
+        || point.x >= m_viewport_.width || point.y >= m_viewport_.height) {
+      result.cursor_type = PointerCursorType::DEFAULT;
+      return result;
+    }
+    if (m_text_layout_ == nullptr) {
+      result.cursor_type = PointerCursorType::TEXT;
+      return result;
+    }
+
+    if (m_interaction_->isPointInScrollbar(point)) {
+      result.cursor_type = PointerCursorType::DEFAULT;
+      return result;
+    }
+
+    result.hot_target = toHotInteractiveTarget(m_text_layout_->hitTestDecoration(point));
+    if (result.hot_target.type != HitTargetType::NONE) {
+      result.cursor_type = PointerCursorType::HAND;
+      return result;
+    }
+
+    result.cursor_type = point.x >= m_text_layout_->getLayoutMetrics().textAreaX()
+                           ? PointerCursorType::TEXT
+                           : PointerCursorType::DEFAULT;
+    return result;
+  }
+
+  void EditorCore::finalizeGestureResult(GestureResult& result) const {
+    result.cursor_position = m_caret_.cursor;
+    result.has_selection = hasSelection();
+    result.selection = m_caret_.selection;
+    result.view_scroll_x = m_view_state_.scroll_x;
+    result.view_scroll_y = m_view_state_.scroll_y;
+    result.view_scale = m_view_state_.scale;
+    result.pointer_cursor_type = m_pointer_cursor_type_;
   }
 
   void EditorCore::normalizeScrollState() {

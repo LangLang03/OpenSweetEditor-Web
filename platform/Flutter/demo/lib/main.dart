@@ -174,9 +174,9 @@ class _EditorDemoPageState extends State<EditorDemoPage> {
   String _describeCodeLensCommand(int commandId) {
     switch (commandId) {
       case codeLensRun:
-        return 'Run';
+        return '▶ Run';
       case codeLensDebug:
-        return 'Debug';
+        return '◎ Debug';
       default:
         return 'Command#$commandId';
     }
