@@ -41,6 +41,12 @@ export interface CodeLensItem {
   commandId: number;
 }
 
+export interface LinkSpan {
+  column: number;
+  length: number;
+  target: string;
+}
+
 export interface GutterIcon {
   iconId: number;
 }

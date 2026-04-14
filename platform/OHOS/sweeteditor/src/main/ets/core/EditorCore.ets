@@ -13,6 +13,7 @@ import { KeyMap } from './CoreKeymap';
 import {
   BracketGuide,
   CodeLensItem,
+  LinkSpan,
   DiagnosticItem,
   FlowGuide,
   FoldRegion,
@@ -73,7 +74,8 @@ export enum HitTargetType {
   FOLD_PLACEHOLDER = 4,
   FOLD_GUTTER = 5,
   INLAY_HINT_COLOR = 6,
-  CODELENS = 7
+  CODELENS = 7,
+  LINK = 8
 }
 
 export enum ScrollbarMode {
@@ -810,6 +812,40 @@ export class EditorCore {
 
   clearCodeLens(): void {
     native.editorClearCodeLens(this.handle);
+  }
+
+  // ==================== Links ====================
+
+  setLineLinks(lineOrData: number | ArrayBuffer, linksOrSize?: LinkSpan[] | number): void {
+    if (lineOrData instanceof ArrayBuffer) {
+      native.editorSetLineLinks(this.handle, lineOrData, lineOrData.byteLength);
+      return;
+    }
+    if (!Array.isArray(linksOrSize)) {
+      return;
+    }
+    const data = ProtocolEncoder.packLineLinks(lineOrData, linksOrSize);
+    native.editorSetLineLinks(this.handle, data, data.byteLength);
+  }
+
+  setBatchLineLinks(linksByLineOrData: Map<number, LinkSpan[]> | ArrayBuffer, _size?: number): void {
+    if (linksByLineOrData instanceof ArrayBuffer) {
+      native.editorSetBatchLineLinks(this.handle, linksByLineOrData, linksByLineOrData.byteLength);
+      return;
+    }
+    if (linksByLineOrData.size === 0) {
+      return;
+    }
+    const data = ProtocolEncoder.packBatchLineLinks(linksByLineOrData);
+    native.editorSetBatchLineLinks(this.handle, data, data.byteLength);
+  }
+
+  clearLinks(): void {
+    native.editorClearLinks(this.handle);
+  }
+
+  getLinkTargetAt(line: number, column: number): string {
+    return native.editorGetLinkTargetAt(this.handle, line, column);
   }
 
   // ==================== Diagnostic Decorations ====================

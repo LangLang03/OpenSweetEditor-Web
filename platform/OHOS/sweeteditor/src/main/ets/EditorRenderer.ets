@@ -33,6 +33,7 @@ const HANDLE_LINE_WIDTH = 1.5;
 const HANDLE_DROP_RADIUS = 10.0;
 const HANDLE_CENTER_DIST = 24.0;
 const DEFAULT_TEXT_SIZE = 28;
+const TEMP_LINK_COLOR = 0xFF4C9DFF;
 
 interface FontMetricsSnapshot {
   ascent: number;
@@ -219,7 +220,8 @@ export class EditorRenderer {
           continue;
         }
         if (run.type === VisualRunType.TEXT || run.type === VisualRunType.WHITESPACE
-          || run.type === VisualRunType.CODELENS || run.type === VisualRunType.PHANTOM_TEXT) {
+          || run.type === VisualRunType.CODELENS || run.type === VisualRunType.LINK
+          || run.type === VisualRunType.PHANTOM_TEXT) {
           if (!run.text || run.text.length === 0) {
             continue;
           }
@@ -234,6 +236,8 @@ export class EditorRenderer {
     let color = (run.style && run.style.color !== 0) ? run.style.color : this.theme.textColor;
     if (run.type === VisualRunType.CODELENS) {
       color = run.active ? this.getActiveLineNumberColor() : this.theme.inlayHintTextColor;
+    } else if (run.type === VisualRunType.LINK) {
+      color = TEMP_LINK_COLOR;
     }
 
     if (run.style && run.style.backgroundColor !== 0) {
@@ -250,7 +254,7 @@ export class EditorRenderer {
       ctx.fillStyle = colorToString(color);
     }
     ctx.fillText(run.text, run.x, run.y);
-    if (run.type === VisualRunType.CODELENS && run.active) {
+    if ((run.type === VisualRunType.CODELENS || run.type === VisualRunType.LINK) && run.active) {
       const underlineY = run.y + 1;
       ctx.beginPath();
       ctx.strokeStyle = colorToString(color);

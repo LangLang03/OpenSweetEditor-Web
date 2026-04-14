@@ -149,6 +149,12 @@ static napi_value Init(napi_env env, napi_value exports)
         NAPI_METHOD("editorSetBatchLineCodeLens", EditorCoreNapi::setBatchLineCodeLens),
         NAPI_METHOD("editorClearCodeLens", EditorCoreNapi::clearCodeLens),
 
+        // Links
+        NAPI_METHOD("editorSetLineLinks", EditorCoreNapi::setLineLinks),
+        NAPI_METHOD("editorSetBatchLineLinks", EditorCoreNapi::setBatchLineLinks),
+        NAPI_METHOD("editorClearLinks", EditorCoreNapi::clearLinks),
+        NAPI_METHOD("editorGetLinkTargetAt", EditorCoreNapi::getLinkTargetAt),
+
         // Diagnostics
         NAPI_METHOD("editorSetLineDiagnostics", EditorCoreNapi::setLineDiagnostics),
         NAPI_METHOD("editorSetBatchLineDiagnostics", EditorCoreNapi::setBatchLineDiagnostics),

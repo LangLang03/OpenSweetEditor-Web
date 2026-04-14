@@ -16,6 +16,7 @@ import {
   InlayHint,
   PhantomText,
   CodeLensItem,
+  LinkSpan,
   SeparatorGuide,
   StyleSpan
 } from '../core/CoreAdornments';
@@ -229,6 +230,7 @@ export class DecorationProviderManager {
     const gutterIcons = new Map<number, GutterIcon[]>();
     const phantomTexts = new Map<number, PhantomText[]>();
     const codeLensItems = new Map<number, CodeLensItem[]>();
+    const links = new Map<number, LinkSpan[]>();
 
     let syntaxMode = ApplyMode.MERGE;
     let semanticMode = ApplyMode.MERGE;
@@ -242,6 +244,7 @@ export class DecorationProviderManager {
     let gutterMode = ApplyMode.MERGE;
     let phantomMode = ApplyMode.MERGE;
     let codeLensMode = ApplyMode.MERGE;
+    let linksMode = ApplyMode.MERGE;
 
     for (const provider of this.providers) {
       const state = this.providerStates.get(provider);
@@ -277,6 +280,10 @@ export class DecorationProviderManager {
       codeLensMode = mergeMode(codeLensMode, r.codeLensItemsMode);
       if (r.codeLensItems) {
         appendMapOfArrays(codeLensItems, r.codeLensItems);
+      }
+      linksMode = mergeMode(linksMode, r.linksMode);
+      if (r.links) {
+        appendMapOfArrays(links, r.links);
       }
 
       indentMode = mergeMode(indentMode, r.indentGuidesMode);
@@ -331,6 +338,9 @@ export class DecorationProviderManager {
 
     this.applyCodeLensMode(codeLensMode);
     this.editor.setBatchLineCodeLens(codeLensItems);
+
+    this.applyLinksMode(linksMode);
+    this.editor.setBatchLineLinks(links);
 
     this.editor.flush();
   }
@@ -413,6 +423,14 @@ export class DecorationProviderManager {
       this.editor.clearCodeLens();
     } else if (mode === ApplyMode.REPLACE_RANGE) {
       this.clearCodeLensRange(this.lastVisibleStartLine, this.lastVisibleEndLine);
+    }
+  }
+
+  private applyLinksMode(mode: ApplyMode): void {
+    if (mode === ApplyMode.REPLACE_ALL) {
+      this.editor.clearLinks();
+    } else if (mode === ApplyMode.REPLACE_RANGE) {
+      this.clearLinksRange(this.lastVisibleStartLine, this.lastVisibleEndLine);
     }
   }
 
@@ -499,6 +517,14 @@ export class DecorationProviderManager {
       return;
     }
     this.editor.setBatchLineCodeLens(empty);
+  }
+
+  private clearLinksRange(startLine: number, endLine: number): void {
+    const empty = buildEmptyMapRange<LinkSpan>(startLine, endLine);
+    if (empty.size === 0) {
+      return;
+    }
+    this.editor.setBatchLineLinks(empty);
   }
 
   /** @internal Called by ManagedReceiver when a provider submits results. */
@@ -608,6 +634,13 @@ export class DecorationProviderManager {
     } else if (patch.codeLensItemsMode !== ApplyMode.MERGE) {
       target.codeLensItems = null;
       target.codeLensItemsMode = patch.codeLensItemsMode;
+    }
+    if (patch.links !== null) {
+      target.links = patch.links;
+      target.linksMode = patch.linksMode;
+    } else if (patch.linksMode !== ApplyMode.MERGE) {
+      target.links = null;
+      target.linksMode = patch.linksMode;
     }
   }
 }

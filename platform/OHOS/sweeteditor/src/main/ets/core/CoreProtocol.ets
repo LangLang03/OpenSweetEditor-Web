@@ -19,6 +19,7 @@ import {
   IndentGuide,
   InlayHint,
   InlayType,
+  LinkSpan,
   PhantomText,
   SeparatorGuide,
   StyleSpan,
@@ -353,6 +354,63 @@ export class ProtocolEncoder {
         writer.writeInt32(items[i].column);
         writer.writeInt32(items[i].commandId);
         const tb = lineTextBytes[i];
+        writer.writeInt32(tb.length);
+        if (tb.length > 0) {
+          writer.writeBytes(tb);
+        }
+      }
+    });
+    return writer.getBuffer();
+  }
+
+  static packLineLinks(line: number, links: LinkSpan[]): ArrayBuffer {
+    const encoder = new util.TextEncoder();
+    const targetBytesArray: Uint8Array[] = [];
+    let targetBlobSize = 0;
+    for (const link of links) {
+      const bytes = encoder.encodeInto(link.target);
+      targetBytesArray.push(bytes);
+      targetBlobSize += bytes.length;
+    }
+    const writer = new BinaryWriter(8 + links.length * 12 + targetBlobSize);
+    writer.writeInt32(line);
+    writer.writeInt32(links.length);
+    for (let i = 0; i < links.length; i++) {
+      writer.writeInt32(links[i].column);
+      writer.writeInt32(links[i].length);
+      const tb = targetBytesArray[i];
+      writer.writeInt32(tb.length);
+      if (tb.length > 0) {
+        writer.writeBytes(tb);
+      }
+    }
+    return writer.getBuffer();
+  }
+
+  static packBatchLineLinks(linksByLine: Map<number, LinkSpan[]>): ArrayBuffer {
+    const encoder = new util.TextEncoder();
+    const allTargetBytes: Map<number, Uint8Array[]> = new Map();
+    let totalSize = 4;
+    linksByLine.forEach((links, line) => {
+      totalSize += 8;
+      const lineTargetBytes: Uint8Array[] = [];
+      for (const link of links) {
+        const bytes = encoder.encodeInto(link.target);
+        lineTargetBytes.push(bytes);
+        totalSize += 12 + bytes.length;
+      }
+      allTargetBytes.set(line, lineTargetBytes);
+    });
+    const writer = new BinaryWriter(totalSize);
+    writer.writeInt32(linksByLine.size);
+    linksByLine.forEach((links, line) => {
+      writer.writeInt32(line);
+      writer.writeInt32(links.length);
+      const lineTargetBytes = allTargetBytes.get(line)!;
+      for (let i = 0; i < links.length; i++) {
+        writer.writeInt32(links[i].column);
+        writer.writeInt32(links[i].length);
+        const tb = lineTargetBytes[i];
         writer.writeInt32(tb.length);
         if (tb.length > 0) {
           writer.writeBytes(tb);

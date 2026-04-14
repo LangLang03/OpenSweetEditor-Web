@@ -42,6 +42,7 @@ import {
   IndentGuide,
   InlayHint,
   InlayType,
+  LinkSpan,
   PhantomText,
   SeparatorGuide,
   TextStyle,
@@ -58,6 +59,7 @@ import { EditorEventBus } from './event/EditorEventBus';
 import {
   ContextMenuEvent,
   CodeLensClickEvent,
+  LinkClickEvent,
   CursorChangedEvent,
   DocumentLoadedEvent,
   DoubleTapEvent,
@@ -1409,6 +1411,27 @@ export struct SweetEditor {
     this.editorCore.setBatchLineCodeLens(itemsByLine);
   }
 
+  setLineLinks(line: number, links: LinkSpan[]): void {
+    if (!this.editorCore) {
+      return;
+    }
+    this.editorCore.setLineLinks(line, links);
+  }
+
+  setBatchLineLinks(linksByLine: Map<number, LinkSpan[]>): void {
+    if (!this.editorCore) {
+      return;
+    }
+    this.editorCore.setBatchLineLinks(linksByLine);
+  }
+
+  getLinkTargetAt(line: number, column: number): string {
+    if (!this.editorCore) {
+      return '';
+    }
+    return this.editorCore.getLinkTargetAt(line, column);
+  }
+
   setLineDiagnostics(line: number, items: DiagnosticItem[]): void {
     if (!this.editorCore) {
       return;
@@ -1590,6 +1613,12 @@ export struct SweetEditor {
   clearCodeLens(): void {
     if (this.editorCore) {
       this.editorCore.clearCodeLens();
+    }
+  }
+
+  clearLinks(): void {
+    if (this.editorCore) {
+      this.editorCore.clearLinks();
     }
   }
 
@@ -1859,6 +1888,14 @@ export struct SweetEditor {
 
   offCodeLensClick(listener: EditorEventListener<CodeLensClickEvent>): void {
     this.eventBus.off('codeLensClick', listener as EditorEventListener<EditorEvent>);
+  }
+
+  onLinkClick(listener: EditorEventListener<LinkClickEvent>): void {
+    this.eventBus.on('linkClick', listener as EditorEventListener<EditorEvent>);
+  }
+
+  offLinkClick(listener: EditorEventListener<LinkClickEvent>): void {
+    this.eventBus.off('linkClick', listener as EditorEventListener<EditorEvent>);
   }
 
   onDocumentLoaded(listener: EditorEventListener<DocumentLoadedEvent>): void {
@@ -2388,6 +2425,10 @@ export struct SweetEditor {
       case HitTargetType.CODELENS:
         this.eventBus.emit('codeLensClick', new CodeLensClickEvent(
           ht.line, ht.column, ht.iconId, screenPoint));
+        break;
+      case HitTargetType.LINK:
+        this.eventBus.emit('linkClick', new LinkClickEvent(
+          ht.line, ht.column, this.getLinkTargetAt(ht.line, ht.column), screenPoint));
         break;
     }
   }

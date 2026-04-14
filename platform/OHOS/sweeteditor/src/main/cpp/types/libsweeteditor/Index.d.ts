@@ -140,6 +140,12 @@ export const editorSetLineCodeLens: (handle: number, data: ArrayBuffer, size: nu
 export const editorSetBatchLineCodeLens: (handle: number, data: ArrayBuffer, size: number) => void;
 export const editorClearCodeLens: (handle: number) => void;
 
+// Links
+export const editorSetLineLinks: (handle: number, data: ArrayBuffer, size: number) => void;
+export const editorSetBatchLineLinks: (handle: number, data: ArrayBuffer, size: number) => void;
+export const editorClearLinks: (handle: number) => void;
+export const editorGetLinkTargetAt: (handle: number, line: number, column: number) => string;
+
 // Diagnostics
 export const editorSetLineDiagnostics: (handle: number, data: ArrayBuffer, size: number) => void;
 export const editorSetBatchLineDiagnostics: (handle: number, data: ArrayBuffer, size: number) => void;

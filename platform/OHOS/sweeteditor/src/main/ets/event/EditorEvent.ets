@@ -161,6 +161,20 @@ export class CodeLensClickEvent implements EditorEvent {
   }
 }
 
+export class LinkClickEvent implements EditorEvent {
+  readonly line: number;
+  readonly column: number;
+  readonly target: string;
+  readonly screenPoint: PointF;
+
+  constructor(line: number, column: number, target: string, screenPoint: PointF) {
+    this.line = line;
+    this.column = column;
+    this.target = target;
+    this.screenPoint = screenPoint;
+  }
+}
+
 export class DocumentLoadedEvent implements EditorEvent {
 }
 

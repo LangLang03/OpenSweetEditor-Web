@@ -7,6 +7,7 @@ import {
   IndentGuide,
   InlayHint,
   CodeLensItem,
+  LinkSpan,
   PhantomText,
   SeparatorGuide,
   StyleSpan
@@ -26,7 +27,8 @@ export enum DecorationType {
   SEPARATOR_GUIDE = 'separator_guide',
   GUTTER_ICON = 'gutter_icon',
   PHANTOM_TEXT = 'phantom_text',
-  CODELENS = 'codelens'
+  CODELENS = 'codelens',
+  LINK = 'link'
 }
 
 export { TextChange } from '../core/EditorCore';
@@ -98,6 +100,7 @@ export class DecorationResult {
   gutterIcons: Map<number, GutterIcon[]> | null = null;
   phantomTexts: Map<number, PhantomText[]> | null = null;
   codeLensItems: Map<number, CodeLensItem[]> | null = null;
+  links: Map<number, LinkSpan[]> | null = null;
   syntaxSpansMode: ApplyMode = ApplyMode.MERGE;
   semanticSpansMode: ApplyMode = ApplyMode.MERGE;
   inlayHintsMode: ApplyMode = ApplyMode.MERGE;
@@ -110,6 +113,7 @@ export class DecorationResult {
   gutterIconsMode: ApplyMode = ApplyMode.MERGE;
   phantomTextsMode: ApplyMode = ApplyMode.MERGE;
   codeLensItemsMode: ApplyMode = ApplyMode.MERGE;
+  linksMode: ApplyMode = ApplyMode.MERGE;
 
   copy(): DecorationResult {
     const out = new DecorationResult();
@@ -125,6 +129,7 @@ export class DecorationResult {
     out.gutterIcons = copyMapOfArrays(this.gutterIcons);
     out.phantomTexts = copyMapOfArrays(this.phantomTexts);
     out.codeLensItems = copyMapOfArrays(this.codeLensItems);
+    out.links = copyMapOfArrays<LinkSpan>(this.links);
     out.syntaxSpansMode = this.syntaxSpansMode;
     out.semanticSpansMode = this.semanticSpansMode;
     out.inlayHintsMode = this.inlayHintsMode;
@@ -137,6 +142,7 @@ export class DecorationResult {
     out.gutterIconsMode = this.gutterIconsMode;
     out.phantomTextsMode = this.phantomTextsMode;
     out.codeLensItemsMode = this.codeLensItemsMode;
+    out.linksMode = this.linksMode;
     return out;
   }
 }
@@ -213,6 +219,12 @@ export class DecorationResultBuilder {
   codeLensItems(value: Map<number, CodeLensItem[]> | null, mode: ApplyMode): DecorationResultBuilder {
     this.result.codeLensItems = value;
     this.result.codeLensItemsMode = mode;
+    return this;
+  }
+
+  links(value: Map<number, LinkSpan[]> | null, mode: ApplyMode): DecorationResultBuilder {
+    this.result.links = value;
+    this.result.linksMode = mode;
     return this;
   }
 
