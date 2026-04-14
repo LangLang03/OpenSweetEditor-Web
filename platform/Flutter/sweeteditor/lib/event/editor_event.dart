@@ -136,6 +136,20 @@ class CodeLensClickEvent implements EditorEvent {
   });
 }
 
+class LinkClickEvent implements EditorEvent {
+  final int line;
+  final int column;
+  final String target;
+  final core.PointF screenPoint;
+
+  const LinkClickEvent({
+    required this.line,
+    required this.column,
+    required this.target,
+    required this.screenPoint,
+  });
+}
+
 class DocumentLoadedEvent implements EditorEvent {}
 
 class SelectionMenuItemClickEvent implements EditorEvent {

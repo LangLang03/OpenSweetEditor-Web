@@ -14,6 +14,7 @@ enum DecorationType {
   gutterIcon,
   phantomText,
   codeLens,
+  link,
 }
 
 class DecorationContext {
@@ -64,6 +65,7 @@ class DecorationResult {
   Map<int, List<core.GutterIcon>>? gutterIcons;
   Map<int, List<core.PhantomText>>? phantomTexts;
   Map<int, List<core.CodeLensItem>>? codeLensItems;
+  Map<int, List<core.LinkSpan>>? links;
   ApplyMode syntaxSpansMode = ApplyMode.merge;
   ApplyMode semanticSpansMode = ApplyMode.merge;
   ApplyMode inlayHintsMode = ApplyMode.merge;
@@ -76,6 +78,7 @@ class DecorationResult {
   ApplyMode gutterIconsMode = ApplyMode.merge;
   ApplyMode phantomTextsMode = ApplyMode.merge;
   ApplyMode codeLensItemsMode = ApplyMode.merge;
+  ApplyMode linksMode = ApplyMode.merge;
 
   DecorationResult copy() {
     final out = DecorationResult()
@@ -93,6 +96,7 @@ class DecorationResult {
       ..gutterIcons = _copyMap(gutterIcons)
       ..phantomTexts = _copyMap(phantomTexts)
       ..codeLensItems = _copyMap(codeLensItems)
+      ..links = _copyMap(links)
       ..syntaxSpansMode = syntaxSpansMode
       ..semanticSpansMode = semanticSpansMode
       ..inlayHintsMode = inlayHintsMode
@@ -104,7 +108,8 @@ class DecorationResult {
       ..foldRegionsMode = foldRegionsMode
       ..gutterIconsMode = gutterIconsMode
       ..phantomTextsMode = phantomTextsMode
-      ..codeLensItemsMode = codeLensItemsMode;
+      ..codeLensItemsMode = codeLensItemsMode
+      ..linksMode = linksMode;
     return out;
   }
 
@@ -223,6 +228,15 @@ class DecorationResultBuilder {
   ) {
     _result.codeLensItems = value;
     _result.codeLensItemsMode = mode;
+    return this;
+  }
+
+  DecorationResultBuilder links(
+    Map<int, List<core.LinkSpan>>? value,
+    ApplyMode mode,
+  ) {
+    _result.links = value;
+    _result.linksMode = mode;
     return this;
   }
 

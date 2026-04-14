@@ -70,7 +70,8 @@ enum HitTargetType {
   foldPlaceholder(4),
   foldGutter(5),
   inlayHintColor(6),
-  codelens(7);
+  codelens(7),
+  link(8);
 
   const HitTargetType(this.value);
   final int value;
@@ -816,6 +817,12 @@ class EditorCore {
     return _readNativeUtf8(bindings.editor_get_word_at_cursor(_handle));
   }
 
+  String getLinkTargetAt(int line, int column) {
+    _ensureOpen();
+    final ptr = bindings.editor_get_link_target_at(_handle, line, column);
+    return _readNativeUtf8(ptr);
+  }
+
   void moveCursorLeft({bool extendSelection = false}) {
     _ensureOpen();
     bindings.editor_move_cursor_left(_handle, extendSelection ? 1 : 0);
@@ -1026,7 +1033,9 @@ class EditorCore {
   }
 
   void setLinePhantomTexts(int line, List<PhantomText> phantoms) {
-    setLinePhantomTextsRaw(ProtocolEncoder.packLinePhantomTexts(line, phantoms));
+    setLinePhantomTextsRaw(
+      ProtocolEncoder.packLinePhantomTexts(line, phantoms),
+    );
   }
 
   void setLinePhantomTextsRaw(Uint8List data) {
@@ -1092,17 +1101,38 @@ class EditorCore {
   }
 
   void setBatchLineCodeLens(Map<int, List<CodeLensItem>> itemsByLine) {
-    setBatchLineCodeLensRaw(
-      ProtocolEncoder.packBatchLineCodeLens(itemsByLine),
-    );
+    setBatchLineCodeLensRaw(ProtocolEncoder.packBatchLineCodeLens(itemsByLine));
   }
 
   void setBatchLineCodeLensRaw(Uint8List data) {
     _ensureOpen();
     _callWithBinaryData(
       data,
-      (ptr, len) =>
-          bindings.editor_set_batch_line_codelens(_handle, ptr, len),
+      (ptr, len) => bindings.editor_set_batch_line_codelens(_handle, ptr, len),
+    );
+  }
+
+  void setLineLinks(int line, List<LinkSpan> links) {
+    setLineLinksRaw(ProtocolEncoder.packLineLinks(line, links));
+  }
+
+  void setLineLinksRaw(Uint8List data) {
+    _ensureOpen();
+    _callWithBinaryData(
+      data,
+      (ptr, len) => bindings.editor_set_line_links(_handle, ptr, len),
+    );
+  }
+
+  void setBatchLineLinks(Map<int, List<LinkSpan>> linksByLine) {
+    setBatchLineLinksRaw(ProtocolEncoder.packBatchLineLinks(linksByLine));
+  }
+
+  void setBatchLineLinksRaw(Uint8List data) {
+    _ensureOpen();
+    _callWithBinaryData(
+      data,
+      (ptr, len) => bindings.editor_set_batch_line_links(_handle, ptr, len),
     );
   }
 
@@ -1241,6 +1271,11 @@ class EditorCore {
   void clearCodeLens() {
     _ensureOpen();
     bindings.editor_clear_codelens(_handle);
+  }
+
+  void clearLinks() {
+    _ensureOpen();
+    bindings.editor_clear_links(_handle);
   }
 
   void clearGuides() {

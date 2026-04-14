@@ -17,7 +17,8 @@ enum VisualRunType {
   phantomText(4),
   foldPlaceholder(5),
   tab(6),
-  codelens(7);
+  codelens(7),
+  link(8);
 
   const VisualRunType(this.value);
   final int value;
@@ -50,10 +51,8 @@ enum VisualLineKind {
   const VisualLineKind(this.value);
   final int value;
 
-  static VisualLineKind fromValue(int value) => VisualLineKind.values.firstWhere(
-    (e) => e.value == value,
-    orElse: () => content,
-  );
+  static VisualLineKind fromValue(int value) => VisualLineKind.values
+      .firstWhere((e) => e.value == value, orElse: () => content);
 }
 
 /// Guide direction.

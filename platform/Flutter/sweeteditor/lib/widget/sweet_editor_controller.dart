@@ -372,6 +372,8 @@ class SweetEditorController {
   Stream<CodeLensClickEvent> get onCodeLensClick =>
       _eventBus.on<CodeLensClickEvent>();
 
+  Stream<LinkClickEvent> get onLinkClick => _eventBus.on<LinkClickEvent>();
+
   Stream<FoldToggleEvent> get onFoldToggle => _eventBus.on<FoldToggleEvent>();
 
   Stream<DocumentLoadedEvent> get onDocumentLoaded =>
@@ -565,15 +567,28 @@ class SweetEditorController {
     });
   }
 
+  void setLineLinks(int line, List<core.LinkSpan> links) {
+    _withEditorCore((editorCore) {
+      editorCore.setLineLinks(line, links);
+    });
+  }
+
+  void setBatchLineLinks(Map<int, List<core.LinkSpan>> linksByLine) {
+    _withEditorCore((editorCore) {
+      editorCore.setBatchLineLinks(linksByLine);
+    });
+  }
+
+  String getLinkTargetAt(int line, int column) =>
+      _state?._editorCore?.getLinkTargetAt(line, column) ?? '';
+
   void setLineDiagnostics(int line, List<core.Diagnostic> items) {
     _withEditorCore((editorCore) {
       editorCore.setLineDiagnostics(line, items);
     });
   }
 
-  void setBatchLineDiagnostics(
-    Map<int, List<core.Diagnostic>> itemsByLine,
-  ) {
+  void setBatchLineDiagnostics(Map<int, List<core.Diagnostic>> itemsByLine) {
     _withEditorCore((editorCore) {
       editorCore.setBatchLineDiagnostics(itemsByLine);
     });
@@ -649,6 +664,10 @@ class SweetEditorController {
 
   void clearCodeLens() {
     _withEditorCore((editorCore) => editorCore.clearCodeLens());
+  }
+
+  void clearLinks() {
+    _withEditorCore((editorCore) => editorCore.clearLinks());
   }
 
   void clearGuides() {

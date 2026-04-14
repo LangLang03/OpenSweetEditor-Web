@@ -90,8 +90,8 @@ class DecorationProviderManager {
     if (_disposed) return;
     final now = DateTime.now().millisecondsSinceEpoch;
     final elapsed = now - _lastScrollRefreshTimeMs;
-    final minInterval =
-        session.settings.getDecorationScrollRefreshMinIntervalMs();
+    final minInterval = session.settings
+        .getDecorationScrollRefreshMinIntervalMs();
     final delay = elapsed >= minInterval ? 0 : (minInterval - elapsed);
     _pendingScrollRefresh = true;
     _scrollRefreshTimer?.cancel();
@@ -189,6 +189,7 @@ class DecorationProviderManager {
     final gutterIcons = <int, List<core.GutterIcon>>{};
     final phantomTexts = <int, List<core.PhantomText>>{};
     final codeLensItems = <int, List<core.CodeLensItem>>{};
+    final links = <int, List<core.LinkSpan>>{};
 
     var syntaxMode = ApplyMode.merge;
     var semanticMode = ApplyMode.merge;
@@ -202,6 +203,7 @@ class DecorationProviderManager {
     var gutterMode = ApplyMode.merge;
     var phantomMode = ApplyMode.merge;
     var codeLensMode = ApplyMode.merge;
+    var linksMode = ApplyMode.merge;
 
     for (final provider in _providers) {
       final state = _providerStates[provider];
@@ -235,6 +237,10 @@ class DecorationProviderManager {
       codeLensMode = _mergeMode(codeLensMode, r.codeLensItemsMode);
       if (r.codeLensItems != null) {
         _appendMapOfArrays(codeLensItems, r.codeLensItems!);
+      }
+      linksMode = _mergeMode(linksMode, r.linksMode);
+      if (r.links != null) {
+        _appendMapOfArrays(links, r.links!);
       }
 
       indentMode = _mergeMode(indentMode, r.indentGuidesMode);
@@ -282,6 +288,9 @@ class DecorationProviderManager {
 
     _applyCodeLensMode(codeLensMode);
     _setBatchLineCodeLens(codeLensItems);
+
+    _applyLinksMode(linksMode);
+    _setBatchLineLinks(links);
 
     session.requestFlush();
   }
@@ -334,6 +343,14 @@ class DecorationProviderManager {
     }
   }
 
+  void _applyLinksMode(ApplyMode mode) {
+    if (mode == ApplyMode.replaceAll) {
+      _clearLinks();
+    } else if (mode == ApplyMode.replaceRange) {
+      _clearLinksRange(_lastVisibleStartLine, _lastVisibleEndLine);
+    }
+  }
+
   void _applyGuidesMode(ApplyMode mode, List<Object>? data, int guideType) {
     final shouldReplace =
         mode == ApplyMode.replaceAll || mode == ApplyMode.replaceRange;
@@ -363,9 +380,11 @@ class DecorationProviderManager {
         ? (visibleEnd - visibleStart + 1)
         : 0;
     if (viewportLineCount <= 0) return 0;
-    final multiplier = (session.settings
-            .getDecorationOverscanViewportMultiplier())
-        .clamp(0.0, double.infinity);
+    final multiplier =
+        (session.settings.getDecorationOverscanViewportMultiplier()).clamp(
+          0.0,
+          double.infinity,
+        );
     return (viewportLineCount * multiplier).ceil().clamp(0, 1 << 30);
   }
 
@@ -382,7 +401,7 @@ class DecorationProviderManager {
   }
 
   void _clearDiagnosticRange(int startLine, int endLine) {
-      final empty = _buildEmptyMapRange<core.Diagnostic>(startLine, endLine);
+    final empty = _buildEmptyMapRange<core.Diagnostic>(startLine, endLine);
     if (empty.isEmpty) return;
     _setBatchLineDiagnostics(empty);
   }
@@ -403,6 +422,12 @@ class DecorationProviderManager {
     final empty = _buildEmptyMapRange<core.CodeLensItem>(startLine, endLine);
     if (empty.isEmpty) return;
     _setBatchLineCodeLens(empty);
+  }
+
+  void _clearLinksRange(int startLine, int endLine) {
+    final empty = _buildEmptyMapRange<core.LinkSpan>(startLine, endLine);
+    if (empty.isEmpty) return;
+    _setBatchLineLinks(empty);
   }
 
   void onProviderResult(
@@ -509,6 +534,13 @@ class DecorationProviderManager {
       target.codeLensItems = null;
       target.codeLensItemsMode = patch.codeLensItemsMode;
     }
+    if (patch.links != null) {
+      target.links = patch.links;
+      target.linksMode = patch.linksMode;
+    } else if (patch.linksMode != ApplyMode.merge) {
+      target.links = null;
+      target.linksMode = patch.linksMode;
+    }
   }
 
   static ApplyMode _mergeMode(ApplyMode current, ApplyMode next) {
@@ -584,6 +616,16 @@ class DecorationProviderManager {
     final ec = session.editorCore;
     if (ec == null) return;
     ec.setBatchLineCodeLens(items);
+  }
+
+  void _clearLinks() {
+    session.editorCore?.clearLinks();
+  }
+
+  void _setBatchLineLinks(Map<int, List<core.LinkSpan>> links) {
+    final ec = session.editorCore;
+    if (ec == null) return;
+    ec.setBatchLineLinks(links);
   }
 
   void _setIndentGuides(List<core.IndentGuide> guides) {

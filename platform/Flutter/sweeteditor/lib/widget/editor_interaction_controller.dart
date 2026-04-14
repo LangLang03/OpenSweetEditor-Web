@@ -374,6 +374,20 @@ class EditorInteractionController {
             screenPoint: screenPoint,
           ),
         );
+      case core.HitTargetType.link:
+        _session.eventBus.publish(
+          LinkClickEvent(
+            line: hitTarget.line,
+            column: hitTarget.column,
+            target:
+                _session.editorCore?.getLinkTargetAt(
+                  hitTarget.line,
+                  hitTarget.column,
+                ) ??
+                '',
+            screenPoint: screenPoint,
+          ),
+        );
     }
   }
 

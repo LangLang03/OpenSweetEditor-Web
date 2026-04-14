@@ -8,6 +8,8 @@ import '../editor_types.dart';
 
 import 'editor_text_measurer.dart';
 
+const int _linkColor = 0xFF4C9DFF;
+
 class EditorCanvasPainter extends ChangeNotifier implements CustomPainter {
   EditorCanvasPainter({
     required EditorTheme theme,
@@ -217,6 +219,7 @@ class EditorCanvasPainter extends ChangeNotifier implements CustomPainter {
           case core.VisualRunType.whitespace:
           case core.VisualRunType.tab:
           case core.VisualRunType.codelens:
+          case core.VisualRunType.link:
             _drawTextRun(canvas, run);
           case core.VisualRunType.phantomText:
             _drawPhantomTextRun(canvas, run);
@@ -235,19 +238,27 @@ class EditorCanvasPainter extends ChangeNotifier implements CustomPainter {
     if (run.text.isEmpty) return;
     final screenX = run.x;
     final baselineY = run.y;
-    final effectiveColor = run.type == core.VisualRunType.codelens
-        ? (run.active
-              ? (_theme.currentLineNumberColor != 0
-                    ? _theme.currentLineNumberColor
-                    : _theme.lineNumberColor)
-              : _theme.inlayHintTextColor)
-        : _theme.textColor;
-    final style = _measurer.buildRunStyle(run.style, effectiveColor).copyWith(
-      color: Color(effectiveColor),
-      decoration: run.type == core.VisualRunType.codelens && run.active
-          ? TextDecoration.underline
-          : TextDecoration.none,
-    );
+    int? overrideColor;
+    if (run.type == core.VisualRunType.codelens) {
+      overrideColor = run.active
+          ? (_theme.currentLineNumberColor != 0
+                ? _theme.currentLineNumberColor
+                : _theme.lineNumberColor)
+          : _theme.inlayHintTextColor;
+    } else if (run.type == core.VisualRunType.link) {
+      overrideColor = _linkColor;
+    }
+    final style = _measurer
+        .buildRunStyle(run.style, overrideColor ?? _theme.textColor)
+        .copyWith(
+          color: overrideColor != null ? Color(overrideColor) : null,
+          decoration:
+              ((run.type == core.VisualRunType.codelens ||
+                      run.type == core.VisualRunType.link) &&
+                  run.active)
+              ? TextDecoration.underline
+              : TextDecoration.none,
+        );
     final fontMetrics = _measurer.getFontMetrics(run.style.fontStyle);
     final painter = TextPainter(
       text: TextSpan(text: run.text, style: style),
