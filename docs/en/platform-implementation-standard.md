@@ -38,11 +38,12 @@ The Widget layer handles platform-native rendering, user interaction, and extens
 | **Widget** | `SweetEditor`, `SweetEditorController` *(declarative frameworks MUST; imperative frameworks MAY)*, `EditorTheme`, `EditorSettings`, `EditorIconProvider`, `EditorMetadata`, `LanguageConfiguration` | Widget entry, controller, theme, configuration |
 | **Decoration** | `DecorationProvider`, `DecorationProviderManager`, `DecorationContext`, `DecorationResult`, `DecorationType`; if the Receiver callback pattern is used, `DecorationReceiver` is the recommended name | Decoration provider system |
 | **Completion** | `CompletionProvider`, `CompletionProviderManager`, `CompletionContext`, `CompletionItem`, `CompletionResult`; if the Receiver callback pattern is used, `CompletionReceiver` is the recommended name | Completion provider system |
-| **Event** | A type-safe event mechanism, `EditorEvent`, `TextChangedEvent`, `CursorChangedEvent`, `SelectionChangedEvent`, `ScrollChangedEvent`, `ScaleChangedEvent`, `DocumentLoadedEvent`, `FoldToggleEvent`, `GutterIconClickEvent`, `InlayHintClickEvent`, `CodeLensClickEvent`, `LinkClickEvent`, `LongPressEvent`*(mobile only)*, `DoubleTapEvent`, `ContextMenuEvent`*(desktop & cross-platform UI frameworks)*; if an explicit event-bus/listener pattern is used, `EditorEventBus` and `EditorEventListener` are the recommended names | Event system |
+| **Event** | A type-safe event mechanism, `EditorEvent`, `TextChangedEvent`, `CursorChangedEvent`, `SelectionChangedEvent`, `ScrollChangedEvent`, `ScaleChangedEvent`, `DocumentLoadedEvent`, `FoldToggleEvent`, `GutterIconClickEvent`, `InlayHintClickEvent`, `CodeLensClickEvent`, `LinkClickEvent`, `LongPressEvent`*(mobile only)*, `DoubleTapEvent`, `ContextMenuEvent`*(platforms with ContextMenu support)*; if an explicit event-bus/listener pattern is used, `EditorEventBus` and `EditorEventListener` are the recommended names | Event system |
 | **NewLine** | `NewLineActionProvider`, `NewLineActionProviderManager`, `NewLineAction`, `NewLineContext` | Newline action provider system |
 | **Keymap** | `EditorKeyMap` | Widget-layer keymap extension that binds command ids to host-side handlers |
 | **Copilot** *(SHOULD)* | `InlineSuggestion`, `InlineSuggestionListener` or an equivalent host-visible accept/dismiss callback mechanism; MAY: `InlineSuggestionController` | Inline suggestion data + callback; listener shape is the primary path when exposed |
 | **Selection** *(MAY, mobile-only)* | `SelectionMenuController`, `SelectionMenuItem`, `SelectionMenuItemProvider`, a host-visible custom-item click callback mechanism; MAY: `SelectionMenuListener` | Selection menu (MAY omit on desktop) |
+| **ContextMenu** *(MAY)* | `ContextMenuController`, `ContextMenuRequest`, `ContextMenuSection`, `ContextMenuItem`, `ContextMenuItemProvider`, a host-visible custom-item click callback mechanism; MAY: `ContextMenuPopup`, `ContextMenuTriggerKind` | Platform-side context menu / action menu (desktop SHOULD; mobile MAY) |
 | **Perf** *(SHOULD)* | `PerfOverlay`, `MeasurePerfStats`, `PerfStepRecorder` | Performance overlay |
 
 > `TextChangeAction` is a SHOULD-level auxiliary event enum. Platforms MAY expose it to classify a text-change cycle at a coarse level (for example: `INSERT`, `DELETE`, `UNDO`, `REDO`, `KEY`, `COMPOSITION`), but it MUST NOT replace `changes: List<TextChange>` as the primary incremental payload.
@@ -54,7 +55,7 @@ The following types are **internal implementation details**, not part of the pub
 | Pattern | Recommended Types | Use Case | Benefits |
 |---|---|---|---|
 | **Renderer** | `EditorRenderer` | Separate rendering logic from the widget entry class | Single responsibility; rendering logic can be iterated and tested independently |
-| **Controller** | `CompletionPopupController`, `InlineSuggestionController`, `SelectionMenuController` | Manage popup / overlay lifecycle and interaction logic | Decouples UI popups from data logic; platforms may implement directly with Popup instead |
+| **Controller** | `CompletionPopupController`, `InlineSuggestionController`, `SelectionMenuController`, `ContextMenuController` | Manage popup / overlay lifecycle and interaction logic | Decouples UI popups from data logic; platforms may implement directly with Popup instead |
 
 > If adopting the above patterns, naming SHOULD follow the canonical names in Section 2.1.
 > Not adopting these patterns is not a violation, but equivalent functionality must be implemented elsewhere.
@@ -107,6 +108,11 @@ Other public types:
 | `SelectionMenuItem` | OC: `SESelectionMenuItem` | Selection menu item data type |
 | `SelectionMenuItemProvider` | C#/TS/Kotlin: `ISelectionMenuItemProvider`; OC: `SESelectionMenuItemProvider` | Selection menu item provider; builds the full menu for the current editor state |
 | `SelectionMenuListener` | C#/TS/Kotlin: `ISelectionMenuListener`; OC: `SESelectionMenuListener` | Listener interface; only applicable when the platform exposes an explicit selection-menu listener |
+| `ContextMenuItem` | OC: `SEContextMenuItem` | Context menu item data type |
+| `ContextMenuSection` | OC: `SEContextMenuSection` | One visual section inside the context menu |
+| `ContextMenuRequest` | OC: `SEContextMenuRequest` | Immutable request snapshot used to build a context menu |
+| `ContextMenuItemProvider` | C#/TS/Kotlin: `IContextMenuItemProvider`; OC: `SEContextMenuItemProvider` | Context menu item provider; builds the full menu for the current show cycle |
+| `ContextMenuTriggerKind` | OC: `SEContextMenuTriggerKind` | Trigger kind for opening the context menu |
 | `EditorIconProvider` | C#/TS/Kotlin: `IEditorIconProvider`; OC: `SEEditorIconProvider` | Icon provider interface |
 | `SweetEditorController` | OC: `SESweetEditorController` | External control entry for declarative frameworks (see Section 3.0) |
 
@@ -1094,10 +1100,10 @@ ScrollChangedEvent, ScaleChangedEvent, DocumentLoadedEvent,
 FoldToggleEvent, GutterIconClickEvent, InlayHintClickEvent, CodeLensClickEvent, LinkClickEvent,
 LongPressEvent,       // mobile only (iOS/Android)
 DoubleTapEvent,
-ContextMenuEvent      // desktop (macOS/Windows/Linux) & cross-platform UI frameworks
+ContextMenuEvent      // platforms with ContextMenu support
 ```
 
-> `LongPressEvent` is for mobile platforms (iOS/Android), while `ContextMenuEvent` is for desktop platforms (macOS/Windows/Linux) and cross-platform UI frameworks. Platform implementations SHOULD only register events relevant to their platform.
+> `LongPressEvent` is for mobile platforms (iOS/Android). `ContextMenuEvent` is for platforms that expose a platform-side context menu entry point (for example desktop right click, cross-platform framework context gesture, or mobile long press). Platform implementations SHOULD only register events relevant to their platform.
 
 > The above event types MUST be distinguishable and consumable in a type-safe way through the platform's chosen event mechanism.
 
@@ -1123,6 +1129,7 @@ Event payloads MUST be defined per-event. Platforms MUST NOT assume or require a
 | `LongPressEvent` | `cursorPosition: TextPosition`, `locationInView: PointF or platform-native point type` | Long-press target position and pointer location relative to the editor view |
 | `DoubleTapEvent` | `cursorPosition: TextPosition`, `hasSelection: boolean`, `selection: TextRange?`, `locationInView: PointF or platform-native point type` | Double-tap target position, resulting selection state, and pointer location relative to the editor view |
 | `ContextMenuEvent` | `cursorPosition: TextPosition`, `locationInView: PointF or platform-native point type` | Context-menu target position and pointer location relative to the editor view |
+| `ContextMenuItemClickEvent` *(platform-specific)* | `item: ContextMenuItem`, `request: ContextMenuRequest` | Clicked custom context-menu item and the immutable request snapshot used to build that menu |
 | `SelectionMenuItemClickEvent` *(platform-specific)* | `item: SelectionMenuItem` | Clicked custom selection-menu item |
 
 ### 11.4 Gesture Result Contract
@@ -1135,6 +1142,66 @@ Platforms MAY expose the raw return value of `handleGestureEvent(...)` / `handle
 | `pointerCursorType` | `PointerCursorType` | **MUST** | Pointer cursor hint for the current mouse location |
 
 > Desktop platforms SHOULD apply `pointerCursorType` immediately after gesture processing for responsive cursor updates. Touch-only platforms MAY ignore the visual cursor change while still preserving enum and bridge compatibility.
+
+### 11.5 ContextMenu Standard Contract
+
+`ContextMenu` is a widget-layer, platform-side UI capability. It MUST NOT be modeled as a C++ Core render-model concept or serialized as a Core decoration type. If a platform implements context menus, it SHOULD expose the following standard data model and semantics.
+
+#### Recommended Types
+
+```
+enum ContextMenuTriggerKind {
+    LONG_PRESS,
+    RIGHT_CLICK
+}
+
+interface ContextMenuItemProvider {
+    provideMenuItems(editor: SweetEditor, request: ContextMenuRequest) -> List<ContextMenuSection>
+}
+```
+
+#### `ContextMenuRequest` MUST Fields
+
+| Field | Type | MUST/MAY | Description |
+|---|---|---|---|
+| `triggerKind` | `ContextMenuTriggerKind` | **MUST** | Trigger kind for the current menu show cycle |
+| `cursorPosition` | `TextPosition` | **MUST** | Caret position after the triggering gesture resolves |
+| `locationInView` | `PointF or platform-native point type` | **MUST** | Pointer location relative to the editor view |
+| `hasSelection` | boolean | **MUST** | Whether the editor has a non-empty selection |
+| `selection` | `TextRange?` | **MAY** | Current selection snapshot; `null` when `hasSelection == false` |
+| `hitTarget` | platform-aligned `HitTarget` payload | **MUST** | Hit-test result at the trigger location |
+| `linkTarget` | String | **MAY** | Resolved link target when `hitTarget` is `LINK`; empty string when not applicable |
+
+#### `ContextMenuItem` MUST Fields
+
+| Field | Type | MUST/MAY | Description |
+|---|---|---|---|
+| `id` | String | **MUST** | Stable action identifier |
+| `label` | String | **MUST** | Primary display text |
+| `secondaryLabel` | String? | **MAY** | Optional secondary text shown on the same row |
+| `enabled` | boolean | **MAY** | Whether the item is currently actionable; defaults to enabled if omitted |
+| `icon` | platform-native leading icon object or equivalent | **MAY** | Optional leading icon. This SHOULD be a platform-native image object, not a cross-platform numeric icon id |
+
+#### `ContextMenuSection` MUST Fields
+
+| Field | Type | MUST/MAY | Description |
+|---|---|---|---|
+| `items` | `List<ContextMenuItem>` | **MUST** | Full list of menu items in that section |
+
+The context-menu capability SHOULD satisfy the following semantics:
+- `ContextMenuEvent` is the activation signal; `ContextMenuRequest` is the immutable snapshot used to build the actual menu model
+- The provider returns the complete menu model for the current show cycle, rather than incremental appended items
+- Passing `null` as the provider SHOULD restore the platform default context menu
+- Returning an empty list MAY suppress the menu for that show cycle
+- `locationInView` MUST remain view-local; platforms convert it to screen / window coordinates only when presenting a popup or native menu
+- If `hitTarget == LINK` and `linkTarget` is non-empty, the default menu SHOULD include built-in actions `open_link` and `copy_link`
+- If `hasSelection == true`, the default menu SHOULD include built-in actions `cut` and `copy`
+- The general/default section SHOULD include built-in actions `paste` and `select_all`
+- `ContextMenuItem.icon` MAY be null; if a given menu contains any icon-bearing rows, platforms SHOULD reserve a consistent leading icon slot for visual alignment
+- If custom-item injection is supported, the platform MUST provide a host-visible way to observe custom item activation via `ContextMenuItemClickEvent` or an equivalent callback payload
+- After command execution, text change, or another gesture that invalidates the current target, the menu SHOULD dismiss unless the platform intentionally supports a persistent multi-step workflow
+
+Platforms SHOULD expose a `SweetEditor`-level API equivalent to `setContextMenuItemProvider(provider)` when host code is allowed to customize context-menu content.
 
 ---
 
@@ -1200,6 +1267,7 @@ IME integration is inherently platform-specific:
 | Module | Mobile | Desktop |
 |---|---|---|
 | `copilot/` (InlineSuggestion) | SHOULD | SHOULD |
+| `contextmenu/` (ContextMenu) | MAY | SHOULD |
 | `selection/` (SelectionMenu) | SHOULD | MAY omit |
 | `perf/` (PerfOverlay) | SHOULD | SHOULD |
 
