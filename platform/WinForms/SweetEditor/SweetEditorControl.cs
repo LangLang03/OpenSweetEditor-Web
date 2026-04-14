@@ -577,6 +577,8 @@ namespace SweetEditor {
 		public event EventHandler<FoldToggleEventArgs> FoldToggle;
 		/// <summary>CodeLens click event.</summary>
 		public event EventHandler<CodeLensClickEventArgs> CodeLensClick;
+		/// <summary>Link click event.</summary>
+		public event EventHandler<LinkClickEventArgs> LinkClick;
 		#endregion
 
 		#region Constants
@@ -1110,6 +1112,25 @@ namespace SweetEditor {
 
 		/// <summary>Clears all CodeLens items.</summary>
 		public void ClearCodeLens() { editorCore.ClearCodeLens(); }
+
+		/// <summary>Sets links for a specified line.</summary>
+		public void SetLineLinks(int line, IList<LinkSpan> links) {
+			editorCore.SetLineLinks(line, links);
+		}
+
+		/// <summary>Sets links for multiple lines.</summary>
+		public void SetBatchLineLinks(Dictionary<int, IList<LinkSpan>> linksByLine) {
+			editorCore.SetBatchLineLinks(linksByLine);
+		}
+
+		/// <summary>Clears all links.</summary>
+		public void ClearLinks() { editorCore.ClearLinks(); }
+
+		/// <summary>Gets the link target at the specified position.</summary>
+		public string GetLinkTargetAt(int line, int column) {
+			if (IsReleased) return string.Empty;
+			return editorCore.GetLinkTargetAt(line, column);
+		}
 
 		public void AddDecorationProvider(IDecorationProvider provider) => decorationProviderManager?.AddProvider(provider);
 		public void RemoveDecorationProvider(IDecorationProvider provider) => decorationProviderManager?.RemoveProvider(provider);
@@ -1750,6 +1771,13 @@ namespace SweetEditor {
 									result.HitTarget.IconId,
 									sp));
 								break;
+							case HitTargetType.LINK:
+								LinkClick?.Invoke(this, new LinkClickEventArgs(
+									result.HitTarget.Line,
+									result.HitTarget.Column,
+									GetLinkTargetAt(result.HitTarget.Line, result.HitTarget.Column),
+									sp));
+								break;
 						}
 					}
 					break;
@@ -1993,6 +2021,7 @@ namespace SweetEditor {
 			GutterIconClick = null;
 			FoldToggle = null;
 			CodeLensClick = null;
+			LinkClick = null;
 		}
 
 		protected override void Dispose(bool disposing) {

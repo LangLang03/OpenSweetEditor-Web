@@ -276,6 +276,72 @@ namespace SweetEditor {
 
 		#endregion
 
+		#region Links
+
+		internal static byte[] PackLineLinks(int line, IList<LinkSpan> links) {
+			int count = links.Count;
+			int totalSize = 8;
+			var targetBytes = new byte[count][];
+			for (int i = 0; i < count; i++) {
+				var tb = Encoding.UTF8.GetBytes(links[i].Target ?? string.Empty);
+				targetBytes[i] = tb;
+				totalSize += 12 + tb.Length;
+			}
+			byte[] payload = new byte[totalSize];
+			int offset = 0;
+			WriteInt32LE(payload, ref offset, line);
+			WriteInt32LE(payload, ref offset, count);
+			for (int i = 0; i < count; i++) {
+				WriteInt32LE(payload, ref offset, links[i].Column);
+				WriteInt32LE(payload, ref offset, links[i].Length);
+				var tb = targetBytes[i];
+				WriteInt32LE(payload, ref offset, tb.Length);
+				if (tb.Length > 0) {
+					Buffer.BlockCopy(tb, 0, payload, offset, tb.Length);
+					offset += tb.Length;
+				}
+			}
+			return payload;
+		}
+
+		internal static byte[] PackBatchLineLinks(Dictionary<int, IList<LinkSpan>> linksByLine) {
+			int totalSize = 4;
+			var allTargetBytes = new Dictionary<int, byte[][]>();
+			foreach (var kv in linksByLine) {
+				var links = kv.Value;
+				totalSize += 8;
+				var lineTargets = new byte[links.Count][];
+				for (int i = 0; i < links.Count; i++) {
+					var tb = Encoding.UTF8.GetBytes(links[i].Target ?? string.Empty);
+					lineTargets[i] = tb;
+					totalSize += 12 + tb.Length;
+				}
+				allTargetBytes[kv.Key] = lineTargets;
+			}
+			byte[] payload = new byte[totalSize];
+			int offset = 0;
+			WriteInt32LE(payload, ref offset, linksByLine.Count);
+			foreach (var kv in linksByLine) {
+				WriteInt32LE(payload, ref offset, kv.Key);
+				var links = kv.Value;
+				WriteInt32LE(payload, ref offset, links.Count);
+				var lineTargets = allTargetBytes[kv.Key];
+				for (int i = 0; i < links.Count; i++) {
+					WriteInt32LE(payload, ref offset, links[i].Column);
+					WriteInt32LE(payload, ref offset, links[i].Length);
+					var tb = lineTargets[i];
+					WriteInt32LE(payload, ref offset, tb.Length);
+					if (tb.Length > 0) {
+						Buffer.BlockCopy(tb, 0, payload, offset, tb.Length);
+						offset += tb.Length;
+					}
+				}
+			}
+			return payload;
+		}
+
+		#endregion
+
 		#region Diagnostics
 
 		internal static byte[] PackLineDiagnostics(int line, IList<Diagnostic> items) {

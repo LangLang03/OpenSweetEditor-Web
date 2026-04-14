@@ -19,6 +19,7 @@ namespace SweetEditor {
 		GutterIcon = 1 << 9,
 		PhantomText = 1 << 10,
 		CodeLens = 1 << 11,
+		Link = 1 << 12,
 	}
 
 	public enum DecorationApplyMode {
@@ -78,6 +79,7 @@ namespace SweetEditor {
 		public Dictionary<int, List<GutterIcon>>? GutterIcons { get; set; }
 		public Dictionary<int, List<PhantomText>>? PhantomTexts { get; set; }
 		public Dictionary<int, List<CodeLensItem>>? CodeLensItems { get; set; }
+		public Dictionary<int, List<LinkSpan>>? Links { get; set; }
 
 		public DecorationApplyMode SyntaxSpansMode { get; set; } = DecorationApplyMode.MERGE;
 		public DecorationApplyMode SemanticSpansMode { get; set; } = DecorationApplyMode.MERGE;
@@ -91,6 +93,7 @@ namespace SweetEditor {
 		public DecorationApplyMode GutterIconsMode { get; set; } = DecorationApplyMode.MERGE;
 		public DecorationApplyMode PhantomTextsMode { get; set; } = DecorationApplyMode.MERGE;
 		public DecorationApplyMode CodeLensItemsMode { get; set; } = DecorationApplyMode.MERGE;
+		public DecorationApplyMode LinksMode { get; set; } = DecorationApplyMode.MERGE;
 
 		public DecorationResult Clone() {
 			return new DecorationResult {
@@ -106,6 +109,7 @@ namespace SweetEditor {
 				GutterIcons = CopyMap(GutterIcons),
 				PhantomTexts = CopyMap(PhantomTexts),
 				CodeLensItems = CopyMap(CodeLensItems),
+				Links = CopyMap(Links),
 				SyntaxSpansMode = SyntaxSpansMode,
 				SemanticSpansMode = SemanticSpansMode,
 				InlayHintsMode = InlayHintsMode,
@@ -118,6 +122,7 @@ namespace SweetEditor {
 				GutterIconsMode = GutterIconsMode,
 				PhantomTextsMode = PhantomTextsMode,
 				CodeLensItemsMode = CodeLensItemsMode,
+				LinksMode = LinksMode,
 			};
 		}
 
@@ -298,6 +303,7 @@ namespace SweetEditor {
 			var gutterIcons = new Dictionary<int, List<GutterIcon>>();
 			var phantomTexts = new Dictionary<int, List<PhantomText>>();
 			var codeLensItems = new Dictionary<int, List<CodeLensItem>>();
+			var links = new Dictionary<int, List<LinkSpan>>();
 			DecorationApplyMode syntaxMode = DecorationApplyMode.MERGE;
 			DecorationApplyMode semanticMode = DecorationApplyMode.MERGE;
 			DecorationApplyMode inlayMode = DecorationApplyMode.MERGE;
@@ -310,6 +316,7 @@ namespace SweetEditor {
 			DecorationApplyMode gutterMode = DecorationApplyMode.MERGE;
 			DecorationApplyMode phantomMode = DecorationApplyMode.MERGE;
 			DecorationApplyMode codeLensMode = DecorationApplyMode.MERGE;
+			DecorationApplyMode linksMode = DecorationApplyMode.MERGE;
 
 			foreach (var provider in providers) {
 				if (!states.TryGetValue(provider, out var st) || st.Snapshot == null) continue;
@@ -341,6 +348,10 @@ namespace SweetEditor {
 				codeLensMode = MergeMode(codeLensMode, r.CodeLensItemsMode);
 				if (r.CodeLensItems != null) {
 					AppendMap(codeLensItems, r.CodeLensItems);
+				}
+				linksMode = MergeMode(linksMode, r.LinksMode);
+				if (r.Links != null) {
+					AppendMap(links, r.Links);
 				}
 
 				indentMode = MergeMode(indentMode, r.IndentGuidesMode);
@@ -441,6 +452,11 @@ namespace SweetEditor {
 				editor.SetLineCodeLens(line, items);
 			}
 
+			ApplyLinksMode(linksMode);
+			foreach (var (line, items) in links) {
+				editor.SetLineLinks(line, items);
+			}
+
 			editor.Flush();
 		}
 
@@ -492,6 +508,14 @@ namespace SweetEditor {
 			}
 		}
 
+		private void ApplyLinksMode(DecorationApplyMode mode) {
+			if (mode == DecorationApplyMode.REPLACE_ALL) {
+				editor.ClearLinks();
+			} else if (mode == DecorationApplyMode.REPLACE_RANGE) {
+				ClearLinksRange(lastVisibleStartLine, lastVisibleEndLine);
+			}
+		}
+
 		private void ClearSpanRange(SpanLayer layer, int startLine, int endLine) {
 			var empty = BuildEmptyRangeMap<StyleSpan>(startLine, endLine);
 			if (empty.Count == 0) return;
@@ -526,6 +550,12 @@ namespace SweetEditor {
 			var empty = BuildEmptyRangeMap<CodeLensItem>(startLine, endLine);
 			if (empty.Count == 0) return;
 			editor.SetBatchLineCodeLens(empty);
+		}
+
+		private void ClearLinksRange(int startLine, int endLine) {
+			var empty = BuildEmptyRangeMap<LinkSpan>(startLine, endLine);
+			if (empty.Count == 0) return;
+			editor.SetBatchLineLinks(empty);
 		}
 
 		private static Dictionary<int, IList<T>> BuildEmptyRangeMap<T>(int startLine, int endLine) {
@@ -693,6 +723,13 @@ namespace SweetEditor {
 			} else if (patch.CodeLensItemsMode != DecorationApplyMode.MERGE) {
 				target.CodeLensItems = null;
 				target.CodeLensItemsMode = patch.CodeLensItemsMode;
+			}
+			if (patch.Links != null) {
+				target.Links = patch.Links;
+				target.LinksMode = patch.LinksMode;
+			} else if (patch.LinksMode != DecorationApplyMode.MERGE) {
+				target.Links = null;
+				target.LinksMode = patch.LinksMode;
 			}
 		}
 

@@ -681,6 +681,21 @@ namespace SweetEditor {
 		public CodeLensItem(int column, string text, int commandId) { Column = column; Text = text; CommandId = commandId; }
 	}
 
+	/// <summary>Immutable value object representing a clickable link span on a line.</summary>
+	public sealed class LinkSpan {
+		/// <summary>Start column within the logical line (0-based, UTF-16 offset).</summary>
+		public int Column { get; }
+		/// <summary>Character length of the link span.</summary>
+		public int Length { get; }
+		/// <summary>Link target string returned on click.</summary>
+		public string Target { get; }
+		public LinkSpan(int column, int length, string target) {
+			Column = column;
+			Length = length;
+			Target = target ?? string.Empty;
+		}
+	}
+
 	/// <summary>Immutable value object describing a single gutter icon.</summary>
 	public sealed class GutterIcon {
 		/// <summary>Icon resource ID</summary>
@@ -772,6 +787,8 @@ namespace SweetEditor {
 		INLAY_HINT_COLOR = 6,
 		/// <summary>Hit a CodeLens item.</summary>
 		CODELENS = 7,
+		/// <summary>Hit a clickable document link.</summary>
+		LINK = 8,
 	}
 
 	/// <summary>
@@ -793,10 +810,10 @@ namespace SweetEditor {
 		/// <summary>Hit logical line (0-based)</summary>
 		[JsonPropertyName("line")]
 		public int Line { get; set; }
-		/// <summary>Hit column (0-based, meaningful for InlayHint and CodeLens).</summary>
+		/// <summary>Hit column (0-based, meaningful for InlayHint, CodeLens, and Link).</summary>
 		[JsonPropertyName("column")]
 		public int Column { get; set; }
-		/// <summary>Icon ID (valid for INLAY_HINT_ICON / GUTTER_ICON).</summary>
+		/// <summary>Icon ID (valid for INLAY_HINT_ICON / GUTTER_ICON, or command ID for CODELENS).</summary>
 		[JsonPropertyName("icon_id")]
 		public int IconId { get; set; }
 		/// <summary>Color value (ARGB, valid for INLAY_HINT_COLOR).</summary>
@@ -894,7 +911,9 @@ namespace SweetEditor {
 		/// <summary>Tab character (width computed by core based on tab_size and column position).</summary>
 		TAB,
 		/// <summary>CodeLens clickable label (above code line).</summary>
-		CODELENS
+		CODELENS,
+		/// <summary>Clickable document link embedded in code text.</summary>
+		LINK
 	}
 
 	/// <summary>
@@ -910,7 +929,7 @@ namespace SweetEditor {
 		/// <summary>Draw start Y coordinate.</summary>
 		[JsonPropertyName("y")]
 		public float Y { get; set; }
-		/// <summary>Segment text content (only present for TEXT, INLAY_HINT(TEXT), and PHANTOM_TEXT).</summary>
+		/// <summary>Segment text content (used by TEXT, INLAY_HINT(TEXT), PHANTOM_TEXT, and LINK).</summary>
 		[JsonPropertyName("text")]
 		public string Text { get; set; }
 		/// <summary>Style (color + background color + font style).</summary>
@@ -1243,6 +1262,26 @@ namespace SweetEditor {
 		public PointF ScreenPoint { get; }
 		public CodeLensClickEventArgs(int line, int column, int commandId, PointF point) {
 			Line = line; Column = column; CommandId = commandId; ScreenPoint = point;
+		}
+	}
+
+	/// <summary>
+	/// Link click event args.
+	/// </summary>
+	public class LinkClickEventArgs : EventArgs {
+		/// <summary>Hit logical line (0-based)</summary>
+		public int Line { get; }
+		/// <summary>Column anchor of the clicked link (0-based, UTF-16 offset)</summary>
+		public int Column { get; }
+		/// <summary>Link target string resolved by the native core.</summary>
+		public string Target { get; }
+		/// <summary>Tap screen position</summary>
+		public PointF ScreenPoint { get; }
+		public LinkClickEventArgs(int line, int column, string target, PointF point) {
+			Line = line;
+			Column = column;
+			Target = target ?? string.Empty;
+			ScreenPoint = point;
 		}
 	}
 
@@ -1874,6 +1913,18 @@ namespace SweetEditor {
 
 		[DllImport(LibraryName, EntryPoint = "editor_clear_codelens", CallingConvention = CallingConvention.Cdecl)]
 		internal static extern void ClearCodeLens(IntPtr handle);
+
+		[DllImport(LibraryName, EntryPoint = "editor_set_line_links", CallingConvention = CallingConvention.Cdecl)]
+		internal static extern void SetLineLinks(IntPtr handle, byte[] data, nuint size);
+
+		[DllImport(LibraryName, EntryPoint = "editor_set_batch_line_links", CallingConvention = CallingConvention.Cdecl)]
+		internal static extern void SetBatchLineLinks(IntPtr handle, byte[] data, nuint size);
+
+		[DllImport(LibraryName, EntryPoint = "editor_clear_links", CallingConvention = CallingConvention.Cdecl)]
+		internal static extern void ClearLinks(IntPtr handle);
+
+		[DllImport(LibraryName, EntryPoint = "editor_get_link_target_at", CallingConvention = CallingConvention.Cdecl)]
+		internal static extern IntPtr GetLinkTargetAt(IntPtr handle, nuint line, nuint column);
 
 		[DllImport(LibraryName, EntryPoint = "editor_set_batch_line_diagnostics", CallingConvention = CallingConvention.Cdecl)]
 		internal static extern void SetBatchLineDiagnostics(IntPtr handle, byte[] data, nuint size);
@@ -2914,6 +2965,48 @@ namespace SweetEditor {
 		public void ClearCodeLens() {
 			if (IsReleased) return;
 			NativeMethods.ClearCodeLens(nativeHandle);
+		}
+
+		/// <summary>Sets link spans for the specified line (model overload).</summary>
+		public void SetLineLinks(int line, IList<LinkSpan> links) {
+			if (IsReleased || links == null) return;
+			byte[] payload = ProtocolEncoder.PackLineLinks(line, links);
+			NativeMethods.SetLineLinks(nativeHandle, payload, (nuint)payload.Length);
+		}
+
+		/// <summary>Sets link spans for the specified line (buffer overload).</summary>
+		public void SetLineLinks(byte[] payload) {
+			if (IsReleased || payload == null) return;
+			NativeMethods.SetLineLinks(nativeHandle, payload, (nuint)payload.Length);
+		}
+
+		/// <summary>Batch sets link spans for multiple lines (model overload).</summary>
+		public void SetBatchLineLinks(Dictionary<int, IList<LinkSpan>> linksByLine) {
+			if (IsReleased || linksByLine == null || linksByLine.Count == 0) return;
+			byte[] payload = ProtocolEncoder.PackBatchLineLinks(linksByLine);
+			NativeMethods.SetBatchLineLinks(nativeHandle, payload, (nuint)payload.Length);
+		}
+
+		/// <summary>Batch sets link spans for multiple lines (buffer overload).</summary>
+		public void SetBatchLineLinks(byte[] payload) {
+			if (IsReleased || payload == null) return;
+			NativeMethods.SetBatchLineLinks(nativeHandle, payload, (nuint)payload.Length);
+		}
+
+		/// <summary>Clears all link spans.</summary>
+		public void ClearLinks() {
+			if (IsReleased) return;
+			NativeMethods.ClearLinks(nativeHandle);
+		}
+
+		/// <summary>Gets the link target at the specified line and column.</summary>
+		public string GetLinkTargetAt(int line, int column) {
+			if (IsReleased) return "";
+			IntPtr ptr = NativeMethods.GetLinkTargetAt(nativeHandle, (nuint)line, (nuint)column);
+			if (ptr == IntPtr.Zero) return "";
+			string target = Marshal.PtrToStringUTF8(ptr) ?? "";
+			NativeMethods.FreeUtf8String(ptr);
+			return target;
 		}
 
 		/// <summary>Sets diagnostic decorations for the specified line (model overload).</summary>
