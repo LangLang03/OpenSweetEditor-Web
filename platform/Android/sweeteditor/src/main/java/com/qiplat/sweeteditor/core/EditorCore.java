@@ -1761,7 +1761,7 @@ public class EditorCore {
         }
     }
 
-    /** Click hit target information (filled by C++ layer during TAP gestures). */
+    /** Decoration hit target information returned by the C++ layer when applicable. */
     public static class HitTarget {
         public static final HitTarget NONE = new HitTarget(HitTargetType.NONE, 0, 0, 0, 0);
 
@@ -1851,7 +1851,7 @@ public class EditorCore {
         public final float viewScrollY;
         public final float viewScale;
         /**
-         * Click hit target during TAP (InlayHint / GutterIcon)
+         * Decoration hit target at the gesture location.
          */
         public final HitTarget hitTarget;
         /**

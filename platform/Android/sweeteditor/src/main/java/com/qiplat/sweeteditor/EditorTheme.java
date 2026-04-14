@@ -123,6 +123,12 @@ public class EditorTheme {
     public int selectionMenuTextColor;
     /** Selection menu divider color (ARGB). */
     public int selectionMenuDividerColor;
+    /** Context menu background color (ARGB). */
+    public int contextMenuBgColor;
+    /** Context menu text color (ARGB). */
+    public int contextMenuTextColor;
+    /** Context menu divider color (ARGB). */
+    public int contextMenuDividerColor;
 
     /**
      * Theme text style mapping (extensible).
@@ -191,6 +197,9 @@ public class EditorTheme {
         t.selectionMenuBgColor           = t.completionBgColor;
         t.selectionMenuTextColor         = t.completionLabelColor;
         t.selectionMenuDividerColor      = 0x33D8DEE9;
+        t.contextMenuBgColor             = t.selectionMenuBgColor;
+        t.contextMenuTextColor           = t.selectionMenuTextColor;
+        t.contextMenuDividerColor        = t.selectionMenuDividerColor;
 
         t.defineTextStyle(STYLE_KEYWORD, new TextStyle(0xFF7AA2F7, TextStyle.BOLD));
         t.defineTextStyle(STYLE_STRING, new TextStyle(0xFF9ECE6A, TextStyle.NORMAL));
@@ -253,6 +262,9 @@ public class EditorTheme {
         t.selectionMenuBgColor           = t.completionBgColor;
         t.selectionMenuTextColor         = t.completionLabelColor;
         t.selectionMenuDividerColor      = 0x331F2937;
+        t.contextMenuBgColor             = t.selectionMenuBgColor;
+        t.contextMenuTextColor           = t.selectionMenuTextColor;
+        t.contextMenuDividerColor        = t.selectionMenuDividerColor;
 
         t.defineTextStyle(STYLE_KEYWORD, new TextStyle(0xFF3559D6, TextStyle.BOLD));
         t.defineTextStyle(STYLE_STRING, new TextStyle(0xFF0F7B6C, TextStyle.NORMAL));
@@ -269,4 +281,3 @@ public class EditorTheme {
         return t;
     }
 }
-

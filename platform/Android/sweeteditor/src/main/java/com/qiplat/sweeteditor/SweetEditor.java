@@ -73,6 +73,8 @@ import com.qiplat.sweeteditor.completion.CompletionContext;
 import com.qiplat.sweeteditor.copilot.InlineSuggestion;
 import com.qiplat.sweeteditor.copilot.InlineSuggestionController;
 import com.qiplat.sweeteditor.copilot.InlineSuggestionListener;
+import com.qiplat.sweeteditor.contextmenu.ContextMenuController;
+import com.qiplat.sweeteditor.contextmenu.ContextMenuItemProvider;
 import com.qiplat.sweeteditor.decoration.DecorationProvider;
 import com.qiplat.sweeteditor.decoration.DecorationProviderManager;
 import com.qiplat.sweeteditor.newline.NewLineAction;
@@ -144,6 +146,7 @@ public class SweetEditor extends View {
     private InlineSuggestionController mInlineSuggestionController;
     private NewLineActionProviderManager mNewLineActionProviderManager;
     private SelectionMenuController mSelectionMenuController;
+    private ContextMenuController mContextMenuController;
     @Nullable
     private LanguageConfiguration mLanguageConfiguration;
     @Nullable
@@ -293,13 +296,7 @@ public class SweetEditor extends View {
             syncPlatformScale(result.viewScale);
         }
         flush();
-        if (result.needsAnimation && !mScrollAnimationActive) {
-            mScrollAnimationActive = true;
-            Choreographer.getInstance().postFrameCallback(mScrollAnimationCallback);
-        } else if (!result.needsAnimation && mScrollAnimationActive) {
-            mScrollAnimationActive = false;
-            Choreographer.getInstance().removeFrameCallback(mScrollAnimationCallback);
-        }
+        updateGestureAnimationState(result);
         if (ENABLE_PERF_LOG) {
             float ms = (System.nanoTime() - t0) / 1_000_000f;
             if (ms >= PerfOverlay.WARN_INPUT_MS) {
@@ -308,6 +305,35 @@ public class SweetEditor extends View {
             mRenderer.getPerfOverlay().recordInput("touch", ms);
         }
         return true;
+    }
+
+    @Override
+    public boolean onGenericMotionEvent(MotionEvent event) {
+        if (event.getActionMasked() == MotionEvent.ACTION_BUTTON_PRESS
+                && (event.getButtonState() & MotionEvent.BUTTON_SECONDARY) != 0) {
+            long t0 = ENABLE_PERF_LOG ? System.nanoTime() : 0;
+            PointF screenPoint = new PointF(event.getX(), event.getY());
+            EditorCore.GestureResult result = mEditorCore.handleGestureEventEx(
+                    EditorCore.EVENT_TYPE_MOUSE_RIGHT_DOWN,
+                    new PointF[] {screenPoint},
+                    getMotionEventModifiers(event),
+                    0,
+                    0,
+                    1
+            );
+            fireGestureEvents(result, screenPoint, event.getActionMasked());
+            flush();
+            updateGestureAnimationState(result);
+            if (ENABLE_PERF_LOG) {
+                float ms = (System.nanoTime() - t0) / 1_000_000f;
+                if (ms >= PerfOverlay.WARN_INPUT_MS) {
+                    Log.w(TAG, String.format("[PERF][SLOW] onGenericMotionEvent: %.2f ms", ms));
+                }
+                mRenderer.getPerfOverlay().recordInput("mouse", ms);
+            }
+            return true;
+        }
+        return super.onGenericMotionEvent(event);
     }
 
     @Override
@@ -432,6 +458,9 @@ public class SweetEditor extends View {
         if (mSelectionMenuController != null) {
             mSelectionMenuController.dismiss();
         }
+        if (mContextMenuController != null) {
+            mContextMenuController.dismiss();
+        }
     }
 
     @Override
@@ -542,6 +571,10 @@ public class SweetEditor extends View {
 
         if (mSelectionMenuController != null) {
             mSelectionMenuController.applyTheme(theme);
+        }
+
+        if (mContextMenuController != null) {
+            mContextMenuController.applyTheme(theme);
         }
 
         flush();
@@ -739,7 +772,8 @@ public class SweetEditor extends View {
      */
     public void selectAll() {
         mEditorCore.selectAll();
-        if (mSelectionMenuController != null) {
+        if (mSelectionMenuController != null
+                && (mContextMenuController == null || !mContextMenuController.isShowing())) {
             mSelectionMenuController.onSelectAll();
         }
         flush();
@@ -808,6 +842,36 @@ public class SweetEditor extends View {
         if (mSelectionMenuController != null) {
             mSelectionMenuController.setItemProvider(provider);
         }
+    }
+
+    /**
+     * Set a custom provider for context menu sections.
+     * <p>
+     * The provider is called each time the context menu is about to show.
+     * Pass {@code null} to restore the default menu sections.
+     *
+     * @param provider custom provider, or null for the default menu
+     */
+    public void setContextMenuItemProvider(@Nullable ContextMenuItemProvider provider) {
+        if (mContextMenuController != null) {
+            mContextMenuController.setItemProvider(provider);
+        }
+    }
+
+    /**
+     * Dismiss the context menu if it is currently visible.
+     */
+    public void dismissContextMenu() {
+        if (mContextMenuController != null) {
+            mContextMenuController.dismiss();
+        }
+    }
+
+    /**
+     * Check whether the context menu is currently visible.
+     */
+    public boolean isContextMenuShowing() {
+        return mContextMenuController != null && mContextMenuController.isShowing();
     }
 
     /**
@@ -1714,6 +1778,9 @@ public class SweetEditor extends View {
             if (mSelectionMenuController != null) {
                 mSelectionMenuController.onTextChanged();
             }
+            if (mContextMenuController != null) {
+                mContextMenuController.onTextChanged();
+            }
             // Suppress completion trigger during linked editing to avoid conflict with Enter/Tab keys
             if (!mEditorCore.isInLinkedEditing()) {
                 // Completion trigger: based on first change (primary change)
@@ -1868,9 +1935,19 @@ public class SweetEditor extends View {
                 break;
         }
 
+        if ((result.type == EditorCore.GestureType.LONG_PRESS
+                || result.type == EditorCore.GestureType.CONTEXT_MENU)
+                && mSelectionMenuController != null) {
+            mSelectionMenuController.dismiss();
+        }
+
         // Drive selection menu state machine
         if (mSelectionMenuController != null) {
             mSelectionMenuController.onGestureResult(result, actionMasked);
+        }
+
+        if (mContextMenuController != null) {
+            mContextMenuController.onGestureResult(result, screenPoint);
         }
     }
 
@@ -1878,6 +1955,9 @@ public class SweetEditor extends View {
         if (result.contentChanged) {
             if (mSelectionMenuController != null) {
                 mSelectionMenuController.onTextChanged();
+            }
+            if (mContextMenuController != null) {
+                mContextMenuController.onTextChanged();
             }
             if (result.editResult != null && result.editResult.changed && !result.editResult.changes.isEmpty()) {
                 mEventBus.publish(new TextChangedEvent(TextChangeAction.KEY, result.editResult.changes));
@@ -2004,6 +2084,16 @@ public class SweetEditor extends View {
         }
     }
 
+    private void updateGestureAnimationState(@NonNull EditorCore.GestureResult result) {
+        if (result.needsAnimation && !mScrollAnimationActive) {
+            mScrollAnimationActive = true;
+            Choreographer.getInstance().postFrameCallback(mScrollAnimationCallback);
+        } else if (!result.needsAnimation && mScrollAnimationActive) {
+            mScrollAnimationActive = false;
+            Choreographer.getInstance().removeFrameCallback(mScrollAnimationCallback);
+        }
+    }
+
     private void refreshHoverActivation(@NonNull KeyEvent event) {
         if (!isLinkActivationModifierKey(event.getKeyCode()) || mLastHoverPoint == null) {
             return;
@@ -2077,6 +2167,7 @@ public class SweetEditor extends View {
         mInlineSuggestionController = new InlineSuggestionController(context, this);
 
         mSelectionMenuController = new SelectionMenuController(this, mEventBus, mTheme);
+        mContextMenuController = new ContextMenuController(this, mEventBus, mTheme);
 
         mEditorCore.registerBatchTextStyles(mTheme.textStyles);
 
