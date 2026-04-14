@@ -3,6 +3,7 @@ package com.qiplat.sweeteditor.contextmenu;
 import android.content.Context;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.RippleDrawable;
@@ -12,6 +13,7 @@ import android.view.ViewGroup;
 import android.view.animation.AccelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
 import android.view.animation.Interpolator;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.PopupWindow;
 import android.widget.TextView;
@@ -35,6 +37,8 @@ public final class ContextMenuPopup {
     private static final int MIN_WIDTH_DP = 120;
     private static final int ROW_HEIGHT_DP = 36;
     private static final int ROW_HORIZONTAL_PADDING_DP = 10;
+    private static final int ROW_ICON_SIZE_DP = 18;
+    private static final int ROW_ICON_GAP_DP = 10;
     private static final int ROW_GAP_DP = 8;
     private static final int SECTION_DIVIDER_HEIGHT_DP = 1;
     private static final int SECTION_DIVIDER_MARGIN_H_DP = 10;
@@ -100,16 +104,20 @@ public final class ContextMenuPopup {
         int popupWidth = contentView.getMeasuredWidth();
         int popupHeight = contentView.getMeasuredHeight();
 
-        int clampedX = Math.max(0, Math.min(x, Math.max(0, anchor.getWidth() - popupWidth)));
-        int desiredY = y;
+        int clampedLocalX = Math.max(0, Math.min(x, Math.max(0, anchor.getWidth() - popupWidth)));
+        int desiredLocalY = y;
         boolean showAboveAnchor = false;
-        if (desiredY + popupHeight > anchor.getHeight()) {
-            desiredY = y - popupHeight;
+        if (desiredLocalY + popupHeight > anchor.getHeight()) {
+            desiredLocalY = y - popupHeight;
             showAboveAnchor = true;
         }
-        int clampedY = Math.max(0, Math.min(desiredY, Math.max(0, anchor.getHeight() - popupHeight)));
+        int clampedLocalY = Math.max(0, Math.min(desiredLocalY, Math.max(0, anchor.getHeight() - popupHeight)));
+        int[] anchorLocation = new int[2];
+        anchor.getLocationOnScreen(anchorLocation);
 
-        popupWindow.showAtLocation(anchor, Gravity.NO_GRAVITY, clampedX, clampedY);
+        popupWindow.showAtLocation(anchor, Gravity.NO_GRAVITY,
+                anchorLocation[0] + clampedLocalX,
+                anchorLocation[1] + clampedLocalY);
         prepareForShow(showAboveAnchor);
         animateIn();
     }
@@ -143,6 +151,7 @@ public final class ContextMenuPopup {
     private View buildContentView(@NonNull List<ContextMenuSection> sections) {
         LinearLayout container = new LinearLayout(context);
         container.setOrientation(LinearLayout.VERTICAL);
+        boolean reserveIconSlot = hasAnyIcons(sections);
         if (MIN_WIDTH_DP > 0) {
             container.setMinimumWidth(dpToPx(MIN_WIDTH_DP));
         }
@@ -157,7 +166,7 @@ public final class ContextMenuPopup {
             ContextMenuSection section = sections.get(sectionIndex);
             for (ContextMenuItem item : section.items) {
                 if (item != null) {
-                    View row = createRow(item);
+                    View row = createRow(item, reserveIconSlot);
                     row.setLayoutParams(new LinearLayout.LayoutParams(
                             ViewGroup.LayoutParams.WRAP_CONTENT,
                             ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -171,13 +180,35 @@ public final class ContextMenuPopup {
         return container;
     }
 
-    private View createRow(@NonNull ContextMenuItem item) {
+    private View createRow(@NonNull ContextMenuItem item, boolean reserveIconSlot) {
         LinearLayout row = new LinearLayout(context);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setMinimumHeight(dpToPx(ROW_HEIGHT_DP));
         row.setPadding(dpToPx(ROW_HORIZONTAL_PADDING_DP), 0, dpToPx(ROW_HORIZONTAL_PADDING_DP), 0);
         row.setBackground(createRowBackground());
+
+        if (reserveIconSlot) {
+            ImageView iconView = new ImageView(context);
+            LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(
+                    dpToPx(ROW_ICON_SIZE_DP),
+                    dpToPx(ROW_ICON_SIZE_DP));
+            iconLp.rightMargin = dpToPx(ROW_ICON_GAP_DP);
+            iconView.setLayoutParams(iconLp);
+            if (item.icon != null) {
+                Drawable icon = cloneIcon(item.icon);
+                if (icon != null) {
+                    int iconColor = item.enabled ? textColor : deriveDisabledTextColor(textColor);
+                    icon.setTintList(ColorStateList.valueOf(iconColor));
+                    iconView.setImageDrawable(icon);
+                } else {
+                    iconView.setVisibility(View.INVISIBLE);
+                }
+            } else {
+                iconView.setVisibility(View.INVISIBLE);
+            }
+            row.addView(iconView);
+        }
 
         TextView labelView = new TextView(context);
         labelView.setText(item.label);
@@ -205,8 +236,7 @@ public final class ContextMenuPopup {
                 }
             });
         } else {
-            int disabledTextColor = Color.argb(96,
-                    Color.red(textColor), Color.green(textColor), Color.blue(textColor));
+            int disabledTextColor = deriveDisabledTextColor(textColor);
             labelView.setTextColor(disabledTextColor);
             secondaryView.setTextColor(Color.argb(72,
                     Color.red(textColor), Color.green(textColor), Color.blue(textColor)));
@@ -294,6 +324,31 @@ public final class ContextMenuPopup {
     private static int deriveSecondaryTextColor(int textColor) {
         return Color.argb(170,
                 Color.red(textColor), Color.green(textColor), Color.blue(textColor));
+    }
+
+    private static int deriveDisabledTextColor(int textColor) {
+        return Color.argb(96,
+                Color.red(textColor), Color.green(textColor), Color.blue(textColor));
+    }
+
+    private static boolean hasAnyIcons(@NonNull List<ContextMenuSection> sections) {
+        for (ContextMenuSection section : sections) {
+            for (ContextMenuItem item : section.items) {
+                if (item != null && item.icon != null) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    @Nullable
+    private Drawable cloneIcon(@NonNull Drawable source) {
+        Drawable.ConstantState state = source.getConstantState();
+        Drawable drawable = state != null
+                ? state.newDrawable(context.getResources(), context.getTheme())
+                : source.mutate();
+        return drawable != null ? drawable.mutate() : null;
     }
 
     private int dpToPx(int dp) {

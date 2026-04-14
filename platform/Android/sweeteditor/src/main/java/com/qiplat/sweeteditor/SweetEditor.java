@@ -283,8 +283,8 @@ public class SweetEditor extends View {
         long t0 = ENABLE_PERF_LOG ? System.nanoTime() : 0;
         EditorCore.GestureResult result = mEditorCore.handleGestureEvent(event);
         Log.d(TAG, "result: " + result);
-        PointF screenPoint = new PointF(event.getX(), event.getY());
-        fireGestureEvents(result, screenPoint, event.getActionMasked());
+        PointF locationInView = new PointF(event.getX(), event.getY());
+        fireGestureEvents(result, locationInView, event.getActionMasked());
         if (result.type == EditorCore.GestureType.TAP) {
             requestFocus();
             if (result.hitTarget == null || result.hitTarget.type == EditorCore.HitTargetType.NONE) {
@@ -312,16 +312,16 @@ public class SweetEditor extends View {
         if (event.getActionMasked() == MotionEvent.ACTION_BUTTON_PRESS
                 && (event.getButtonState() & MotionEvent.BUTTON_SECONDARY) != 0) {
             long t0 = ENABLE_PERF_LOG ? System.nanoTime() : 0;
-            PointF screenPoint = new PointF(event.getX(), event.getY());
+            PointF locationInView = new PointF(event.getX(), event.getY());
             EditorCore.GestureResult result = mEditorCore.handleGestureEventEx(
                     EditorCore.EVENT_TYPE_MOUSE_RIGHT_DOWN,
-                    new PointF[] {screenPoint},
+                    new PointF[] {locationInView},
                     getMotionEventModifiers(event),
                     0,
                     0,
                     1
             );
-            fireGestureEvents(result, screenPoint, event.getActionMasked());
+            fireGestureEvents(result, locationInView, event.getActionMasked());
             flush();
             updateGestureAnimationState(result);
             if (ENABLE_PERF_LOG) {
@@ -1707,7 +1707,7 @@ public class SweetEditor extends View {
      * <pre>
      * editor.subscribe(TextChangedEvent.class, e -> Log.d(TAG, "changes=" + e.changes.size()));
      * editor.subscribe(CursorChangedEvent.class, e -> updateStatusBar(e.cursorPosition));
-     * editor.subscribe(LongPressEvent.class, e -> showPopup(e.screenPoint));
+     * editor.subscribe(LongPressEvent.class, e -> showPopup(e.locationInView));
      * </pre>
      */
     public <T extends EditorEvent> void subscribe(@NonNull Class<T> eventType, @NonNull EditorEventListener<T> listener) {
@@ -1831,16 +1831,16 @@ public class SweetEditor extends View {
      * Dispatch corresponding editor events based on gesture result.
      *
      * @param result      Gesture processing result
-     * @param screenPoint Screen coordinates of touch point
+     * @param locationInView Pointer location relative to the editor view
      */
-    private void fireGestureEvents(EditorCore.GestureResult result, PointF screenPoint, int actionMasked) {
+    private void fireGestureEvents(EditorCore.GestureResult result, PointF locationInView, int actionMasked) {
         switch (result.type) {
             case LONG_PRESS:
-                mEventBus.publish(new LongPressEvent(result.cursorPosition, screenPoint));
+                mEventBus.publish(new LongPressEvent(result.cursorPosition, locationInView));
                 mEventBus.publish(new CursorChangedEvent(result.cursorPosition));
                 break;
             case DOUBLE_TAP:
-                mEventBus.publish(new DoubleTapEvent(result.cursorPosition, result.hasSelection, result.selection, screenPoint));
+                mEventBus.publish(new DoubleTapEvent(result.cursorPosition, result.hasSelection, result.selection, locationInView));
                 mEventBus.publish(new CursorChangedEvent(result.cursorPosition));
                 if (result.hasSelection) {
                     mEventBus.publish(new SelectionChangedEvent(true, result.selection, result.cursorPosition));
@@ -1861,7 +1861,7 @@ public class SweetEditor extends View {
                                     result.hitTarget.column,
                                     InlayType.TEXT,
                                     0,
-                                    screenPoint));
+                                    locationInView));
                             break;
                         case INLAY_HINT_ICON:
                             mEventBus.publish(new InlayHintClickEvent(
@@ -1869,7 +1869,7 @@ public class SweetEditor extends View {
                                     result.hitTarget.column,
                                     InlayType.ICON,
                                     result.hitTarget.iconId,
-                                    screenPoint));
+                                    locationInView));
                             break;
                         case INLAY_HINT_COLOR:
                             mEventBus.publish(new InlayHintClickEvent(
@@ -1877,34 +1877,34 @@ public class SweetEditor extends View {
                                     result.hitTarget.column,
                                     InlayType.COLOR,
                                     result.hitTarget.colorValue,
-                                    screenPoint));
+                                    locationInView));
                             break;
                         case GUTTER_ICON:
                             mEventBus.publish(new GutterIconClickEvent(
                                     result.hitTarget.line,
                                     result.hitTarget.iconId,
-                                    screenPoint));
+                                    locationInView));
                             break;
                         case FOLD_PLACEHOLDER:
                         case FOLD_GUTTER:
                             mEventBus.publish(new FoldToggleEvent(
                                     result.hitTarget.line,
                                     result.hitTarget.type == EditorCore.HitTargetType.FOLD_GUTTER,
-                                    screenPoint));
+                                    locationInView));
                             break;
                         case CODELENS:
                             mEventBus.publish(new CodeLensClickEvent(
                                     result.hitTarget.line,
                                     result.hitTarget.column,
                                     result.hitTarget.iconId,
-                                    screenPoint));
+                                    locationInView));
                             break;
                         case LINK:
                             mEventBus.publish(new LinkClickEvent(
                                     result.hitTarget.line,
                                     result.hitTarget.column,
                                     getLinkTargetAt(result.hitTarget.line, result.hitTarget.column),
-                                    screenPoint));
+                                    locationInView));
                             break;
                     }
                 }
@@ -1931,7 +1931,7 @@ public class SweetEditor extends View {
                 mEventBus.publish(new SelectionChangedEvent(result.hasSelection, result.selection, result.cursorPosition));
                 break;
             case CONTEXT_MENU:
-                mEventBus.publish(new ContextMenuEvent(result.cursorPosition, screenPoint));
+                mEventBus.publish(new ContextMenuEvent(result.cursorPosition, locationInView));
                 break;
         }
 
@@ -1947,7 +1947,7 @@ public class SweetEditor extends View {
         }
 
         if (mContextMenuController != null) {
-            mContextMenuController.onGestureResult(result, screenPoint);
+            mContextMenuController.onGestureResult(result, locationInView);
         }
     }
 

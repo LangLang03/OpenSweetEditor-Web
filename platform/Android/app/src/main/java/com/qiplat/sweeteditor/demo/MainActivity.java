@@ -1,8 +1,11 @@
 package com.qiplat.sweeteditor.demo;
 
+import android.content.ActivityNotFoundException;
+import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.PorterDuff;
 import android.graphics.Typeface;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -266,11 +269,7 @@ public class MainActivity extends AppCompatActivity {
             updateStatus(message);
             Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
         });
-        mEditor.subscribe(LinkClickEvent.class, e -> {
-            String message = "Link " + e.target;
-            updateStatus(message);
-            Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
-        });
+        mEditor.subscribe(LinkClickEvent.class, e -> openLinkInBrowser(e.target));
         mEditor.subscribe(CursorChangedEvent.class, e -> scheduleSuggestionIfAtLineEnd(e));
 
         mEditor.setInlineSuggestionListener(new com.qiplat.sweeteditor.copilot.InlineSuggestionListener() {
@@ -316,6 +315,24 @@ public class MainActivity extends AppCompatActivity {
         if (mPendingSuggestion != null) {
             mSuggestionHandler.removeCallbacks(mPendingSuggestion);
             mPendingSuggestion = null;
+        }
+    }
+
+    private void openLinkInBrowser(@Nullable String target) {
+        if (target == null || target.isEmpty()) {
+            updateStatus("Link target is empty");
+            Toast.makeText(this, "Link target is empty", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        try {
+            Intent viewIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(target));
+            viewIntent.addCategory(Intent.CATEGORY_BROWSABLE);
+            Intent chooserIntent = Intent.createChooser(viewIntent, "Open link with");
+            startActivity(chooserIntent);
+            updateStatus("Open link " + target);
+        } catch (ActivityNotFoundException ex) {
+            updateStatus("No browser found for " + target);
+            Toast.makeText(this, "No browser found", Toast.LENGTH_SHORT).show();
         }
     }
 

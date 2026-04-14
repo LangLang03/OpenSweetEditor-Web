@@ -4,11 +4,13 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.graphics.PointF;
+import android.graphics.drawable.Drawable;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.qiplat.sweeteditor.EditorTheme;
+import com.qiplat.sweeteditor.R;
 import com.qiplat.sweeteditor.SweetEditor;
 import com.qiplat.sweeteditor.core.EditorCore;
 import com.qiplat.sweeteditor.core.foundation.TextPosition;
@@ -58,13 +60,13 @@ public final class ContextMenuController {
                 theme.contextMenuDividerColor);
     }
 
-    public void onGestureResult(@NonNull EditorCore.GestureResult result, @NonNull PointF screenPoint) {
+    public void onGestureResult(@NonNull EditorCore.GestureResult result, @NonNull PointF locationInView) {
         switch (result.type) {
             case LONG_PRESS:
-                showMenu(buildRequest(ContextMenuTriggerKind.LONG_PRESS, result, screenPoint));
+                showMenu(buildRequest(ContextMenuTriggerKind.LONG_PRESS, result, locationInView));
                 break;
             case CONTEXT_MENU:
-                showMenu(buildRequest(ContextMenuTriggerKind.RIGHT_CLICK, result, screenPoint));
+                showMenu(buildRequest(ContextMenuTriggerKind.RIGHT_CLICK, result, locationInView));
                 break;
             case TAP:
             case DOUBLE_TAP:
@@ -100,7 +102,7 @@ public final class ContextMenuController {
     @NonNull
     private ContextMenuRequest buildRequest(@NonNull ContextMenuTriggerKind triggerKind,
                                             @NonNull EditorCore.GestureResult result,
-                                            @NonNull PointF screenPoint) {
+                                            @NonNull PointF locationInView) {
         EditorCore.HitTarget hitTarget = result.hitTarget != null ? result.hitTarget : EditorCore.HitTarget.NONE;
         String linkTarget = "";
         if (hitTarget.type == EditorCore.HitTargetType.LINK) {
@@ -109,7 +111,7 @@ public final class ContextMenuController {
         return new ContextMenuRequest(
                 triggerKind,
                 copyPosition(result.cursorPosition),
-                new PointF(screenPoint.x, screenPoint.y),
+                new PointF(locationInView.x, locationInView.y),
                 result.hasSelection,
                 result.hasSelection ? copyRange(result.selection) : null,
                 hitTarget,
@@ -125,8 +127,8 @@ public final class ContextMenuController {
         }
         currentRequest = request;
         popup.showAt(editor,
-                Math.round(request.screenPoint.x) + dpToPx(MENU_OFFSET_X_DP),
-                Math.round(request.screenPoint.y) + dpToPx(MENU_OFFSET_Y_DP),
+                Math.round(request.locationInView.x) + dpToPx(MENU_OFFSET_X_DP),
+                Math.round(request.locationInView.y) + dpToPx(MENU_OFFSET_Y_DP),
                 sections);
     }
 
@@ -176,8 +178,12 @@ public final class ContextMenuController {
             return;
         }
         List<ContextMenuItem> items = new ArrayList<>(2);
-        items.add(new ContextMenuItem(ContextMenuItem.ACTION_OPEN_LINK, "Open Link"));
-        items.add(new ContextMenuItem(ContextMenuItem.ACTION_COPY_LINK, "Copy Link"));
+        items.add(new ContextMenuItem(ContextMenuItem.ACTION_OPEN_LINK,
+                "Open Link",
+                loadIcon(R.drawable.ic_context_menu_open_link)));
+        items.add(new ContextMenuItem(ContextMenuItem.ACTION_COPY_LINK,
+                "Copy Link",
+                loadIcon(R.drawable.ic_context_menu_copy_link)));
         out.add(new ContextMenuSection(items));
     }
 
@@ -187,15 +193,23 @@ public final class ContextMenuController {
             return;
         }
         List<ContextMenuItem> items = new ArrayList<>(2);
-        items.add(new ContextMenuItem(ContextMenuItem.ACTION_CUT, "Cut"));
-        items.add(new ContextMenuItem(ContextMenuItem.ACTION_COPY, "Copy"));
+        items.add(new ContextMenuItem(ContextMenuItem.ACTION_CUT,
+                "Cut",
+                loadIcon(R.drawable.ic_context_menu_cut)));
+        items.add(new ContextMenuItem(ContextMenuItem.ACTION_COPY,
+                "Copy",
+                loadIcon(R.drawable.ic_context_menu_copy)));
         out.add(new ContextMenuSection(items));
     }
 
     private void appendGeneralSection(@NonNull List<ContextMenuSection> out) {
         List<ContextMenuItem> items = new ArrayList<>(2);
-        items.add(new ContextMenuItem(ContextMenuItem.ACTION_PASTE, "Paste"));
-        items.add(new ContextMenuItem(ContextMenuItem.ACTION_SELECT_ALL, "Select All"));
+        items.add(new ContextMenuItem(ContextMenuItem.ACTION_PASTE,
+                "Paste",
+                loadIcon(R.drawable.ic_context_menu_paste)));
+        items.add(new ContextMenuItem(ContextMenuItem.ACTION_SELECT_ALL,
+                "Select All",
+                loadIcon(R.drawable.ic_context_menu_select_all)));
         out.add(new ContextMenuSection(items));
     }
 
@@ -213,7 +227,7 @@ public final class ContextMenuController {
                             request.hitTarget.line,
                             request.hitTarget.column,
                             request.linkTarget,
-                            new PointF(request.screenPoint.x, request.screenPoint.y)));
+                            new PointF(request.locationInView.x, request.locationInView.y)));
                 }
                 dismissImmediate();
                 break;
@@ -269,5 +283,10 @@ public final class ContextMenuController {
 
     private int dpToPx(int dp) {
         return (int) (dp * editor.getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    @Nullable
+    private Drawable loadIcon(int resId) {
+        return editor.getContext().getDrawable(resId);
     }
 }
