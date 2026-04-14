@@ -17,6 +17,7 @@ import com.qiplat.sweeteditor.core.adornment.IndentGuide;
 import com.qiplat.sweeteditor.core.adornment.SeparatorGuide;
 import com.qiplat.sweeteditor.core.adornment.InlayHint;
 import com.qiplat.sweeteditor.core.adornment.InlayType;
+import com.qiplat.sweeteditor.core.adornment.LinkSpan;
 import com.qiplat.sweeteditor.core.adornment.TextStyle;
 import com.qiplat.sweeteditor.core.snippet.LinkedEditingModel;
 import com.qiplat.sweeteditor.core.snippet.TabStopGroup;
@@ -781,6 +782,109 @@ public final class ProtocolEncoder {
                     payload.putInt(0);
                 }
                 itemIdx++;
+            }
+        }
+        payload.flip();
+        return payload;
+    }
+
+    /**
+     * Pack the LinkSpan list for a given line into a binary ByteBuffer.
+     * <p>
+     * Format (LE): u32 line, u32 link_count,
+     * then repeat link_count times: [u32 column, u32 length, u32 target_len, u8[target_len] target_utf8]
+     */
+    public static ByteBuffer packLineLinks(int line, @NonNull List<? extends LinkSpan> links) {
+        int count = links.size();
+        int totalSize = 8;
+        byte[][] targetBytes = new byte[count][];
+        for (int i = 0; i < count; i++) {
+            LinkSpan link = links.get(i);
+            totalSize += 12;
+            if (link.target != null) {
+                byte[] bytes = link.target.getBytes(StandardCharsets.UTF_8);
+                targetBytes[i] = bytes;
+                totalSize += bytes.length;
+            }
+        }
+
+        ByteBuffer payload = ByteBuffer.allocateDirect(totalSize).order(ByteOrder.LITTLE_ENDIAN);
+        payload.putInt(line);
+        payload.putInt(count);
+        for (int i = 0; i < count; i++) {
+            LinkSpan link = links.get(i);
+            payload.putInt(link.column);
+            payload.putInt(link.length);
+            byte[] tb = targetBytes[i];
+            if (tb != null) {
+                payload.putInt(tb.length);
+                payload.put(tb);
+            } else {
+                payload.putInt(0);
+            }
+        }
+        payload.flip();
+        return payload;
+    }
+
+    /**
+     * Batch encode multiple lines of LinkSpan entries.
+     * <p>
+     * Format (LE): u32 entry_count,
+     * [u32 line, u32 link_count,
+     *  [u32 column, u32 length, u32 target_len, u8[target_len] target_utf8] x link_count] x entry_count
+     */
+    @Nullable
+    public static ByteBuffer packBatchLineLinks(@Nullable SparseArray<? extends List<? extends LinkSpan>> linksByLine) {
+        if (linksByLine == null || linksByLine.size() == 0) return null;
+        int entryCount = linksByLine.size();
+        int totalSize = 4;
+        int totalLinkCount = 0;
+        for (int i = 0; i < entryCount; i++) {
+            List<? extends LinkSpan> links = linksByLine.valueAt(i);
+            int linkCount = (links != null) ? links.size() : 0;
+            totalLinkCount += linkCount;
+            totalSize += 8;
+        }
+
+        byte[][] targetBytesCache = new byte[totalLinkCount][];
+        int linkIndex = 0;
+        for (int i = 0; i < entryCount; i++) {
+            List<? extends LinkSpan> links = linksByLine.valueAt(i);
+            if (links == null) continue;
+            for (int j = 0; j < links.size(); j++) {
+                LinkSpan link = links.get(j);
+                totalSize += 12;
+                if (link.target != null) {
+                    byte[] bytes = link.target.getBytes(StandardCharsets.UTF_8);
+                    targetBytesCache[linkIndex] = bytes;
+                    totalSize += bytes.length;
+                }
+                linkIndex++;
+            }
+        }
+
+        ByteBuffer payload = ByteBuffer.allocateDirect(totalSize).order(ByteOrder.LITTLE_ENDIAN);
+        payload.putInt(entryCount);
+        linkIndex = 0;
+        for (int i = 0; i < entryCount; i++) {
+            int line = linksByLine.keyAt(i);
+            List<? extends LinkSpan> links = linksByLine.valueAt(i);
+            int linkCount = (links != null) ? links.size() : 0;
+            payload.putInt(line);
+            payload.putInt(linkCount);
+            for (int j = 0; j < linkCount; j++) {
+                LinkSpan link = links.get(j);
+                payload.putInt(link.column);
+                payload.putInt(link.length);
+                byte[] tb = targetBytesCache[linkIndex];
+                if (tb != null) {
+                    payload.putInt(tb.length);
+                    payload.put(tb);
+                } else {
+                    payload.putInt(0);
+                }
+                linkIndex++;
             }
         }
         payload.flip();

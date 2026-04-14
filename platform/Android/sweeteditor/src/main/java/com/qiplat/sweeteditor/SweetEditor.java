@@ -49,6 +49,7 @@ import com.qiplat.sweeteditor.core.adornment.CodeLensItem;
 import com.qiplat.sweeteditor.core.adornment.GutterIcon;
 import com.qiplat.sweeteditor.core.adornment.InlayHint;
 import com.qiplat.sweeteditor.core.adornment.InlayType;
+import com.qiplat.sweeteditor.core.adornment.LinkSpan;
 import com.qiplat.sweeteditor.core.adornment.PhantomText;
 import com.qiplat.sweeteditor.core.adornment.StyleSpan;
 import com.qiplat.sweeteditor.core.adornment.TextStyle;
@@ -88,6 +89,7 @@ import com.qiplat.sweeteditor.event.CodeLensClickEvent;
 import com.qiplat.sweeteditor.event.FoldToggleEvent;
 import com.qiplat.sweeteditor.event.GutterIconClickEvent;
 import com.qiplat.sweeteditor.event.InlayHintClickEvent;
+import com.qiplat.sweeteditor.event.LinkClickEvent;
 import com.qiplat.sweeteditor.event.LongPressEvent;
 import com.qiplat.sweeteditor.selection.SelectionMenuController;
 import com.qiplat.sweeteditor.selection.SelectionMenuItemProvider;
@@ -125,6 +127,8 @@ public class SweetEditor extends View {
     private int mBottomOcclusionInset = 0;
     private int mAppliedViewportWidth = -1;
     private int mAppliedViewportHeight = -1;
+    @Nullable
+    private PointF mLastHoverPoint;
 
     // ==================== Construction/Init/Lifecycle ====================
 
@@ -315,25 +319,8 @@ public class SweetEditor extends View {
             return super.onHoverEvent(event);
         }
 
-        PointF point = action == MotionEvent.ACTION_HOVER_EXIT
-                ? new PointF(-1f, -1f)
-                : new PointF(event.getX(), event.getY());
-        EditorCore.GestureResult result = mEditorCore.handleGestureEventEx(
-                EditorCore.EVENT_TYPE_MOUSE_MOVE,
-                new PointF[] {point},
-                0,
-                0,
-                0,
-                1
-        );
-        flush();
-        if (result.needsAnimation && !mScrollAnimationActive) {
-            mScrollAnimationActive = true;
-            Choreographer.getInstance().postFrameCallback(mScrollAnimationCallback);
-        } else if (!result.needsAnimation && mScrollAnimationActive) {
-            mScrollAnimationActive = false;
-            Choreographer.getInstance().removeFrameCallback(mScrollAnimationCallback);
-        }
+        PointF point = action == MotionEvent.ACTION_HOVER_EXIT ? null : new PointF(event.getX(), event.getY());
+        updateHoverGesture(point, getMotionEventModifiers(event));
         return true;
     }
 
@@ -352,7 +339,17 @@ public class SweetEditor extends View {
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         handleKeyEventFromIME(event);
+        refreshHoverActivation(event);
         return true;
+    }
+
+    @Override
+    public boolean onKeyUp(int keyCode, KeyEvent event) {
+        if (isLinkActivationModifierKey(keyCode)) {
+            refreshHoverActivation(event);
+            return true;
+        }
+        return super.onKeyUp(keyCode, event);
     }
 
     @Override
@@ -1118,6 +1115,35 @@ public class SweetEditor extends View {
         mEditorCore.setBatchLineCodeLens(itemsByLine);
     }
 
+    // -------------------- Links --------------------
+
+    /**
+     * Set link ranges for a specified line.
+     *
+     * @param line  Line number (0-based)
+     * @param links Link range list
+     */
+    public void setLineLinks(int line, @NonNull List<? extends LinkSpan> links) {
+        mEditorCore.setLineLinks(line, links);
+    }
+
+    /**
+     * Batch set link ranges for multiple lines (reduces JNI calls).
+     *
+     * @param linksByLine Sparse array of line number to link list
+     */
+    public void setBatchLineLinks(@Nullable SparseArray<? extends List<? extends LinkSpan>> linksByLine) {
+        mEditorCore.setBatchLineLinks(linksByLine);
+    }
+
+    /**
+     * Resolve link target by line and column inside that link.
+     */
+    @NonNull
+    public String getLinkTargetAt(int line, int column) {
+        return mEditorCore.getLinkTargetAt(line, column);
+    }
+
     // -------------------- Diagnostic Decorations --------------------
 
     /**
@@ -1363,6 +1389,13 @@ public class SweetEditor extends View {
      */
     public void clearCodeLens() {
         mEditorCore.clearCodeLens();
+    }
+
+    /**
+     * Clear all link ranges.
+     */
+    public void clearLinks() {
+        mEditorCore.clearLinks();
     }
 
     /**
@@ -1799,6 +1832,13 @@ public class SweetEditor extends View {
                                     result.hitTarget.iconId,
                                     screenPoint));
                             break;
+                        case LINK:
+                            mEventBus.publish(new LinkClickEvent(
+                                    result.hitTarget.line,
+                                    result.hitTarget.column,
+                                    getLinkTargetAt(result.hitTarget.line, result.hitTarget.column),
+                                    screenPoint));
+                            break;
                     }
                 }
                 break;
@@ -1941,6 +1981,60 @@ public class SweetEditor extends View {
 
     private EditorKeyMap createDefaultKeyMap() {
         return EditorKeyMap.defaultKeyMap();
+    }
+
+    private void updateHoverGesture(@Nullable PointF point, int modifiers) {
+        mLastHoverPoint = point != null ? new PointF(point.x, point.y) : null;
+        PointF probePoint = point != null ? point : new PointF(-1f, -1f);
+        EditorCore.GestureResult result = mEditorCore.handleGestureEventEx(
+                EditorCore.EVENT_TYPE_MOUSE_MOVE,
+                new PointF[] {probePoint},
+                modifiers,
+                0,
+                0,
+                1
+        );
+        flush();
+        if (result.needsAnimation && !mScrollAnimationActive) {
+            mScrollAnimationActive = true;
+            Choreographer.getInstance().postFrameCallback(mScrollAnimationCallback);
+        } else if (!result.needsAnimation && mScrollAnimationActive) {
+            mScrollAnimationActive = false;
+            Choreographer.getInstance().removeFrameCallback(mScrollAnimationCallback);
+        }
+    }
+
+    private void refreshHoverActivation(@NonNull KeyEvent event) {
+        if (!isLinkActivationModifierKey(event.getKeyCode()) || mLastHoverPoint == null) {
+            return;
+        }
+        updateHoverGesture(mLastHoverPoint, getKeyEventModifiers(event));
+    }
+
+    private static boolean isLinkActivationModifierKey(int keyCode) {
+        return keyCode == KeyEvent.KEYCODE_CTRL_LEFT
+                || keyCode == KeyEvent.KEYCODE_CTRL_RIGHT
+                || keyCode == KeyEvent.KEYCODE_META_LEFT
+                || keyCode == KeyEvent.KEYCODE_META_RIGHT;
+    }
+
+    private static int getMotionEventModifiers(@NonNull MotionEvent event) {
+        int metaState = event.getMetaState();
+        int modifiers = KeyModifier.NONE;
+        if ((metaState & KeyEvent.META_SHIFT_ON) != 0) modifiers |= KeyModifier.SHIFT;
+        if ((metaState & KeyEvent.META_CTRL_ON) != 0) modifiers |= KeyModifier.CTRL;
+        if ((metaState & KeyEvent.META_ALT_ON) != 0) modifiers |= KeyModifier.ALT;
+        if ((metaState & KeyEvent.META_META_ON) != 0) modifiers |= KeyModifier.META;
+        return modifiers;
+    }
+
+    private static int getKeyEventModifiers(@NonNull KeyEvent event) {
+        int modifiers = KeyModifier.NONE;
+        if (event.isShiftPressed()) modifiers |= KeyModifier.SHIFT;
+        if (event.isCtrlPressed()) modifiers |= KeyModifier.CTRL;
+        if (event.isAltPressed()) modifiers |= KeyModifier.ALT;
+        if (event.isMetaPressed()) modifiers |= KeyModifier.META;
+        return modifiers;
     }
 
     // ==================== Private Helper / Internal Implementation ====================
@@ -2107,4 +2201,3 @@ public class SweetEditor extends View {
         }
     }
 }
-

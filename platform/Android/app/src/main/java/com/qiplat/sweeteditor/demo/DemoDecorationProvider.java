@@ -14,6 +14,7 @@ import com.qiplat.sweeteditor.core.adornment.FoldRegion;
 import com.qiplat.sweeteditor.core.adornment.GutterIcon;
 import com.qiplat.sweeteditor.core.adornment.IndentGuide;
 import com.qiplat.sweeteditor.core.adornment.InlayHint;
+import com.qiplat.sweeteditor.core.adornment.LinkSpan;
 import com.qiplat.sweeteditor.core.adornment.SeparatorGuide;
 import com.qiplat.sweeteditor.core.adornment.StyleSpan;
 import com.qiplat.sweeteditor.core.foundation.TextChange;
@@ -57,7 +58,8 @@ public class DemoDecorationProvider implements DecorationProvider {
 
     private static final String SYNTAX_ASSET_DIR = "syntaxes";
     private static final String DEFAULT_ANALYSIS_FILE_NAME = "sample.cpp";
-    private static final int STYLE_COLOR = EditorTheme.STYLE_USER_BASE + 1;
+    public static final int STYLE_COLOR = EditorTheme.STYLE_USER_BASE + 1;
+    public static final int STYLE_LINK = EditorTheme.STYLE_USER_BASE + 2;
     private static final int MAX_DYNAMIC_DIAGNOSTICS = 8;
 
     public static final int ICON_TYPE = 1;
@@ -87,7 +89,8 @@ public class DemoDecorationProvider implements DecorationProvider {
                 DecorationType.FOLD_REGION,
                 DecorationType.INLAY_HINT,
                 DecorationType.DIAGNOSTIC,
-                DecorationType.CODELENS
+                DecorationType.CODELENS,
+                DecorationType.LINK
         );
     }
 
@@ -124,6 +127,7 @@ public class DemoDecorationProvider implements DecorationProvider {
         SparseArray<List<InlayHint>> colorInlayHints = new SparseArray<>();
         SparseArray<List<GutterIcon>> gutterIcons = new SparseArray<>();
         SparseArray<List<CodeLensItem>> codeLensItems = new SparseArray<>();
+        SparseArray<List<LinkSpan>> links = new SparseArray<>();
         List<IndentGuide> indentGuides = new ArrayList<>();
         List<FoldRegion> foldRegions = new ArrayList<>();
         List<SeparatorGuide> separatorGuides = new ArrayList<>();
@@ -141,6 +145,7 @@ public class DemoDecorationProvider implements DecorationProvider {
                     .foldRegions(foldRegions, DecorationResult.ApplyMode.REPLACE_ALL)
                     .separatorGuides(separatorGuides, DecorationResult.ApplyMode.REPLACE_ALL)
                     .gutterIcons(gutterIcons, DecorationResult.ApplyMode.REPLACE_ALL)
+                    .links(links, DecorationResult.ApplyMode.REPLACE_RANGE)
                     .build();
         }
         String text = editorDocument.getText();
@@ -168,6 +173,7 @@ public class DemoDecorationProvider implements DecorationProvider {
                     .foldRegions(foldRegions, DecorationResult.ApplyMode.REPLACE_ALL)
                     .separatorGuides(separatorGuides, DecorationResult.ApplyMode.REPLACE_ALL)
                     .gutterIcons(gutterIcons, DecorationResult.ApplyMode.REPLACE_ALL)
+                    .links(links, DecorationResult.ApplyMode.REPLACE_RANGE)
                     .build();
         }
         int renderStartLine = Math.max(0, context.visibleStartLine);
@@ -181,6 +187,7 @@ public class DemoDecorationProvider implements DecorationProvider {
                 appendSeparator(separatorGuides, editorDocument, token);
                 appendGutterIcons(gutterIcons, editorDocument, token);
                 appendCodeLens(codeLensItems, editorDocument, token);
+                appendLink(links, editorDocument, token);
                 firstKeywordRange = appendDynamicDemoDecorations(
                         dynamicDiagnostics,
                         seenDiagnostics,
@@ -225,6 +232,7 @@ public class DemoDecorationProvider implements DecorationProvider {
                 .separatorGuides(separatorGuides, DecorationResult.ApplyMode.REPLACE_ALL)
                 .gutterIcons(gutterIcons, DecorationResult.ApplyMode.REPLACE_ALL)
                 .codeLensItems(codeLensItems, DecorationResult.ApplyMode.REPLACE_ALL)
+                .links(links, DecorationResult.ApplyMode.REPLACE_RANGE)
                 .build();
     }
 
@@ -516,6 +524,29 @@ public class DemoDecorationProvider implements DecorationProvider {
         }
     }
 
+    private void appendLink(@NonNull SparseArray<List<LinkSpan>> linksByLine,
+                            @NonNull Document editorDocument,
+                            TokenSpan token) {
+        if (token.styleId != STYLE_LINK) {
+            return;
+        }
+        TokenRangeInfo range = extractSingleLineTokenRange(token);
+        if (range == null) {
+            return;
+        }
+        String target = getTokenLiteral(editorDocument, range);
+        if (target.isEmpty()) {
+            return;
+        }
+
+        List<LinkSpan> lineLinks = linksByLine.get(range.line);
+        if (lineLinks == null) {
+            lineLinks = new ArrayList<>();
+            linksByLine.put(range.line, lineLinks);
+        }
+        lineLinks.add(new LinkSpan(range.startColumn, range.length(), target));
+    }
+
     private static final class TokenRangeInfo {
         final int line;
         final int startColumn;
@@ -623,6 +654,7 @@ public class DemoDecorationProvider implements DecorationProvider {
         engine.registerStyleName("builtin", EditorTheme.STYLE_BUILTIN);
         engine.registerStyleName("annotation", EditorTheme.STYLE_ANNOTATION);
         engine.registerStyleName("color", STYLE_COLOR);
+        engine.registerStyleName("link", STYLE_LINK);
     }
 
     @NonNull

@@ -34,6 +34,7 @@ final class EditorRenderer {
     private static final float HANDLE_DROP_RADIUS = 10.0f;
     private static final float HANDLE_CENTER_DIST = 24.0f;
     private static final int DEFAULT_TEXT_SIZE = 28;
+    private static final int TEMP_LINK_COLOR = 0xFF4C9DFF;
 
     private EditorTheme mTheme;
     private final float mDensity;
@@ -416,7 +417,8 @@ final class EditorRenderer {
             int lastColor = 0;
             for (VisualRun run : line.runs) {
                 if (run.type == VisualRunType.TEXT || run.type == VisualRunType.WHITESPACE
-                        || run.type == VisualRunType.CODELENS || run.type == VisualRunType.INLAY_HINT || run.type == VisualRunType.PHANTOM_TEXT
+                        || run.type == VisualRunType.CODELENS || run.type == VisualRunType.LINK
+                        || run.type == VisualRunType.INLAY_HINT || run.type == VisualRunType.PHANTOM_TEXT
                         || run.type == VisualRunType.FOLD_PLACEHOLDER) {
 
                     if (run.type == VisualRunType.FOLD_PLACEHOLDER) {
@@ -506,6 +508,8 @@ final class EditorRenderer {
                     int color = (run.style != null && run.style.color != 0) ? run.style.color : mTheme.textColor;
                     if (run.type == VisualRunType.CODELENS) {
                         color = run.active ? getActiveLineNumberColor() : mTheme.inlayHintTextColor;
+                    } else if (run.type == VisualRunType.LINK) {
+                        color = TEMP_LINK_COLOR;
                     }
 
                     if (fontStyle != lastFontStyle) {
@@ -533,7 +537,7 @@ final class EditorRenderer {
                         continue;
                     }
 
-                    if (run.type == VisualRunType.CODELENS) {
+                    if (run.type == VisualRunType.CODELENS || run.type == VisualRunType.LINK) {
                         mTextPaint.setUnderlineText(run.active);
                         canvas.drawText(run.text, run.x, run.y, mTextPaint);
                         mTextPaint.setUnderlineText(false);

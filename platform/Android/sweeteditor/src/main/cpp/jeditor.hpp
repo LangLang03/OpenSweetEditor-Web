@@ -576,6 +576,10 @@ public:
     editor_clear_codelens(static_cast<intptr_t>(handle));
   }
 
+  static void clearLinks(jlong handle) {
+    editor_clear_links(static_cast<intptr_t>(handle));
+  }
+
   static void clearGuides(jlong handle) {
     editor_clear_guides(static_cast<intptr_t>(handle));
   }
@@ -699,6 +703,22 @@ public:
     jlong capacity = env->GetDirectBufferCapacity(data);
     if (ptr == nullptr || capacity < 0 || static_cast<jlong>(size) > capacity) return;
     editor_set_batch_line_codelens(static_cast<intptr_t>(handle), reinterpret_cast<const uint8_t*>(ptr), static_cast<size_t>(size));
+  }
+
+  static void setLineLinks(JNIEnv* env, jclass clazz, jlong handle, jobject data, jint size) {
+    if (handle == 0 || data == nullptr || size <= 0) return;
+    void* ptr = env->GetDirectBufferAddress(data);
+    jlong capacity = env->GetDirectBufferCapacity(data);
+    if (ptr == nullptr || capacity < 0 || static_cast<jlong>(size) > capacity) return;
+    editor_set_line_links(static_cast<intptr_t>(handle), reinterpret_cast<const uint8_t*>(ptr), static_cast<size_t>(size));
+  }
+
+  static void setBatchLineLinks(JNIEnv* env, jclass clazz, jlong handle, jobject data, jint size) {
+    if (handle == 0 || data == nullptr || size <= 0) return;
+    void* ptr = env->GetDirectBufferAddress(data);
+    jlong capacity = env->GetDirectBufferCapacity(data);
+    if (ptr == nullptr || capacity < 0 || static_cast<jlong>(size) > capacity) return;
+    editor_set_batch_line_links(static_cast<intptr_t>(handle), reinterpret_cast<const uint8_t*>(ptr), static_cast<size_t>(size));
   }
 
   static void setBatchLineDiagnostics(JNIEnv* env, jclass clazz, jlong handle, jobject data, jint size) {
@@ -864,6 +884,13 @@ public:
     return env->NewStringUTF(word.c_str());
   }
 
+  static jstring getLinkTargetAt(JNIEnv* env, jclass clazz, jlong handle, jint line, jint column) {
+    SharedPtr<EditorCore> editor_core = getCPtrHolderValue<EditorCore>(handle);
+    if (editor_core == nullptr) return env->NewStringUTF("");
+    U8String target = editor_core->getLinkTargetAt(static_cast<size_t>(line), static_cast<size_t>(column));
+    return env->NewStringUTF(target.c_str());
+  }
+
   static void setCursorPosition(jlong handle, jint line, jint column) {
     editor_set_cursor_position(static_cast<intptr_t>(handle),
                                static_cast<size_t>(line),
@@ -1023,6 +1050,7 @@ public:
       {"nativeClearPhantomTexts", "(J)V", (void*) clearPhantomTexts},
       {"nativeClearGutterIcons", "(J)V", (void*) clearGutterIcons},
       {"nativeClearCodeLens", "(J)V", (void*) clearCodeLens},
+      {"nativeClearLinks", "(J)V", (void*) clearLinks},
       {"nativeClearGuides", "(J)V", (void*) clearGuides},
       {"nativeClearAllDecorations", "(J)V", (void*) clearAllDecorations},
       {"nativeSetIndentGuides", "(JLjava/nio/ByteBuffer;I)V", (void*) setIndentGuides},
@@ -1041,6 +1069,8 @@ public:
       {"nativeSetBatchLineGutterIcons", "(JLjava/nio/ByteBuffer;I)V", (void*) setBatchLineGutterIcons},
       {"nativeSetLineCodeLens", "(JLjava/nio/ByteBuffer;I)V", (void*) setLineCodeLens},
       {"nativeSetBatchLineCodeLens", "(JLjava/nio/ByteBuffer;I)V", (void*) setBatchLineCodeLens},
+      {"nativeSetLineLinks", "(JLjava/nio/ByteBuffer;I)V", (void*) setLineLinks},
+      {"nativeSetBatchLineLinks", "(JLjava/nio/ByteBuffer;I)V", (void*) setBatchLineLinks},
       {"nativeSetBatchLineDiagnostics", "(JLjava/nio/ByteBuffer;I)V", (void*) setBatchLineDiagnostics},
       {"nativeSetFoldRegions", "(JLjava/nio/ByteBuffer;I)V", (void*) setFoldRegions},
       {"nativeToggleFoldAt", "(JI)Z", (void*) toggleFoldAt},
@@ -1073,6 +1103,7 @@ public:
       {"nativeGetCursorPosition", "(J)J", (void*) getCursorPosition},
       {"nativeGetWordRangeAtCursor", "(J)[J", (void*) getWordRangeAtCursor},
       {"nativeGetWordAtCursor", "(J)Ljava/lang/String;", (void*) getWordAtCursor},
+      {"nativeGetLinkTargetAt", "(JII)Ljava/lang/String;", (void*) getLinkTargetAt},
       {"nativeMoveCursorLeft", "(JZ)V", (void*) moveCursorLeft},
       {"nativeMoveCursorRight", "(JZ)V", (void*) moveCursorRight},
       {"nativeMoveCursorUp", "(JZ)V", (void*) moveCursorUp},

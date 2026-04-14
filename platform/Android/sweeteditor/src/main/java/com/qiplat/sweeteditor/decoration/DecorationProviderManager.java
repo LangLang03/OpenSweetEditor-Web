@@ -19,6 +19,7 @@ import com.qiplat.sweeteditor.core.adornment.FlowGuide;
 import com.qiplat.sweeteditor.core.adornment.IndentGuide;
 import com.qiplat.sweeteditor.core.adornment.SeparatorGuide;
 import com.qiplat.sweeteditor.core.adornment.InlayHint;
+import com.qiplat.sweeteditor.core.adornment.LinkSpan;
 import com.qiplat.sweeteditor.core.adornment.SpanLayer;
 import com.qiplat.sweeteditor.core.adornment.StyleSpan;
 import com.qiplat.sweeteditor.core.EditorCore;
@@ -187,6 +188,7 @@ public final class DecorationProviderManager {
         SparseArray<List<GutterIcon>> gutterIcons = new SparseArray<>();
         SparseArray<List<PhantomText>> phantomTexts = new SparseArray<>();
         SparseArray<List<CodeLensItem>> codeLensItems = new SparseArray<>();
+        SparseArray<List<LinkSpan>> links = new SparseArray<>();
         DecorationResult.ApplyMode syntaxMode = DecorationResult.ApplyMode.MERGE;
         DecorationResult.ApplyMode semanticMode = DecorationResult.ApplyMode.MERGE;
         DecorationResult.ApplyMode inlayMode = DecorationResult.ApplyMode.MERGE;
@@ -199,6 +201,7 @@ public final class DecorationProviderManager {
         DecorationResult.ApplyMode gutterMode = DecorationResult.ApplyMode.MERGE;
         DecorationResult.ApplyMode phantomMode = DecorationResult.ApplyMode.MERGE;
         DecorationResult.ApplyMode codeLensMode = DecorationResult.ApplyMode.MERGE;
+        DecorationResult.ApplyMode linksMode = DecorationResult.ApplyMode.MERGE;
 
         for (DecorationProvider provider : providers) {
             ProviderState state = providerStates.get(provider);
@@ -232,6 +235,10 @@ public final class DecorationProviderManager {
             codeLensMode = mergeMode(codeLensMode, r.getCodeLensItemsMode());
             if (r.getCodeLensItems() != null) {
                 appendSparseArrayOfList(codeLensItems, r.getCodeLensItems());
+            }
+            linksMode = mergeMode(linksMode, r.getLinksMode());
+            if (r.getLinks() != null) {
+                appendSparseArrayOfList(links, r.getLinks());
             }
 
             indentMode = mergeMode(indentMode, r.getIndentGuidesMode());
@@ -287,6 +294,9 @@ public final class DecorationProviderManager {
         applyCodeLensMode(codeLensMode);
         editor.setBatchLineCodeLens(codeLensItems);
 
+        applyLinksMode(linksMode);
+        editor.setBatchLineLinks(links);
+
         editor.flush();
     }
 
@@ -335,6 +345,14 @@ public final class DecorationProviderManager {
             editor.clearCodeLens();
         } else if (mode == DecorationResult.ApplyMode.REPLACE_RANGE) {
             clearCodeLensRange(lastVisibleStartLine, lastVisibleEndLine);
+        }
+    }
+
+    private void applyLinksMode(@NonNull DecorationResult.ApplyMode mode) {
+        if (mode == DecorationResult.ApplyMode.REPLACE_ALL) {
+            editor.clearLinks();
+        } else if (mode == DecorationResult.ApplyMode.REPLACE_RANGE) {
+            clearLinksRange(lastVisibleStartLine, lastVisibleEndLine);
         }
     }
 
@@ -439,6 +457,12 @@ public final class DecorationProviderManager {
         SparseArray<List<CodeLensItem>> empty = buildEmptySparseRange(startLine, endLine);
         if (empty.size() == 0) return;
         editor.setBatchLineCodeLens(empty);
+    }
+
+    private void clearLinksRange(int startLine, int endLine) {
+        SparseArray<List<LinkSpan>> empty = buildEmptySparseRange(startLine, endLine);
+        if (empty.size() == 0) return;
+        editor.setBatchLineLinks(empty);
     }
 
     @NonNull
@@ -592,6 +616,13 @@ public final class DecorationProviderManager {
         } else if (patch.getCodeLensItemsMode() != DecorationResult.ApplyMode.MERGE) {
             target.setCodeLensItems(null);
             target.setCodeLensItemsMode(patch.getCodeLensItemsMode());
+        }
+        if (patch.getLinks() != null) {
+            target.setLinks(patch.getLinks());
+            target.setLinksMode(patch.getLinksMode());
+        } else if (patch.getLinksMode() != DecorationResult.ApplyMode.MERGE) {
+            target.setLinks(null);
+            target.setLinksMode(patch.getLinksMode());
         }
     }
 

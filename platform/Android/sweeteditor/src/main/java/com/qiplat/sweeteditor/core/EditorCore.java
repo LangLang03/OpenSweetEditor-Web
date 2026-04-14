@@ -2,6 +2,7 @@ package com.qiplat.sweeteditor.core;
 
 import android.graphics.PointF;
 import android.util.SparseArray;
+import android.view.KeyEvent;
 import android.view.MotionEvent;
 
 import androidx.annotation.NonNull;
@@ -12,12 +13,14 @@ import com.qiplat.sweeteditor.core.adornment.CodeLensItem;
 import com.qiplat.sweeteditor.core.adornment.Diagnostic;
 import com.qiplat.sweeteditor.core.adornment.FoldRegion;
 import com.qiplat.sweeteditor.core.adornment.GutterIcon;
+import com.qiplat.sweeteditor.core.adornment.LinkSpan;
 import com.qiplat.sweeteditor.core.adornment.BracketGuide;
 import com.qiplat.sweeteditor.core.adornment.FlowGuide;
 import com.qiplat.sweeteditor.core.adornment.IndentGuide;
 import com.qiplat.sweeteditor.core.adornment.SeparatorGuide;
 import com.qiplat.sweeteditor.core.adornment.InlayHint;
 import com.qiplat.sweeteditor.core.keymap.KeyMap;
+import com.qiplat.sweeteditor.core.keymap.KeyModifier;
 import com.qiplat.sweeteditor.core.visual.CursorRect;
 import com.qiplat.sweeteditor.core.visual.EditorRenderModel;
 import com.qiplat.sweeteditor.core.visual.LayoutMetrics;
@@ -261,7 +264,15 @@ public class EditorCore {
             points[i * 2] = event.getX(i);
             points[i * 2 + 1] = event.getY(i);
         }
-        ByteBuffer data = nativeHandleGestureEvent(mNativeHandle, eventType, pointerCount, points);
+        ByteBuffer data = nativeHandleGestureEventEx(
+                mNativeHandle,
+                eventType,
+                pointerCount,
+                points,
+                getMotionEventModifiers(event),
+                0f,
+                0f,
+                1f);
         try {
             return ProtocolDecoder.decodeGestureResult(data);
         } finally {
@@ -1562,6 +1573,60 @@ public class EditorCore {
         nativeClearCodeLens(mNativeHandle);
     }
 
+    // ==================== Links ====================
+
+    /**
+     * Sets link ranges for the specified line (replaces the entire line).
+     *
+     * @param line  Line number (0-based)
+     * @param links LinkSpan list
+     */
+    public void setLineLinks(int line, @NonNull List<? extends LinkSpan> links) {
+        if (mNativeHandle == 0 || links == null) return;
+        setLineLinks(ProtocolEncoder.packLineLinks(line, links));
+    }
+
+    /**
+     * Sets link ranges for the specified line (already packed by caller via ProtocolEncoder).
+     */
+    public void setLineLinks(ByteBuffer payload) {
+        if (mNativeHandle == 0 || payload == null) return;
+        nativeSetLineLinks(mNativeHandle, payload, payload.remaining());
+    }
+
+    /**
+     * Batch sets link ranges for multiple lines (reduces JNI calls).
+     */
+    public void setBatchLineLinks(@Nullable SparseArray<? extends List<? extends LinkSpan>> linksByLine) {
+        if (mNativeHandle == 0 || linksByLine == null || linksByLine.size() == 0) return;
+        ByteBuffer payload = ProtocolEncoder.packBatchLineLinks(linksByLine);
+        setBatchLineLinks(payload);
+    }
+
+    /**
+     * Batch sets link ranges for multiple lines (already encoded as ByteBuffer by caller).
+     */
+    public void setBatchLineLinks(ByteBuffer payload) {
+        if (mNativeHandle == 0 || payload == null) return;
+        nativeSetBatchLineLinks(mNativeHandle, payload, payload.remaining());
+    }
+
+    /** Clears all link ranges. */
+    public void clearLinks() {
+        if (mNativeHandle == 0) return;
+        nativeClearLinks(mNativeHandle);
+    }
+
+    /**
+     * Resolves link target by logical line and column inside that link.
+     */
+    @NonNull
+    public String getLinkTargetAt(int line, int column) {
+        if (mNativeHandle == 0) return "";
+        String target = nativeGetLinkTargetAt(mNativeHandle, line, column);
+        return target != null ? target : "";
+    }
+
     /** Clears all code structure guides (indent guides, bracket guides, flow arrows, separators). */
     public void clearGuides() {
         if (mNativeHandle == 0) return;
@@ -1676,7 +1741,11 @@ public class EditorCore {
         /**
          * Hit a CodeLens item
          */
-        CODELENS(7);
+        CODELENS(7),
+        /**
+         * Hit a document link
+         */
+        LINK(8);
 
         public final int value;
 
@@ -1702,11 +1771,11 @@ public class EditorCore {
          */
         public final int line;
         /**
-         * Hit column number (0-based, only meaningful for InlayHint)
+         * Hit column number (0-based, meaningful for InlayHint, CodeLens, and Link)
          */
         public final int column;
         /**
-         * Icon ID (valid for INLAY_HINT_ICON / GUTTER_ICON)
+         * Icon ID (valid for INLAY_HINT_ICON / GUTTER_ICON, or commandId for CODELENS)
          */
         public final int iconId;
         /**
@@ -1873,6 +1942,16 @@ public class EditorCore {
             default:
                 return EVENT_TYPE_UNDEFINED;
         }
+    }
+
+    private static int getMotionEventModifiers(MotionEvent event) {
+        int metaState = event.getMetaState();
+        int modifiers = KeyModifier.NONE;
+        if ((metaState & KeyEvent.META_SHIFT_ON) != 0) modifiers |= KeyModifier.SHIFT;
+        if ((metaState & KeyEvent.META_CTRL_ON) != 0) modifiers |= KeyModifier.CTRL;
+        if ((metaState & KeyEvent.META_ALT_ON) != 0) modifiers |= KeyModifier.ALT;
+        if ((metaState & KeyEvent.META_META_ON) != 0) modifiers |= KeyModifier.META;
+        return modifiers;
     }
 
     // ==================== Native Method Declarations ====================
@@ -2220,6 +2299,18 @@ public class EditorCore {
 
     @CriticalNative
     private static native void nativeClearCodeLens(long handle);
+
+    @FastNative
+    private static native void nativeSetLineLinks(long handle, ByteBuffer data, int size);
+
+    @FastNative
+    private static native void nativeSetBatchLineLinks(long handle, ByteBuffer data, int size);
+
+    @CriticalNative
+    private static native void nativeClearLinks(long handle);
+
+    @FastNative
+    private static native String nativeGetLinkTargetAt(long handle, int line, int column);
 
     @CriticalNative
     private static native void nativeClearGuides(long handle);

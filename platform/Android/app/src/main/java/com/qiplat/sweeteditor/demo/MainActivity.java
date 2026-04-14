@@ -42,6 +42,7 @@ import com.qiplat.sweeteditor.event.CursorChangedEvent;
 import com.qiplat.sweeteditor.event.CodeLensClickEvent;
 import com.qiplat.sweeteditor.event.GutterIconClickEvent;
 import com.qiplat.sweeteditor.event.InlayHintClickEvent;
+import com.qiplat.sweeteditor.event.LinkClickEvent;
 import com.qiplat.sweeteditor.event.TextChangedEvent;
 
 import java.io.BufferedReader;
@@ -53,7 +54,8 @@ import java.util.Collections;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
-    private static final int STYLE_COLOR = EditorTheme.STYLE_PREPROCESSOR + 1;
+    private static final int STYLE_COLOR = DemoDecorationProvider.STYLE_COLOR;
+    private static final int STYLE_LINK = DemoDecorationProvider.STYLE_LINK;
     private static final String DEMO_FILES_ASSET_DIR = "files";
     private static final String FALLBACK_FILE_NAME = "sample.cpp";
 
@@ -114,7 +116,7 @@ public class MainActivity extends AppCompatActivity {
                 .setInsertSpaces(true)
                 .build();
         mEditor.setLanguageConfiguration(configuration);
-        registerColorStyleForCurrentTheme();
+        registerDemoStylesForCurrentTheme();
 
         try {
             DemoDecorationProvider.ensureSweetLineReady(this);
@@ -264,7 +266,11 @@ public class MainActivity extends AppCompatActivity {
             updateStatus(message);
             Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
         });
-
+        mEditor.subscribe(LinkClickEvent.class, e -> {
+            String message = "Link " + e.target;
+            updateStatus(message);
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+        });
         mEditor.subscribe(CursorChangedEvent.class, e -> scheduleSuggestionIfAtLineEnd(e));
 
         mEditor.setInlineSuggestionListener(new com.qiplat.sweeteditor.copilot.InlineSuggestionListener() {
@@ -418,7 +424,7 @@ public class MainActivity extends AppCompatActivity {
         mBtnTheme.setOnClickListener(v -> {
             mIsDarkTheme = !mIsDarkTheme;
             mEditor.applyTheme(mIsDarkTheme ? EditorTheme.dark() : EditorTheme.light());
-            registerColorStyleForCurrentTheme();
+            registerDemoStylesForCurrentTheme();
             applyAppTheme();
             updateStatus(mIsDarkTheme ? "Dark theme" : "Light theme");
         });
@@ -437,9 +443,10 @@ public class MainActivity extends AppCompatActivity {
         mStatusBar.setText(message);
     }
 
-    private void registerColorStyleForCurrentTheme() {
+    private void registerDemoStylesForCurrentTheme() {
         int color = mIsDarkTheme ? 0xFFB5CEA8 : 0xFF098658;
+        int linkColor = mIsDarkTheme ? 0xFF7DCFFF : 0xFF005FB8;
         mEditor.registerTextStyle(STYLE_COLOR, color, 0);
+        mEditor.registerTextStyle(STYLE_LINK, linkColor, 0);
     }
 }
-

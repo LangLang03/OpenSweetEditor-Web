@@ -12,5 +12,6 @@ public enum DecorationType {
     SEPARATOR_GUIDE,
     GUTTER_ICON,
     PHANTOM_TEXT,
-    CODELENS
+    CODELENS,
+    LINK
 }
