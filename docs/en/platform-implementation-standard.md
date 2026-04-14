@@ -1115,14 +1115,14 @@ Event payloads MUST be defined per-event. Platforms MUST NOT assume or require a
 | `ScrollChangedEvent` | `scrollX: float`, `scrollY: float` | Current view scroll offset |
 | `ScaleChangedEvent` | `scale: float` | Current editor scale |
 | `DocumentLoadedEvent` | — | No payload fields are required |
-| `FoldToggleEvent` | `line: int`, `isGutter: boolean`, `screenPoint: PointF or platform-native point type` | Toggled fold line, whether the click came from gutter, and screen position |
-| `GutterIconClickEvent` | `line: int`, `iconId: int`, `screenPoint: PointF or platform-native point type` | Clicked gutter icon line, icon id, and screen position |
-| `InlayHintClickEvent` | `line: int`, `column: int`, `type: InlayType`, `intValue: int`, `screenPoint: PointF or platform-native point type` | Clicked inlay hint position, inlay type, type-specific value, and screen position |
-| `CodeLensClickEvent` | `line: int`, `column: int`, `commandId: int`, `screenPoint: PointF or platform-native point type` | Clicked CodeLens line/column anchor, unique command id, and screen position |
-| `LinkClickEvent` | `line: int`, `column: int`, `target: String`, `screenPoint: PointF or platform-native point type` | Clicked link line/column anchor, resolved link target, and screen position |
-| `LongPressEvent` | `cursorPosition: TextPosition`, `screenPoint: PointF or platform-native point type` | Long-press target position and screen position |
-| `DoubleTapEvent` | `cursorPosition: TextPosition`, `hasSelection: boolean`, `selection: TextRange?`, `screenPoint: PointF or platform-native point type` | Double-tap target position, resulting selection state, and screen position |
-| `ContextMenuEvent` | `cursorPosition: TextPosition`, `screenPoint: PointF or platform-native point type` | Context-menu target position and screen position |
+| `FoldToggleEvent` | `line: int`, `isGutter: boolean`, `locationInView: PointF or platform-native point type` | Toggled fold line, whether the click came from gutter, and pointer location relative to the editor view |
+| `GutterIconClickEvent` | `line: int`, `iconId: int`, `locationInView: PointF or platform-native point type` | Clicked gutter icon line, icon id, and pointer location relative to the editor view |
+| `InlayHintClickEvent` | `line: int`, `column: int`, `type: InlayType`, `intValue: int`, `locationInView: PointF or platform-native point type` | Clicked inlay hint position, inlay type, type-specific value, and pointer location relative to the editor view |
+| `CodeLensClickEvent` | `line: int`, `column: int`, `commandId: int`, `locationInView: PointF or platform-native point type` | Clicked CodeLens line/column anchor, unique command id, and pointer location relative to the editor view |
+| `LinkClickEvent` | `line: int`, `column: int`, `target: String`, `locationInView: PointF or platform-native point type` | Clicked link line/column anchor, resolved link target, and pointer location relative to the editor view |
+| `LongPressEvent` | `cursorPosition: TextPosition`, `locationInView: PointF or platform-native point type` | Long-press target position and pointer location relative to the editor view |
+| `DoubleTapEvent` | `cursorPosition: TextPosition`, `hasSelection: boolean`, `selection: TextRange?`, `locationInView: PointF or platform-native point type` | Double-tap target position, resulting selection state, and pointer location relative to the editor view |
+| `ContextMenuEvent` | `cursorPosition: TextPosition`, `locationInView: PointF or platform-native point type` | Context-menu target position and pointer location relative to the editor view |
 | `SelectionMenuItemClickEvent` *(platform-specific)* | `item: SelectionMenuItem` | Clicked custom selection-menu item |
 
 ### 11.4 Gesture Result Contract
