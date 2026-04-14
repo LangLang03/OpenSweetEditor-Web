@@ -805,7 +805,7 @@ EDITOR_API void editor_clear_gutter_icons(intptr_t editor_handle);
 /// Set CodeLens items for specified line (compact binary)
 /// @param data payload(LE):
 ///             u32 line, u32 item_count, then repeat for item_count groups:
-///             [i32 command_id, u32 text_len, u8[text_len] text_utf8]
+///             [i32 column, i32 command_id, u32 text_len, u8[text_len] text_utf8]
 /// @param size payload byte length
 EDITOR_API void editor_set_line_codelens(intptr_t editor_handle, const uint8_t* data, size_t size);
 
@@ -813,7 +813,7 @@ EDITOR_API void editor_set_line_codelens(intptr_t editor_handle, const uint8_t* 
 /// @param data payload(LE):
 ///             u32 entry_count,
 ///             [u32 line, u32 item_count,
-///              [i32 command_id, u32 text_len, u8[text_len] text_utf8] x item_count] x entry_count
+///              [i32 column, i32 command_id, u32 text_len, u8[text_len] text_utf8] x item_count] x entry_count
 /// @param size payload byte length
 EDITOR_API void editor_set_batch_line_codelens(intptr_t editor_handle, const uint8_t* data, size_t size);
 
@@ -839,7 +839,8 @@ EDITOR_API void editor_set_batch_line_links(intptr_t editor_handle, const uint8_
 EDITOR_API void editor_clear_links(intptr_t editor_handle);
 
 /// Resolve link target by line and column inside that link
-/// @return UTF8 target string; caller owns returned buffer and must free it with free_u8_string
+/// @return UTF8 target string; caller owns returned buffer and must free it with free_u8_string.
+///         Returns an empty string when no link matches the requested position.
 EDITOR_API const char* editor_get_link_target_at(intptr_t editor_handle, size_t line, size_t column);
 
 /// Set diagnostic decoration ranges for specified line (compact binary)

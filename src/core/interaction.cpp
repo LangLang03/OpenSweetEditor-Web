@@ -243,13 +243,16 @@ namespace NS_SWEETEDITOR {
         intent.place_cursor = true;
       }
       result.hit_target = m_context_.text_layout->hitTestDecoration(result.tap_point);
+      if (result.hit_target.type == HitTargetType::LINK
+          && !hasAnyModifier(result.modifiers, KeyModifier::CTRL | KeyModifier::META)) {
+        result.hit_target = {};
+      }
       if (result.hit_target.type == HitTargetType::FOLD_PLACEHOLDER ||
           result.hit_target.type == HitTargetType::FOLD_GUTTER) {
         intent.toggle_fold = true;
         intent.fold_line = result.hit_target.line;
         intent.place_cursor = false;
-      } else if (result.hit_target.type == HitTargetType::CODELENS
-                 || result.hit_target.type == HitTargetType::LINK) {
+      } else if (result.hit_target.type == HitTargetType::CODELENS) {
         intent.place_cursor = false;
       }
       break;

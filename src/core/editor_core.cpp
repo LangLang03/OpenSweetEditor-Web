@@ -82,10 +82,15 @@ namespace NS_SWEETEDITOR {
            && lhs.color_value == rhs.color_value;
   }
 
-  static HitTarget toHotInteractiveTarget(const HitTarget& target) {
-    return (target.type == HitTargetType::CODELENS || target.type == HitTargetType::LINK)
-             ? target
-             : HitTarget {};
+  static HitTarget toHotInteractiveTarget(const HitTarget& target, KeyModifier modifiers) {
+    if (target.type == HitTargetType::CODELENS) {
+      return target;
+    }
+    if (target.type == HitTargetType::LINK
+        && hasAnyModifier(modifiers, KeyModifier::CTRL | KeyModifier::META)) {
+      return target;
+    }
+    return {};
   }
 
   static bool isMousePointerEvent(EventType type) {
@@ -496,7 +501,7 @@ namespace NS_SWEETEDITOR {
     bool primary_probe_ready = false;
     auto get_primary_probe = [&]() -> const PointerProbeResult& {
       if (!primary_probe_ready) {
-        primary_probe = has_primary_point ? probePointer(event.points[0]) : PointerProbeResult {};
+        primary_probe = has_primary_point ? probePointer(event.points[0], event.modifiers) : PointerProbeResult {};
         primary_probe_ready = true;
       }
       return primary_probe;
@@ -2908,7 +2913,7 @@ namespace NS_SWEETEDITOR {
     return m_press_hit_target_.type != HitTargetType::NONE ? m_press_hit_target_ : m_hover_hit_target_;
   }
 
-  EditorCore::PointerProbeResult EditorCore::probePointer(const PointF& point) const {
+  EditorCore::PointerProbeResult EditorCore::probePointer(const PointF& point, KeyModifier modifiers) const {
     PointerProbeResult result;
     if (point.x < 0.0f || point.y < 0.0f
         || point.x >= m_viewport_.width || point.y >= m_viewport_.height) {
@@ -2925,7 +2930,7 @@ namespace NS_SWEETEDITOR {
       return result;
     }
 
-    result.hot_target = toHotInteractiveTarget(m_text_layout_->hitTestDecoration(point));
+    result.hot_target = toHotInteractiveTarget(m_text_layout_->hitTestDecoration(point), modifiers);
     if (result.hot_target.type != HitTargetType::NONE) {
       result.cursor_type = PointerCursorType::HAND;
       return result;
@@ -2964,4 +2969,3 @@ namespace NS_SWEETEDITOR {
 #pragma endregion
 
 }
-
