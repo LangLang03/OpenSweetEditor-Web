@@ -440,6 +440,13 @@ namespace NS_SWEETEDITOR {
         if (click_x >= run_x && click_x < run_right) {
           return {HitTargetType::CODELENS, hit_line, run.column, run.icon_id};
         }
+      } else if (run.type == VisualRunType::LINK) {
+        if (click_x >= run_x && click_x < run_right) {
+          const LinkSpan* link = m_decoration_manager_->findLinkAt(hit_line, run.column);
+          if (link != nullptr) {
+            return {HitTargetType::LINK, hit_line, link->column, 0};
+          }
+        }
       }
 
       run_x = run_right;
@@ -474,7 +481,8 @@ namespace NS_SWEETEDITOR {
         bool found = false;
         float vl_x = 0;
         for (const VisualRun& run : vl.runs) {
-          if (run.type != VisualRunType::TEXT && run.type != VisualRunType::TAB) {
+          if (run.type != VisualRunType::TEXT && run.type != VisualRunType::LINK && run.type != VisualRunType::TAB) {
+
             vl_x += run.width;
             continue;
           }
@@ -1923,10 +1931,11 @@ namespace NS_SWEETEDITOR {
                                        float& out_x) {
     float vl_x = 0;
     for (const VisualRun& run : visual_line.runs) {
-      if (run.type != VisualRunType::TEXT && run.type != VisualRunType::TAB) {
+      if (run.type != VisualRunType::TEXT && run.type != VisualRunType::LINK && run.type != VisualRunType::TAB) {
         vl_x += run.width;
         continue;
       }
+
 
       size_t run_start = run.column;
       size_t run_end = run.column + run.length;

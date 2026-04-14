@@ -441,6 +441,18 @@ namespace NS_SWEETEDITOR {
     /// Clear all CodeLens items
     void clearCodeLens();
 
+    /// Set link ranges for a given line (replace whole line)
+    void setLineLinks(size_t line, Vector<LinkSpan>&& links);
+
+    /// Batch set link ranges for multiple lines
+    void setBatchLineLinks(Vector<std::pair<size_t, Vector<LinkSpan>>>&& entries);
+
+    /// Clear all link ranges
+    void clearLinks();
+
+    /// Resolve link target by logical line and column inside that link
+    U8String getLinkTargetAt(size_t line, size_t column) const;
+
     /// Set diagnostic decorations for given line (wavy underline/underline)
     /// @param line Line number
     /// @param diagnostics Diagnostic span list

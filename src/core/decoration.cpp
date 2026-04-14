@@ -12,6 +12,7 @@ namespace NS_SWEETEDITOR {
   const Vector<GutterIcon> DecorationManager::kEmptyGutterIcons;
   const Vector<DiagnosticSpan> DecorationManager::kEmptyDiagnostics;
   const Vector<CodeLensItem> DecorationManager::kEmptyCodeLensItems;
+  const Vector<LinkSpan> DecorationManager::kEmptyLinks;
 
 #pragma region [Class: TextStyleRegistry]
   void TextStyleRegistry::registerTextStyle(uint32_t style_id, TextStyle&& style) {
@@ -170,6 +171,41 @@ namespace NS_SWEETEDITOR {
     m_codelens_items_.clear();
   }
 
+  void DecorationManager::setLineLinks(size_t line, Vector<LinkSpan>&& links) {
+    if (links.empty()) {
+      m_links_.erase(line);
+    } else {
+      m_links_[line] = std::move(links);
+    }
+  }
+
+  const Vector<LinkSpan>& DecorationManager::getLineLinks(size_t line) const {
+    auto it = m_links_.find(line);
+    if (it != m_links_.end()) {
+      return it->second;
+    }
+    return kEmptyLinks;
+  }
+
+  void DecorationManager::clearLinks() {
+    m_links_.clear();
+  }
+
+  const LinkSpan* DecorationManager::findLinkAt(size_t line, size_t column) const {
+    auto it = m_links_.find(line);
+    if (it == m_links_.end()) {
+      return nullptr;
+    }
+    for (const auto& link : it->second) {
+      const size_t start_column = static_cast<size_t>(link.column);
+      const size_t end_column = start_column + static_cast<size_t>(link.length);
+      if (column >= start_column && column < end_column) {
+        return &link;
+      }
+    }
+    return nullptr;
+  }
+
   void DecorationManager::setLineDiagnostics(size_t line, Vector<DiagnosticSpan>&& diagnostics) {
     if (m_diagnostics_.size() <= line) {
       m_diagnostics_.resize(line + 1);
@@ -195,6 +231,7 @@ namespace NS_SWEETEDITOR {
     if (line < m_diagnostics_.size()) m_diagnostics_[line].clear();
     m_gutter_icons_.erase(line);
     m_codelens_items_.erase(line);
+    m_links_.erase(line);
   }
 
   void DecorationManager::clearHighlights(SpanLayer layer) {
@@ -647,6 +684,65 @@ namespace NS_SWEETEDITOR {
     }
   }
 
+  // Adjust start line for LinkSpan (same shape as DiagnosticSpan with extra target payload)
+  static void adjustLinkStartLine(Vector<LinkSpan>& spans, size_t span_storage_size,
+                                  const HashMap<size_t, Vector<LinkSpan>>& storage, const EditParams& p) {
+    if (p.old_line_count == 0 && p.new_line_count == 0) {
+      int64_t col_delta = static_cast<int64_t>(p.new_end_col) - static_cast<int64_t>(p.old_end_col);
+      for (auto it = spans.begin(); it != spans.end(); ) {
+        uint32_t span_end = it->column + it->length;
+        if (span_end <= p.old_start_col) {
+          ++it;
+        } else if (it->column >= p.old_end_col) {
+          it->column = adjustColumn(it->column, p.old_end_col, col_delta);
+          ++it;
+        } else if (it->column >= p.old_start_col && span_end <= p.old_end_col) {
+          it = spans.erase(it);
+        } else if (it->column < p.old_start_col && span_end > p.old_end_col) {
+          uint32_t deleted = static_cast<uint32_t>(p.old_end_col - p.old_start_col);
+          uint32_t inserted = static_cast<uint32_t>(p.new_end_col - p.old_start_col);
+          it->length = it->length - deleted + inserted;
+          ++it;
+        } else if (it->column < p.old_start_col) {
+          it->length = static_cast<uint32_t>(p.old_start_col) - it->column;
+          ++it;
+        } else {
+          uint32_t tail = span_end - static_cast<uint32_t>(p.old_end_col);
+          it->column = static_cast<uint32_t>(p.new_end_col);
+          it->length = tail;
+          ++it;
+        }
+      }
+    } else {
+      for (auto it = spans.begin(); it != spans.end(); ) {
+        uint32_t span_end = it->column + it->length;
+        if (span_end <= p.old_start_col) {
+          ++it;
+        } else if (it->column < p.old_start_col) {
+          it->length = static_cast<uint32_t>(p.old_start_col) - it->column;
+          ++it;
+        } else {
+          it = spans.erase(it);
+        }
+      }
+      if (p.old_end_line < span_storage_size && p.old_end_line != p.old_start_line) {
+        auto end_it = storage.find(p.old_end_line);
+        if (end_it != storage.end()) {
+          for (const auto& span : end_it->second) {
+            if (span.column >= p.old_end_col) {
+              LinkSpan s = span;
+              s.column = static_cast<uint32_t>(p.new_end_col + (span.column - p.old_end_col));
+              spans.push_back(std::move(s));
+            } else if (span.column + span.length > p.old_end_col) {
+              uint32_t tail = (span.column + span.length) - static_cast<uint32_t>(p.old_end_col);
+              spans.push_back({static_cast<uint32_t>(p.new_end_col), tail, span.target});
+            }
+          }
+        }
+      }
+    }
+  }
+
   void DecorationManager::adjustForEdit(const TextRange& old_range, const TextPosition& new_end) {
     EditParams p;
     p.old_start_line = old_range.start.line;
@@ -705,6 +801,26 @@ namespace NS_SWEETEDITOR {
       adjustDiagnosticStartLine(m_diagnostics_[p.old_start_line], m_diagnostics_.size(), m_diagnostics_, p);
     }
     adjustLineStorage(m_diagnostics_, p);
+
+    // LinkSpan
+    auto link_start_it = m_links_.find(p.old_start_line);
+    if (link_start_it != m_links_.end()) {
+      adjustLinkStartLine(link_start_it->second, m_links_.size(), m_links_, p);
+    }
+    if (p.line_delta != 0 && !m_links_.empty()) {
+      if (p.old_line_count > 0) {
+        for (size_t l = p.old_start_line + 1; l <= p.old_end_line; ++l) {
+          m_links_.erase(l);
+        }
+      }
+      HashMap<size_t, Vector<LinkSpan>> new_links;
+      for (auto& [line, links] : m_links_) {
+        size_t target = (line <= p.old_start_line) ? line
+          : static_cast<size_t>(static_cast<int64_t>(line) + p.line_delta);
+        new_links[target] = std::move(links);
+      }
+      m_links_ = std::move(new_links);
+    }
 
     // Guides: adjust by line/column offsets
     auto adjustPosition = [&](TextPosition& pos) {

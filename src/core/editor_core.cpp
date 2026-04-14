@@ -82,8 +82,10 @@ namespace NS_SWEETEDITOR {
            && lhs.color_value == rhs.color_value;
   }
 
-  static HitTarget toHotCodeLensTarget(const HitTarget& target) {
-    return target.type == HitTargetType::CODELENS ? target : HitTarget {};
+  static HitTarget toHotInteractiveTarget(const HitTarget& target) {
+    return (target.type == HitTargetType::CODELENS || target.type == HitTargetType::LINK)
+             ? target
+             : HitTarget {};
   }
 
   static bool isMousePointerEvent(EventType type) {
@@ -2459,6 +2461,40 @@ namespace NS_SWEETEDITOR {
     normalizeScrollState();
   }
 
+  void EditorCore::setLineLinks(size_t line, Vector<LinkSpan>&& links) {
+    m_decorations_->setLineLinks(line, std::move(links));
+    auto& lines = m_document_->getLogicalLines();
+    if (line < lines.size()) {
+      lines[line].is_layout_dirty = true;
+    }
+    m_text_layout_->invalidateContentMetrics(line);
+  }
+
+  void EditorCore::setBatchLineLinks(Vector<std::pair<size_t, Vector<LinkSpan>>>&& entries) {
+    if (entries.empty()) return;
+    auto& lines = m_document_->getLogicalLines();
+    size_t min_line = entries[0].first;
+    for (auto& [line, links] : entries) {
+      m_decorations_->setLineLinks(line, std::move(links));
+      if (line < lines.size()) {
+        lines[line].is_layout_dirty = true;
+      }
+      if (line < min_line) min_line = line;
+    }
+    m_text_layout_->invalidateContentMetrics(min_line);
+  }
+
+  void EditorCore::clearLinks() {
+    m_decorations_->clearLinks();
+    markAllLinesDirty();
+    normalizeScrollState();
+  }
+
+  U8String EditorCore::getLinkTargetAt(size_t line, size_t column) const {
+    const LinkSpan* link = m_decorations_->findLinkAt(line, column);
+    return link != nullptr ? link->target : U8String {};
+  }
+
   void EditorCore::setLineDiagnostics(size_t line, Vector<DiagnosticSpan>&& diagnostics) {
     m_decorations_->setLineDiagnostics(line, std::move(diagnostics));
   }
@@ -2889,8 +2925,8 @@ namespace NS_SWEETEDITOR {
       return result;
     }
 
-    result.hot_target = toHotCodeLensTarget(m_text_layout_->hitTestDecoration(point));
-    if (result.hot_target.type == HitTargetType::CODELENS) {
+    result.hot_target = toHotInteractiveTarget(m_text_layout_->hitTestDecoration(point));
+    if (result.hot_target.type != HitTargetType::NONE) {
       result.cursor_type = PointerCursorType::HAND;
       return result;
     }

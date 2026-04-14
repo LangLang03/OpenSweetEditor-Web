@@ -38,6 +38,16 @@ static const VisualRun& findNthCodeLensRun(const VisualLine& line, size_t index)
   return line.runs.front();
 }
 
+static const VisualRun& findFirstRunOfType(const VisualLine& line, VisualRunType type) {
+  for (const VisualRun& run : line.runs) {
+    if (run.type == type) {
+      return run;
+    }
+  }
+  REQUIRE(false);
+  return line.runs.front();
+}
+
 TEST_CASE("TextLayout hitTest matches getPositionScreenCoord in non-wrap mode") {
   SharedPtr<TextMeasurer> measurer = makeShared<FixedWidthTextMeasurer>(10.0f);
   SharedPtr<DecorationManager> decorations = makeShared<DecorationManager>();
@@ -294,6 +304,35 @@ TEST_CASE("TextLayout positions CodeLens runs by anchored columns") {
   CHECK(first.x == Catch::Approx(text_area_x + 20.0f));
   CHECK(second.x >= text_area_x + 70.0f);
   CHECK(second.x >= first.x + first.width + sep_width);
+}
+
+TEST_CASE("TextLayout hitTestDecoration resolves LINK target by canonical start column") {
+  SharedPtr<TextMeasurer> measurer = makeShared<FixedWidthTextMeasurer>(10.0f);
+  SharedPtr<DecorationManager> decorations = makeShared<DecorationManager>();
+  TextLayout layout(measurer, decorations);
+
+  SharedPtr<Document> document = makeShared<LineArrayDocument>("prefixLinkSuffix");
+  layout.loadDocument(document);
+  layout.setViewport({400, 200});
+  layout.setViewState({1.0f, 0.0f, 0.0f});
+  layout.setWrapMode(WrapMode::NONE);
+
+  Vector<LinkSpan> links;
+  links.push_back({6, 4, "doc://link"});
+  decorations->setLineLinks(0, std::move(links));
+
+  EditorRenderModel model;
+  layout.layoutVisibleLines(model, PresentationContext {});
+  REQUIRE_FALSE(model.lines.empty());
+  const VisualLine& content_line = model.lines.front();
+  const VisualRun& link_run = findFirstRunOfType(content_line, VisualRunType::LINK);
+
+  const HitTarget target = layout.hitTestDecoration({link_run.x + link_run.width * 0.5f, link_run.y});
+  CHECK(target.type == HitTargetType::LINK);
+  CHECK(target.line == 0);
+  CHECK(target.column == 6);
+  CHECK(decorations->findLinkAt(target.line, target.column) != nullptr);
+  CHECK(decorations->findLinkAt(target.line, target.column)->target == "doc://link");
 }
 
 TEST_CASE("TextLayout gutter fold hit uses content line geometry when CodeLens exists") {

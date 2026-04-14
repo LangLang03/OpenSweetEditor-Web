@@ -820,6 +820,28 @@ EDITOR_API void editor_set_batch_line_codelens(intptr_t editor_handle, const uin
 /// Clear all CodeLens items
 EDITOR_API void editor_clear_codelens(intptr_t editor_handle);
 
+/// Set link ranges for specified line (compact binary)
+/// @param data payload(LE):
+///             u32 line, u32 link_count, then repeat for link_count groups:
+///             [u32 column, u32 length, u32 target_len, u8[target_len] target_utf8]
+/// @param size payload byte length
+EDITOR_API void editor_set_line_links(intptr_t editor_handle, const uint8_t* data, size_t size);
+
+/// Batch set link ranges for multiple lines (compact binary)
+/// @param data payload(LE):
+///             u32 entry_count,
+///             [u32 line, u32 link_count,
+///              [u32 column, u32 length, u32 target_len, u8[target_len] target_utf8] x link_count] x entry_count
+/// @param size payload byte length
+EDITOR_API void editor_set_batch_line_links(intptr_t editor_handle, const uint8_t* data, size_t size);
+
+/// Clear all link ranges
+EDITOR_API void editor_clear_links(intptr_t editor_handle);
+
+/// Resolve link target by line and column inside that link
+/// @return UTF8 target string; caller owns returned buffer and must free it with free_u8_string
+EDITOR_API const char* editor_get_link_target_at(intptr_t editor_handle, size_t line, size_t column);
+
 /// Set diagnostic decoration ranges for specified line (compact binary)
 /// @param data payload(LE):
 ///             u32 line, u32 diag_count, then repeat for diag_count groups

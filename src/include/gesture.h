@@ -167,6 +167,8 @@ namespace NS_SWEETEDITOR {
     INLAY_HINT_COLOR = 6,
     /// Hit CodeLens item (icon_id carries the unique command_id)
     CODELENS = 7,
+    /// Hit document link embedded in content text
+    LINK = 8,
   };
 
   /// Tap hit target info (filled by EditorCore for TAP)
@@ -174,7 +176,7 @@ namespace NS_SWEETEDITOR {
     HitTargetType type {HitTargetType::NONE};
     /// Hit logical line index (0-based)
     size_t line {0};
-    /// Hit column index (0-based, meaningful for INLAY_HINT and CODELENS)
+    /// Hit column index (0-based, meaningful for INLAY_HINT, CODELENS, and LINK)
     size_t column {0};
     /// Icon ID (valid for INLAY_HINT_ICON / GUTTER_ICON, or unique command_id for CODELENS)
     int32_t icon_id {0};

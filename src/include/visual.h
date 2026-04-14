@@ -28,7 +28,9 @@ namespace NS_SWEETEDITOR {
     /// Tab character (width computed by core based on tab_size and column position)
     TAB,
     /// CodeLens clickable label (above code line)
-    CODELENS
+    CODELENS,
+    /// Clickable document link embedded in content text
+    LINK
   };
 
   /// Data for each rendered text run

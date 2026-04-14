@@ -25,6 +25,21 @@ namespace {
     REQUIRE(false);
     return line.runs.front();
   }
+
+  Vector<const VisualRun*> findRunsOfType(const EditorRenderModel& model,
+                                          size_t logical_line,
+                                          VisualRunType type) {
+    Vector<const VisualRun*> runs;
+    for (const VisualLine& line : model.lines) {
+      if (line.logical_line != logical_line) continue;
+      for (const VisualRun& run : line.runs) {
+        if (run.type == type) {
+          runs.push_back(&run);
+        }
+      }
+    }
+    return runs;
+  }
 }
 
 TEST_CASE("EditorCore buildRenderModel exposes normalized selection handles") {
@@ -356,6 +371,75 @@ TEST_CASE("EditorCore exposes pointer cursor type for text, CodeLens, gutter and
   model = {};
   editor.buildRenderModel(model);
   CHECK(model.pointer_cursor_type == PointerCursorType::DEFAULT);
+}
+
+TEST_CASE("EditorCore handleGestureEvent tap on LINK keeps cursor unchanged and resolves target") {
+  EditorOptions options;
+  EditorCore editor(makeShared<FixedWidthTextMeasurer>(10.0f), options);
+
+  editor.loadDocument(makeShared<LineArrayDocument>("prefixLinkSuffix"));
+  editor.setViewport({420, 160});
+  editor.setCursorPosition({0, 2});
+  Vector<LinkSpan> links;
+  links.push_back({6, 4, "doc://link"});
+  editor.setLineLinks(0, std::move(links));
+
+  EditorRenderModel model;
+  editor.buildRenderModel(model);
+  const auto link_runs = findRunsOfType(model, 0, VisualRunType::LINK);
+  REQUIRE(link_runs.size() == 1);
+  const float point[2] = {
+      link_runs.front()->x + link_runs.front()->width * 0.5f,
+      link_runs.front()->y
+  };
+
+  const GestureResult result = editor.handleGestureEvent(
+      GestureEvent::create(EventType::MOUSE_DOWN, 1, point));
+
+  CHECK(result.hit_target.type == HitTargetType::LINK);
+  CHECK(result.hit_target.line == 0);
+  CHECK(result.hit_target.column == 6);
+  CHECK(editor.getLinkTargetAt(result.hit_target.line, result.hit_target.column) == "doc://link");
+  CHECK(result.cursor_position == (TextPosition{0, 2}));
+  CHECK(editor.getCursorPosition() == (TextPosition{0, 2}));
+}
+
+TEST_CASE("EditorCore buildRenderModel activates wrapped LINK runs together") {
+  EditorOptions options;
+  EditorCore editor(makeShared<FixedWidthTextMeasurer>(10.0f), options);
+
+  editor.loadDocument(makeShared<LineArrayDocument>("abLongWrappedLinkTail"));
+  editor.setViewport({95, 220});
+  editor.setWrapMode(WrapMode::CHAR_BREAK);
+  Vector<LinkSpan> links;
+  links.push_back({2, 15, "doc://wrapped"});
+  editor.setLineLinks(0, std::move(links));
+
+  EditorRenderModel model;
+  editor.buildRenderModel(model);
+  auto initial_link_runs = findRunsOfType(model, 0, VisualRunType::LINK);
+  REQUIRE(initial_link_runs.size() >= 2);
+  for (const VisualRun* run : initial_link_runs) {
+    CHECK_FALSE(run->active);
+  }
+
+  const VisualRun* hover_target = initial_link_runs.back();
+  const float hover_point[2] = {
+      hover_target->x + hover_target->width * 0.5f,
+      hover_target->y
+  };
+  const GestureResult hover = editor.handleGestureEvent(
+      GestureEvent::create(EventType::MOUSE_MOVE, 1, hover_point));
+  CHECK(hover.hit_target.type == HitTargetType::LINK);
+  CHECK(hover.pointer_cursor_type == PointerCursorType::HAND);
+
+  model = {};
+  editor.buildRenderModel(model);
+  auto active_link_runs = findRunsOfType(model, 0, VisualRunType::LINK);
+  REQUIRE(active_link_runs.size() >= 2);
+  for (const VisualRun* run : active_link_runs) {
+    CHECK(run->active);
+  }
 }
 
 TEST_CASE("EditorCore line-start word selection end handle can cross CodeLens virtual line") {

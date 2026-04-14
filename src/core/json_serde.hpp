@@ -72,6 +72,7 @@ namespace NS_SWEETEDITOR {
     {VisualRunType::FOLD_PLACEHOLDER, "FOLD_PLACEHOLDER"},
     {VisualRunType::TAB, "TAB"},
     {VisualRunType::CODELENS, "CODELENS"},
+    {VisualRunType::LINK, "LINK"},
   })
   inline void to_json(nlohmann::json& j, const VisualRun& r) {
     U8String u8_text;

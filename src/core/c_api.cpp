@@ -2074,6 +2074,85 @@ void editor_clear_codelens(intptr_t editor_handle) {
   editor_core->clearCodeLens();
 }
 
+void editor_set_line_links(intptr_t editor_handle, const uint8_t* data, size_t size) {
+  SharedPtr<EditorCore> editor_core = getCPtrHolderValue<EditorCore>(editor_handle);
+  if (editor_core == nullptr || data == nullptr) return;
+
+  ByteCursor cursor(data, size);
+  uint32_t line = 0;
+  uint32_t link_count = 0;
+  if (!cursor.readU32(line) || !cursor.readU32(link_count)) return;
+
+  Vector<LinkSpan> links;
+  links.reserve(link_count);
+  for (uint32_t i = 0; i < link_count; ++i) {
+    uint32_t column = 0;
+    uint32_t length = 0;
+    uint32_t target_len = 0;
+    if (!cursor.readU32(column) || !cursor.readU32(length) || !cursor.readU32(target_len)) return;
+    U8String target;
+    if (target_len > 0) {
+      const uint8_t* target_ptr = nullptr;
+      if (!cursor.readBytes(target_ptr, target_len)) return;
+      target = U8String(reinterpret_cast<const char*>(target_ptr), target_len);
+    }
+    links.push_back({column, length, std::move(target)});
+  }
+  editor_core->setLineLinks(static_cast<size_t>(line), std::move(links));
+}
+
+void editor_set_batch_line_links(intptr_t editor_handle, const uint8_t* data, size_t size) {
+  SharedPtr<EditorCore> editor_core = getCPtrHolderValue<EditorCore>(editor_handle);
+  if (editor_core == nullptr || data == nullptr) return;
+
+  ByteCursor cursor(data, size);
+  uint32_t entry_count = 0;
+  if (!cursor.readU32(entry_count)) return;
+
+  Vector<std::pair<size_t, Vector<LinkSpan>>> entries;
+  entries.reserve(entry_count);
+  for (uint32_t e = 0; e < entry_count; ++e) {
+    uint32_t line = 0;
+    uint32_t link_count = 0;
+    if (!cursor.readU32(line) || !cursor.readU32(link_count)) return;
+
+    Vector<LinkSpan> links;
+    links.reserve(link_count);
+    for (uint32_t i = 0; i < link_count; ++i) {
+      uint32_t column = 0;
+      uint32_t length = 0;
+      uint32_t target_len = 0;
+      if (!cursor.readU32(column) || !cursor.readU32(length) || !cursor.readU32(target_len)) return;
+      U8String target;
+      if (target_len > 0) {
+        const uint8_t* target_ptr = nullptr;
+        if (!cursor.readBytes(target_ptr, target_len)) return;
+        target = U8String(reinterpret_cast<const char*>(target_ptr), target_len);
+      }
+      links.push_back({column, length, std::move(target)});
+    }
+    entries.emplace_back(static_cast<size_t>(line), std::move(links));
+  }
+  editor_core->setBatchLineLinks(std::move(entries));
+}
+
+void editor_clear_links(intptr_t editor_handle) {
+  SharedPtr<EditorCore> editor_core = getCPtrHolderValue<EditorCore>(editor_handle);
+  if (editor_core == nullptr) return;
+  editor_core->clearLinks();
+}
+
+const char* editor_get_link_target_at(intptr_t editor_handle, size_t line, size_t column) {
+  SharedPtr<EditorCore> editor_core = getCPtrHolderValue<EditorCore>(editor_handle);
+  U8String target;
+  if (editor_core != nullptr) {
+    target = editor_core->getLinkTargetAt(line, column);
+  }
+  char* result = new char[target.size() + 1];
+  std::strcpy(result, target.c_str());
+  return result;
+}
+
 void editor_clear_guides(intptr_t editor_handle) {
   SharedPtr<EditorCore> editor_core = getCPtrHolderValue<EditorCore>(editor_handle);
   if (editor_core == nullptr) return;

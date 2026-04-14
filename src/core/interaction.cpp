@@ -248,7 +248,8 @@ namespace NS_SWEETEDITOR {
         intent.toggle_fold = true;
         intent.fold_line = result.hit_target.line;
         intent.place_cursor = false;
-      } else if (result.hit_target.type == HitTargetType::CODELENS) {
+      } else if (result.hit_target.type == HitTargetType::CODELENS
+                 || result.hit_target.type == HitTargetType::LINK) {
         intent.place_cursor = false;
       }
       break;
