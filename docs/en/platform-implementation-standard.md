@@ -24,8 +24,8 @@ The Core layer does not involve UI rendering. It contains only bridging, data mo
 |---|---|---|
 | **Core Bridge** | `EditorCore`, `Document`, `ProtocolEncoder`, `ProtocolDecoder`, `TextMeasurer`, `EditorOptions` | Native bridge + public core API wrapper |
 | **Foundation** | `TextPosition`, `TextRange`, `TextChange`, `WrapMode`, `FoldArrowMode`, `AutoIndentMode`, `CurrentLineRenderMode`, `ScrollBehavior` | Fundamental value types and enums |
-| **Adornment** | `StyleSpan`, `SpanLayer`, `InlayHint`, `InlayType`, `PhantomText`, `CodeLensItem`, `FoldRegion`, `GutterIcon`, `Diagnostic`, `IndentGuide`, `BracketGuide`, `FlowGuide`, `SeparatorGuide`, `SeparatorStyle`, `TextStyle` | Decoration data types |
-| **Visual** | `EditorRenderModel`, `VisualLine`, `VisualLineKind`, `VisualRun`, `VisualRunType`, `Cursor`, `CursorRect`, `SelectionRect`, `SelectionHandle`, `ScrollMetrics`, `ScrollbarModel`, `ScrollbarRect`, `GuideSegment`, `GuideType`, `GuideDirection`, `GuideStyle`, `DiagnosticDecoration`, `CompositionDecoration`, `FoldMarkerRenderItem`, `FoldState`, `GutterIconRenderItem`, `LinkedEditingRect`, `BracketHighlightRect` | Render model types (geometry semantics follow Section 2.4) |
+| **Adornment** | `StyleSpan`, `SpanLayer`, `InlayHint`, `InlayType`, `PhantomText`, `CodeLensItem`, `LinkSpan`, `FoldRegion`, `GutterIcon`, `Diagnostic`, `IndentGuide`, `BracketGuide`, `FlowGuide`, `SeparatorGuide`, `SeparatorStyle`, `TextStyle` | Decoration data types |
+| **Visual** | `EditorRenderModel`, `VisualLine`, `VisualLineKind`, `VisualRun`, `VisualRunType`, `PointerCursorType`, `Cursor`, `CursorRect`, `SelectionRect`, `SelectionHandle`, `ScrollMetrics`, `ScrollbarModel`, `ScrollbarRect`, `GuideSegment`, `GuideType`, `GuideDirection`, `GuideStyle`, `DiagnosticDecoration`, `CompositionDecoration`, `FoldMarkerRenderItem`, `FoldState`, `GutterIconRenderItem`, `LinkedEditingRect`, `BracketHighlightRect` | Render model types (geometry semantics follow Section 2.4) |
 | **Snippet** | `LinkedEditingModel`, `TabStopGroup` | Linked editing / tab stop groups |
 | **Keymap** | `KeyMap`, `KeyBinding`, `KeyChord`, `KeyCode`, `KeyModifier`, `EditorCommand` | Shortcut mapping data types and command identifiers |
 
@@ -38,7 +38,7 @@ The Widget layer handles platform-native rendering, user interaction, and extens
 | **Widget** | `SweetEditor`, `SweetEditorController` *(declarative frameworks MUST; imperative frameworks MAY)*, `EditorTheme`, `EditorSettings`, `EditorIconProvider`, `EditorMetadata`, `LanguageConfiguration` | Widget entry, controller, theme, configuration |
 | **Decoration** | `DecorationProvider`, `DecorationProviderManager`, `DecorationContext`, `DecorationResult`, `DecorationType`; if the Receiver callback pattern is used, `DecorationReceiver` is the recommended name | Decoration provider system |
 | **Completion** | `CompletionProvider`, `CompletionProviderManager`, `CompletionContext`, `CompletionItem`, `CompletionResult`; if the Receiver callback pattern is used, `CompletionReceiver` is the recommended name | Completion provider system |
-| **Event** | A type-safe event mechanism, `EditorEvent`, `TextChangedEvent`, `CursorChangedEvent`, `SelectionChangedEvent`, `ScrollChangedEvent`, `ScaleChangedEvent`, `DocumentLoadedEvent`, `FoldToggleEvent`, `GutterIconClickEvent`, `InlayHintClickEvent`, `CodeLensClickEvent`, `LongPressEvent`*(mobile only)*, `DoubleTapEvent`, `ContextMenuEvent`*(desktop & cross-platform UI frameworks)*; if an explicit event-bus/listener pattern is used, `EditorEventBus` and `EditorEventListener` are the recommended names | Event system |
+| **Event** | A type-safe event mechanism, `EditorEvent`, `TextChangedEvent`, `CursorChangedEvent`, `SelectionChangedEvent`, `ScrollChangedEvent`, `ScaleChangedEvent`, `DocumentLoadedEvent`, `FoldToggleEvent`, `GutterIconClickEvent`, `InlayHintClickEvent`, `CodeLensClickEvent`, `LinkClickEvent`, `LongPressEvent`*(mobile only)*, `DoubleTapEvent`, `ContextMenuEvent`*(desktop & cross-platform UI frameworks)*; if an explicit event-bus/listener pattern is used, `EditorEventBus` and `EditorEventListener` are the recommended names | Event system |
 | **NewLine** | `NewLineActionProvider`, `NewLineActionProviderManager`, `NewLineAction`, `NewLineContext` | Newline action provider system |
 | **Keymap** | `EditorKeyMap` | Widget-layer keymap extension that binds command ids to host-side handlers |
 | **Copilot** *(SHOULD)* | `InlineSuggestion`, `InlineSuggestionListener` or an equivalent host-visible accept/dismiss callback mechanism; MAY: `InlineSuggestionController` | Inline suggestion data + callback; listener shape is the primary path when exposed |
@@ -338,6 +338,10 @@ controller.applyTheme(EditorTheme.dark());
 | Set line CodeLens | `setLineCodeLens(line, items)` | — |
 | Batch set CodeLens | `setBatchLineCodeLens(entries)` | — |
 | Clear CodeLens | `clearCodeLens()` | — |
+| **Link** | | |
+| Set line links | `setLineLinks(line, links)` | — |
+| Batch set links | `setBatchLineLinks(entries)` | — |
+| Clear links | `clearLinks()` | — |
 | **Diagnostic** | | |
 | Set line diagnostics | `setLineDiagnostics(line, items)` | — |
 | Batch set diagnostics | `setBatchLineDiagnostics(entries)` | — |
@@ -462,6 +466,8 @@ controller.applyTheme(EditorTheme.dark());
 | Set batch line gutter icons | `setBatchLineGutterIcons(iconsByLine)` | — |
 | Set line CodeLens | `setLineCodeLens(line, items)` | — |
 | Set batch line CodeLens | `setBatchLineCodeLens(itemsByLine)` | — |
+| Set line links | `setLineLinks(line, links)` | — |
+| Set batch line links | `setBatchLineLinks(linksByLine)` | — |
 | Set line diagnostics | `setLineDiagnostics(line, items)` | — |
 | Set batch line diagnostics | `setBatchLineDiagnostics(diagsByLine)` | — |
 | Set indent guides | `setIndentGuides(guides)` | — |
@@ -476,6 +482,7 @@ controller.applyTheme(EditorTheme.dark());
 | Clear phantom texts | `clearPhantomTexts()` | — |
 | Clear gutter icons | `clearGutterIcons()` | — |
 | Clear CodeLens | `clearCodeLens()` | — |
+| Clear links | `clearLinks()` | — |
 | Clear guides | `clearGuides()` | — |
 | Clear diagnostics | `clearDiagnostics()` | — |
 | Clear all decorations | `clearAllDecorations()` | — |
@@ -484,6 +491,7 @@ controller.applyTheme(EditorTheme.dark());
 | **Query** | | |
 | Visible line range | `getVisibleLineRange()` | property: `visibleLineRange` / `VisibleLineRange { get; }` |
 | Total line count | `getTotalLineCount()` | property: `totalLineCount` / `TotalLineCount { get; }` |
+| Link target at position | `getLinkTargetAt(line, column)` | returns `String` / non-null string; empty string when no link matches |
 
 > The canonical naming for provider management methods is `add` / `remove`. Each platform MAY use semantically equivalent variants per its own conventions (e.g. `attach` / `detach`, `register` / `unregister`).
 
@@ -551,7 +559,7 @@ When multiple Providers return different ApplyModes, the Manager MUST use the hi
 
 #### DecorationResult MUST Fields
 
-`DecorationResult` contains 12 decoration data types, each with a corresponding `ApplyMode` (default `MERGE`). Data types MUST use the standard types defined in the Core layer (e.g. `StyleSpan`, `InlayHint`, `CodeLensItem`, `Diagnostic`, etc.).
+`DecorationResult` contains 13 decoration data types, each with a corresponding `ApplyMode` (default `MERGE`). Data types MUST use the standard types defined in the Core layer (e.g. `StyleSpan`, `InlayHint`, `CodeLensItem`, `LinkSpan`, `Diagnostic`, etc.).
 
 | Data Field | Type | ApplyMode Field |
 |---|---|---|
@@ -567,12 +575,13 @@ When multiple Providers return different ApplyModes, the Manager MUST use the hi
 | `gutterIcons` | Map\<int, List\<GutterIcon\>\>? | `gutterIconsMode` |
 | `phantomTexts` | Map\<int, List\<PhantomText\>\>? | `phantomTextsMode` |
 | `codeLensItems` | Map\<int, List\<CodeLensItem\>\>? | `codeLensItemsMode` |
+| `links` | Map\<int, List\<LinkSpan\>\>? | `linksMode` |
 
 > Line-indexed data (syntaxSpans, semanticSpans, etc.) uses `Map<int, List<T>>` where the key is the line number (0-based).
 
 #### DecorationType Enum (MUST)
 
-Platforms MUST include `CODELENS` in `DecorationType` when exposing the decoration capability set.
+Platforms MUST include `CODELENS` and `LINK` in `DecorationType` when exposing the decoration capability set.
 
 #### Multi-Provider Merge Strategy
 
@@ -1082,7 +1091,7 @@ All platforms MUST support the following event types:
 ```
 TextChangedEvent, CursorChangedEvent, SelectionChangedEvent,
 ScrollChangedEvent, ScaleChangedEvent, DocumentLoadedEvent,
-FoldToggleEvent, GutterIconClickEvent, InlayHintClickEvent, CodeLensClickEvent,
+FoldToggleEvent, GutterIconClickEvent, InlayHintClickEvent, CodeLensClickEvent, LinkClickEvent,
 LongPressEvent,       // mobile only (iOS/Android)
 DoubleTapEvent,
 ContextMenuEvent      // desktop (macOS/Windows/Linux) & cross-platform UI frameworks
@@ -1110,10 +1119,22 @@ Event payloads MUST be defined per-event. Platforms MUST NOT assume or require a
 | `GutterIconClickEvent` | `line: int`, `iconId: int`, `screenPoint: PointF or platform-native point type` | Clicked gutter icon line, icon id, and screen position |
 | `InlayHintClickEvent` | `line: int`, `column: int`, `type: InlayType`, `intValue: int`, `screenPoint: PointF or platform-native point type` | Clicked inlay hint position, inlay type, type-specific value, and screen position |
 | `CodeLensClickEvent` | `line: int`, `column: int`, `commandId: int`, `screenPoint: PointF or platform-native point type` | Clicked CodeLens line/column anchor, unique command id, and screen position |
+| `LinkClickEvent` | `line: int`, `column: int`, `target: String`, `screenPoint: PointF or platform-native point type` | Clicked link line/column anchor, resolved link target, and screen position |
 | `LongPressEvent` | `cursorPosition: TextPosition`, `screenPoint: PointF or platform-native point type` | Long-press target position and screen position |
 | `DoubleTapEvent` | `cursorPosition: TextPosition`, `hasSelection: boolean`, `selection: TextRange?`, `screenPoint: PointF or platform-native point type` | Double-tap target position, resulting selection state, and screen position |
 | `ContextMenuEvent` | `cursorPosition: TextPosition`, `screenPoint: PointF or platform-native point type` | Context-menu target position and screen position |
 | `SelectionMenuItemClickEvent` *(platform-specific)* | `item: SelectionMenuItem` | Clicked custom selection-menu item |
+
+### 11.4 Gesture Result Contract
+
+Platforms MAY expose the raw return value of `handleGestureEvent(...)` / `handleGestureEventEx(...)` or MAY consume it internally, but if it is surfaced in public APIs or platform-internal bridge types, the following fields MUST preserve the Core semantics:
+
+| Field | Type | MUST/MAY | Description |
+|---|---|---|---|
+| `hitTarget` | `HitTargetType` + platform-aligned payload | **MUST** | Hit-test result for the current gesture location |
+| `pointerCursorType` | `PointerCursorType` | **MUST** | Pointer cursor hint for the current mouse location |
+
+> Desktop platforms SHOULD apply `pointerCursorType` immediately after gesture processing for responsive cursor updates. Touch-only platforms MAY ignore the visual cursor change while still preserving enum and bridge compatibility.
 
 ---
 
@@ -1130,10 +1151,12 @@ Enum and enum-like constant values MUST match the C++ core definitions. The foll
 | `ScrollBehavior` | TOP=0, CENTER=1, BOTTOM=2 |
 | `SpanLayer` | SYNTAX=0, SEMANTIC=1 |
 | `InlayType` | TEXT=0, ICON=1, COLOR=2 |
-| `VisualRunType` | TEXT=0, WHITESPACE=1, NEWLINE=2, INLAY_HINT=3, PHANTOM_TEXT=4, FOLD_PLACEHOLDER=5, TAB=6, CODELENS=7 |
+| `VisualRunType` | TEXT=0, WHITESPACE=1, NEWLINE=2, INLAY_HINT=3, PHANTOM_TEXT=4, FOLD_PLACEHOLDER=5, TAB=6, CODELENS=7, LINK=8 |
 | `VisualLineKind` | CONTENT=0, PHANTOM=1, CODELENS=2 |
+| `PointerCursorType` | DEFAULT=0, TEXT=1, HAND=2 |
 | `FoldState` | NONE=0, EXPANDED=1, COLLAPSED=2 |
-| `DecorationType` | SYNTAX_HIGHLIGHT, SEMANTIC_HIGHLIGHT, INLAY_HINT, DIAGNOSTIC, FOLD_REGION, INDENT_GUIDE, BRACKET_GUIDE, FLOW_GUIDE, SEPARATOR_GUIDE, GUTTER_ICON, PHANTOM_TEXT, CODELENS |
+| `DecorationType` | SYNTAX_HIGHLIGHT, SEMANTIC_HIGHLIGHT, INLAY_HINT, DIAGNOSTIC, FOLD_REGION, INDENT_GUIDE, BRACKET_GUIDE, FLOW_GUIDE, SEPARATOR_GUIDE, GUTTER_ICON, PHANTOM_TEXT, CODELENS, LINK |
+| `HitTargetType` | NONE=0, INLAY_HINT_TEXT=1, INLAY_HINT_ICON=2, GUTTER_ICON=3, FOLD_PLACEHOLDER=4, FOLD_GUTTER=5, INLAY_HINT_COLOR=6, CODELENS=7, LINK=8 |
 | `GuideType` | INDENT=0, BRACKET=1, FLOW=2, SEPARATOR=3 |
 | `GuideDirection` | (platform-aligned with C++ core) |
 | `GuideStyle` | SOLID=0, DASHED=1, DOUBLE=2 |
@@ -1353,6 +1376,14 @@ Multiple CodeLens items on the same code line **MUST** be ordered by `column` as
 | `text` | String | **MUST** | Display label text |
 | `commandId` | int | **MUST** | Unique command identifier passed back in `CodeLensClickEvent` |
 
+**`LinkSpan`** - Clickable text range inside a logical line
+
+| Field | Type | MUST/MAY | Description |
+|---|---|---|---|
+| `column` | int | **MUST** | Start column within the logical line (0-based, UTF-16 offset) |
+| `length` | int | **MUST** | Character length of the clickable range |
+| `target` | String | **MUST** | Resolved link target returned by `getLinkTargetAt()` and `LinkClickEvent` |
+
 **`GutterIcon`** — Gutter area icon
 
 | Field | Type | MUST/MAY | Description |
@@ -1412,13 +1443,23 @@ Multiple CodeLens items on the same code line **MUST** be ordered by `column` as
 
 ### 17.4 Visual Render Types
 
+**`EditorRenderModel`** - Immutable render snapshot returned by `buildRenderModel()`
+
+| Field | Type | MUST/MAY | Description |
+|---|---|---|---|
+| `pointerCursorType` | PointerCursorType | **MUST** | Pointer cursor hint for the current mouse location in the snapshot |
+
+> Desktop platforms SHOULD map `pointerCursorType` to the native cursor shape, typically `TEXT` for text editing regions, `HAND` for clickable interactive content, and `DEFAULT` for neutral chrome such as scrollbars or gutter areas when appropriate.
+
+> `GestureResult.pointerCursorType` and `EditorRenderModel.pointerCursorType` SHOULD remain semantically consistent. Platforms MAY use the gesture result for immediate cursor updates and the render model as the latest stable snapshot state.
+
 **`VisualRun`** - One resolved render run
 
 | Field | Type | MUST/MAY | Description |
 |---|---|---|---|
 | `type` | VisualRunType | **MUST** | Run semantic type |
 | `iconId` | int | **MUST** | For `INLAY_HINT(ICON)`, icon resource id; for `CODELENS`, the unique `commandId` |
-| `active` | boolean | **MUST** | Render-time interactive active state for clickable runs such as `CODELENS` |
+| `active` | boolean | **MUST** | Render-time interactive active state for clickable runs such as `CODELENS` and `LINK` |
 
 **`VisualLine`** - One resolved visual line
 
@@ -1428,6 +1469,8 @@ Multiple CodeLens items on the same code line **MUST** be ordered by `column` as
 | `ownsGutterSemantics` | boolean | **MUST** | Whether this visual line owns line-number, gutter-icon, and fold-marker semantics |
 
 > `CODELENS` is represented as a virtual visual line. The first real content line of the same logical line MUST be identified through `ownsGutterSemantics` rather than inferred from `wrapIndex`.
+
+> Platforms MUST consume the Core-provided `active` state for clickable runs and apply the corresponding hover or pressed styling consistently for both `CODELENS` and `LINK`.
 
 ## 18. Document Specification (MUST)
 

@@ -120,6 +120,13 @@ func clearInlayHints()
 func setLinePhantomTexts(line: Int, phantoms: [PhantomTextPayload])
 func setBatchLinePhantomTexts(_ phantomsByLine: [Int: [PhantomTextPayload]])
 func clearPhantomTexts()
+func setLineCodeLens(line: Int, items: [CodeLensPayload])
+func setBatchLineCodeLens(_ itemsByLine: [Int: [CodeLensPayload]])
+func clearCodeLens()
+func setLineLinks(line: Int, links: [LinkSpan])
+func setBatchLineLinks(_ linksByLine: [Int: [LinkSpan]])
+func getLinkTargetAt(line: Int, column: Int) -> String
+func clearLinks()
 func clearAllDecorations()
 
 func setLineGutterIcons(line: Int, icons: [GutterIcon])
@@ -157,6 +164,8 @@ func cancelLinkedEditing()
 
 > Compatibility note: `SweetEditorCore` still keeps some old tuple/array overloads and marks them `deprecated`. For new integrations, use the model version or `payload: Data` version.
 
+`getLinkTargetAt(line:column:)` returns an empty string when no link matches the requested position.
+
 ### Bracket Highlight
 
 ```swift
@@ -178,6 +187,7 @@ On top of shared core, iOS adds wrappers for:
 - CompletionProvider: `add/remove/trigger/show/dismiss`
 - Language config: `setLanguageConfiguration(_:)` (syncs bracket pairs to Core)
 - Generic metadata API: `setMetadata<T: EditorMetadata>(_:)` / `getMetadata<T: EditorMetadata>() -> T?`
+- CodeLens / Link click callbacks: `onCodeLensClick`, `onLinkClick`
 - `setWrapMode(_ mode: Int)`: keeps `Int` entry and maps to `SweetEditorCore.WrapMode`
 
 SwiftUI entry: `SweetEditorSwiftUIViewiOS`.
@@ -191,7 +201,7 @@ macOS view-layer files:
 - `platform/Apple/Sources/SweetEditorMacOS/SweetEditorViewMacOS.swift`
 - `platform/Apple/Sources/SweetEditorMacOS/SweetEditorSwiftUIMacOS.swift`
 
-macOS also wraps providers, language config, and metadata on top of shared core. Features align with iOS. Main differences come from AppKit event system and input path.
+macOS also wraps providers, language config, metadata, and click callbacks (`onCodeLensClick`, `onLinkClick`) on top of shared core. Features align with iOS. Main differences come from AppKit event system and input path.
 
 SwiftUI entry: `SweetEditorSwiftUIMacOS`.
 

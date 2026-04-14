@@ -172,6 +172,13 @@ public void SetLineInlayHints(int line, IList<InlayHint> hints)
 public void SetBatchLineInlayHints(Dictionary<int, IList<InlayHint>> hintsByLine)
 public void SetLinePhantomTexts(int line, IList<PhantomText> phantoms)
 public void SetBatchLinePhantomTexts(Dictionary<int, IList<PhantomText>> phantomsByLine)
+public void SetLineCodeLens(int line, IList<CodeLensItem> items)
+public void SetBatchLineCodeLens(Dictionary<int, IList<CodeLensItem>> itemsByLine)
+public void ClearCodeLens()
+public void SetLineLinks(int line, IList<LinkSpan> links)
+public void SetBatchLineLinks(Dictionary<int, IList<LinkSpan>> linksByLine)
+public string GetLinkTargetAt(int line, int column)
+public void ClearLinks()
 
 public void SetLineDiagnostics(int line, IList<DiagnosticItem> items)
 public void SetBatchLineDiagnostics(Dictionary<int, IList<DiagnosticItem>> diagsByLine)
@@ -231,6 +238,15 @@ public int GetTotalLineCount()
 ```
 
 `GetTotalLineCount()` returns the current document line count, or `-1` when no document is loaded.
+
+### Interaction Events
+
+```csharp
+public event EventHandler<CodeLensClickEventArgs> CodeLensClick
+public event EventHandler<LinkClickEventArgs> LinkClick
+```
+
+`GetLinkTargetAt()` returns an empty string when no link matches the requested position.
 
 ## Bridge Layer Notes
 

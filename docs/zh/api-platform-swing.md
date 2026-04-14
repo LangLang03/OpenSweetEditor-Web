@@ -209,6 +209,13 @@ public void setLineInlayHints(int line, List<? extends InlayHint> hints)
 public void setBatchLineInlayHints(Map<Integer, ? extends List<? extends InlayHint>> hintsByLine)
 public void setLinePhantomTexts(int line, List<? extends PhantomText> phantoms)
 public void setBatchLinePhantomTexts(Map<Integer, ? extends List<? extends PhantomText>> phantomsByLine)
+public void setLineCodeLens(int line, List<? extends CodeLensItem> items)
+public void setBatchLineCodeLens(Map<Integer, ? extends List<? extends CodeLensItem>> itemsByLine)
+public void clearCodeLens()
+public void setLineLinks(int line, List<? extends LinkSpan> links)
+public void setBatchLineLinks(Map<Integer, ? extends List<? extends LinkSpan>> linksByLine)
+public String getLinkTargetAt(int line, int column)
+public void clearLinks()
 
 public void setLineDiagnostics(int line, List<? extends DiagnosticItem> items)
 public void setBatchLineDiagnostics(Map<Integer, ? extends List<? extends DiagnosticItem>> diagsByLine)
@@ -243,6 +250,8 @@ public boolean linkedEditingNext()
 public boolean linkedEditingPrev()
 public void cancelLinkedEditing()
 ```
+
+`CodeLensClickEvent` 和 `LinkClickEvent` 通过泛型 `subscribe(...)` 事件总线分发。`getLinkTargetAt(...)` 在请求位置未命中 link 时返回空字符串。
 
 ## 桥接层说明
 

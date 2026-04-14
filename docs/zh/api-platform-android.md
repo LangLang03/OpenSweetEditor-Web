@@ -191,6 +191,13 @@ public void removeNewLineActionProvider(NewLineActionProvider provider)
 public void addDecorationProvider(DecorationProvider provider)
 public void removeDecorationProvider(DecorationProvider provider)
 public void requestDecorationRefresh()
+public void setLineCodeLens(int line, @NonNull List<? extends CodeLensItem> items)
+public void setBatchLineCodeLens(@Nullable SparseArray<? extends List<? extends CodeLensItem>> itemsByLine)
+public void clearCodeLens()
+public void setLineLinks(int line, @NonNull List<? extends LinkSpan> links)
+public void setBatchLineLinks(@Nullable SparseArray<? extends List<? extends LinkSpan>> linksByLine)
+public String getLinkTargetAt(int line, int column)
+public void clearLinks()
 
 public void addCompletionProvider(CompletionProvider provider)
 public void removeCompletionProvider(CompletionProvider provider)
@@ -206,6 +213,8 @@ public void flush()
 ```
 
 `flush()` 用于提交待处理更新（装饰 / 布局 / 滚动 / 选区）并触发重绘。装饰批量更新时，建议在最后手动调用一次 `flush()`。
+
+`CodeLensClickEvent` 与 `LinkClickEvent` 也通过同一个泛型 `subscribe(...)` API 分发。`getLinkTargetAt(...)` 在请求位置未命中 link 时返回空字符串。
 
 ### 补全触发规则
 

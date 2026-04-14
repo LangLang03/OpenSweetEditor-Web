@@ -27,7 +27,7 @@ Current bridge status:
 - Complex return values like render model, gesture result, key result, text edit result, scroll metrics are usually returned as `const uint8_t* + out_size` binary payload, and caller frees with `free_binary_data`.
 - `get_layout_metrics` returns `LayoutMetrics` binary payload (`const uint8_t* + out_size`), also freed by `free_binary_data`.
 - `get_document_line_text` returns UTF-16 text, caller frees with `free_u16_string`.
-- A few text queries return UTF-8 `const char*` (for example `get_document_text`, `editor_get_selected_text`, `editor_get_word_at_cursor`); platform wrappers usually copy immediately, and current C API does not export a dedicated UTF-8 free function.
+- A few text queries return UTF-8 `const char*` (for example `get_document_text`, `editor_get_selected_text`, `editor_get_word_at_cursor`, `editor_get_link_target_at`); caller frees them with `free_u8_string`, although platform wrappers usually copy immediately.
 
 ## Callback Struct
 
@@ -268,13 +268,22 @@ void editor_clear_highlights_layer(intptr_t editor_handle, uint8_t layer);
   - `u32 layer, u32 entry_count`
   - repeat `entry_count` groups: `[u32 line, u32 span_count, [u32 column, u32 length, u32 style_id] × span_count]`
 
-### 15) Inlay / Phantom / Gutter / Diagnostics
+### 15) Inlay / Phantom / CodeLens / Links / Gutter / Diagnostics
 
 ```c
 void editor_set_line_inlay_hints(intptr_t editor_handle, const uint8_t* data, size_t size);
 void editor_set_batch_line_inlay_hints(intptr_t editor_handle, const uint8_t* data, size_t size);
 void editor_set_line_phantom_texts(intptr_t editor_handle, const uint8_t* data, size_t size);
 void editor_set_batch_line_phantom_texts(intptr_t editor_handle, const uint8_t* data, size_t size);
+
+void editor_set_line_codelens(intptr_t editor_handle, const uint8_t* data, size_t size);
+void editor_set_batch_line_codelens(intptr_t editor_handle, const uint8_t* data, size_t size);
+void editor_clear_codelens(intptr_t editor_handle);
+
+void editor_set_line_links(intptr_t editor_handle, const uint8_t* data, size_t size);
+void editor_set_batch_line_links(intptr_t editor_handle, const uint8_t* data, size_t size);
+void editor_clear_links(intptr_t editor_handle);
+const char* editor_get_link_target_at(intptr_t editor_handle, size_t line, size_t column);
 
 void editor_set_line_gutter_icons(intptr_t editor_handle, const uint8_t* data, size_t size);
 void editor_set_batch_line_gutter_icons(intptr_t editor_handle, const uint8_t* data, size_t size);
@@ -298,6 +307,19 @@ void editor_clear_diagnostics(intptr_t editor_handle);
 - `editor_set_batch_line_phantom_texts` payload (LE):
   - `u32 entry_count`
   - repeat `entry_count` groups: `[u32 line, u32 phantom_count, phantom_items...]`
+- `editor_set_line_codelens` payload (LE):
+  - `u32 line, u32 item_count`
+  - repeat `item_count` groups: `[i32 column, i32 command_id, u32 text_len, u8[text_len] text_utf8]`
+- `editor_set_batch_line_codelens` payload (LE):
+  - `u32 entry_count`
+  - repeat `entry_count` groups: `[u32 line, u32 item_count, codelens_items...]`
+- `editor_set_line_links` payload (LE):
+  - `u32 line, u32 link_count`
+  - repeat `link_count` groups: `[u32 column, u32 length, u32 target_len, u8[target_len] target_utf8]`
+- `editor_set_batch_line_links` payload (LE):
+  - `u32 entry_count`
+  - repeat `entry_count` groups: `[u32 line, u32 link_count, link_items...]`
+- `editor_get_link_target_at` returns a UTF-8 string freed with `free_u8_string`; it returns an empty string when no link matches the requested position.
 - `editor_set_line_gutter_icons` payload (LE):
   - `u32 line, u32 icon_count`
   - repeat `icon_count` groups: `[i32 icon_id]`
@@ -386,6 +408,7 @@ void           editor_cancel_linked_editing(intptr_t editor_handle);
 ### 19) Utilities / memory management
 
 ```c
+void free_u8_string(intptr_t string_ptr);
 void free_u16_string(intptr_t string_ptr);
 void free_binary_data(intptr_t data_ptr);
 ```

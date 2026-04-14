@@ -192,6 +192,13 @@ public void removeNewLineActionProvider(NewLineActionProvider provider)
 public void addDecorationProvider(DecorationProvider provider)
 public void removeDecorationProvider(DecorationProvider provider)
 public void requestDecorationRefresh()
+public void setLineCodeLens(int line, @NonNull List<? extends CodeLensItem> items)
+public void setBatchLineCodeLens(@Nullable SparseArray<? extends List<? extends CodeLensItem>> itemsByLine)
+public void clearCodeLens()
+public void setLineLinks(int line, @NonNull List<? extends LinkSpan> links)
+public void setBatchLineLinks(@Nullable SparseArray<? extends List<? extends LinkSpan>> linksByLine)
+public String getLinkTargetAt(int line, int column)
+public void clearLinks()
 
 public void addCompletionProvider(CompletionProvider provider)
 public void removeCompletionProvider(CompletionProvider provider)
@@ -207,6 +214,8 @@ public void flush()
 ```
 
 `flush()` applies pending updates (decoration / layout / scroll / selection) and triggers redraw. For batched decoration updates, call `flush()` once at the end.
+
+`CodeLensClickEvent` and `LinkClickEvent` are published through the same generic `subscribe(...)` API. `getLinkTargetAt(...)` returns an empty string when no link matches the requested position.
 
 ### Completion Trigger Rules
 
