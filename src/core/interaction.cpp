@@ -260,7 +260,11 @@ namespace NS_SWEETEDITOR {
       intent.select_word = true;
       break;
     case GestureType::LONG_PRESS:
+      result.hit_target = m_context_.text_layout->hitTestDecoration(result.tap_point);
       intent.place_cursor = true;
+      break;
+    case GestureType::CONTEXT_MENU:
+      result.hit_target = m_context_.text_layout->hitTestDecoration(result.tap_point);
       break;
     case GestureType::DRAG_SELECT: {
       bool is_mouse = (event.type == EventType::MOUSE_MOVE);
