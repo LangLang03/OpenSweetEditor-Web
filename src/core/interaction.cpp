@@ -110,6 +110,16 @@ namespace NS_SWEETEDITOR {
     LOGD("EditorInteraction::dragHandleTo, selection = %s", m_context_.caret->selection.dump().c_str());
   }
 
+  bool EditorInteraction::shouldPlaceCursorOnLongPress(const PointF& screen_point) const {
+    if (m_context_.text_layout == nullptr || !m_context_.caret->has_selection) {
+      return true;
+    }
+
+    const TextRange selection = m_context_.caret->normalizedSelection();
+    const TextPosition pressed_position = m_context_.text_layout->hitTestPointer(screen_point);
+    return !selection.contains(pressed_position);
+  }
+
   void EditorInteraction::dragSelectTo(const PointF& screen_point, bool is_mouse) {
     PointF adjusted_point = screen_point;
     if (!is_mouse) {
@@ -261,7 +271,7 @@ namespace NS_SWEETEDITOR {
       break;
     case GestureType::LONG_PRESS:
       result.hit_target = m_context_.text_layout->hitTestDecoration(result.tap_point);
-      intent.place_cursor = true;
+      intent.place_cursor = shouldPlaceCursorOnLongPress(result.tap_point);
       break;
     case GestureType::CONTEXT_MENU:
       result.hit_target = m_context_.text_layout->hitTestDecoration(result.tap_point);

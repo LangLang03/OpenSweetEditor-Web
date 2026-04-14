@@ -373,7 +373,7 @@ TEST_CASE("EditorCore exposes pointer cursor type for text, CodeLens, gutter and
   CHECK(model.pointer_cursor_type == PointerCursorType::DEFAULT);
 }
 
-TEST_CASE("EditorCore handleGestureEvent tap on LINK keeps cursor unchanged and resolves target") {
+TEST_CASE("EditorCore handleGestureEvent ctrl-tap on LINK resolves target and places cursor at tap") {
   EditorOptions options;
   EditorCore editor(makeShared<FixedWidthTextMeasurer>(10.0f), options);
 
@@ -394,17 +394,19 @@ TEST_CASE("EditorCore handleGestureEvent tap on LINK keeps cursor unchanged and 
   };
 
   const GestureResult result = editor.handleGestureEvent(
-      GestureEvent::create(EventType::MOUSE_DOWN, 1, point));
+      GestureEvent::createWithModifiers(EventType::MOUSE_DOWN, 1, point, KeyModifier::CTRL));
 
   CHECK(result.hit_target.type == HitTargetType::LINK);
   CHECK(result.hit_target.line == 0);
   CHECK(result.hit_target.column == 6);
   CHECK(editor.getLinkTargetAt(result.hit_target.line, result.hit_target.column) == "doc://link");
-  CHECK(result.cursor_position == (TextPosition{0, 2}));
-  CHECK(editor.getCursorPosition() == (TextPosition{0, 2}));
+  CHECK(result.cursor_position == editor.getCursorPosition());
+  CHECK(result.cursor_position.line == 0);
+  CHECK(result.cursor_position.column >= 6);
+  CHECK(result.cursor_position.column <= 10);
 }
 
-TEST_CASE("EditorCore buildRenderModel activates wrapped LINK runs together") {
+TEST_CASE("EditorCore buildRenderModel activates wrapped LINK runs together with ctrl hover") {
   EditorOptions options;
   EditorCore editor(makeShared<FixedWidthTextMeasurer>(10.0f), options);
 
@@ -428,9 +430,20 @@ TEST_CASE("EditorCore buildRenderModel activates wrapped LINK runs together") {
       hover_target->x + hover_target->width * 0.5f,
       hover_target->y
   };
-  const GestureResult hover = editor.handleGestureEvent(
+  const GestureResult plain_hover = editor.handleGestureEvent(
       GestureEvent::create(EventType::MOUSE_MOVE, 1, hover_point));
-  CHECK(hover.hit_target.type == HitTargetType::LINK);
+  CHECK(plain_hover.pointer_cursor_type == PointerCursorType::TEXT);
+
+  model = {};
+  editor.buildRenderModel(model);
+  auto inactive_link_runs = findRunsOfType(model, 0, VisualRunType::LINK);
+  REQUIRE(inactive_link_runs.size() >= 2);
+  for (const VisualRun* run : inactive_link_runs) {
+    CHECK_FALSE(run->active);
+  }
+
+  const GestureResult hover = editor.handleGestureEvent(
+      GestureEvent::createWithModifiers(EventType::MOUSE_MOVE, 1, hover_point, KeyModifier::CTRL));
   CHECK(hover.pointer_cursor_type == PointerCursorType::HAND);
 
   model = {};
@@ -440,6 +453,59 @@ TEST_CASE("EditorCore buildRenderModel activates wrapped LINK runs together") {
   for (const VisualRun* run : active_link_runs) {
     CHECK(run->active);
   }
+}
+
+TEST_CASE("EditorCore long press inside selection keeps existing selection") {
+  EditorOptions options;
+  options.long_press_ms = -1;
+  EditorCore editor(makeShared<FixedWidthTextMeasurer>(10.0f), options);
+
+  editor.loadDocument(makeShared<LineArrayDocument>("abcdef"));
+  editor.setViewport({420, 160});
+  editor.setSelection({{0, 1}, {0, 4}});
+
+  const CursorRect inside_rect = editor.getPositionScreenRect({0, 2});
+  const float point[2] = {
+      inside_rect.x + 1.0f,
+      inside_rect.y + inside_rect.height * 0.5f
+  };
+
+  editor.handleGestureEvent(GestureEvent::create(EventType::TOUCH_DOWN, 1, point));
+  const GestureResult result = editor.handleGestureEvent(
+      GestureEvent::create(EventType::TOUCH_MOVE, 1, point));
+
+  REQUIRE(result.type == GestureType::LONG_PRESS);
+  CHECK(result.has_selection);
+  CHECK(result.selection == (TextRange{{0, 1}, {0, 4}}));
+  CHECK(result.cursor_position == (TextPosition{0, 4}));
+  CHECK(editor.getSelection() == (TextRange{{0, 1}, {0, 4}}));
+  CHECK(editor.getCursorPosition() == (TextPosition{0, 4}));
+}
+
+TEST_CASE("EditorCore long press outside selection places cursor and clears selection") {
+  EditorOptions options;
+  options.long_press_ms = -1;
+  EditorCore editor(makeShared<FixedWidthTextMeasurer>(10.0f), options);
+
+  editor.loadDocument(makeShared<LineArrayDocument>("abcdef"));
+  editor.setViewport({420, 160});
+  editor.setSelection({{0, 1}, {0, 4}});
+
+  const CursorRect outside_rect = editor.getPositionScreenRect({0, 5});
+  const float point[2] = {
+      outside_rect.x + 1.0f,
+      outside_rect.y + outside_rect.height * 0.5f
+  };
+
+  editor.handleGestureEvent(GestureEvent::create(EventType::TOUCH_DOWN, 1, point));
+  const GestureResult result = editor.handleGestureEvent(
+      GestureEvent::create(EventType::TOUCH_MOVE, 1, point));
+
+  REQUIRE(result.type == GestureType::LONG_PRESS);
+  CHECK_FALSE(result.has_selection);
+  CHECK(result.cursor_position == (TextPosition{0, 5}));
+  CHECK(editor.getCursorPosition() == (TextPosition{0, 5}));
+  CHECK_FALSE(editor.hasSelection());
 }
 
 TEST_CASE("EditorCore line-start word selection end handle can cross CodeLens virtual line") {

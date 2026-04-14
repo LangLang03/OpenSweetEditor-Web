@@ -73,6 +73,7 @@ namespace NS_SWEETEDITOR {
     PointF resolveScaleFocus(const GestureEvent& event) const;
     bool handleScrollbarGesture(const GestureEvent& event, GestureResult& result);
     HandleDragTarget hitTestHandle(const PointF& screen_point) const;
+    bool shouldPlaceCursorOnLongPress(const PointF& screen_point) const;
     void dragHandleTo(HandleDragTarget target, const PointF& screen_point);
     void dragSelectTo(const PointF& screen_point, bool is_mouse = false);
     void updateEdgeScrollState(const PointF& screen_point, bool is_handle_drag, bool is_mouse);
