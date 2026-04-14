@@ -211,6 +211,13 @@ void editor_set_line_codelens(intptr_t editor_handle, const uint8_t* data, size_
 void editor_set_batch_line_codelens(intptr_t editor_handle, const uint8_t* data, size_t size);
 void editor_clear_codelens(intptr_t editor_handle);
 
+// ===================== Link API =====================
+
+void editor_set_line_links(intptr_t editor_handle, const uint8_t* data, size_t size);
+void editor_set_batch_line_links(intptr_t editor_handle, const uint8_t* data, size_t size);
+void editor_clear_links(intptr_t editor_handle);
+const char* editor_get_link_target_at(intptr_t editor_handle, size_t line, size_t column);
+
 // ===================== Guide API =====================
 
 void editor_set_indent_guides(intptr_t editor_handle, const uint8_t* data, size_t size);

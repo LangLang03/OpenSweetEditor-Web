@@ -10,6 +10,7 @@ public struct SweetEditorSwiftUIMacOS: NSViewRepresentable {
     public let onInlayHintClick: ((SweetEditorInlayHintClickEvent) -> Void)?
     public let onGutterIconClick: ((SweetEditorGutterIconClickEvent) -> Void)?
     public let onCodeLensClick: ((SweetEditorCodeLensClickEvent) -> Void)?
+    public let onLinkClick: ((SweetEditorLinkClickEvent) -> Void)?
 
     public init(
         isDarkTheme: Bool = false,
@@ -17,7 +18,8 @@ public struct SweetEditorSwiftUIMacOS: NSViewRepresentable {
         onFoldToggle: ((SweetEditorFoldToggleEvent) -> Void)? = nil,
         onInlayHintClick: ((SweetEditorInlayHintClickEvent) -> Void)? = nil,
         onGutterIconClick: ((SweetEditorGutterIconClickEvent) -> Void)? = nil,
-        onCodeLensClick: ((SweetEditorCodeLensClickEvent) -> Void)? = nil
+        onCodeLensClick: ((SweetEditorCodeLensClickEvent) -> Void)? = nil,
+        onLinkClick: ((SweetEditorLinkClickEvent) -> Void)? = nil
     ) {
         self.isDarkTheme = isDarkTheme
         self.showsPerformanceOverlay = showsPerformanceOverlay
@@ -25,6 +27,7 @@ public struct SweetEditorSwiftUIMacOS: NSViewRepresentable {
         self.onInlayHintClick = onInlayHintClick
         self.onGutterIconClick = onGutterIconClick
         self.onCodeLensClick = onCodeLensClick
+        self.onLinkClick = onLinkClick
     }
 
     public func makeCoordinator() -> Coordinator { Coordinator() }
@@ -36,6 +39,7 @@ public struct SweetEditorSwiftUIMacOS: NSViewRepresentable {
         view.onInlayHintClick = onInlayHintClick
         view.onGutterIconClick = onGutterIconClick
         view.onCodeLensClick = onCodeLensClick
+        view.onLinkClick = onLinkClick
         return view
     }
 
@@ -46,6 +50,7 @@ public struct SweetEditorSwiftUIMacOS: NSViewRepresentable {
         nsView.onInlayHintClick = onInlayHintClick
         nsView.onGutterIconClick = onGutterIconClick
         nsView.onCodeLensClick = onCodeLensClick
+        nsView.onLinkClick = onLinkClick
         requestInitialFocusIfNeeded(view: nsView, coordinator: context.coordinator)
     }
 

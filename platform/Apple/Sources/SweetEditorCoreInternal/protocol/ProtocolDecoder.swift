@@ -124,6 +124,7 @@ extension SweetEditorCore {
         case 5: return .FOLD_GUTTER
         case 6: return .INLAY_HINT_COLOR
         case 7: return .CODELENS
+        case 8: return .LINK
         default: return .NONE
         }
     }
@@ -267,6 +268,7 @@ extension SweetEditorCore {
         case 5: return .FOLD_PLACEHOLDER
         case 6: return .TAB
         case 7: return .CODELENS
+        case 8: return .LINK
         default: return .TEXT
         }
     }

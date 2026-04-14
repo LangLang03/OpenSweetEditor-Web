@@ -70,25 +70,42 @@ public struct EditorPhantomText {
     }
 }
 
+public struct EditorLinkSpan {
+    public let line: Int
+    public let column: Int
+    public let length: Int
+    public let target: String
+
+    public init(line: Int, column: Int, length: Int, target: String) {
+        self.line = line
+        self.column = column
+        self.length = length
+        self.target = target
+    }
+}
+
 public struct EditorResolvedDecorations {
     public let foldRegions: [EditorFoldRegion]
     public let diagnostics: [EditorLineDiagnostics]
     public let textInlays: [EditorTextInlay]
     public let colorInlays: [EditorColorInlay]
     public let phantomTexts: [EditorPhantomText]
+    public let links: [EditorLinkSpan]
 
     public init(
         foldRegions: [EditorFoldRegion] = [],
         diagnostics: [EditorLineDiagnostics] = [],
         textInlays: [EditorTextInlay] = [],
         colorInlays: [EditorColorInlay] = [],
-        phantomTexts: [EditorPhantomText] = []
+        phantomTexts: [EditorPhantomText] = [],
+        links: [EditorLinkSpan] = []
     ) {
         self.foldRegions = foldRegions
         self.diagnostics = diagnostics
         self.textInlays = textInlays
         self.colorInlays = colorInlays
         self.phantomTexts = phantomTexts
+        self.links = links
     }
 }
 

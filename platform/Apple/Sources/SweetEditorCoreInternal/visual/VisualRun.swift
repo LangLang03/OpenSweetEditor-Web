@@ -9,6 +9,7 @@ enum VisualRunType: String, Codable {
     case FOLD_PLACEHOLDER
     case TAB
     case CODELENS
+    case LINK
 }
 
 struct InlineStyle: Codable {

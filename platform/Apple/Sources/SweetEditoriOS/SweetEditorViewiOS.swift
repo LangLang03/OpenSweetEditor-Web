@@ -11,6 +11,7 @@ class IOSEditorView: UIView, UIKeyInput, UITextInput, UITextInputTraits, UIPoint
     var onInlayHintClick: ((SweetEditorInlayHintClickEvent) -> Void)?
     var onGutterIconClick: ((SweetEditorGutterIconClickEvent) -> Void)?
     var onCodeLensClick: ((SweetEditorCodeLensClickEvent) -> Void)?
+    var onLinkClick: ((SweetEditorLinkClickEvent) -> Void)?
     var onDocumentTextChanged: ((String) -> Void)?
     var editorIconProvider: EditorIconProvider?
     let settings = EditorSettings(host: nil)
@@ -243,6 +244,20 @@ class IOSEditorView: UIView, UIKeyInput, UITextInput, UITextInputTraits, UIPoint
         rebuildAndRedraw()
     }
 
+    func setLineLinks(line: Int, links: [SweetEditorCore.LinkSpan]) {
+        editorCore.setLineLinks(line: line, links: links)
+        rebuildAndRedraw()
+    }
+
+    func setBatchLineLinks(_ linksByLine: [Int: [SweetEditorCore.LinkSpan]]) {
+        editorCore.setBatchLineLinks(linksByLine)
+        rebuildAndRedraw()
+    }
+
+    func getLinkTargetAt(line: Int, column: Int) -> String {
+        editorCore.getLinkTargetAt(line: line, column: column)
+    }
+
     func setMaxGutterIcons(_ count: UInt32) {
         settings.setMaxGutterIcons(count)
     }
@@ -336,6 +351,11 @@ class IOSEditorView: UIView, UIKeyInput, UITextInput, UITextInputTraits, UIPoint
         rebuildAndRedraw()
     }
 
+    func clearLinks() {
+        editorCore.clearLinks()
+        rebuildAndRedraw()
+    }
+
     func clearGuides() {
         editorCore.clearGuides()
         rebuildAndRedraw()
@@ -412,6 +432,16 @@ class IOSEditorView: UIView, UIKeyInput, UITextInput, UITextInputTraits, UIPoint
         }
         if !phantomsByLine.isEmpty {
             editorCore.setBatchLinePhantomTexts(phantomsByLine)
+        }
+
+        var linksByLine: [Int: [SweetEditorCore.LinkSpan]] = [:]
+        for item in decorations.links {
+            linksByLine[item.line, default: []].append(
+                SweetEditorCore.LinkSpan(column: item.column, length: item.length, target: item.target)
+            )
+        }
+        if !linksByLine.isEmpty {
+            editorCore.setBatchLineLinks(linksByLine)
         }
     }
 
@@ -757,6 +787,15 @@ class IOSEditorView: UIView, UIKeyInput, UITextInput, UITextInputTraits, UIPoint
                     line: result.hit_target.line,
                     column: result.hit_target.column,
                     commandId: result.hit_target.icon_id,
+                    locationInView: CGPoint(x: CGFloat(result.tap_point.x), y: CGFloat(result.tap_point.y))
+                )
+            )
+        case .LINK:
+            onLinkClick?(
+                SweetEditorLinkClickEvent(
+                    line: result.hit_target.line,
+                    column: result.hit_target.column,
+                    target: getLinkTargetAt(line: result.hit_target.line, column: result.hit_target.column),
                     locationInView: CGPoint(x: CGFloat(result.tap_point.x), y: CGFloat(result.tap_point.y))
                 )
             )
