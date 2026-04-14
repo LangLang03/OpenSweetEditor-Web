@@ -3,6 +3,10 @@
 --[[ multi-line comment
       can span multiple lines ]]
 
+-- links
+local sweetEditorUrl = "https://github.com/FinalScave/OpenSweetEditor"
+local sweetLineUrl = "https://github.com/FinalScave/SweetLine"
+
 local function greet(name)
     print("Hello, " .. name .. "!")
 end

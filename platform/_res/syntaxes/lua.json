@@ -69,6 +69,14 @@
         "styles": [1, "variable", 2, "punctuation", 3, "variable"]
       },
       {
+        "pattern": "(\")(https?://[^\\s\"'<>]+)(\")",
+        "styles": [1, "string", 2, "link", 3, "string"]
+      },
+      {
+        "pattern": "(')(https?://[^\\s\"'<>]+)(')",
+        "styles": [1, "string", 2, "link", 3, "string"]
+      },
+      {
         "pattern": "\\[\\[",
         "style": "string",
         "state": "longString"
