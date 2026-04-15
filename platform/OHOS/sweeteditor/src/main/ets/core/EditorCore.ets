@@ -162,6 +162,8 @@ export class EditorOptions {
   flingMinVelocity: number = 30;
   flingMaxVelocity: number = 12000;
   maxUndoStackSize: number = 512;
+  keyChordTimeoutMs: number = 2000;
+  revealSelectionEndOnSelectAll: boolean = false;
 }
 
 export class HandleConfig {
@@ -1034,4 +1036,3 @@ export class EditorCore {
     native.editorClearAllDecorations(this.handle);
   }
 }
-

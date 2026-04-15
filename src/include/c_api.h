@@ -108,6 +108,7 @@ EDITOR_API U16Char* get_document_line_utf16(intptr_t document_handle, size_t lin
 ///        f32 fling_max_velocity — Maximum fling velocity in px/s (default 8000)
 ///        u64 max_undo_stack_size — Max undo stack depth, 0=unlimited (default 512)
 ///        i64 key_chord_timeout_ms — Key chord pending timeout in ms (default 2000)
+///        u8 reveal_selection_end_on_select_all — When true, selectAll() reveals the selection end (default false)
 /// @param options_size Byte length of options_data
 /// @return EditorCore handle
 EDITOR_API intptr_t create_editor(text_measurer_t measurer, const uint8_t* options_data, size_t options_size);

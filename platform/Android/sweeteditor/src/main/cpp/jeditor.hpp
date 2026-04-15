@@ -197,6 +197,10 @@ public:
         editor_options.max_undo_stack_size = static_cast<size_t>(max_undo);
         if (offset + sizeof(int64_t) <= static_cast<size_t>(options_size)) {
           std::memcpy(&editor_options.key_chord_timeout_ms, data_ptr + offset, sizeof(int64_t));
+          offset += sizeof(int64_t);
+        }
+        if (offset + sizeof(uint8_t) <= static_cast<size_t>(options_size)) {
+          editor_options.reveal_selection_end_on_select_all = data_ptr[offset] != 0;
         }
       }
     }

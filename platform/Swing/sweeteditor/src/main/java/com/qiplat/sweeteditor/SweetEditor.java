@@ -100,7 +100,7 @@ public class SweetEditor extends JPanel {
         renderer = new EditorRenderer(theme);
         animationHolder = new AnimationHolder();
 
-        editorCore = new EditorCore(renderer.getTextMeasureCallback(), new EditorOptions(20.0f, 300));
+        editorCore = new EditorCore(renderer.getTextMeasureCallback(), new EditorOptions(20.0f, 300, false));
         keyMap = createDefaultKeyMap();
         editorCore.setKeyMap(keyMap);
 

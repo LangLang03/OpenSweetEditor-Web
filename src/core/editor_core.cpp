@@ -1705,6 +1705,9 @@ namespace NS_SWEETEDITOR {
     size_t last_line = m_document_->getLineCount() > 0 ? m_document_->getLineCount() - 1 : 0;
     uint32_t last_col = m_document_->getLineColumns(last_line);
     setSelection({{0, 0}, {last_line, last_col}});
+    if (m_options_.reveal_selection_end_on_select_all) {
+      ensureCursorVisible();
+    }
   }
 
   U8String EditorCore::getSelectedText() const {

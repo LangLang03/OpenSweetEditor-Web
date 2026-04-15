@@ -220,8 +220,15 @@ public:
         std::memcpy(&options.fling_min_velocity, ptr + offset, sizeof(float)); offset += sizeof(float);
         std::memcpy(&options.fling_max_velocity, ptr + offset, sizeof(float)); offset += sizeof(float);
         uint64_t max_undo = 0;
-        std::memcpy(&max_undo, ptr + offset, sizeof(uint64_t));
+        std::memcpy(&max_undo, ptr + offset, sizeof(uint64_t)); offset += sizeof(uint64_t);
         options.max_undo_stack_size = static_cast<size_t>(max_undo);
+        if (offset + sizeof(int64_t) <= byte_length) {
+          std::memcpy(&options.key_chord_timeout_ms, ptr + offset, sizeof(int64_t));
+          offset += sizeof(int64_t);
+        }
+        if (offset + sizeof(uint8_t) <= byte_length) {
+          options.reveal_selection_end_on_select_all = ptr[offset] != 0;
+        }
       }
     }
 

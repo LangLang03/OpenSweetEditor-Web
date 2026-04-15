@@ -233,6 +233,8 @@ class EditorOptions {
     this.flingMinVelocity = 50,
     this.flingMaxVelocity = 8000,
     this.maxUndoStackSize = 512,
+    this.keyChordTimeoutMs = 2000,
+    this.revealSelectionEndOnSelectAll = false,
   });
 
   final double touchSlop;
@@ -242,10 +244,12 @@ class EditorOptions {
   final double flingMinVelocity;
   final double flingMaxVelocity;
   final int maxUndoStackSize;
+  final int keyChordTimeoutMs;
+  final bool revealSelectionEndOnSelectAll;
 
   /// Serialize to LE binary payload matching C API EditorOptions layout.
   Uint8List toBytes() {
-    final data = ByteData(4 + 8 + 8 + 4 + 4 + 4 + 8);
+    final data = ByteData(4 + 8 + 8 + 4 + 4 + 4 + 8 + 8 + 1);
     var offset = 0;
     data.setFloat32(offset, touchSlop, Endian.little);
     offset += 4;
@@ -260,6 +264,10 @@ class EditorOptions {
     data.setFloat32(offset, flingMaxVelocity, Endian.little);
     offset += 4;
     data.setUint64(offset, maxUndoStackSize, Endian.little);
+    offset += 8;
+    data.setInt64(offset, keyChordTimeoutMs, Endian.little);
+    offset += 8;
+    data.setUint8(offset, revealSelectionEndOnSelectAll ? 1 : 0);
     return data.buffer.asUint8List();
   }
 }

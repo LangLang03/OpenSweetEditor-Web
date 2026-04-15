@@ -10,8 +10,7 @@ namespace SweetEditor {
 		#region EditorOptions
 
 		internal static byte[] PackEditorOptions(EditorOptions options) {
-			// 4 + 8 + 8 + 4 + 4 + 4 + 8 = 40 bytes
-			byte[] payload = new byte[40];
+			byte[] payload = new byte[49];
 			int offset = 0;
 			BitConverter.TryWriteBytes(payload.AsSpan(offset), options.TouchSlop); offset += 4;
 			BinaryPrimitives.WriteInt64LittleEndian(payload.AsSpan(offset), options.DoubleTapTimeout); offset += 8;
@@ -19,7 +18,9 @@ namespace SweetEditor {
 			BitConverter.TryWriteBytes(payload.AsSpan(offset), options.FlingFriction); offset += 4;
 			BitConverter.TryWriteBytes(payload.AsSpan(offset), options.FlingMinVelocity); offset += 4;
 			BitConverter.TryWriteBytes(payload.AsSpan(offset), options.FlingMaxVelocity); offset += 4;
-			BinaryPrimitives.WriteUInt64LittleEndian(payload.AsSpan(offset), options.MaxUndoStackSize);
+			BinaryPrimitives.WriteUInt64LittleEndian(payload.AsSpan(offset), options.MaxUndoStackSize); offset += 8;
+			BinaryPrimitives.WriteInt64LittleEndian(payload.AsSpan(offset), options.KeyChordTimeoutMs); offset += 8;
+			payload[offset] = options.RevealSelectionEndOnSelectAll ? (byte)1 : (byte)0;
 			return payload;
 		}
 

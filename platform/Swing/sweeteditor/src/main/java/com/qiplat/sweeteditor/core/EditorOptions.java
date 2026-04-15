@@ -16,6 +16,8 @@ package com.qiplat.sweeteditor.core;
  *   f32  fling_min_velocity
  *   f32  fling_max_velocity
  *   u64  max_undo_stack_size
+ *   i64  key_chord_timeout_ms
+ *   u8   reveal_selection_end_on_select_all
  * </pre>
  */
 public class EditorOptions {
@@ -33,22 +35,44 @@ public class EditorOptions {
     public final float flingMaxVelocity;
     /** Max undo stack size (0 = unlimited) */
     public final long maxUndoStackSize;
+    /** Key chord pending timeout in milliseconds (default 2000). */
+    public final long keyChordTimeoutMs;
+    /** Whether selectAll() should reveal the selection end after selecting the full document. */
+    public final boolean revealSelectionEndOnSelectAll;
 
     public EditorOptions() {
-this(10f, 300, 500, 2.0f, 30f, 12000f, 512);
+        this(10f, 300, 500, 2.0f, 30f, 12000f, 512, 2000, false);
     }
 
     public EditorOptions(float touchSlop, long doubleTapTimeout) {
-this(touchSlop, doubleTapTimeout, 500, 2.0f, 30f, 12000f, 512);
+        this(touchSlop, doubleTapTimeout, 500, 2.0f, 30f, 12000f, 512, 2000, false);
+    }
+
+    public EditorOptions(float touchSlop, long doubleTapTimeout, boolean revealSelectionEndOnSelectAll) {
+        this(touchSlop, doubleTapTimeout, 500, 2.0f, 30f, 12000f, 512, 2000, revealSelectionEndOnSelectAll);
     }
 
     public EditorOptions(float touchSlop, long doubleTapTimeout, long longPressMs, long maxUndoStackSize) {
-this(touchSlop, doubleTapTimeout, longPressMs, 2.0f, 30f, 12000f, maxUndoStackSize);
+        this(touchSlop, doubleTapTimeout, longPressMs, 2.0f, 30f, 12000f, maxUndoStackSize, 2000, false);
     }
 
     public EditorOptions(float touchSlop, long doubleTapTimeout, long longPressMs,
                          float flingFriction, float flingMinVelocity, float flingMaxVelocity,
                          long maxUndoStackSize) {
+        this(touchSlop, doubleTapTimeout, longPressMs, flingFriction, flingMinVelocity,
+                flingMaxVelocity, maxUndoStackSize, 2000, false);
+    }
+
+    public EditorOptions(float touchSlop, long doubleTapTimeout, long longPressMs,
+                         float flingFriction, float flingMinVelocity, float flingMaxVelocity,
+                         long maxUndoStackSize, long keyChordTimeoutMs) {
+        this(touchSlop, doubleTapTimeout, longPressMs, flingFriction, flingMinVelocity,
+                flingMaxVelocity, maxUndoStackSize, keyChordTimeoutMs, false);
+    }
+
+    public EditorOptions(float touchSlop, long doubleTapTimeout, long longPressMs,
+                         float flingFriction, float flingMinVelocity, float flingMaxVelocity,
+                         long maxUndoStackSize, long keyChordTimeoutMs, boolean revealSelectionEndOnSelectAll) {
         this.touchSlop = touchSlop;
         this.doubleTapTimeout = doubleTapTimeout;
         this.longPressMs = longPressMs;
@@ -56,5 +80,7 @@ this(touchSlop, doubleTapTimeout, longPressMs, 2.0f, 30f, 12000f, maxUndoStackSi
         this.flingMinVelocity = flingMinVelocity;
         this.flingMaxVelocity = flingMaxVelocity;
         this.maxUndoStackSize = maxUndoStackSize;
+        this.keyChordTimeoutMs = keyChordTimeoutMs;
+        this.revealSelectionEndOnSelectAll = revealSelectionEndOnSelectAll;
     }
 }

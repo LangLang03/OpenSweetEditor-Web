@@ -61,6 +61,7 @@ TEST_CASE("DecorationManager adjustForEdit updates fold regions and line-based d
 
   manager.setLineInlayHints(5, {InlayHint{InlayType::TEXT, 2, "tail"}});
   manager.setLinePhantomTexts(6, {PhantomText{1, "p"}});
+  manager.setLineLinks(5, {{2, 4, "doc://tail"}});
   manager.setLineGutterIcons(2, {GutterIcon{11}});
   manager.setLineGutterIcons(6, {GutterIcon{22}});
 

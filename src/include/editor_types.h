@@ -29,6 +29,8 @@ namespace NS_SWEETEDITOR {
     size_t max_undo_stack_size {512};
     /// Multi-chord key binding timeout in milliseconds
     int64_t key_chord_timeout_ms {2000};
+    /// Whether selectAll() should reveal the selection end after updating the selection
+    bool reveal_selection_end_on_select_all {false};
 
     TouchConfig simpleAsTouchConfig() const;
     U8String dump() const;

@@ -2152,7 +2152,7 @@ public class SweetEditor extends View {
         mTextMeasurer = mRenderer.getTextMeasurer();
 
         int scaledTouchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
-        EditorOptions editorOptions = new EditorOptions(scaledTouchSlop, 300);
+        EditorOptions editorOptions = new EditorOptions(scaledTouchSlop, 300, true);
         mEditorCore = new EditorCore(mTextMeasurer, editorOptions);
         mEditorCore.setHandleConfig(mRenderer.getHandleConfig());
         mEditorCore.setScrollbarConfig(mRenderer.getScrollbarConfig());

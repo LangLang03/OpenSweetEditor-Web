@@ -9,7 +9,16 @@ namespace NS_SWEETEDITOR {
   }
 
   U8String EditorOptions::dump() const {
-    return "EditorOptions {touch_slop = " + std::to_string(touch_slop) + ", double_tap_timeout = " + std::to_string(double_tap_timeout) + ", long_press_ms = " + std::to_string(long_press_ms) + ", fling_friction = " + std::to_string(fling_friction) + ", fling_min_velocity = " + std::to_string(fling_min_velocity) + ", fling_max_velocity = " + std::to_string(fling_max_velocity) + ", max_undo_stack_size = " + std::to_string(max_undo_stack_size) + ", key_chord_timeout_ms = " + std::to_string(key_chord_timeout_ms) + "}";
+    return "EditorOptions {touch_slop = " + std::to_string(touch_slop)
+        + ", double_tap_timeout = " + std::to_string(double_tap_timeout)
+        + ", long_press_ms = " + std::to_string(long_press_ms)
+        + ", fling_friction = " + std::to_string(fling_friction)
+        + ", fling_min_velocity = " + std::to_string(fling_min_velocity)
+        + ", fling_max_velocity = " + std::to_string(fling_max_velocity)
+        + ", max_undo_stack_size = " + std::to_string(max_undo_stack_size)
+        + ", key_chord_timeout_ms = " + std::to_string(key_chord_timeout_ms)
+        + ", reveal_selection_end_on_select_all = " + (reveal_selection_end_on_select_all ? "true" : "false")
+        + "}";
   }
 
   U8String EditorSettings::dump() const {

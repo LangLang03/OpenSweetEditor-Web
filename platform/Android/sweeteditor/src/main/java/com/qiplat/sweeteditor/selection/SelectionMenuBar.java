@@ -9,13 +9,15 @@ import android.graphics.drawable.RippleDrawable;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.animation.AlphaAnimation;
 import android.widget.LinearLayout;
 import android.widget.PopupWindow;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+
+import com.qiplat.sweeteditor.animation.PopupAnimator;
+import com.qiplat.sweeteditor.popup.PopupPositioner;
 
 import java.util.List;
 
@@ -32,7 +34,6 @@ public class SelectionMenuBar {
     private static final int HORIZONTAL_PADDING_DP = 4;
     private static final int BUTTON_HORIZONTAL_PADDING_DP = 12;
     private static final int BAR_HEIGHT_DP = 36;
-    private static final int FADE_DURATION_MS = 120;
     private static final int DIVIDER_WIDTH_DP = 1;
 
     private final Context context;
@@ -43,6 +44,8 @@ public class SelectionMenuBar {
     private int textColor;
     private int dividerColor;
     private int rippleColor;
+    private int measuredWidth = -1;
+    @NonNull private PopupPositioner.PopupSide lastPopupSide = PopupPositioner.PopupSide.BELOW;
 
     @Nullable private OnMenuItemClickListener listener;
     @Nullable private List<SelectionMenuItem> currentItems;
@@ -77,11 +80,16 @@ public class SelectionMenuBar {
         }
     }
 
-    public void showAt(@NonNull View anchor, int x, int y, @NonNull List<SelectionMenuItem> items) {
+    public void showAt(@NonNull View anchor, int x, int y,
+                       @NonNull List<SelectionMenuItem> items,
+                       @NonNull PopupPositioner.PopupSide side) {
         currentItems = items;
         rebuildContent(items);
+        lastPopupSide = side;
+        PopupAnimator.prepareForShow(contentView, side);
         popupWindow.showAtLocation(anchor, Gravity.NO_GRAVITY, x, y);
-        fadeIn();
+        popupWindow.update(x, y, getPopupWidth(), getPopupHeight());
+        PopupAnimator.animateShow(contentView, side);
     }
 
     public void updatePosition(int x, int y) {
@@ -92,7 +100,7 @@ public class SelectionMenuBar {
 
     public void dismiss() {
         if (popupWindow.isShowing()) {
-            fadeOut(() -> {
+            PopupAnimator.animateDismiss(contentView, lastPopupSide, () -> {
                 if (popupWindow.isShowing()) {
                     popupWindow.dismiss();
                 }
@@ -111,15 +119,12 @@ public class SelectionMenuBar {
     }
 
     public int getPopupWidth() {
-        if (contentView != null) {
-            contentView.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
-            return contentView.getMeasuredWidth();
-        }
-        return 0;
+        ensureMeasuredWidth();
+        return measuredWidth;
     }
 
     public int getPopupHeight() {
-        return dpToPx(BAR_HEIGHT_DP);
+        return PopupPositioner.dpToPx(context, BAR_HEIGHT_DP);
     }
 
     // Internal
@@ -128,20 +133,22 @@ public class SelectionMenuBar {
         View newContent = buildContentView(items);
         popupWindow.setContentView(newContent);
         contentView = newContent;
+        measuredWidth = -1;
     }
 
     private View buildContentView(@NonNull List<SelectionMenuItem> items) {
         LinearLayout bar = new LinearLayout(context);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setPadding(dpToPx(HORIZONTAL_PADDING_DP), 0, dpToPx(HORIZONTAL_PADDING_DP), 0);
-        bar.setMinimumHeight(dpToPx(BAR_HEIGHT_DP));
+        bar.setPadding(PopupPositioner.dpToPx(context, HORIZONTAL_PADDING_DP), 0,
+                PopupPositioner.dpToPx(context, HORIZONTAL_PADDING_DP), 0);
+        bar.setMinimumHeight(PopupPositioner.dpToPx(context, BAR_HEIGHT_DP));
 
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(bgColor);
-        bg.setCornerRadius(dpToPx(CORNER_RADIUS_DP));
+        bg.setCornerRadius(PopupPositioner.dpToPx(context, CORNER_RADIUS_DP));
         bar.setBackground(bg);
-        bar.setElevation(dpToPx(4));
+        bar.setElevation(PopupPositioner.dpToPx(context, 4));
 
         for (int i = 0; i < items.size(); i++) {
             SelectionMenuItem item = items.get(i);
@@ -158,14 +165,15 @@ public class SelectionMenuBar {
         btn.setText(item.label);
         btn.setTextSize(12);
         btn.setGravity(Gravity.CENTER);
-        btn.setPadding(dpToPx(BUTTON_HORIZONTAL_PADDING_DP), 0, dpToPx(BUTTON_HORIZONTAL_PADDING_DP), 0);
-        btn.setMinHeight(dpToPx(BAR_HEIGHT_DP));
+        btn.setPadding(PopupPositioner.dpToPx(context, BUTTON_HORIZONTAL_PADDING_DP), 0,
+                PopupPositioner.dpToPx(context, BUTTON_HORIZONTAL_PADDING_DP), 0);
+        btn.setMinHeight(PopupPositioner.dpToPx(context, BAR_HEIGHT_DP));
 
         if (item.enabled) {
             btn.setTextColor(textColor);
             GradientDrawable mask = new GradientDrawable();
             mask.setColor(Color.WHITE);
-            mask.setCornerRadius(dpToPx(4));
+            mask.setCornerRadius(PopupPositioner.dpToPx(context, 4));
             btn.setBackground(new RippleDrawable(
                     ColorStateList.valueOf(rippleColor), null, mask));
             btn.setOnClickListener(v -> {
@@ -184,31 +192,12 @@ public class SelectionMenuBar {
     private View createDivider() {
         View divider = new View(context);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                dpToPx(DIVIDER_WIDTH_DP), dpToPx(BAR_HEIGHT_DP - 12));
+                PopupPositioner.dpToPx(context, DIVIDER_WIDTH_DP),
+                PopupPositioner.dpToPx(context, BAR_HEIGHT_DP - 12));
         lp.gravity = Gravity.CENTER_VERTICAL;
         divider.setLayoutParams(lp);
         divider.setBackgroundColor(dividerColor);
         return divider;
-    }
-
-    private void fadeIn() {
-        AlphaAnimation anim = new AlphaAnimation(0f, 1f);
-        anim.setDuration(FADE_DURATION_MS);
-        contentView.startAnimation(anim);
-    }
-
-    private void fadeOut(Runnable onEnd) {
-        AlphaAnimation anim = new AlphaAnimation(1f, 0f);
-        anim.setDuration(FADE_DURATION_MS);
-        anim.setFillAfter(true);
-        anim.setAnimationListener(new android.view.animation.Animation.AnimationListener() {
-            @Override public void onAnimationStart(android.view.animation.Animation a) {}
-            @Override public void onAnimationRepeat(android.view.animation.Animation a) {}
-            @Override public void onAnimationEnd(android.view.animation.Animation a) {
-                contentView.post(onEnd);
-            }
-        });
-        contentView.startAnimation(anim);
     }
 
     private static int deriveOverlayColor(int base) {
@@ -220,7 +209,12 @@ public class SelectionMenuBar {
         return dividerColor != 0 ? dividerColor : deriveOverlayColor(bgColor);
     }
 
-    private int dpToPx(int dp) {
-        return (int) (dp * context.getResources().getDisplayMetrics().density + 0.5f);
+    private void ensureMeasuredWidth() {
+        if (measuredWidth >= 0) {
+            return;
+        }
+        contentView.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
+        measuredWidth = contentView.getMeasuredWidth();
     }
+
 }

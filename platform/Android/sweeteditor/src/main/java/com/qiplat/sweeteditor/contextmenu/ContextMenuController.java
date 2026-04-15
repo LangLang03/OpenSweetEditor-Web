@@ -4,6 +4,7 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.graphics.PointF;
+import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 
 import androidx.annotation.NonNull;
@@ -18,8 +19,10 @@ import com.qiplat.sweeteditor.core.foundation.TextRange;
 import com.qiplat.sweeteditor.event.ContextMenuItemClickEvent;
 import com.qiplat.sweeteditor.event.EditorEventBus;
 import com.qiplat.sweeteditor.event.LinkClickEvent;
+import com.qiplat.sweeteditor.popup.PopupPositioner;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -29,6 +32,10 @@ import java.util.List;
 public final class ContextMenuController {
     private static final int MENU_OFFSET_X_DP = 2;
     private static final int MENU_OFFSET_Y_DP = 4;
+    private static final List<PopupPositioner.Placement> MENU_PLACEMENTS = Arrays.asList(
+            PopupPositioner.Placement.of(PopupPositioner.PopupSide.BELOW, PopupPositioner.PopupAlign.START),
+            PopupPositioner.Placement.of(PopupPositioner.PopupSide.ABOVE, PopupPositioner.PopupAlign.START)
+    );
 
     private final SweetEditor editor;
     private final EditorEventBus eventBus;
@@ -126,10 +133,24 @@ public final class ContextMenuController {
             return;
         }
         currentRequest = request;
-        popup.showAt(editor,
-                Math.round(request.locationInView.x) + dpToPx(MENU_OFFSET_X_DP),
-                Math.round(request.locationInView.y) + dpToPx(MENU_OFFSET_Y_DP),
-                sections);
+        popup.setSections(sections);
+        int offsetX = PopupPositioner.dpToPx(editor.getContext(), MENU_OFFSET_X_DP);
+        int offsetY = PopupPositioner.dpToPx(editor.getContext(), MENU_OFFSET_Y_DP);
+        PopupPositioner.Result position = PopupPositioner.compute(new PopupPositioner.Request(
+                editor,
+                new RectF(
+                        request.locationInView.x + offsetX,
+                        request.locationInView.y + offsetY,
+                        request.locationInView.x + offsetX,
+                        request.locationInView.y + offsetY
+                ),
+                Math.max(1, popup.getPopupWidth()),
+                Math.max(1, popup.getPopupHeight()),
+                0,
+                0,
+                MENU_PLACEMENTS
+        ));
+        popup.showAt(editor, position.screenX, position.screenY, position.placement.side);
     }
 
     @NonNull
@@ -279,10 +300,6 @@ public final class ContextMenuController {
             return null;
         }
         return new TextRange(copyPosition(range.start), copyPosition(range.end));
-    }
-
-    private int dpToPx(int dp) {
-        return (int) (dp * editor.getResources().getDisplayMetrics().density + 0.5f);
     }
 
     @Nullable

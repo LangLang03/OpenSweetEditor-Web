@@ -28,7 +28,15 @@ class EditorSession implements EditorSettingsHost {
       iconProvider: _iconProvider,
     );
     final nativeMeasurer = _measurer.buildNativeMeasurer();
-    _editorCore = core.EditorCore(measurer: nativeMeasurer);
+    _editorCore = core.EditorCore(
+      measurer: nativeMeasurer,
+      options: core.EditorOptions(
+        revealSelectionEndOnSelectAll:
+            !kIsWeb &&
+            (defaultTargetPlatform == TargetPlatform.android ||
+                defaultTargetPlatform == TargetPlatform.iOS),
+      ),
+    );
     _keyMap = controller.getKeyMap();
     _editorCore!.setKeyMap(_keyMap);
     completionProviderManager = CompletionProviderManager(session: this);

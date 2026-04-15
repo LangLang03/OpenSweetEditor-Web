@@ -10,9 +10,6 @@ import android.graphics.drawable.RippleDrawable;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.animation.AccelerateInterpolator;
-import android.view.animation.DecelerateInterpolator;
-import android.view.animation.Interpolator;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.PopupWindow;
@@ -20,6 +17,9 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+
+import com.qiplat.sweeteditor.animation.PopupAnimator;
+import com.qiplat.sweeteditor.popup.PopupPositioner;
 
 import java.util.List;
 
@@ -43,23 +43,17 @@ public final class ContextMenuPopup {
     private static final int SECTION_DIVIDER_HEIGHT_DP = 1;
     private static final int SECTION_DIVIDER_MARGIN_H_DP = 10;
     private static final int SECTION_DIVIDER_MARGIN_V_DP = 4;
-    private static final int SHOW_DURATION_MS = 160;
-    private static final int DISMISS_DURATION_MS = 110;
-    private static final float SHOW_START_SCALE = 0.96f;
-    private static final float DISMISS_END_SCALE = 0.985f;
-    private static final int SHOW_PIVOT_X_DP = 24;
-    private static final int SHOW_PIVOT_Y_DP = 12;
-
     private final Context context;
     private final PopupWindow popupWindow;
-    private final Interpolator showInterpolator = new DecelerateInterpolator(1.6f);
-    private final Interpolator dismissInterpolator = new AccelerateInterpolator(1.2f);
     private View contentView;
 
     private int bgColor;
     private int textColor;
     private int dividerColor;
     private int rippleColor;
+    private int measuredWidth = -1;
+    private int measuredHeight = -1;
+    @NonNull private PopupPositioner.PopupSide lastPopupSide = PopupPositioner.PopupSide.BELOW;
 
     @Nullable private OnMenuItemClickListener listener;
     @Nullable private List<ContextMenuSection> currentSections;
@@ -94,37 +88,27 @@ public final class ContextMenuPopup {
         }
     }
 
-    public void showAt(@NonNull View anchor, int x, int y, @NonNull List<ContextMenuSection> sections) {
+    public void setSections(@NonNull List<ContextMenuSection> sections) {
+        currentSections = sections;
+        rebuildContent(sections);
+    }
+
+    public void showAt(@NonNull View anchor, int screenX, int screenY,
+                       @NonNull PopupPositioner.PopupSide side) {
         if (popupWindow.isShowing()) {
             popupWindow.dismiss();
         }
-        currentSections = sections;
-        rebuildContent(sections);
-        contentView.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
-        int popupWidth = contentView.getMeasuredWidth();
-        int popupHeight = contentView.getMeasuredHeight();
-
-        int clampedLocalX = Math.max(0, Math.min(x, Math.max(0, anchor.getWidth() - popupWidth)));
-        int desiredLocalY = y;
-        boolean showAboveAnchor = false;
-        if (desiredLocalY + popupHeight > anchor.getHeight()) {
-            desiredLocalY = y - popupHeight;
-            showAboveAnchor = true;
-        }
-        int clampedLocalY = Math.max(0, Math.min(desiredLocalY, Math.max(0, anchor.getHeight() - popupHeight)));
-        int[] anchorLocation = new int[2];
-        anchor.getLocationOnScreen(anchorLocation);
-
-        popupWindow.showAtLocation(anchor, Gravity.NO_GRAVITY,
-                anchorLocation[0] + clampedLocalX,
-                anchorLocation[1] + clampedLocalY);
-        prepareForShow(showAboveAnchor);
-        animateIn();
+        ensureMeasured();
+        lastPopupSide = side;
+        PopupAnimator.prepareForShow(contentView, side);
+        popupWindow.showAtLocation(anchor, Gravity.NO_GRAVITY, screenX, screenY);
+        popupWindow.update(screenX, screenY, measuredWidth, measuredHeight);
+        PopupAnimator.animateShow(contentView, side);
     }
 
     public void dismiss() {
         if (popupWindow.isShowing()) {
-            animateOut(() -> {
+            PopupAnimator.animateDismiss(contentView, lastPopupSide, () -> {
                 if (popupWindow.isShowing()) {
                     popupWindow.dismiss();
                 }
@@ -142,10 +126,21 @@ public final class ContextMenuPopup {
         return popupWindow.isShowing();
     }
 
+    public int getPopupWidth() {
+        ensureMeasured();
+        return measuredWidth;
+    }
+
+    public int getPopupHeight() {
+        ensureMeasured();
+        return measuredHeight;
+    }
+
     private void rebuildContent(@NonNull List<ContextMenuSection> sections) {
         View newContent = buildContentView(sections);
         popupWindow.setContentView(newContent);
         contentView = newContent;
+        invalidateMeasurement();
     }
 
     private View buildContentView(@NonNull List<ContextMenuSection> sections) {
@@ -153,24 +148,20 @@ public final class ContextMenuPopup {
         container.setOrientation(LinearLayout.VERTICAL);
         boolean reserveIconSlot = hasAnyIcons(sections);
         if (MIN_WIDTH_DP > 0) {
-            container.setMinimumWidth(dpToPx(MIN_WIDTH_DP));
+            container.setMinimumWidth(PopupPositioner.dpToPx(context, MIN_WIDTH_DP));
         }
 
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(bgColor);
-        bg.setCornerRadius(dpToPx(CORNER_RADIUS_DP));
+        bg.setCornerRadius(PopupPositioner.dpToPx(context, CORNER_RADIUS_DP));
         container.setBackground(bg);
-        container.setElevation(dpToPx(CONTAINER_ELEVATION_DP));
+        container.setElevation(PopupPositioner.dpToPx(context, CONTAINER_ELEVATION_DP));
 
         for (int sectionIndex = 0; sectionIndex < sections.size(); sectionIndex++) {
             ContextMenuSection section = sections.get(sectionIndex);
             for (ContextMenuItem item : section.items) {
                 if (item != null) {
-                    View row = createRow(item, reserveIconSlot);
-                    row.setLayoutParams(new LinearLayout.LayoutParams(
-                            ViewGroup.LayoutParams.WRAP_CONTENT,
-                            ViewGroup.LayoutParams.WRAP_CONTENT));
-                    container.addView(row);
+                    container.addView(createRow(item, reserveIconSlot));
                 }
             }
             if (sectionIndex < sections.size() - 1) {
@@ -184,16 +175,18 @@ public final class ContextMenuPopup {
         LinearLayout row = new LinearLayout(context);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setMinimumHeight(dpToPx(ROW_HEIGHT_DP));
-        row.setPadding(dpToPx(ROW_HORIZONTAL_PADDING_DP), 0, dpToPx(ROW_HORIZONTAL_PADDING_DP), 0);
+        row.setMinimumHeight(PopupPositioner.dpToPx(context, ROW_HEIGHT_DP));
+        row.setPadding(
+                PopupPositioner.dpToPx(context, ROW_HORIZONTAL_PADDING_DP), 0,
+                PopupPositioner.dpToPx(context, ROW_HORIZONTAL_PADDING_DP), 0);
         row.setBackground(createRowBackground());
 
         if (reserveIconSlot) {
             ImageView iconView = new ImageView(context);
             LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(
-                    dpToPx(ROW_ICON_SIZE_DP),
-                    dpToPx(ROW_ICON_SIZE_DP));
-            iconLp.rightMargin = dpToPx(ROW_ICON_GAP_DP);
+                    PopupPositioner.dpToPx(context, ROW_ICON_SIZE_DP),
+                    PopupPositioner.dpToPx(context, ROW_ICON_SIZE_DP));
+            iconLp.rightMargin = PopupPositioner.dpToPx(context, ROW_ICON_GAP_DP);
             iconView.setLayoutParams(iconLp);
             if (item.icon != null) {
                 Drawable icon = cloneIcon(item.icon);
@@ -218,18 +211,10 @@ public final class ContextMenuPopup {
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         labelView.setLayoutParams(labelLp);
 
-        TextView secondaryView = new TextView(context);
-        secondaryView.setText(item.secondaryLabel != null ? item.secondaryLabel : "");
-        secondaryView.setTextSize(11);
-        secondaryView.setSingleLine(true);
-        LinearLayout.LayoutParams secondaryLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        secondaryLp.leftMargin = dpToPx(ROW_GAP_DP);
-        secondaryView.setLayoutParams(secondaryLp);
+        boolean hasSecondaryLabel = item.secondaryLabel != null && !item.secondaryLabel.isEmpty();
 
         if (item.enabled) {
             labelView.setTextColor(textColor);
-            secondaryView.setTextColor(deriveSecondaryTextColor(textColor));
             row.setOnClickListener(v -> {
                 if (listener != null) {
                     listener.onMenuItemClick(item);
@@ -238,13 +223,25 @@ public final class ContextMenuPopup {
         } else {
             int disabledTextColor = deriveDisabledTextColor(textColor);
             labelView.setTextColor(disabledTextColor);
-            secondaryView.setTextColor(Color.argb(72,
-                    Color.red(textColor), Color.green(textColor), Color.blue(textColor)));
             row.setClickable(false);
         }
 
         row.addView(labelView);
-        if (item.secondaryLabel != null && !item.secondaryLabel.isEmpty()) {
+        if (hasSecondaryLabel) {
+            TextView secondaryView = new TextView(context);
+            secondaryView.setText(item.secondaryLabel);
+            secondaryView.setTextSize(11);
+            secondaryView.setSingleLine(true);
+            LinearLayout.LayoutParams secondaryLp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            secondaryLp.leftMargin = PopupPositioner.dpToPx(context, ROW_GAP_DP);
+            secondaryView.setLayoutParams(secondaryLp);
+            if (item.enabled) {
+                secondaryView.setTextColor(deriveSecondaryTextColor(textColor));
+            } else {
+                secondaryView.setTextColor(Color.argb(72,
+                        Color.red(textColor), Color.green(textColor), Color.blue(textColor)));
+            }
             row.addView(secondaryView);
         }
         return row;
@@ -253,12 +250,12 @@ public final class ContextMenuPopup {
     private View createSectionDivider() {
         View divider = new View(context);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(SECTION_DIVIDER_HEIGHT_DP));
-        int margin = dpToPx(SECTION_DIVIDER_MARGIN_V_DP);
+                ViewGroup.LayoutParams.MATCH_PARENT, PopupPositioner.dpToPx(context, SECTION_DIVIDER_HEIGHT_DP));
+        int margin = PopupPositioner.dpToPx(context, SECTION_DIVIDER_MARGIN_V_DP);
         lp.topMargin = margin;
         lp.bottomMargin = margin;
-        lp.leftMargin = dpToPx(SECTION_DIVIDER_MARGIN_H_DP);
-        lp.rightMargin = dpToPx(SECTION_DIVIDER_MARGIN_H_DP);
+        lp.leftMargin = PopupPositioner.dpToPx(context, SECTION_DIVIDER_MARGIN_H_DP);
+        lp.rightMargin = PopupPositioner.dpToPx(context, SECTION_DIVIDER_MARGIN_H_DP);
         divider.setLayoutParams(lp);
         divider.setBackgroundColor(dividerColor);
         return divider;
@@ -267,49 +264,8 @@ public final class ContextMenuPopup {
     private RippleDrawable createRowBackground() {
         GradientDrawable mask = new GradientDrawable();
         mask.setColor(Color.WHITE);
-        mask.setCornerRadius(dpToPx(4));
+        mask.setCornerRadius(PopupPositioner.dpToPx(context, 4));
         return new RippleDrawable(ColorStateList.valueOf(rippleColor), null, mask);
-    }
-
-    private void prepareForShow(boolean showAboveAnchor) {
-        contentView.animate().cancel();
-        contentView.clearAnimation();
-        float pivotX = Math.min(dpToPx(SHOW_PIVOT_X_DP), contentView.getMeasuredWidth());
-        float pivotY = showAboveAnchor
-                ? Math.max(0, contentView.getMeasuredHeight() - dpToPx(SHOW_PIVOT_Y_DP))
-                : Math.min(dpToPx(SHOW_PIVOT_Y_DP), contentView.getMeasuredHeight());
-        contentView.setPivotX(pivotX);
-        contentView.setPivotY(pivotY);
-        contentView.setAlpha(0f);
-        contentView.setScaleX(SHOW_START_SCALE);
-        contentView.setScaleY(SHOW_START_SCALE);
-    }
-
-    private void animateIn() {
-        contentView.animate()
-                .alpha(1f)
-                .scaleX(1f)
-                .scaleY(1f)
-                .setDuration(SHOW_DURATION_MS)
-                .setInterpolator(showInterpolator)
-                .start();
-    }
-
-    private void animateOut(@NonNull Runnable onEnd) {
-        contentView.animate().cancel();
-        contentView.animate()
-                .alpha(0f)
-                .scaleX(DISMISS_END_SCALE)
-                .scaleY(DISMISS_END_SCALE)
-                .setDuration(DISMISS_DURATION_MS)
-                .setInterpolator(dismissInterpolator)
-                .withEndAction(() -> {
-                    contentView.setAlpha(1f);
-                    contentView.setScaleX(1f);
-                    contentView.setScaleY(1f);
-                    contentView.post(onEnd);
-                })
-                .start();
     }
 
     private static int deriveOverlayColor(int base) {
@@ -351,7 +307,17 @@ public final class ContextMenuPopup {
         return drawable != null ? drawable.mutate() : null;
     }
 
-    private int dpToPx(int dp) {
-        return (int) (dp * context.getResources().getDisplayMetrics().density + 0.5f);
+    private void invalidateMeasurement() {
+        measuredWidth = -1;
+        measuredHeight = -1;
+    }
+
+    private void ensureMeasured() {
+        if (measuredWidth >= 0 && measuredHeight >= 0) {
+            return;
+        }
+        contentView.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
+        measuredWidth = contentView.getMeasuredWidth();
+        measuredHeight = contentView.getMeasuredHeight();
     }
 }

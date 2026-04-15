@@ -145,6 +145,11 @@ class BinaryWriter {
     this.writeInt64(value);
   }
 
+  writeUint8(value: number): void {
+    this.view.setUint8(this.offset, value);
+    this.offset += 1;
+  }
+
   writeBytes(bytes: Uint8Array): void {
     const target = new Uint8Array(this.buffer, this.offset, bytes.length);
     target.set(bytes);
@@ -162,7 +167,7 @@ class BinaryWriter {
 
 export class ProtocolEncoder {
   static packEditorOptions(options: EditorOptions): ArrayBuffer {
-    const writer = new BinaryWriter(40);
+    const writer = new BinaryWriter(49);
     writer.writeFloat32(options.touchSlop);
     writer.writeInt64(options.doubleTapTimeout);
     writer.writeInt64(options.longPressMs);
@@ -170,6 +175,8 @@ export class ProtocolEncoder {
     writer.writeFloat32(options.flingMinVelocity);
     writer.writeFloat32(options.flingMaxVelocity);
     writer.writeUint64(options.maxUndoStackSize);
+    writer.writeInt64(options.keyChordTimeoutMs);
+    writer.writeUint8(options.revealSelectionEndOnSelectAll ? 1 : 0);
     return writer.getBuffer();
   }
 
@@ -1075,4 +1082,3 @@ export class ProtocolDecoder {
     };
   }
 }
-

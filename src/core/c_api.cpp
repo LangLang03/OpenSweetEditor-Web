@@ -542,7 +542,9 @@ U16Char* get_document_line_utf16(intptr_t document_handle, size_t line) {
 intptr_t create_editor(text_measurer_t measurer, const uint8_t* options_data, size_t options_size) {
   SharedPtr<CTextMeasurer> c_measurer = makeShared<CTextMeasurer>(measurer);
   EditorOptions options;
-  // Decode binary payload (LE): f32 touch_slop, i64 double_tap_timeout, i64 long_press_ms, f32 fling_friction, f32 fling_min_velocity, f32 fling_max_velocity, u64 max_undo_stack_size
+  // Decode binary payload (LE): f32 touch_slop, i64 double_tap_timeout, i64 long_press_ms,
+  // f32 fling_friction, f32 fling_min_velocity, f32 fling_max_velocity, u64 max_undo_stack_size,
+  // i64 key_chord_timeout_ms, u8 reveal_selection_end_on_select_all.
   if (options_data != nullptr) {
     size_t offset = 0;
     auto readF32 = [&](float& out) {
@@ -554,6 +556,14 @@ intptr_t create_editor(text_measurer_t measurer, const uint8_t* options_data, si
     auto readU64 = [&](size_t& out) {
       if (offset + sizeof(uint64_t) <= options_size) { uint64_t v; std::memcpy(&v, options_data + offset, sizeof(uint64_t)); out = static_cast<size_t>(v); offset += sizeof(uint64_t); }
     };
+    auto readBool = [&](bool& out) {
+      if (offset + sizeof(uint8_t) <= options_size) {
+        uint8_t v = 0;
+        std::memcpy(&v, options_data + offset, sizeof(uint8_t));
+        out = v != 0;
+        offset += sizeof(uint8_t);
+      }
+    };
     readF32(options.touch_slop);
     readI64(options.double_tap_timeout);
     readI64(options.long_press_ms);
@@ -562,6 +572,7 @@ intptr_t create_editor(text_measurer_t measurer, const uint8_t* options_data, si
     readF32(options.fling_max_velocity);
     readU64(options.max_undo_stack_size);
     readI64(options.key_chord_timeout_ms);
+    readBool(options.reveal_selection_end_on_select_all);
   }
   SharedPtr<EditorCore> editor_core = makeShared<EditorCore>(c_measurer, options);
   return toIntPtr(editor_core);

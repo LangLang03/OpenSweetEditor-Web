@@ -478,7 +478,7 @@ namespace SweetEditor {
 	/// <summary>
 	/// Construction-time immutable options for EditorCore.
 	/// Fields mirror the C++ EditorOptions struct.
-	/// Binary layout (LE): f32 touch_slop, i64 double_tap_timeout, i64 long_press_ms, f32 fling_friction, f32 fling_min_velocity, f32 fling_max_velocity, u64 max_undo_stack_size
+	/// Binary layout (LE): f32 touch_slop, i64 double_tap_timeout, i64 long_press_ms, f32 fling_friction, f32 fling_min_velocity, f32 fling_max_velocity, u64 max_undo_stack_size, i64 key_chord_timeout_ms, u8 reveal_selection_end_on_select_all
 	/// </summary>
 	public class EditorOptions {
 		/// <summary>Threshold to determine if a gesture is a move (default 10)</summary>
@@ -495,6 +495,10 @@ namespace SweetEditor {
 		public float FlingMaxVelocity { get; set; } = 12000f;
 		/// <summary>Max undo stack size, 0 = unlimited (default 512)</summary>
 		public ulong MaxUndoStackSize { get; set; } = 512;
+		/// <summary>Key chord pending timeout in ms (default 2000)</summary>
+		public long KeyChordTimeoutMs { get; set; } = 2000;
+		/// <summary>Whether selectAll() should reveal the selection end after selecting the full document.</summary>
+		public bool RevealSelectionEndOnSelectAll { get; set; } = false;
 	}
 
 	/// <summary>

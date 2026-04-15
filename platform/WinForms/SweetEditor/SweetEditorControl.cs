@@ -1306,7 +1306,11 @@ namespace SweetEditor {
 			var doubleClickSize = SystemInformation.DoubleClickSize;
 			float clickSlop = Math.Max(20f, Math.Max(doubleClickSize.Width, doubleClickSize.Height));
 			int doubleClickTime = SystemInformation.DoubleClickTime;
-			editorCore = new EditorCore(renderer.GetTextMeasurer(), new EditorOptions { TouchSlop = clickSlop, DoubleTapTimeout = doubleClickTime });
+			editorCore = new EditorCore(renderer.GetTextMeasurer(), new EditorOptions {
+				TouchSlop = clickSlop,
+				DoubleTapTimeout = doubleClickTime,
+				RevealSelectionEndOnSelectAll = false
+			});
 			decorationProviderManager = new DecorationProviderManager(this);
 
 			// Completion manager and popup controller.

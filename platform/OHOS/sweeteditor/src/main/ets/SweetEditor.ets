@@ -707,6 +707,7 @@ export struct SweetEditor {
     const options = new EditorOptions();
     options.touchSlop = touchSlop;
     options.doubleTapTimeout = 300;
+    options.revealSelectionEndOnSelectAll = true;
 
     const ctx = this.canvasContext!;
     this.renderer.attachCanvasContext(ctx);
