@@ -23,7 +23,7 @@ The Core layer does not involve UI rendering. It contains only bridging, data mo
 | Category | Required Types | Description |
 |---|---|---|
 | **Core Bridge** | `EditorCore`, `Document`, `ProtocolEncoder`, `ProtocolDecoder`, `TextMeasurer`, `EditorOptions` | Native bridge + public core API wrapper |
-| **Foundation** | `TextPosition`, `TextRange`, `TextChange`, `WrapMode`, `FoldArrowMode`, `AutoIndentMode`, `CurrentLineRenderMode`, `ScrollBehavior` | Fundamental value types and enums |
+| **Foundation** | `TextPosition`, `TextRange`, `IntRange`, `TextChange`, `WrapMode`, `FoldArrowMode`, `AutoIndentMode`, `CurrentLineRenderMode`, `ScrollBehavior` | Fundamental value types and enums |
 | **Adornment** | `StyleSpan`, `SpanLayer`, `InlayHint`, `InlayType`, `PhantomText`, `CodeLensItem`, `LinkSpan`, `FoldRegion`, `GutterIcon`, `Diagnostic`, `IndentGuide`, `BracketGuide`, `FlowGuide`, `SeparatorGuide`, `SeparatorStyle`, `TextStyle` | Decoration data types |
 | **Visual** | `EditorRenderModel`, `VisualLine`, `VisualLineKind`, `VisualRun`, `VisualRunType`, `PointerCursorType`, `Cursor`, `CursorRect`, `SelectionRect`, `SelectionHandle`, `ScrollMetrics`, `ScrollbarModel`, `ScrollbarRect`, `GuideSegment`, `GuideType`, `GuideDirection`, `GuideStyle`, `DiagnosticDecoration`, `CompositionDecoration`, `FoldMarkerRenderItem`, `FoldState`, `GutterIconRenderItem`, `LinkedEditingRect`, `BracketHighlightRect` | Render model types (geometry semantics follow Section 2.4) |
 | **Snippet** | `LinkedEditingModel`, `TabStopGroup` | Linked editing / tab stop groups |
@@ -115,6 +115,7 @@ Other public types:
 | `ContextMenuTriggerKind` | OC: `SEContextMenuTriggerKind` | Trigger kind for opening the context menu |
 | `EditorIconProvider` | C#/TS/Kotlin: `IEditorIconProvider`; OC: `SEEditorIconProvider` | Icon provider interface |
 | `SweetEditorController` | OC: `SESweetEditorController` | External control entry for declarative frameworks (see Section 3.0) |
+| `IntRange` | OC: `SEIntRange` | Inclusive integer range value type |
 
 > **Naming variant rules:**
 > - Languages whose convention requires an `I` prefix on interfaces (e.g. C#, TypeScript, Kotlin) MAY use the `I`-prefixed variant
@@ -382,6 +383,24 @@ controller.applyTheme(EditorTheme.dark());
 | Cancel linked editing | `cancelLinkedEditing()` | — |
 
 > Payload-level APIs (e.g. `setLineSpans`, `setBatchLineSpans`) — all platforms MUST provide high-level typed wrappers (e.g. `setLineSpans(line, layer, spans: List<StyleSpan>)`). Platforms SHOULD additionally expose raw/binary payload APIs when the host language has a natural public binary carrier (e.g. `ByteBuffer`, `NSData`, `byte[]`, `Uint8List`). If both typed and payload APIs are exposed, their parameter semantics and final Core behavior MUST be identical. Payload encoding format remains platform-defined.
+
+#### 3.1.1 `EditorOptions` Standard Fields
+
+`EditorOptions` is a bridge-layer configuration payload. Platforms MAY expose it as a public type or keep it internal, but if it crosses the bridge boundary or is serialized into a binary payload, the following field semantics and ordering MUST remain aligned with Core:
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `touchSlop` | float | `10` | Gesture move threshold below which the interaction is still treated as a tap |
+| `doubleTapTimeout` | int64 | `300` | Double-tap recognition timeout in milliseconds |
+| `longPressMs` | int64 | `500` | Long-press recognition timeout in milliseconds |
+| `flingFriction` | float | `3.5` | Fling friction coefficient |
+| `flingMinVelocity` | float | `50.0` | Minimum fling velocity in px/s |
+| `flingMaxVelocity` | float | `8000.0` | Maximum fling velocity in px/s |
+| `maxUndoStackSize` | uint64 / size_t-aligned integer | `512` | Maximum undo stack depth; `0` means unlimited |
+| `keyChordTimeoutMs` | int64 | `2000` | Timeout for completing a pending multi-chord key binding |
+| `revealSelectionEndOnSelectAll` | boolean | `false` | When true, `selectAll()` SHOULD reveal the selection end after updating the selection |
+
+> If a platform serializes `EditorOptions` into a binary bridge payload, field order MUST stay aligned with Core: `touch_slop`, `double_tap_timeout`, `long_press_ms`, `fling_friction`, `fling_min_velocity`, `fling_max_velocity`, `max_undo_stack_size`, `key_chord_timeout_ms`, `reveal_selection_end_on_select_all`.
 
 ### 3.2 `SweetEditor` Public API
 
@@ -1103,7 +1122,7 @@ DoubleTapEvent,
 ContextMenuEvent      // platforms with ContextMenu support
 ```
 
-> `LongPressEvent` is for mobile platforms (iOS/Android). `ContextMenuEvent` is for platforms that expose a platform-side context menu entry point (for example desktop right click, cross-platform framework context gesture, or mobile long press). Platform implementations SHOULD only register events relevant to their platform.
+> `LongPressEvent` is for mobile platforms (iOS/Android) and represents the raw long-press gesture itself. `ContextMenuEvent` is for platforms that expose an explicit context-menu gesture entry point (for example desktop right click or a framework-native context-menu gesture). Platform implementations SHOULD only register events relevant to their platform.
 
 > The above event types MUST be distinguishable and consumable in a type-safe way through the platform's chosen event mechanism.
 
@@ -1126,9 +1145,9 @@ Event payloads MUST be defined per-event. Platforms MUST NOT assume or require a
 | `InlayHintClickEvent` | `line: int`, `column: int`, `type: InlayType`, `intValue: int`, `locationInView: PointF or platform-native point type` | Clicked inlay hint position, inlay type, type-specific value, and pointer location relative to the editor view |
 | `CodeLensClickEvent` | `line: int`, `column: int`, `commandId: int`, `locationInView: PointF or platform-native point type` | Clicked CodeLens line/column anchor, unique command id, and pointer location relative to the editor view |
 | `LinkClickEvent` | `line: int`, `column: int`, `target: String`, `locationInView: PointF or platform-native point type` | Clicked link line/column anchor, resolved link target, and pointer location relative to the editor view |
-| `LongPressEvent` | `cursorPosition: TextPosition`, `locationInView: PointF or platform-native point type` | Long-press target position and pointer location relative to the editor view |
+| `LongPressEvent` | `cursorPosition: TextPosition`, `locationInView: PointF or platform-native point type` | Raw long-press target position and pointer location relative to the editor view |
 | `DoubleTapEvent` | `cursorPosition: TextPosition`, `hasSelection: boolean`, `selection: TextRange?`, `locationInView: PointF or platform-native point type` | Double-tap target position, resulting selection state, and pointer location relative to the editor view |
-| `ContextMenuEvent` | `cursorPosition: TextPosition`, `locationInView: PointF or platform-native point type` | Context-menu target position and pointer location relative to the editor view |
+| `ContextMenuEvent` | `cursorPosition: TextPosition`, `locationInView: PointF or platform-native point type` | Explicit context-menu gesture target position and pointer location relative to the editor view |
 | `ContextMenuItemClickEvent` *(platform-specific)* | `item: ContextMenuItem`, `request: ContextMenuRequest` | Clicked custom context-menu item and the immutable request snapshot used to build that menu |
 | `SelectionMenuItemClickEvent` *(platform-specific)* | `item: SelectionMenuItem` | Clicked custom selection-menu item |
 
@@ -1189,11 +1208,12 @@ interface ContextMenuItemProvider {
 | `items` | `List<ContextMenuItem>` | **MUST** | Full list of menu items in that section |
 
 The context-menu capability SHOULD satisfy the following semantics:
-- `ContextMenuEvent` is the activation signal; `ContextMenuRequest` is the immutable snapshot used to build the actual menu model
+- `LongPressEvent` and/or `ContextMenuEvent` MAY be the trigger signal; `ContextMenuRequest` is the immutable snapshot used to build the actual menu model
 - The provider returns the complete menu model for the current show cycle, rather than incremental appended items
 - Passing `null` as the provider SHOULD restore the platform default context menu
 - Returning an empty list MAY suppress the menu for that show cycle
 - `locationInView` MUST remain view-local; platforms convert it to screen / window coordinates only when presenting a popup or native menu
+- A platform MAY open a context menu from `LongPressEvent` without publishing `ContextMenuEvent`; in that case `ContextMenuRequest.triggerKind` MUST still be `LONG_PRESS`
 - If `hitTarget == LINK` and `linkTarget` is non-empty, the default menu SHOULD include built-in actions `open_link` and `copy_link`
 - If `hasSelection == true`, the default menu SHOULD include built-in actions `cut` and `copy`
 - The general/default section SHOULD include built-in actions `paste` and `select_all`
@@ -1390,6 +1410,13 @@ The Core layer defines numerous decoration data types. All platforms MUST implem
 | Coordinate basis | **MUST** | All line numbers (`line`) and column numbers (`column`) MUST be 0-based; columns are measured in UTF-16 character offsets |
 
 ### 17.2 Shared Data Types
+
+**`IntRange`** — Inclusive integer range
+
+| Field | Type | MUST/MAY | Description |
+|---|---|---|---|
+| `start` | int | **MUST** | Inclusive range start |
+| `end` | int | **MUST** | Inclusive range end; `end < start` means empty |
 
 **`TextChange`** — Incremental text change
 
