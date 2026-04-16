@@ -206,7 +206,7 @@ public class SelectionMenuController {
         if (menuBar.isShowing()) {
             menuBar.dismissImmediate();
         }
-        menuBar.showAt(editor, position.screenX, position.screenY, items, position.placement.side);
+        menuBar.showAt(editor, position.screenX, position.screenY, items, position.placement);
     }
 
     private List<SelectionMenuItem> buildItems() {

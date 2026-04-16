@@ -150,7 +150,7 @@ public final class ContextMenuController {
                 0,
                 MENU_PLACEMENTS
         ));
-        popup.showAt(editor, position.screenX, position.screenY, position.placement.side);
+        popup.showAt(editor, position.screenX, position.screenY, position.placement);
     }
 
     @NonNull

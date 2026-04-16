@@ -58,7 +58,8 @@ public class InlineSuggestionActionBar {
     private int dismissTextColor;
     private int dividerColor;
     private int rippleColor;
-    @NonNull private PopupPositioner.PopupSide lastPopupSide = PopupPositioner.PopupSide.ABOVE;
+    @NonNull private PopupPositioner.Placement lastPlacement =
+            PopupPositioner.Placement.of(PopupPositioner.PopupSide.ABOVE, PopupPositioner.PopupAlign.START);
 
     public InlineSuggestionActionBar(@NonNull Context context,
                                      int bgColor, int acceptTextColor, int dismissTextColor) {
@@ -110,12 +111,12 @@ public class InlineSuggestionActionBar {
     public void showAt(@NonNull View anchor, float cursorX, float cursorY, float cursorHeight) {
         PopupLayout layout = computeLayout(anchor, cursorX, cursorY, cursorHeight);
         if (!popupWindow.isShowing()) {
-            lastPopupSide = layout.position.placement.side;
-            PopupAnimator.prepareForShow(contentView, lastPopupSide);
+            lastPlacement = layout.position.placement;
+            PopupAnimator.prepareForShow(contentView, lastPlacement);
             popupWindow.showAtLocation(anchor, Gravity.NO_GRAVITY,
                     layout.position.screenX, layout.position.screenY);
             applyPopupLayout(layout);
-            PopupAnimator.animateShow(contentView, lastPopupSide);
+            PopupAnimator.animateShow(contentView, lastPlacement);
             return;
         }
         applyPopupLayout(layout);
@@ -128,7 +129,7 @@ public class InlineSuggestionActionBar {
 
     public void dismiss() {
         if (!popupWindow.isShowing()) return;
-        PopupAnimator.animateDismiss(contentView, lastPopupSide, () -> {
+        PopupAnimator.animateDismiss(contentView, lastPlacement, () -> {
             if (popupWindow.isShowing()) popupWindow.dismiss();
         });
     }
@@ -242,7 +243,7 @@ public class InlineSuggestionActionBar {
     }
 
     private void applyPopupLayout(@NonNull PopupLayout layout) {
-        lastPopupSide = layout.position.placement.side;
+        lastPlacement = layout.position.placement;
         popupWindow.update(layout.position.screenX, layout.position.screenY,
                 layout.popupWidth, layout.popupHeight);
     }

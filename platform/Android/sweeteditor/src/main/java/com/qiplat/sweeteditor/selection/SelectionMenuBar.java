@@ -45,7 +45,8 @@ public class SelectionMenuBar {
     private int dividerColor;
     private int rippleColor;
     private int measuredWidth = -1;
-    @NonNull private PopupPositioner.PopupSide lastPopupSide = PopupPositioner.PopupSide.BELOW;
+    @NonNull private PopupPositioner.Placement lastPlacement =
+            PopupPositioner.Placement.of(PopupPositioner.PopupSide.BELOW, PopupPositioner.PopupAlign.CENTER);
 
     @Nullable private OnMenuItemClickListener listener;
     @Nullable private List<SelectionMenuItem> currentItems;
@@ -82,14 +83,14 @@ public class SelectionMenuBar {
 
     public void showAt(@NonNull View anchor, int x, int y,
                        @NonNull List<SelectionMenuItem> items,
-                       @NonNull PopupPositioner.PopupSide side) {
+                       @NonNull PopupPositioner.Placement placement) {
         currentItems = items;
         rebuildContent(items);
-        lastPopupSide = side;
-        PopupAnimator.prepareForShow(contentView, side);
+        lastPlacement = placement;
+        PopupAnimator.prepareForShow(contentView, placement);
         popupWindow.showAtLocation(anchor, Gravity.NO_GRAVITY, x, y);
         popupWindow.update(x, y, getPopupWidth(), getPopupHeight());
-        PopupAnimator.animateShow(contentView, side);
+        PopupAnimator.animateShow(contentView, placement);
     }
 
     public void updatePosition(int x, int y) {
@@ -100,7 +101,7 @@ public class SelectionMenuBar {
 
     public void dismiss() {
         if (popupWindow.isShowing()) {
-            PopupAnimator.animateDismiss(contentView, lastPopupSide, () -> {
+            PopupAnimator.animateDismiss(contentView, lastPlacement, () -> {
                 if (popupWindow.isShowing()) {
                     popupWindow.dismiss();
                 }

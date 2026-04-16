@@ -53,7 +53,8 @@ public final class ContextMenuPopup {
     private int rippleColor;
     private int measuredWidth = -1;
     private int measuredHeight = -1;
-    @NonNull private PopupPositioner.PopupSide lastPopupSide = PopupPositioner.PopupSide.BELOW;
+    @NonNull private PopupPositioner.Placement lastPlacement =
+            PopupPositioner.Placement.of(PopupPositioner.PopupSide.BELOW, PopupPositioner.PopupAlign.START);
 
     @Nullable private OnMenuItemClickListener listener;
     @Nullable private List<ContextMenuSection> currentSections;
@@ -94,21 +95,21 @@ public final class ContextMenuPopup {
     }
 
     public void showAt(@NonNull View anchor, int screenX, int screenY,
-                       @NonNull PopupPositioner.PopupSide side) {
+                       @NonNull PopupPositioner.Placement placement) {
         if (popupWindow.isShowing()) {
             popupWindow.dismiss();
         }
         ensureMeasured();
-        lastPopupSide = side;
-        PopupAnimator.prepareForShow(contentView, side);
+        lastPlacement = placement;
+        PopupAnimator.prepareForShow(contentView, placement);
         popupWindow.showAtLocation(anchor, Gravity.NO_GRAVITY, screenX, screenY);
         popupWindow.update(screenX, screenY, measuredWidth, measuredHeight);
-        PopupAnimator.animateShow(contentView, side);
+        PopupAnimator.animateShow(contentView, placement);
     }
 
     public void dismiss() {
         if (popupWindow.isShowing()) {
-            PopupAnimator.animateDismiss(contentView, lastPopupSide, () -> {
+            PopupAnimator.animateDismiss(contentView, lastPlacement, () -> {
                 if (popupWindow.isShowing()) {
                     popupWindow.dismiss();
                 }

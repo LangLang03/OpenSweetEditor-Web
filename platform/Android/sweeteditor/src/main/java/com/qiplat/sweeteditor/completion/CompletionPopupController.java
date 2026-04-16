@@ -72,7 +72,8 @@ public class CompletionPopupController implements CompletionProviderManager.Comp
     private float cachedCursorX = 0;
     private float cachedCursorY = 0;
     private float cachedCursorHeight = 0;
-    @NonNull private PopupPositioner.PopupSide lastPopupSide = PopupPositioner.PopupSide.BELOW;
+    @NonNull private PopupPositioner.Placement lastPlacement =
+            PopupPositioner.Placement.of(PopupPositioner.PopupSide.BELOW, PopupPositioner.PopupAlign.START);
 
     public CompletionPopupController(@NonNull Context context, @NonNull View anchorView, @NonNull EditorTheme theme) {
         this.context = context;
@@ -179,7 +180,7 @@ public class CompletionPopupController implements CompletionProviderManager.Comp
 
     public void dismiss() {
         if (popupWindow != null && popupWindow.isShowing()) {
-            PopupAnimator.animateDismiss(recyclerView, lastPopupSide, () -> {
+            PopupAnimator.animateDismiss(recyclerView, lastPlacement, () -> {
                 if (popupWindow.isShowing()) {
                     popupWindow.dismiss();
                 }
@@ -216,14 +217,14 @@ public class CompletionPopupController implements CompletionProviderManager.Comp
             dismiss();
             return;
         }
-        lastPopupSide = layout.position.placement.side;
         applyPopupSize(layout.popupWidth, layout.popupHeight);
         if (!popupWindow.isShowing()) {
-            PopupAnimator.prepareForShow(recyclerView, lastPopupSide);
+            lastPlacement = layout.position.placement;
+            PopupAnimator.prepareForShow(recyclerView, lastPlacement);
             popupWindow.showAtLocation(anchorView, Gravity.NO_GRAVITY,
                     layout.position.screenX, layout.position.screenY);
             applyPopupLayout(layout);
-            PopupAnimator.animateShow(recyclerView, lastPopupSide);
+            PopupAnimator.animateShow(recyclerView, lastPlacement);
             return;
         }
         applyPopupLayout(layout);
@@ -282,7 +283,7 @@ public class CompletionPopupController implements CompletionProviderManager.Comp
     }
 
     private void applyPopupLayout(@NonNull PopupLayout layout) {
-        lastPopupSide = layout.position.placement.side;
+        lastPlacement = layout.position.placement;
         applyPopupSize(layout.popupWidth, layout.popupHeight);
         popupWindow.update(layout.position.screenX, layout.position.screenY,
                 layout.popupWidth, layout.popupHeight);
