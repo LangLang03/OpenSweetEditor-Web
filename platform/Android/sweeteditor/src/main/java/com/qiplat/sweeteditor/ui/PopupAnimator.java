@@ -1,12 +1,10 @@
-package com.qiplat.sweeteditor.animation;
+package com.qiplat.sweeteditor.ui;
 
 import android.view.View;
 import android.view.animation.AccelerateInterpolator;
 import android.view.animation.OvershootInterpolator;
 
 import androidx.annotation.NonNull;
-
-import com.qiplat.sweeteditor.popup.PopupPositioner;
 
 /**
  * Shared bubble-style animation for floating popup surfaces.

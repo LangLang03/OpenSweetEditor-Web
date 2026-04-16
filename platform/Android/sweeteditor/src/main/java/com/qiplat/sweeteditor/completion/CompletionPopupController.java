@@ -22,8 +22,8 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.qiplat.sweeteditor.EditorTheme;
-import com.qiplat.sweeteditor.animation.PopupAnimator;
-import com.qiplat.sweeteditor.popup.PopupPositioner;
+import com.qiplat.sweeteditor.ui.PopupAnimator;
+import com.qiplat.sweeteditor.ui.PopupPositioner;
 
 import java.util.ArrayList;
 import java.util.Arrays;

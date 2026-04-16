@@ -13,7 +13,6 @@ import androidx.annotation.Nullable;
 
 import java.util.List;
 
-import com.qiplat.sweeteditor.animation.AnimationHolder;
 import com.qiplat.sweeteditor.core.HandleConfig;
 import com.qiplat.sweeteditor.core.ScrollbarConfig;
 import com.qiplat.sweeteditor.core.TextMeasurer;
@@ -23,6 +22,7 @@ import com.qiplat.sweeteditor.core.visual.*;
 import com.qiplat.sweeteditor.perf.MeasurePerfStats;
 import com.qiplat.sweeteditor.perf.PerfOverlay;
 import com.qiplat.sweeteditor.perf.PerfStepRecorder;
+import com.qiplat.sweeteditor.ui.AnimationHolder;
 
 /**
  * Platform-independent rendering engine for the editor.

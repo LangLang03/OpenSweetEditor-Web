@@ -1,4 +1,4 @@
-package com.qiplat.sweeteditor.popup;
+package com.qiplat.sweeteditor.ui;
 
 import android.content.Context;
 import android.graphics.Rect;

@@ -29,7 +29,6 @@ import androidx.annotation.Nullable;
 
 import java.util.Map;
 
-import com.qiplat.sweeteditor.animation.AnimationHolder;
 import com.qiplat.sweeteditor.core.Document;
 import com.qiplat.sweeteditor.core.EditorOptions;
 import com.qiplat.sweeteditor.core.EditorCore;
@@ -95,6 +94,7 @@ import com.qiplat.sweeteditor.event.InlayHintClickEvent;
 import com.qiplat.sweeteditor.event.LinkClickEvent;
 import com.qiplat.sweeteditor.event.LongPressEvent;
 import com.qiplat.sweeteditor.selection.SelectionMenuController;
+import com.qiplat.sweeteditor.ui.AnimationHolder;
 import com.qiplat.sweeteditor.selection.SelectionMenuItemProvider;
 import com.qiplat.sweeteditor.event.ScaleChangedEvent;
 import com.qiplat.sweeteditor.event.ScrollChangedEvent;

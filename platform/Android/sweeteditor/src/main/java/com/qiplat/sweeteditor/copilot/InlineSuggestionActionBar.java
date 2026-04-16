@@ -17,8 +17,8 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.qiplat.sweeteditor.animation.PopupAnimator;
-import com.qiplat.sweeteditor.popup.PopupPositioner;
+import com.qiplat.sweeteditor.ui.PopupAnimator;
+import com.qiplat.sweeteditor.ui.PopupPositioner;
 
 import java.util.Arrays;
 import java.util.List;

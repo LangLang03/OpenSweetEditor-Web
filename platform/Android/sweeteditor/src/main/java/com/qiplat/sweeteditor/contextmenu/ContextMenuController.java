@@ -19,7 +19,7 @@ import com.qiplat.sweeteditor.core.foundation.TextRange;
 import com.qiplat.sweeteditor.event.ContextMenuItemClickEvent;
 import com.qiplat.sweeteditor.event.EditorEventBus;
 import com.qiplat.sweeteditor.event.LinkClickEvent;
-import com.qiplat.sweeteditor.popup.PopupPositioner;
+import com.qiplat.sweeteditor.ui.PopupPositioner;
 
 import java.util.ArrayList;
 import java.util.Arrays;

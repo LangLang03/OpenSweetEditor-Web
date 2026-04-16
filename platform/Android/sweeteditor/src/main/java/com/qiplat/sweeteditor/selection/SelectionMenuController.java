@@ -14,7 +14,7 @@ import com.qiplat.sweeteditor.core.EditorCore;
 import com.qiplat.sweeteditor.core.visual.SelectionHandle;
 import com.qiplat.sweeteditor.event.EditorEventBus;
 import com.qiplat.sweeteditor.event.SelectionMenuItemClickEvent;
-import com.qiplat.sweeteditor.popup.PopupPositioner;
+import com.qiplat.sweeteditor.ui.PopupPositioner;
 
 import java.util.ArrayList;
 import java.util.Arrays;
