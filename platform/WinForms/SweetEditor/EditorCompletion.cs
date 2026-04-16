@@ -6,15 +6,19 @@ using System.Linq;
 using System.Windows.Forms;
 
 namespace SweetEditor {
+	/// <summary>Precise replacement edit for completion insertion.</summary>
+	public sealed class CompletionTextEdit {
+		public TextRange Range { get; }
+		public string NewText { get; }
+
+		public CompletionTextEdit(TextRange range, string newText) {
+			Range = range;
+			NewText = newText ?? string.Empty;
+		}
+	}
+
 	/// <summary>Completion item data model. Apply priority on confirm: TextEdit -> InsertText -> Label.</summary>
 	public class CompletionItem {
-		/// <summary>Precise replacement edit (explicit replacement range + new text).</summary>
-		public class TextEdit {
-			public TextRange Range { get; }
-			public string NewText { get; }
-			public TextEdit(TextRange range, string newText) { Range = range; NewText = newText; }
-		}
-
 		public const int KIND_KEYWORD = 0;
 		public const int KIND_FUNCTION = 1;
 		public const int KIND_VARIABLE = 2;
@@ -30,12 +34,20 @@ namespace SweetEditor {
 		/// <summary>VSCode Snippet format (supports placeholders like $1, ${1:default}, and $0).</summary>
 		public const int INSERT_TEXT_FORMAT_SNIPPET = 2;
 
+		public CompletionItem() : this(string.Empty, INSERT_TEXT_FORMAT_PLAIN_TEXT, KIND_TEXT) { }
+
+		public CompletionItem(string label, int insertTextFormat, int kind) {
+			Label = label ?? string.Empty;
+			InsertTextFormat = insertTextFormat;
+			Kind = kind;
+		}
+
 		public string Label { get; set; }
 		public string? Detail { get; set; }
 		public string? InsertText { get; set; }
 		/// <summary>Insert text format: INSERT_TEXT_FORMAT_PLAIN_TEXT or INSERT_TEXT_FORMAT_SNIPPET.</summary>
 		public int InsertTextFormat { get; set; } = INSERT_TEXT_FORMAT_PLAIN_TEXT;
-		public TextEdit? TextEditValue { get; set; }
+		public CompletionTextEdit? TextEdit { get; set; }
 		public string? FilterText { get; set; }
 		public string? SortKey { get; set; }
 		public int Kind { get; set; }
@@ -54,14 +66,14 @@ namespace SweetEditor {
 		public string? TriggerCharacter { get; }
 		public TextPosition CursorPosition { get; }
 		public string LineText { get; }
-		public TextRange? WordRange { get; }
+		public TextRange WordRange { get; }
 		/// <summary>Current language configuration (from LanguageConfiguration).</summary>
 		public LanguageConfiguration? LanguageConfiguration { get; }
 		/// <summary>Current editor metadata (from SweetEditorControl).</summary>
 		public IEditorMetadata? EditorMetadata { get; }
 
 		public CompletionContext(CompletionTriggerKind triggerKind, string? triggerCharacter,
-								 TextPosition cursorPosition, string lineText, TextRange? wordRange,
+								 TextPosition cursorPosition, string lineText, TextRange wordRange,
 								 LanguageConfiguration? languageConfiguration = null,
 								 IEditorMetadata? editorMetadata = null) {
 			TriggerKind = triggerKind;

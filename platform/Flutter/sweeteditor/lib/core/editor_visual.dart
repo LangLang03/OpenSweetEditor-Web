@@ -55,6 +55,19 @@ enum VisualLineKind {
       .firstWhere((e) => e.value == value, orElse: () => content);
 }
 
+/// Pointer cursor hint for desktop platforms.
+enum PointerCursorType {
+  default_(0),
+  text(1),
+  hand(2);
+
+  const PointerCursorType(this.value);
+  final int value;
+
+  static PointerCursorType fromValue(int value) => PointerCursorType.values
+      .firstWhere((e) => e.value == value, orElse: () => text);
+}
+
 /// Guide direction.
 enum GuideDirection {
   horizontal(0),
@@ -435,6 +448,7 @@ class EditorRenderModel {
     this.horizontalScrollbar = const ScrollbarModel(),
     this.gutterSticky = false,
     this.gutterVisible = true,
+    this.pointerCursorType = PointerCursorType.text,
   });
 
   static const EditorRenderModel empty = EditorRenderModel();
@@ -464,4 +478,5 @@ class EditorRenderModel {
   final ScrollbarModel horizontalScrollbar;
   final bool gutterSticky;
   final bool gutterVisible;
+  final PointerCursorType pointerCursorType;
 }

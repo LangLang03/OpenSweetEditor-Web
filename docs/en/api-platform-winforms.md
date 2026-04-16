@@ -2,7 +2,7 @@
 
 This document maps to the current WinForms implementation:
 
-- Control layer: `platform/WinForms/SweetEditor/EditorControl.cs`
+- Control layer: `platform/WinForms/SweetEditor/SweetEditorControl.cs`
 - Bridge layer: `platform/WinForms/SweetEditor/EditorCore.cs`
 - Protocol decode: `platform/WinForms/SweetEditor/EditorProtocol.cs`
 - Extension/Provider:
@@ -17,7 +17,7 @@ This document maps to the current WinForms implementation:
 - WinForms calls C API by P/Invoke (`sweeteditor.dll`).
 - `EditorCore` wraps native calls, and `EditorProtocol` decodes binary payload.
 - The current bridge protocol is binary payload.
-- `EditorControl` handles input, drawing, event publishing, and provider management.
+- `SweetEditorControl` handles input, drawing, event publishing, and provider management.
 - `Document` creation and line-text query use UTF-16 boundary; text fields in render model and edit results are currently decoded as UTF-8.
 
 ## Quick Start
@@ -63,7 +63,7 @@ public sealed class MainForm : Form
 {
     public MainForm()
     {
-        var editor = new EditorControl
+        var editor = new SweetEditorControl
         {
             Dock = DockStyle.Fill
         };
@@ -82,13 +82,13 @@ public sealed class MainForm : Form
   `runtimes/win-x64/native/sweeteditor.dll`
 - No manual `DllImport` setup or manual native file copy is required in normal NuGet restore flow.
 
-## Public Control Layer: `EditorControl`
+## Public Control Layer: `SweetEditorControl`
 
 ### Constructors
 
 ```csharp
-public EditorControl()
-public EditorControl(IContainer container)
+public SweetEditorControl()
+public SweetEditorControl(IContainer container)
 ```
 
 ### Document / Appearance / Language Config / Debug
@@ -144,7 +144,7 @@ public bool CanRedo()
 public string GetSelectedText()
 public TextPosition GetCursorPosition()
 public Document? GetDocument()
-public TextRange? GetWordRangeAtCursor()
+public TextRange GetWordRangeAtCursor()
 public string GetWordAtCursor()
 public void SetCursorPosition(TextPosition position)
 public void SetSelection(int startLine, int startColumn, int endLine, int endColumn)
@@ -161,12 +161,13 @@ public void GotoPosition(int line, int column = 0)
 ### Styles / Decorations / Folding / Linked Editing
 
 ```csharp
-public void registerTextStyle(uint styleId, int color, int backgroundColor, int fontStyle)
-public void registerBatchTextStyles(IReadOnlyDictionary<uint, TextStyle> stylesById)
-public void registerTextStyle(uint styleId, int color, int fontStyle)
+public void registerTextStyle(int styleId, int color, int backgroundColor, int fontStyle)
+public void registerBatchTextStyles(IReadOnlyDictionary<int, TextStyle> stylesById)
+public void registerTextStyle(int styleId, int color, int fontStyle)
 public void SetLineSpans(int line, SpanLayer layer, IList<StyleSpan> spans)
 public void SetLineSpans(int line, IList<StyleSpan> spans)
 public void SetBatchLineSpans(SpanLayer layer, Dictionary<int, IList<StyleSpan>> spansByLine)
+public void ClearLineSpans(int line, SpanLayer layer)
 
 public void SetLineInlayHints(int line, IList<InlayHint> hints)
 public void SetBatchLineInlayHints(Dictionary<int, IList<InlayHint>> hintsByLine)
@@ -180,8 +181,8 @@ public void SetBatchLineLinks(Dictionary<int, IList<LinkSpan>> linksByLine)
 public string GetLinkTargetAt(int line, int column)
 public void ClearLinks()
 
-public void SetLineDiagnostics(int line, IList<DiagnosticItem> items)
-public void SetBatchLineDiagnostics(Dictionary<int, IList<DiagnosticItem>> diagsByLine)
+public void SetLineDiagnostics(int line, IList<Diagnostic> items)
+public void SetBatchLineDiagnostics(Dictionary<int, IList<Diagnostic>> diagsByLine)
 public void ClearDiagnostics()
 
 public void SetLineGutterIcons(int line, IList<GutterIcon> icons)
@@ -238,6 +239,8 @@ public int GetTotalLineCount()
 ```
 
 `GetTotalLineCount()` returns the current document line count, or `-1` when no document is loaded.
+
+`CompletionItem.TextEdit` uses the public `CompletionTextEdit` type for precise replacement edits.
 
 ### Interaction Events
 

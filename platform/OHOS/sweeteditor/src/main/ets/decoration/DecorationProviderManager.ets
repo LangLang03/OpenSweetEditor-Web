@@ -9,7 +9,7 @@ import {
 import { IntRange } from '../core/CoreFoundation';
 import {
   BracketGuide,
-  DiagnosticItem,
+  Diagnostic,
   FlowGuide,
   FoldRegion,
   GutterIcon,
@@ -220,7 +220,7 @@ export class DecorationProviderManager {
     const syntaxSpans = new Map<number, StyleSpan[]>();
     const semanticSpans = new Map<number, StyleSpan[]>();
     const inlayHints = new Map<number, InlayHint[]>();
-    const diagnostics = new Map<number, DiagnosticItem[]>();
+    const diagnostics = new Map<number, Diagnostic[]>();
     let indentGuides: IndentGuide[] | null = null;
     let bracketGuides: BracketGuide[] | null = null;
     let flowGuides: FlowGuide[] | null = null;
@@ -487,7 +487,7 @@ export class DecorationProviderManager {
   }
 
   private clearDiagnosticRange(startLine: number, endLine: number): void {
-    const empty = buildEmptyMapRange<DiagnosticItem>(startLine, endLine);
+    const empty = buildEmptyMapRange<Diagnostic>(startLine, endLine);
     if (empty.size === 0) {
       return;
     }

@@ -15,7 +15,7 @@ import {
   BracketGuide,
   CodeLensItem,
   LinkSpan,
-  DiagnosticItem,
+  Diagnostic,
   FlowGuide,
   FoldRegion,
   GutterIcon,
@@ -861,7 +861,7 @@ export class EditorCore {
 
   // ==================== Diagnostic Decorations ====================
 
-  setLineDiagnostics(lineOrData: number | ArrayBuffer, itemsOrSize: DiagnosticItem[] | number): void {
+  setLineDiagnostics(lineOrData: number | ArrayBuffer, itemsOrSize: Diagnostic[] | number): void {
     if (lineOrData instanceof ArrayBuffer) {
       native.editorSetLineDiagnostics(this.handle, lineOrData, lineOrData.byteLength);
       return;
@@ -873,7 +873,7 @@ export class EditorCore {
     native.editorSetLineDiagnostics(this.handle, data, data.byteLength);
   }
 
-  setBatchLineDiagnostics(diagsByLineOrData: Map<number, DiagnosticItem[]> | ArrayBuffer, _size?: number): void {
+  setBatchLineDiagnostics(diagsByLineOrData: Map<number, Diagnostic[]> | ArrayBuffer, _size?: number): void {
     if (diagsByLineOrData instanceof ArrayBuffer) {
       native.editorSetBatchLineDiagnostics(this.handle, diagsByLineOrData, diagsByLineOrData.byteLength);
       return;

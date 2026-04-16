@@ -53,6 +53,66 @@ class EditorSettings {
   bool _gutterStickyCustomized = false;
   EditorSettingsHost? _host;
 
+  EditorSettings copy() {
+    final copy = EditorSettings();
+    copy._textSize = _textSize;
+    copy._fontFamily = _fontFamily;
+    copy._scale = _scale;
+    copy._foldArrowMode = _foldArrowMode;
+    copy._wrapMode = _wrapMode;
+    copy._lineSpacingAdd = _lineSpacingAdd;
+    copy._lineSpacingMult = _lineSpacingMult;
+    copy._contentStartPadding = _contentStartPadding;
+    copy._showSplitLine = _showSplitLine;
+    copy._gutterSticky = _gutterSticky;
+    copy._gutterVisible = _gutterVisible;
+    copy._currentLineRenderMode = _currentLineRenderMode;
+    copy._autoIndentMode = _autoIndentMode;
+    copy._backspaceUnindent = _backspaceUnindent;
+    copy._readOnly = _readOnly;
+    copy._compositionEnabled = _compositionEnabled;
+    copy._maxGutterIcons = _maxGutterIcons;
+    copy._decorationScrollRefreshMinIntervalMs =
+        _decorationScrollRefreshMinIntervalMs;
+    copy._decorationOverscanViewportMultiplier =
+        _decorationOverscanViewportMultiplier;
+    copy._textSizeCustomized = _textSizeCustomized;
+    copy._fontFamilyCustomized = _fontFamilyCustomized;
+    copy._gutterStickyCustomized = _gutterStickyCustomized;
+    return copy;
+  }
+
+  void replaceFrom(EditorSettings other) {
+    _textSize = other._textSize;
+    _fontFamily = other._fontFamily;
+    _scale = other._scale;
+    _foldArrowMode = other._foldArrowMode;
+    _wrapMode = other._wrapMode;
+    _lineSpacingAdd = other._lineSpacingAdd;
+    _lineSpacingMult = other._lineSpacingMult;
+    _contentStartPadding = other._contentStartPadding;
+    _showSplitLine = other._showSplitLine;
+    _gutterSticky = other._gutterSticky;
+    _gutterVisible = other._gutterVisible;
+    _currentLineRenderMode = other._currentLineRenderMode;
+    _autoIndentMode = other._autoIndentMode;
+    _backspaceUnindent = other._backspaceUnindent;
+    _readOnly = other._readOnly;
+    _compositionEnabled = other._compositionEnabled;
+    _maxGutterIcons = other._maxGutterIcons;
+    _decorationScrollRefreshMinIntervalMs =
+        other._decorationScrollRefreshMinIntervalMs;
+    _decorationOverscanViewportMultiplier =
+        other._decorationOverscanViewportMultiplier;
+    _textSizeCustomized = other._textSizeCustomized;
+    _fontFamilyCustomized = other._fontFamilyCustomized;
+    _gutterStickyCustomized = other._gutterStickyCustomized;
+    final host = _host;
+    if (host != null) {
+      _applyAll(host);
+    }
+  }
+
   void seedDefaults({
     required double textSize,
     required String fontFamily,

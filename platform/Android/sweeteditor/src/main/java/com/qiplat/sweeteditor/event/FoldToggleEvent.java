@@ -13,12 +13,12 @@ public final class FoldToggleEvent extends EditorEvent {
     public final int line;
     /** Whether the click was on the gutter fold arrow (false means click was on the fold placeholder) */
     public final boolean isGutter;
-    /** Screen coordinates at the time of click */
-    @NonNull public final PointF screenPoint;
+    /** Pointer location relative to the editor at the time of click. */
+    @NonNull public final PointF locationInEditor;
 
-    public FoldToggleEvent(int line, boolean isGutter, @NonNull PointF screenPoint) {
+    public FoldToggleEvent(int line, boolean isGutter, @NonNull PointF locationInEditor) {
         this.line = line;
         this.isGutter = isGutter;
-        this.screenPoint = screenPoint;
+        this.locationInEditor = locationInEditor;
     }
 }

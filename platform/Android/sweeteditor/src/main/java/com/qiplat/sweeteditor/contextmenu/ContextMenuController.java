@@ -67,13 +67,13 @@ public final class ContextMenuController {
                 theme.contextMenuDividerColor);
     }
 
-    public void onGestureResult(@NonNull EditorCore.GestureResult result, @NonNull PointF locationInView) {
+    public void onGestureResult(@NonNull EditorCore.GestureResult result, @NonNull PointF locationInEditor) {
         switch (result.type) {
             case LONG_PRESS:
-                showMenu(buildRequest(ContextMenuTriggerKind.LONG_PRESS, result, locationInView));
+                showMenu(buildRequest(ContextMenuTriggerKind.LONG_PRESS, result, locationInEditor));
                 break;
             case CONTEXT_MENU:
-                showMenu(buildRequest(ContextMenuTriggerKind.RIGHT_CLICK, result, locationInView));
+                showMenu(buildRequest(ContextMenuTriggerKind.RIGHT_CLICK, result, locationInEditor));
                 break;
             case TAP:
             case DOUBLE_TAP:
@@ -109,7 +109,7 @@ public final class ContextMenuController {
     @NonNull
     private ContextMenuRequest buildRequest(@NonNull ContextMenuTriggerKind triggerKind,
                                             @NonNull EditorCore.GestureResult result,
-                                            @NonNull PointF locationInView) {
+                                            @NonNull PointF locationInEditor) {
         EditorCore.HitTarget hitTarget = result.hitTarget != null ? result.hitTarget : EditorCore.HitTarget.NONE;
         String linkTarget = "";
         if (hitTarget.type == EditorCore.HitTargetType.LINK) {
@@ -118,7 +118,7 @@ public final class ContextMenuController {
         return new ContextMenuRequest(
                 triggerKind,
                 copyPosition(result.cursorPosition),
-                new PointF(locationInView.x, locationInView.y),
+                new PointF(locationInEditor.x, locationInEditor.y),
                 result.hasSelection,
                 result.hasSelection ? copyRange(result.selection) : null,
                 hitTarget,
@@ -139,10 +139,10 @@ public final class ContextMenuController {
         PopupPositioner.Result position = PopupPositioner.compute(new PopupPositioner.Request(
                 editor,
                 new RectF(
-                        request.locationInView.x + offsetX,
-                        request.locationInView.y + offsetY,
-                        request.locationInView.x + offsetX,
-                        request.locationInView.y + offsetY
+                        request.locationInEditor.x + offsetX,
+                        request.locationInEditor.y + offsetY,
+                        request.locationInEditor.x + offsetX,
+                        request.locationInEditor.y + offsetY
                 ),
                 Math.max(1, popup.getPopupWidth()),
                 Math.max(1, popup.getPopupHeight()),
@@ -248,7 +248,7 @@ public final class ContextMenuController {
                             request.hitTarget.line,
                             request.hitTarget.column,
                             request.linkTarget,
-                            new PointF(request.locationInView.x, request.locationInView.y)));
+                            new PointF(request.locationInEditor.x, request.locationInEditor.y)));
                 }
                 dismissImmediate();
                 break;

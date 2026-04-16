@@ -43,7 +43,9 @@ public final class DecorationProviderManager {
     private final List<TextChange> pendingTextChanges = new ArrayList<>();
     private volatile boolean applyScheduled;
     private volatile int generation;
+    private volatile boolean disposed;
     private volatile IntRange lastVisibleLineRange = new IntRange(0, -1);
+    private volatile IntRange lastContextLineRange = new IntRange(0, -1);
     private volatile boolean scrollRefreshScheduled;
     private volatile boolean pendingScrollRefresh;
     private volatile long lastScrollRefreshUptimeMs;
@@ -67,7 +69,9 @@ public final class DecorationProviderManager {
     }
 
     public void addProvider(DecorationProvider provider) {
+        if (disposed) return;
         runOnEdt(() -> {
+            if (disposed) return;
             if (!providers.contains(provider)) {
                 providers.add(provider);
                 providerStates.put(provider, new ProviderState());
@@ -77,7 +81,9 @@ public final class DecorationProviderManager {
     }
 
     public void removeProvider(DecorationProvider provider) {
+        if (disposed) return;
         runOnEdt(() -> {
+            if (disposed) return;
             providers.remove(provider);
             ProviderState state = providerStates.remove(provider);
             if (state != null) {
@@ -91,23 +97,52 @@ public final class DecorationProviderManager {
     }
 
     public void requestRefresh() {
+        if (disposed) return;
         scheduleRefresh(0, null);
     }
 
     public void onDocumentLoaded() {
+        if (disposed) return;
         scheduleRefresh(0, null);
     }
 
     public void onTextChanged(List<TextChange> changes) {
+        if (disposed) return;
         scheduleRefresh(50, changes);
     }
 
     public void onScrollChanged() {
+        if (disposed) return;
         runOnEdt(this::scheduleScrollRefresh);
+    }
+
+    public void close() {
+        runOnEdt(() -> {
+            if (disposed) return;
+            disposed = true;
+            generation++;
+            debounceTimer.stop();
+            scrollRefreshTimer.stop();
+            scrollRefreshScheduled = false;
+            pendingScrollRefresh = false;
+            applyScheduled = false;
+            pendingTextChanges.clear();
+            lastVisibleLineRange = new IntRange(0, -1);
+            lastContextLineRange = new IntRange(0, -1);
+            for (ProviderState state : providerStates.values()) {
+                if (state.activeReceiver != null) {
+                    state.activeReceiver.cancel();
+                }
+                state.executor.shutdownNow();
+            }
+            providers.clear();
+            providerStates.clear();
+        });
     }
 
     private void scheduleRefresh(int delayMs, List<TextChange> changes) {
         runOnEdt(() -> {
+            if (disposed) return;
             if (changes != null) {
                 pendingTextChanges.addAll(changes);
             }
@@ -123,6 +158,7 @@ public final class DecorationProviderManager {
     }
 
     private void scheduleScrollRefresh() {
+        if (disposed) return;
         long now = System.currentTimeMillis();
         long elapsed = now - lastScrollRefreshUptimeMs;
         int minInterval = getScrollRefreshMinIntervalMs();
@@ -140,6 +176,7 @@ public final class DecorationProviderManager {
     }
 
     private void doRefresh() {
+        if (disposed) return;
         generation++;
         int currentGeneration = generation;
 
@@ -161,6 +198,7 @@ public final class DecorationProviderManager {
                 changes,
                 editor.getLanguageConfiguration(),
                 editor.getMetadata());
+        lastContextLineRange = context.visibleLineRange;
 
         for (DecorationProvider provider : providers) {
             ProviderState state = providerStates.computeIfAbsent(provider, p -> new ProviderState());
@@ -185,12 +223,14 @@ public final class DecorationProviderManager {
     }
 
     private void scheduleApply() {
+        if (disposed) return;
         if (applyScheduled) return;
         applyScheduled = true;
         runOnEdt(this::applyMerged);
     }
 
     private void applyMerged() {
+        if (disposed) return;
         applyScheduled = false;
 
         Map<Integer, List<StyleSpan>> syntaxSpans = new HashMap<>();
@@ -260,19 +300,19 @@ public final class DecorationProviderManager {
 
             indentMode = mergeMode(indentMode, r.getIndentGuidesMode());
             if (r.getIndentGuides() != null) {
-                indentGuides = new ArrayList<>(r.getIndentGuides());
+                indentGuides = appendList(indentGuides, r.getIndentGuides());
             }
             bracketMode = mergeMode(bracketMode, r.getBracketGuidesMode());
             if (r.getBracketGuides() != null) {
-                bracketGuides = new ArrayList<>(r.getBracketGuides());
+                bracketGuides = appendList(bracketGuides, r.getBracketGuides());
             }
             flowMode = mergeMode(flowMode, r.getFlowGuidesMode());
             if (r.getFlowGuides() != null) {
-                flowGuides = new ArrayList<>(r.getFlowGuides());
+                flowGuides = appendList(flowGuides, r.getFlowGuides());
             }
             separatorMode = mergeMode(separatorMode, r.getSeparatorGuidesMode());
             if (r.getSeparatorGuides() != null) {
-                separatorGuides = new ArrayList<>(r.getSeparatorGuides());
+                separatorGuides = appendList(separatorGuides, r.getSeparatorGuides());
             }
             foldMode = mergeMode(foldMode, r.getFoldRegionsMode());
             if (r.getFoldRegions() != null) {
@@ -326,11 +366,20 @@ public final class DecorationProviderManager {
         }
     }
 
+    private static <T> List<T> appendList(List<T> out, List<T> patch) {
+        if (patch == null || patch.isEmpty()) {
+            return out;
+        }
+        List<T> target = out != null ? out : new ArrayList<>();
+        target.addAll(patch);
+        return target;
+    }
+
     private void applySpanMode(SpanLayer layer, DecorationResult.ApplyMode mode) {
         if (mode == DecorationResult.ApplyMode.REPLACE_ALL) {
             editor.clearHighlights(layer);
         } else if (mode == DecorationResult.ApplyMode.REPLACE_RANGE) {
-            clearSpanRange(layer, lastVisibleLineRange.start(), lastVisibleLineRange.end());
+            clearSpanRange(layer, lastContextLineRange.start(), lastContextLineRange.end());
         }
     }
 
@@ -338,7 +387,7 @@ public final class DecorationProviderManager {
         if (mode == DecorationResult.ApplyMode.REPLACE_ALL) {
             editor.clearInlayHints();
         } else if (mode == DecorationResult.ApplyMode.REPLACE_RANGE) {
-            clearInlayRange(lastVisibleLineRange.start(), lastVisibleLineRange.end());
+            clearInlayRange(lastContextLineRange.start(), lastContextLineRange.end());
         }
     }
 
@@ -346,7 +395,7 @@ public final class DecorationProviderManager {
         if (mode == DecorationResult.ApplyMode.REPLACE_ALL) {
             editor.clearDiagnostics();
         } else if (mode == DecorationResult.ApplyMode.REPLACE_RANGE) {
-            clearDiagnosticRange(lastVisibleLineRange.start(), lastVisibleLineRange.end());
+            clearDiagnosticRange(lastContextLineRange.start(), lastContextLineRange.end());
         }
     }
 
@@ -354,7 +403,7 @@ public final class DecorationProviderManager {
         if (mode == DecorationResult.ApplyMode.REPLACE_ALL) {
             editor.clearGutterIcons();
         } else if (mode == DecorationResult.ApplyMode.REPLACE_RANGE) {
-            clearGutterRange(lastVisibleLineRange.start(), lastVisibleLineRange.end());
+            clearGutterRange(lastContextLineRange.start(), lastContextLineRange.end());
         }
     }
 
@@ -362,7 +411,7 @@ public final class DecorationProviderManager {
         if (mode == DecorationResult.ApplyMode.REPLACE_ALL) {
             editor.clearPhantomTexts();
         } else if (mode == DecorationResult.ApplyMode.REPLACE_RANGE) {
-            clearPhantomRange(lastVisibleLineRange.start(), lastVisibleLineRange.end());
+            clearPhantomRange(lastContextLineRange.start(), lastContextLineRange.end());
         }
     }
 
@@ -370,7 +419,7 @@ public final class DecorationProviderManager {
         if (mode == DecorationResult.ApplyMode.REPLACE_ALL) {
             editor.clearCodeLens();
         } else if (mode == DecorationResult.ApplyMode.REPLACE_RANGE) {
-            clearCodeLensRange(lastVisibleLineRange.start(), lastVisibleLineRange.end());
+            clearCodeLensRange(lastContextLineRange.start(), lastContextLineRange.end());
         }
     }
 
@@ -378,7 +427,7 @@ public final class DecorationProviderManager {
         if (mode == DecorationResult.ApplyMode.REPLACE_ALL) {
             editor.clearLinks();
         } else if (mode == DecorationResult.ApplyMode.REPLACE_RANGE) {
-            clearLinksRange(lastVisibleLineRange.start(), lastVisibleLineRange.end());
+            clearLinksRange(lastContextLineRange.start(), lastContextLineRange.end());
         }
     }
 
@@ -501,10 +550,10 @@ public final class DecorationProviderManager {
 
         @Override
         public boolean accept(DecorationResult result) {
-            if (cancelled || receiverGeneration != generation) return false;
+            if (disposed || cancelled || receiverGeneration != generation) return false;
             DecorationResult snapshot = result.copy();
             runOnEdt(() -> {
-                if (cancelled || receiverGeneration != generation) return;
+                if (disposed || cancelled || receiverGeneration != generation) return;
                 ProviderState state = providerStates.computeIfAbsent(provider, p -> new ProviderState());
                 mergePatch(state, snapshot);
                 scheduleApply();
@@ -514,7 +563,7 @@ public final class DecorationProviderManager {
 
         @Override
         public boolean isCancelled() {
-            return cancelled || receiverGeneration != generation;
+            return disposed || cancelled || receiverGeneration != generation;
         }
 
         void cancel() {

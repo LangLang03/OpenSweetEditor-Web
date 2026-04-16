@@ -20,10 +20,10 @@ import java.util.List;
 
 /**
  * Platform-independent rendering engine for the Swing editor.
- * Owns all Font objects, implements TextMeasureCallback, and contains all draw methods.
+ * Owns all Font objects, implements TextMeasurer, and contains all draw methods.
  * SweetEditor delegates all rendering to this class.
  */
-final class EditorRenderer implements EditorCore.TextMeasureCallback {
+final class EditorRenderer implements EditorCore.TextMeasurer {
 
     private static final FontRenderContext FALLBACK_FRC = new FontRenderContext(null, true, true);
     private static final Color TEMP_LINK_COLOR = argbToColor(0xFF4C9DFF);
@@ -58,7 +58,7 @@ final class EditorRenderer implements EditorCore.TextMeasureCallback {
         syncPlatformScale(1.0f);
     }
 
-    public EditorCore.TextMeasureCallback getTextMeasureCallback() {
+    public EditorCore.TextMeasurer getTextMeasurer() {
         return this;
     }
 

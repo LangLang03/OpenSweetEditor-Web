@@ -185,6 +185,7 @@ class GestureResult {
     this.needsFling = false,
     this.needsAnimation = false,
     this.isHandleDrag = false,
+    this.pointerCursorType = PointerCursorType.text,
   });
 
   static const GestureResult empty = GestureResult();
@@ -202,6 +203,7 @@ class GestureResult {
   final bool needsFling;
   final bool needsAnimation;
   final bool isHandleDrag;
+  final PointerCursorType pointerCursorType;
 }
 
 /// Result of a keyboard event.
@@ -944,11 +946,7 @@ class EditorCore {
     return using((arena) {
       final outStartLine = arena.allocate<ffi.Int32>(ffi.sizeOf<ffi.Int32>());
       final outEndLine = arena.allocate<ffi.Int32>(ffi.sizeOf<ffi.Int32>());
-      bindings.editor_get_visible_line_range(
-        _handle,
-        outStartLine,
-        outEndLine,
-      );
+      bindings.editor_get_visible_line_range(_handle, outStartLine, outEndLine);
       return IntRange(outStartLine.value, outEndLine.value);
     });
   }

@@ -31,6 +31,7 @@ public class CompletionProviderManager {
 
     private CompletionUpdateListener listener;
     private volatile int generation = 0;
+    private volatile boolean closed;
     private final List<CompletionItem> mergedItems = new ArrayList<>();
 
     private Timer debounceTimer;
@@ -42,21 +43,24 @@ public class CompletionProviderManager {
     }
 
     public void setListener(CompletionUpdateListener listener) {
+        if (closed) return;
         this.listener = listener;
     }
 
     public void addProvider(CompletionProvider provider) {
+        if (closed) return;
         providers.addIfAbsent(provider);
     }
 
     public void removeProvider(CompletionProvider provider) {
+        if (closed) return;
         providers.remove(provider);
         ManagedReceiver receiver = activeReceivers.remove(provider);
         if (receiver != null) receiver.cancel();
     }
 
     public void triggerCompletion(CompletionContext.TriggerKind triggerKind, String triggerCharacter) {
-        if (providers.isEmpty()) return;
+        if (closed || providers.isEmpty()) return;
 
         lastTriggerKind = triggerKind;
         lastTriggerChar = triggerCharacter;
@@ -71,6 +75,7 @@ public class CompletionProviderManager {
     }
 
     public void dismiss() {
+        if (closed) return;
         if (debounceTimer != null) debounceTimer.stop();
         generation++;
         cancelAllReceivers();
@@ -79,6 +84,7 @@ public class CompletionProviderManager {
     }
 
     public boolean isTriggerCharacter(String ch) {
+        if (closed) return false;
         for (CompletionProvider provider : providers) {
             if (provider.isTriggerCharacter(ch)) return true;
         }
@@ -86,6 +92,7 @@ public class CompletionProviderManager {
     }
 
     public void showItems(List<CompletionItem> items) {
+        if (closed) return;
         if (debounceTimer != null) debounceTimer.stop();
         generation++;
         cancelAllReceivers();
@@ -96,7 +103,21 @@ public class CompletionProviderManager {
         }
     }
 
+    public void close() {
+        if (closed) return;
+        closed = true;
+        if (debounceTimer != null) {
+            debounceTimer.stop();
+        }
+        generation++;
+        cancelAllReceivers();
+        providers.clear();
+        mergedItems.clear();
+        listener = null;
+    }
+
     private void executeRefresh(CompletionContext.TriggerKind triggerKind, String triggerCharacter) {
+        if (closed) return;
         final int currentGen = ++generation;
         cancelAllReceivers();
         mergedItems.clear();
@@ -126,6 +147,7 @@ public class CompletionProviderManager {
     }
 
     private CompletionContext buildContext(CompletionContext.TriggerKind triggerKind, String triggerCharacter) {
+        if (closed) return null;
         TextPosition cursor = editor.getCursorPosition();
         if (cursor == null) return null;
 
@@ -145,7 +167,7 @@ public class CompletionProviderManager {
     }
 
     private void onProviderResult(CompletionProvider provider, CompletionResult result, int receiverGeneration) {
-        if (receiverGeneration != generation) return;
+        if (closed || receiverGeneration != generation) return;
 
         mergedItems.addAll(result.items);
         mergedItems.sort((a, b) -> {
@@ -177,14 +199,14 @@ public class CompletionProviderManager {
 
         @Override
         public boolean accept(CompletionResult result) {
-            if (cancelled || receiverGeneration != generation) return false;
+            if (closed || cancelled || receiverGeneration != generation) return false;
             SwingUtilities.invokeLater(() -> onProviderResult(provider, result, receiverGeneration));
             return true;
         }
 
         @Override
         public boolean isCancelled() {
-            return cancelled || receiverGeneration != generation;
+            return closed || cancelled || receiverGeneration != generation;
         }
     }
 }

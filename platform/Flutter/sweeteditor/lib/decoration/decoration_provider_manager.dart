@@ -18,7 +18,12 @@ class DecorationProviderManager {
   final List<core.TextChange> _pendingTextChanges = [];
   int _generation = 0;
   bool _applyScheduled = false;
-  core.IntRange _lastVisibleLineRange = const core.IntRange(0, -1);
+  core.IntRange _lastContextLineRange = const core.IntRange(0, -1);
+  List<core.IndentGuide> _appliedIndentGuides = const [];
+  List<core.BracketGuide> _appliedBracketGuides = const [];
+  List<core.FlowGuide> _appliedFlowGuides = const [];
+  List<core.SeparatorGuide> _appliedSeparatorGuides = const [];
+  List<core.FoldRegion> _appliedFoldRegions = const [];
   bool _pendingScrollRefresh = false;
   int _lastScrollRefreshTimeMs = 0;
   bool _disposed = false;
@@ -114,7 +119,6 @@ class DecorationProviderManager {
 
     final visible =
         session.editorCore?.getVisibleLineRange() ?? const core.IntRange(0, -1);
-    _lastVisibleLineRange = visible;
     final total = session.document?.lineCount ?? 0;
     final changes = List<core.TextChange>.of(_pendingTextChanges);
     _pendingTextChanges.clear();
@@ -126,9 +130,10 @@ class DecorationProviderManager {
       contextStart = (visible.start - overscanLines).clamp(0, total - 1);
       contextEnd = (visible.end + overscanLines).clamp(0, total - 1);
     }
+    _lastContextLineRange = core.IntRange(contextStart, contextEnd);
 
     final context = DecorationContext(
-      visibleLineRange: core.IntRange(contextStart, contextEnd),
+      visibleLineRange: _lastContextLineRange,
       totalLineCount: total,
       textChanges: changes,
       languageConfiguration: session.languageConfiguration,
@@ -180,7 +185,7 @@ class DecorationProviderManager {
     List<core.BracketGuide>? bracketGuides;
     List<core.FlowGuide>? flowGuides;
     List<core.SeparatorGuide>? separatorGuides;
-    final foldRegions = <core.FoldRegion>[];
+    List<core.FoldRegion>? foldRegions;
     final gutterIcons = <int, List<core.GutterIcon>>{};
     final phantomTexts = <int, List<core.PhantomText>>{};
     final codeLensItems = <int, List<core.CodeLensItem>>{};
@@ -239,17 +244,27 @@ class DecorationProviderManager {
       }
 
       indentMode = _mergeMode(indentMode, r.indentGuidesMode);
-      if (r.indentGuides != null) indentGuides = List.of(r.indentGuides!);
+      if (r.indentGuides != null) {
+        (indentGuides ??= <core.IndentGuide>[]).addAll(r.indentGuides!);
+      }
       bracketMode = _mergeMode(bracketMode, r.bracketGuidesMode);
-      if (r.bracketGuides != null) bracketGuides = List.of(r.bracketGuides!);
+      if (r.bracketGuides != null) {
+        (bracketGuides ??= <core.BracketGuide>[]).addAll(r.bracketGuides!);
+      }
       flowMode = _mergeMode(flowMode, r.flowGuidesMode);
-      if (r.flowGuides != null) flowGuides = List.of(r.flowGuides!);
+      if (r.flowGuides != null) {
+        (flowGuides ??= <core.FlowGuide>[]).addAll(r.flowGuides!);
+      }
       separatorMode = _mergeMode(separatorMode, r.separatorGuidesMode);
       if (r.separatorGuides != null) {
-        separatorGuides = List.of(r.separatorGuides!);
+        (separatorGuides ??= <core.SeparatorGuide>[]).addAll(
+          r.separatorGuides!,
+        );
       }
       foldMode = _mergeMode(foldMode, r.foldRegionsMode);
-      if (r.foldRegions != null) foldRegions.addAll(r.foldRegions!);
+      if (r.foldRegions != null) {
+        (foldRegions ??= <core.FoldRegion>[]).addAll(r.foldRegions!);
+      }
     }
 
     _applySpanMode(0, syntaxMode);
@@ -268,11 +283,15 @@ class DecorationProviderManager {
     _applyGuidesMode(flowMode, flowGuides, 2);
     _applyGuidesMode(separatorMode, separatorGuides, 3);
 
-    if (foldMode == ApplyMode.replaceAll ||
-        foldMode == ApplyMode.replaceRange) {
-      _setFoldRegions(foldRegions);
-    } else if (foldRegions.isNotEmpty) {
-      _setFoldRegions(foldRegions);
+    final nextFoldRegions = _resolveRangeAppliedList(
+      previous: _appliedFoldRegions,
+      incoming: foldRegions,
+      mode: foldMode,
+      overlapsRange: _foldRegionOverlapsRange,
+    );
+    if (nextFoldRegions != null) {
+      _appliedFoldRegions = nextFoldRegions;
+      _setFoldRegions(nextFoldRegions);
     }
 
     _applyGutterMode(gutterMode);
@@ -294,7 +313,11 @@ class DecorationProviderManager {
     if (mode == ApplyMode.replaceAll) {
       _clearHighlights(layer);
     } else if (mode == ApplyMode.replaceRange) {
-      _clearSpanRange(layer, _lastVisibleLineRange.start, _lastVisibleLineRange.end);
+      _clearSpanRange(
+        layer,
+        _lastContextLineRange.start,
+        _lastContextLineRange.end,
+      );
     }
   }
 
@@ -302,7 +325,7 @@ class DecorationProviderManager {
     if (mode == ApplyMode.replaceAll) {
       _clearInlayHints();
     } else if (mode == ApplyMode.replaceRange) {
-      _clearInlayRange(_lastVisibleLineRange.start, _lastVisibleLineRange.end);
+      _clearInlayRange(_lastContextLineRange.start, _lastContextLineRange.end);
     }
   }
 
@@ -310,7 +333,10 @@ class DecorationProviderManager {
     if (mode == ApplyMode.replaceAll) {
       _clearDiagnostics();
     } else if (mode == ApplyMode.replaceRange) {
-      _clearDiagnosticRange(_lastVisibleLineRange.start, _lastVisibleLineRange.end);
+      _clearDiagnosticRange(
+        _lastContextLineRange.start,
+        _lastContextLineRange.end,
+      );
     }
   }
 
@@ -318,7 +344,7 @@ class DecorationProviderManager {
     if (mode == ApplyMode.replaceAll) {
       _clearGutterIcons();
     } else if (mode == ApplyMode.replaceRange) {
-      _clearGutterRange(_lastVisibleLineRange.start, _lastVisibleLineRange.end);
+      _clearGutterRange(_lastContextLineRange.start, _lastContextLineRange.end);
     }
   }
 
@@ -326,7 +352,10 @@ class DecorationProviderManager {
     if (mode == ApplyMode.replaceAll) {
       _clearPhantomTexts();
     } else if (mode == ApplyMode.replaceRange) {
-      _clearPhantomRange(_lastVisibleLineRange.start, _lastVisibleLineRange.end);
+      _clearPhantomRange(
+        _lastContextLineRange.start,
+        _lastContextLineRange.end,
+      );
     }
   }
 
@@ -334,7 +363,10 @@ class DecorationProviderManager {
     if (mode == ApplyMode.replaceAll) {
       _clearCodeLens();
     } else if (mode == ApplyMode.replaceRange) {
-      _clearCodeLensRange(_lastVisibleLineRange.start, _lastVisibleLineRange.end);
+      _clearCodeLensRange(
+        _lastContextLineRange.start,
+        _lastContextLineRange.end,
+      );
     }
   }
 
@@ -342,31 +374,60 @@ class DecorationProviderManager {
     if (mode == ApplyMode.replaceAll) {
       _clearLinks();
     } else if (mode == ApplyMode.replaceRange) {
-      _clearLinksRange(_lastVisibleLineRange.start, _lastVisibleLineRange.end);
+      _clearLinksRange(_lastContextLineRange.start, _lastContextLineRange.end);
     }
   }
 
   void _applyGuidesMode(ApplyMode mode, List<Object>? data, int guideType) {
-    final shouldReplace =
-        mode == ApplyMode.replaceAll || mode == ApplyMode.replaceRange;
-    final items = data ?? [];
     switch (guideType) {
       case 0:
-        if (shouldReplace || items.isNotEmpty) {
-          _setIndentGuides(items.cast<core.IndentGuide>());
+        final nextIndentGuides = _resolveRangeAppliedList(
+          previous: _appliedIndentGuides,
+          incoming: data?.cast<core.IndentGuide>(),
+          mode: mode,
+          overlapsRange: _indentGuideOverlapsRange,
+        );
+        if (nextIndentGuides != null) {
+          _appliedIndentGuides = nextIndentGuides;
+          _setIndentGuides(nextIndentGuides);
         }
+        break;
       case 1:
-        if (shouldReplace || items.isNotEmpty) {
-          _setBracketGuides(items.cast<core.BracketGuide>());
+        final nextBracketGuides = _resolveRangeAppliedList(
+          previous: _appliedBracketGuides,
+          incoming: data?.cast<core.BracketGuide>(),
+          mode: mode,
+          overlapsRange: _bracketGuideOverlapsRange,
+        );
+        if (nextBracketGuides != null) {
+          _appliedBracketGuides = nextBracketGuides;
+          _setBracketGuides(nextBracketGuides);
         }
+        break;
       case 2:
-        if (shouldReplace || items.isNotEmpty) {
-          _setFlowGuides(items.cast<core.FlowGuide>());
+        final nextFlowGuides = _resolveRangeAppliedList(
+          previous: _appliedFlowGuides,
+          incoming: data?.cast<core.FlowGuide>(),
+          mode: mode,
+          overlapsRange: _flowGuideOverlapsRange,
+        );
+        if (nextFlowGuides != null) {
+          _appliedFlowGuides = nextFlowGuides;
+          _setFlowGuides(nextFlowGuides);
         }
+        break;
       case 3:
-        if (shouldReplace || items.isNotEmpty) {
-          _setSeparatorGuides(items.cast<core.SeparatorGuide>());
+        final nextSeparatorGuides = _resolveRangeAppliedList(
+          previous: _appliedSeparatorGuides,
+          incoming: data?.cast<core.SeparatorGuide>(),
+          mode: mode,
+          overlapsRange: _separatorGuideOverlapsRange,
+        );
+        if (nextSeparatorGuides != null) {
+          _appliedSeparatorGuides = nextSeparatorGuides;
+          _setSeparatorGuides(nextSeparatorGuides);
         }
+        break;
     }
   }
 
@@ -551,6 +612,76 @@ class DecorationProviderManager {
       case ApplyMode.replaceAll:
         return 2;
     }
+  }
+
+  List<T>? _resolveRangeAppliedList<T>({
+    required List<T> previous,
+    required List<T>? incoming,
+    required ApplyMode mode,
+    required bool Function(T item, core.IntRange range) overlapsRange,
+  }) {
+    switch (mode) {
+      case ApplyMode.merge:
+        return List<T>.of(incoming ?? <T>[]);
+      case ApplyMode.replaceAll:
+        return List<T>.of(incoming ?? <T>[]);
+      case ApplyMode.replaceRange:
+        final next = <T>[
+          for (final item in previous)
+            if (!overlapsRange(item, _lastContextLineRange)) item,
+        ];
+        if (incoming != null) {
+          next.addAll(incoming);
+        }
+        return next;
+    }
+  }
+
+  static bool _indentGuideOverlapsRange(
+    core.IndentGuide guide,
+    core.IntRange range,
+  ) => _positionRangeOverlapsRange(guide.start.line, guide.end.line, range);
+
+  static bool _bracketGuideOverlapsRange(
+    core.BracketGuide guide,
+    core.IntRange range,
+  ) {
+    var maxLine = guide.end.line;
+    for (final child in guide.children) {
+      if (child.line > maxLine) {
+        maxLine = child.line;
+      }
+    }
+    return _positionRangeOverlapsRange(guide.parent.line, maxLine, range);
+  }
+
+  static bool _flowGuideOverlapsRange(
+    core.FlowGuide guide,
+    core.IntRange range,
+  ) => _positionRangeOverlapsRange(guide.start.line, guide.end.line, range);
+
+  static bool _separatorGuideOverlapsRange(
+    core.SeparatorGuide guide,
+    core.IntRange range,
+  ) => _lineOverlapsRange(guide.line, range);
+
+  static bool _foldRegionOverlapsRange(
+    core.FoldRegion region,
+    core.IntRange range,
+  ) => _positionRangeOverlapsRange(region.startLine, region.endLine, range);
+
+  static bool _positionRangeOverlapsRange(
+    int startLine,
+    int endLine,
+    core.IntRange range,
+  ) {
+    if (range.end < range.start) return false;
+    return endLine >= range.start && startLine <= range.end;
+  }
+
+  static bool _lineOverlapsRange(int line, core.IntRange range) {
+    if (range.end < range.start) return false;
+    return line >= range.start && line <= range.end;
   }
 
   void _clearHighlights(int layer) {

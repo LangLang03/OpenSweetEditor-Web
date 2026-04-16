@@ -12,13 +12,13 @@ public final class InlayHintClickEvent extends EditorEvent {
     public final int column;
     public final InlayType type;
     public final int intValue;
-    public final PointF screenPoint;
+    public final PointF locationInEditor;
 
-    public InlayHintClickEvent(int line, int column, InlayType type, int intValue, PointF screenPoint) {
+    public InlayHintClickEvent(int line, int column, InlayType type, int intValue, PointF locationInEditor) {
         this.line = line;
         this.column = column;
         this.type = type;
         this.intValue = intValue;
-        this.screenPoint = screenPoint;
+        this.locationInEditor = locationInEditor;
     }
 }

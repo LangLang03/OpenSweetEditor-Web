@@ -98,7 +98,7 @@ public class SweetEditor extends JPanel {
         renderer = new EditorRenderer(theme);
         animationHolder = new AnimationHolder();
 
-        editorCore = new EditorCore(renderer.getTextMeasureCallback(), new EditorOptions(20.0f, 300, false));
+        editorCore = new EditorCore(renderer.getTextMeasurer(), new EditorOptions(20.0f, 300, false));
         keyMap = createDefaultKeyMap();
         editorCore.setKeyMap(keyMap);
 
@@ -1112,15 +1112,15 @@ public class SweetEditor extends JPanel {
 
     // ===================== Event Dispatching =====================
 
-    private void fireGestureEvents(GestureResult result, PointF screenPoint) {
+    private void fireGestureEvents(GestureResult result, PointF locationInEditor) {
         if (result.type == null) return;
         switch (result.type) {
             case LONG_PRESS:
-                eventBus.publish(new LongPressEvent(result.cursorPosition, screenPoint));
+                eventBus.publish(new LongPressEvent(result.cursorPosition, locationInEditor));
                 eventBus.publish(new CursorChangedEvent(result.cursorPosition));
                 break;
             case DOUBLE_TAP:
-                eventBus.publish(new DoubleTapEvent(result.cursorPosition, result.hasSelection, result.selection, screenPoint));
+                eventBus.publish(new DoubleTapEvent(result.cursorPosition, result.hasSelection, result.selection, locationInEditor));
                 eventBus.publish(new CursorChangedEvent(result.cursorPosition));
                 if (result.hasSelection) {
                     eventBus.publish(new SelectionChangedEvent(true, result.selection, result.cursorPosition));
@@ -1141,39 +1141,39 @@ public class SweetEditor extends JPanel {
                                     result.hitTarget.line, result.hitTarget.column,
                                     hitType == HitTargetType.INLAY_HINT_ICON ? InlayType.ICON : InlayType.TEXT,
                                     result.hitTarget.iconId,
-                                    screenPoint));
+                                    locationInEditor));
                             break;
                         case INLAY_HINT_COLOR:
                             eventBus.publish(new InlayHintClickEvent(
                                     result.hitTarget.line, result.hitTarget.column,
                                     InlayType.COLOR,
                                     result.hitTarget.colorValue,
-                                    screenPoint));
+                                    locationInEditor));
                             break;
                         case GUTTER_ICON:
                             eventBus.publish(new GutterIconClickEvent(
-                                    result.hitTarget.line, result.hitTarget.iconId, screenPoint));
+                                    result.hitTarget.line, result.hitTarget.iconId, locationInEditor));
                             break;
                         case FOLD_PLACEHOLDER:
                         case FOLD_GUTTER:
                             eventBus.publish(new FoldToggleEvent(
                                     result.hitTarget.line,
                                     hitType == HitTargetType.FOLD_GUTTER,
-                                    screenPoint));
+                                    locationInEditor));
                             break;
                         case CODELENS:
                             eventBus.publish(new CodeLensClickEvent(
                                     result.hitTarget.line,
                                     result.hitTarget.column,
                                     result.hitTarget.iconId,
-                                    screenPoint));
+                                    locationInEditor));
                             break;
                         case LINK:
                             eventBus.publish(new LinkClickEvent(
                                     result.hitTarget.line,
                                     result.hitTarget.column,
                                     getLinkTargetAt(result.hitTarget.line, result.hitTarget.column),
-                                    screenPoint));
+                                    locationInEditor));
                             break;
                         default:
                             break;
@@ -1201,7 +1201,7 @@ public class SweetEditor extends JPanel {
                 eventBus.publish(new SelectionChangedEvent(result.hasSelection, result.selection, result.cursorPosition));
                 break;
             case CONTEXT_MENU:
-                eventBus.publish(new ContextMenuEvent(result.cursorPosition, screenPoint));
+                eventBus.publish(new ContextMenuEvent(result.cursorPosition, locationInEditor));
                 break;
         }
     }
@@ -1338,6 +1338,9 @@ public class SweetEditor extends JPanel {
 
     private void setupCursorAnimation() {
         cursorAnimationTimer = new Timer(ANIMATION_INTERVAL_MS, e -> {
+            if (renderModel == null || renderModel.cursor == null || renderModel.cursor.position == null) {
+                return;
+            }
             Cursor cursor = renderModel.cursor;
             PointF position = cursor.position;
             float targetX = position.x;
@@ -1377,6 +1380,9 @@ public class SweetEditor extends JPanel {
 
     private void setupGutterAnimation() {
         gutterAnimationTimer = new Timer(ANIMATION_INTERVAL_MS, e -> {
+            if (renderModel == null) {
+                return;
+            }
             float targetX = renderModel.splitX;
 
             if (animationHolder.splitAnimatedX == -1f) {

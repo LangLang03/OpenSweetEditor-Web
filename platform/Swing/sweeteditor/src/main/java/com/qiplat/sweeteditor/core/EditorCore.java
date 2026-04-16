@@ -47,34 +47,34 @@ public class EditorCore {
         }
     }
 
-    public interface TextMeasureCallback {
+    public interface TextMeasurer {
         float measureTextWidth(MemorySegment textPtr, int fontStyle);
         float measureInlayHintWidth(MemorySegment textPtr);
         float measureIconWidth(int iconId);
         void getFontMetrics(MemorySegment arrPtr, long length);
     }
 
-    public EditorCore(TextMeasureCallback callback, EditorOptions options) {
+    public EditorCore(TextMeasurer callback, EditorOptions options) {
         this.arena = Arena.ofShared();
 
         MemorySegment measurer = arena.allocate(EditorNative.MEASURER_LAYOUT);
 
-        MemorySegment measureTextStub = EditorNative.createUpcallStub(arena, callback, TextMeasureCallback.class,
+        MemorySegment measureTextStub = EditorNative.createUpcallStub(arena, callback, TextMeasurer.class,
                 "measureTextWidth",
                 MethodType.methodType(float.class, MemorySegment.class, int.class),
                 EditorNative.MEASURE_TEXT_WIDTH_DESC);
 
-        MemorySegment measureInlayStub = EditorNative.createUpcallStub(arena, callback, TextMeasureCallback.class,
+        MemorySegment measureInlayStub = EditorNative.createUpcallStub(arena, callback, TextMeasurer.class,
                 "measureInlayHintWidth",
                 MethodType.methodType(float.class, MemorySegment.class),
                 EditorNative.MEASURE_INLAY_HINT_WIDTH_DESC);
 
-        MemorySegment measureIconStub = EditorNative.createUpcallStub(arena, callback, TextMeasureCallback.class,
+        MemorySegment measureIconStub = EditorNative.createUpcallStub(arena, callback, TextMeasurer.class,
                 "measureIconWidth",
                 MethodType.methodType(float.class, int.class),
                 EditorNative.MEASURE_ICON_WIDTH_DESC);
 
-        MemorySegment fontMetricsStub = EditorNative.createUpcallStub(arena, callback, TextMeasureCallback.class,
+        MemorySegment fontMetricsStub = EditorNative.createUpcallStub(arena, callback, TextMeasurer.class,
                 "getFontMetrics",
                 MethodType.methodType(void.class, MemorySegment.class, long.class),
                 EditorNative.GET_FONT_METRICS_DESC);

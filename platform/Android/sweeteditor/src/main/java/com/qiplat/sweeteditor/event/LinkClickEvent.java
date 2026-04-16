@@ -15,13 +15,13 @@ public final class LinkClickEvent extends EditorEvent {
     public final int column;
     /** The resolved link target. */
     @NonNull public final String target;
-    /** Pointer location in the editor view at the time of click. */
-    @NonNull public final PointF locationInView;
+    /** Pointer location relative to the editor at the time of click. */
+    @NonNull public final PointF locationInEditor;
 
-    public LinkClickEvent(int line, int column, @NonNull String target, @NonNull PointF locationInView) {
+    public LinkClickEvent(int line, int column, @NonNull String target, @NonNull PointF locationInEditor) {
         this.line = line;
         this.column = column;
         this.target = target;
-        this.locationInView = locationInView;
+        this.locationInEditor = locationInEditor;
     }
 }

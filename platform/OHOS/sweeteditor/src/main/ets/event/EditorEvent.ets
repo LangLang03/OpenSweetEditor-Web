@@ -74,11 +74,11 @@ export class ScaleChangedEvent implements EditorEvent {
 
 export class LongPressEvent implements EditorEvent {
   readonly cursorPosition: TextPosition;
-  readonly screenPoint: PointF;
+  readonly locationInEditor: PointF;
 
-  constructor(cursorPosition: TextPosition, screenPoint: PointF) {
+  constructor(cursorPosition: TextPosition, locationInEditor: PointF) {
     this.cursorPosition = cursorPosition;
-    this.screenPoint = screenPoint;
+    this.locationInEditor = locationInEditor;
   }
 }
 
@@ -86,36 +86,36 @@ export class DoubleTapEvent implements EditorEvent {
   readonly cursorPosition: TextPosition;
   readonly hasSelection: boolean;
   readonly selection: TextRange | null;
-  readonly screenPoint: PointF;
+  readonly locationInEditor: PointF;
 
   constructor(cursorPosition: TextPosition, hasSelection: boolean,
-    selection: TextRange | null, screenPoint: PointF) {
+    selection: TextRange | null, locationInEditor: PointF) {
     this.cursorPosition = cursorPosition;
     this.hasSelection = hasSelection;
     this.selection = selection;
-    this.screenPoint = screenPoint;
+    this.locationInEditor = locationInEditor;
   }
 }
 
 export class ContextMenuEvent implements EditorEvent {
   readonly cursorPosition: TextPosition;
-  readonly screenPoint: PointF;
+  readonly locationInEditor: PointF;
 
-  constructor(cursorPosition: TextPosition, screenPoint: PointF) {
+  constructor(cursorPosition: TextPosition, locationInEditor: PointF) {
     this.cursorPosition = cursorPosition;
-    this.screenPoint = screenPoint;
+    this.locationInEditor = locationInEditor;
   }
 }
 
 export class GutterIconClickEvent implements EditorEvent {
   readonly line: number;
   readonly iconId: number;
-  readonly screenPoint: PointF;
+  readonly locationInEditor: PointF;
 
-  constructor(line: number, iconId: number, screenPoint: PointF) {
+  constructor(line: number, iconId: number, locationInEditor: PointF) {
     this.line = line;
     this.iconId = iconId;
-    this.screenPoint = screenPoint;
+    this.locationInEditor = locationInEditor;
   }
 }
 
@@ -124,26 +124,26 @@ export class InlayHintClickEvent implements EditorEvent {
   readonly column: number;
   readonly type: InlayType;
   readonly intValue: number;
-  readonly screenPoint: PointF;
+  readonly locationInEditor: PointF;
 
-  constructor(line: number, column: number, type: InlayType, intValue: number, screenPoint: PointF) {
+  constructor(line: number, column: number, type: InlayType, intValue: number, locationInEditor: PointF) {
     this.line = line;
     this.column = column;
     this.type = type;
     this.intValue = intValue;
-    this.screenPoint = screenPoint;
+    this.locationInEditor = locationInEditor;
   }
 }
 
 export class FoldToggleEvent implements EditorEvent {
   readonly line: number;
   readonly isGutter: boolean;
-  readonly screenPoint: PointF;
+  readonly locationInEditor: PointF;
 
-  constructor(line: number, isGutter: boolean, screenPoint: PointF) {
+  constructor(line: number, isGutter: boolean, locationInEditor: PointF) {
     this.line = line;
     this.isGutter = isGutter;
-    this.screenPoint = screenPoint;
+    this.locationInEditor = locationInEditor;
   }
 }
 
@@ -151,13 +151,13 @@ export class CodeLensClickEvent implements EditorEvent {
   readonly line: number;
   readonly column: number;
   readonly commandId: number;
-  readonly screenPoint: PointF;
+  readonly locationInEditor: PointF;
 
-  constructor(line: number, column: number, commandId: number, screenPoint: PointF) {
+  constructor(line: number, column: number, commandId: number, locationInEditor: PointF) {
     this.line = line;
     this.column = column;
     this.commandId = commandId;
-    this.screenPoint = screenPoint;
+    this.locationInEditor = locationInEditor;
   }
 }
 
@@ -165,13 +165,13 @@ export class LinkClickEvent implements EditorEvent {
   readonly line: number;
   readonly column: number;
   readonly target: string;
-  readonly screenPoint: PointF;
+  readonly locationInEditor: PointF;
 
-  constructor(line: number, column: number, target: string, screenPoint: PointF) {
+  constructor(line: number, column: number, target: string, locationInEditor: PointF) {
     this.line = line;
     this.column = column;
     this.target = target;
-    this.screenPoint = screenPoint;
+    this.locationInEditor = locationInEditor;
   }
 }
 
@@ -185,4 +185,3 @@ export class SelectionMenuItemClickEvent implements EditorEvent {
     this.item = new SelectionMenuItem(item.id, item.label, item.enabled);
   }
 }
-

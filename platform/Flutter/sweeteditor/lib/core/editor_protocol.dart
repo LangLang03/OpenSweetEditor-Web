@@ -750,6 +750,10 @@ class ProtocolDecoder {
     if (r.hasRemaining(4)) needsAnimation = r.readInt32() != 0;
     var isHandleDrag = false;
     if (r.hasRemaining(4)) isHandleDrag = r.readInt32() != 0;
+    var pointerCursorType = PointerCursorType.text;
+    if (r.hasRemaining(4)) {
+      pointerCursorType = PointerCursorType.fromValue(r.readInt32());
+    }
     return GestureResult(
       type: gestureType,
       tapPoint: tapPoint,
@@ -764,6 +768,7 @@ class ProtocolDecoder {
       needsFling: needsFling,
       needsAnimation: needsAnimation,
       isHandleDrag: isHandleDrag,
+      pointerCursorType: pointerCursorType,
     );
   }
 
@@ -903,6 +908,11 @@ class ProtocolDecoder {
       gutterVisible = r.readInt32() != 0;
     }
 
+    var pointerCursorType = PointerCursorType.text;
+    if (r.hasRemaining(4)) {
+      pointerCursorType = PointerCursorType.fromValue(r.readInt32());
+    }
+
     return EditorRenderModel(
       splitX: splitX,
       splitLineVisible: splitLineVisible,
@@ -929,6 +939,7 @@ class ProtocolDecoder {
       horizontalScrollbar: horizontalScrollbar,
       gutterSticky: gutterSticky,
       gutterVisible: gutterVisible,
+      pointerCursorType: pointerCursorType,
     );
   }
 

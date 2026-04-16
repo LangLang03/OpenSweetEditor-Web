@@ -35,7 +35,7 @@ import {
 import { CursorRect, EditorRenderModel, PointF, ScrollMetrics } from './core/CoreVisual';
 import {
   BracketGuide,
-  DiagnosticItem,
+  Diagnostic,
   FlowGuide,
   FoldRegion,
   CodeLensItem,
@@ -104,7 +104,6 @@ const HILOG_DOMAIN = 0x3D12;
 const CURSOR_BLINK_INTERVAL_MS = 500;
 const ANIMATION_FRAME_INTERVAL_MS = 16;
 const TRANSIENT_SCROLLBAR_REFRESH_MIN_MS = 16;
-const DEFAULT_CONTENT_START_PADDING_DP = 3.0;
 const EDITOR_FOCUS_ID = 'sweeteditor-canvas';
 const SELECTION_MENU_ITEM_HEIGHT = 26;
 const SELECTION_MENU_ITEM_MIN_WIDTH = 40;
@@ -147,10 +146,10 @@ interface PreviewCapableInputController {
  */
 @Component
 export struct SweetEditor {
-  controller: SweetEditorController | null = null;
+  controller: SweetEditorController;
   private editorCore: EditorCore | null = null;
   private renderer: EditorRenderer | null = null;
-  private settings: EditorSettings | null = null;
+  private settings: EditorSettings = new EditorSettings();
   private theme: EditorTheme = EditorTheme.dark();
   private keyMap: EditorKeyMap = EditorKeyMap.defaultKeyMap();
   private eventBus: EditorEventBus = new EditorEventBus();
@@ -225,6 +224,26 @@ export struct SweetEditor {
   private readonly onImeFinishTextPreview = (): void => {
     this.finishImePreviewText();
   };
+  private readonly settingsHost = {
+    applyEditorTextSize: (size: number): void => this.applySettingsTextSize(size),
+    applyFontFamily: (fontFamily: string): void => this.applySettingsFontFamily(fontFamily),
+    applyScale: (scale: number): void => this.applySettingsScale(scale),
+    applyFoldArrowMode: (mode: FoldArrowMode): void => this.applySettingsFoldArrowMode(mode),
+    applyWrapMode: (mode: WrapMode): void => this.applySettingsWrapMode(mode),
+    applyLineSpacing: (add: number, mult: number): void => this.applySettingsLineSpacing(add, mult),
+    applyContentStartPadding: (padding: number): void => this.applySettingsContentStartPadding(padding),
+    applyShowSplitLine: (show: boolean): void => this.applySettingsShowSplitLine(show),
+    applyGutterSticky: (sticky: boolean): void => this.applySettingsGutterSticky(sticky),
+    applyGutterVisible: (visible: boolean): void => this.applySettingsGutterVisible(visible),
+    applyCurrentLineRenderMode: (mode: CurrentLineRenderMode): void =>
+      this.applySettingsCurrentLineRenderMode(mode),
+    applyAutoIndentMode: (mode: AutoIndentMode): void => this.applySettingsAutoIndentMode(mode),
+    applyBackspaceUnindent: (enabled: boolean): void => this.applySettingsBackspaceUnindent(enabled),
+    applyReadOnly: (readOnly: boolean): void => this.applySettingsReadOnly(readOnly),
+    applyCompositionEnabled: (enabled: boolean): void => this.applySettingsCompositionEnabled(enabled),
+    applyMaxGutterIcons: (count: number): void => this.applySettingsMaxGutterIcons(count),
+    requestDecorationRefresh: (): void => this.requestDecorationRefresh()
+  };
   @State private canvasWidth: number = 0;
   @State private canvasHeight: number = 0;
   @State private completionPopupVisible: boolean = false;
@@ -257,9 +276,7 @@ export struct SweetEditor {
     this.clearTransientScrollbarTimer();
     this.unregisterImeCallbacks();
     this.detachInputMethod();
-    if (this.controller) {
-      this.controller.unbind(this);
-    }
+    this.controller.unbind(this);
     if (this.selectionMenuController) {
       this.selectionMenuController.dismiss();
     }
@@ -289,7 +306,7 @@ export struct SweetEditor {
       this.editorCore = null;
     }
     this.renderer = null;
-    this.settings = null;
+    this.settings.unbind(this.settingsHost);
     this.cachedModel = null;
     this.modelDirty = true;
     this.initialized = false;
@@ -730,14 +747,7 @@ export struct SweetEditor {
     this.editorCore.setKeyMap(this.keyMap);
     this.registerImeCallbacks();
 
-    if (this.controller) {
-      this.settings = this.controller.getSettings();
-    } else {
-      this.settings = new EditorSettings();
-      this.settings.setContentStartPadding(DEFAULT_CONTENT_START_PADDING_DP);
-      this.settings.setGutterSticky(false);
-    }
-    this.settings.bind(this);
+    this.settings.bind(this.settingsHost);
     this.editorCore.setCompositionEnabled(this.settings.isCompositionEnabled());
 
     this.editorCore.registerBatchTextStyles(this.theme.textStyles);
@@ -750,9 +760,6 @@ export struct SweetEditor {
   }
 
   private bindController(): void {
-    if (!this.controller) {
-      return;
-    }
     this.controller.bind(this);
   }
 
@@ -795,7 +802,7 @@ export struct SweetEditor {
     });
 
     // SelectionMenuController
-    this.selectionMenuController = new SelectionMenuController(this, this.eventBus);
+    this.selectionMenuController = new SelectionMenuController(this, this.controller, this.eventBus);
     this.selectionMenuController.setStateListener((state: SelectionMenuState): void => {
       this.applySelectionMenuState(state);
     });
@@ -824,11 +831,11 @@ export struct SweetEditor {
 
   // ==================== Settings ====================
 
-  getSettings(): EditorSettings | null {
+  getSettings(): EditorSettings {
     return this.settings;
   }
 
-  applySettingsTextSize(size: number): void {
+  private applySettingsTextSize(size: number): void {
     if (this.renderer) {
       this.renderer.applyTextSize(size);
     }
@@ -838,7 +845,7 @@ export struct SweetEditor {
     this.flush();
   }
 
-  applySettingsFontFamily(fontFamily: string): void {
+  private applySettingsFontFamily(fontFamily: string): void {
     if (this.renderer) {
       this.renderer.applyFontFamily(fontFamily);
     }
@@ -848,7 +855,7 @@ export struct SweetEditor {
     this.flush();
   }
 
-  applySettingsScale(scale: number): void {
+  private applySettingsScale(scale: number): void {
     if (this.editorCore) {
       this.editorCore.setScale(scale);
     }
@@ -856,87 +863,87 @@ export struct SweetEditor {
     this.flush();
   }
 
-  applySettingsFoldArrowMode(mode: FoldArrowMode): void {
+  private applySettingsFoldArrowMode(mode: FoldArrowMode): void {
     if (this.editorCore) {
       this.editorCore.setFoldArrowMode(mode);
     }
   }
 
-  applySettingsWrapMode(mode: WrapMode): void {
+  private applySettingsWrapMode(mode: WrapMode): void {
     if (this.editorCore) {
       this.editorCore.setWrapMode(mode);
       this.flush();
     }
   }
 
-  applySettingsLineSpacing(add: number, mult: number): void {
+  private applySettingsLineSpacing(add: number, mult: number): void {
     if (this.editorCore) {
       this.editorCore.setLineSpacing(add, mult);
       this.flush();
     }
   }
 
-  applySettingsContentStartPadding(padding: number): void {
+  private applySettingsContentStartPadding(padding: number): void {
     if (this.editorCore) {
       this.editorCore.setContentStartPadding(padding);
       this.flush();
     }
   }
 
-  applySettingsShowSplitLine(show: boolean): void {
+  private applySettingsShowSplitLine(show: boolean): void {
     if (this.editorCore) {
       this.editorCore.setShowSplitLine(show);
       this.flush();
     }
   }
 
-  applySettingsGutterSticky(sticky: boolean): void {
+  private applySettingsGutterSticky(sticky: boolean): void {
     if (this.editorCore) {
       this.editorCore.setGutterSticky(sticky);
       this.flush();
     }
   }
 
-  applySettingsGutterVisible(visible: boolean): void {
+  private applySettingsGutterVisible(visible: boolean): void {
     if (this.editorCore) {
       this.editorCore.setGutterVisible(visible);
       this.flush();
     }
   }
 
-  applySettingsCurrentLineRenderMode(mode: CurrentLineRenderMode): void {
+  private applySettingsCurrentLineRenderMode(mode: CurrentLineRenderMode): void {
     if (this.editorCore) {
       this.editorCore.setCurrentLineRenderMode(mode);
       this.flush();
     }
   }
 
-  applySettingsAutoIndentMode(mode: AutoIndentMode): void {
+  private applySettingsAutoIndentMode(mode: AutoIndentMode): void {
     if (this.editorCore) {
       this.editorCore.setAutoIndentMode(mode);
     }
   }
 
-  applySettingsBackspaceUnindent(enabled: boolean): void {
+  private applySettingsBackspaceUnindent(enabled: boolean): void {
     if (this.editorCore) {
       this.editorCore.setBackspaceUnindent(enabled);
     }
   }
 
-  applySettingsReadOnly(readOnly: boolean): void {
+  private applySettingsReadOnly(readOnly: boolean): void {
     if (this.editorCore) {
       this.editorCore.setReadOnly(readOnly);
     }
   }
 
-  applySettingsCompositionEnabled(enabled: boolean): void {
+  private applySettingsCompositionEnabled(enabled: boolean): void {
     if (this.editorCore) {
       this.editorCore.setCompositionEnabled(enabled);
       this.flush();
     }
   }
 
-  applySettingsMaxGutterIcons(count: number): void {
+  private applySettingsMaxGutterIcons(count: number): void {
     if (this.editorCore) {
       this.editorCore.setMaxGutterIcons(count);
     }
@@ -1423,14 +1430,14 @@ export struct SweetEditor {
     return this.editorCore.getLinkTargetAt(line, column);
   }
 
-  setLineDiagnostics(line: number, items: DiagnosticItem[]): void {
+  setLineDiagnostics(line: number, items: Diagnostic[]): void {
     if (!this.editorCore) {
       return;
     }
     this.editorCore.setLineDiagnostics(line, items);
   }
 
-  setBatchLineDiagnostics(diagsByLine: Map<number, DiagnosticItem[]>): void {
+  setBatchLineDiagnostics(diagsByLine: Map<number, Diagnostic[]>): void {
     if (!this.editorCore) {
       return;
     }
@@ -1928,7 +1935,7 @@ export struct SweetEditor {
   }
 
   isCompositionEnabled(): boolean {
-    return this.settings ? this.settings.isCompositionEnabled() : this.editorCore?.isCompositionEnabled() ?? true;
+    return this.settings.isCompositionEnabled();
   }
 
   commitComposition(text: string): void {
@@ -2189,12 +2196,12 @@ export struct SweetEditor {
     }
 
     const gestureEvent = this.convertTouchToGestureEvent(event);
-    const screenPoint: PointF = event.touches.length > 0
+    const locationInEditor: PointF = event.touches.length > 0
       ? { x: event.touches[0].x, y: event.touches[0].y }
       : { x: 0, y: 0 };
     const isPointerReleased = event.type === TouchType.Up || event.type === TouchType.Cancel;
 
-    this.dispatchPointerGestureEvent(gestureEvent, screenPoint, isPointerReleased, true);
+    this.dispatchPointerGestureEvent(gestureEvent, locationInEditor, isPointerReleased, true);
   }
 
   private handleMouseEvent(event: MouseEvent): void {
@@ -2203,9 +2210,9 @@ export struct SweetEditor {
       return;
     }
 
-    const screenPoint: PointF = { x: event.x, y: event.y };
+    const locationInEditor: PointF = { x: event.x, y: event.y };
     const isPointerReleased = gestureEvent.type === EventType.MOUSE_UP;
-    this.dispatchPointerGestureEvent(gestureEvent, screenPoint, isPointerReleased, false);
+    this.dispatchPointerGestureEvent(gestureEvent, locationInEditor, isPointerReleased, false);
   }
 
   private handleHoverEvent(isHover: boolean, event: HoverEvent): void {
@@ -2235,7 +2242,7 @@ export struct SweetEditor {
 
   private dispatchPointerGestureEvent(
     gestureEvent: GestureEvent,
-    screenPoint: PointF,
+    locationInEditor: PointF,
     isPointerReleased: boolean,
     showSoftKeyboardOnEmptyTap: boolean
   ): void {
@@ -2244,7 +2251,7 @@ export struct SweetEditor {
     }
 
     const result = this.editorCore.handleGestureEvent(gestureEvent);
-    this.fireGestureEvents(result, screenPoint);
+    this.fireGestureEvents(result, locationInEditor);
 
     if (this.selectionMenuController) {
       this.selectionMenuController.onGestureResult(result, isPointerReleased);
@@ -2341,15 +2348,15 @@ export struct SweetEditor {
 
   // ==================== Event Dispatch ====================
 
-  private fireGestureEvents(result: GestureResult, screenPoint: PointF): void {
+  private fireGestureEvents(result: GestureResult, locationInEditor: PointF): void {
     switch (result.type) {
       case GestureType.LONG_PRESS:
-        this.eventBus.emit('longPress', new LongPressEvent(result.cursorPosition, screenPoint));
+        this.eventBus.emit('longPress', new LongPressEvent(result.cursorPosition, locationInEditor));
         this.eventBus.emit('cursorChanged', new CursorChangedEvent(result.cursorPosition));
         break;
       case GestureType.DOUBLE_TAP:
         this.eventBus.emit('doubleTap', new DoubleTapEvent(
-          result.cursorPosition, result.hasSelection, result.selection, screenPoint));
+          result.cursorPosition, result.hasSelection, result.selection, locationInEditor));
         this.eventBus.emit('cursorChanged', new CursorChangedEvent(result.cursorPosition));
         if (result.hasSelection) {
           this.eventBus.emit('selectionChanged', new SelectionChangedEvent(
@@ -2363,7 +2370,7 @@ export struct SweetEditor {
           this.completionProviderManager.dismiss();
         }
         if (result.hitTarget && result.hitTarget.type !== HitTargetType.NONE) {
-          this.fireHitTargetEvent(result, screenPoint);
+          this.fireHitTargetEvent(result, locationInEditor);
         }
         break;
       case GestureType.SCROLL:
@@ -2385,41 +2392,41 @@ export struct SweetEditor {
           result.hasSelection, result.selection, result.cursorPosition));
         break;
       case GestureType.CONTEXT_MENU:
-        this.eventBus.emit('contextMenu', new ContextMenuEvent(result.cursorPosition, screenPoint));
+        this.eventBus.emit('contextMenu', new ContextMenuEvent(result.cursorPosition, locationInEditor));
         break;
     }
   }
 
-  private fireHitTargetEvent(result: GestureResult, screenPoint: PointF): void {
+  private fireHitTargetEvent(result: GestureResult, locationInEditor: PointF): void {
     const ht = result.hitTarget;
     switch (ht.type) {
       case HitTargetType.INLAY_HINT_ICON:
         this.eventBus.emit('inlayHintClick', new InlayHintClickEvent(
-          ht.line, ht.column, InlayType.Icon, ht.iconId, screenPoint));
+          ht.line, ht.column, InlayType.Icon, ht.iconId, locationInEditor));
         break;
       case HitTargetType.INLAY_HINT_TEXT:
         this.eventBus.emit('inlayHintClick', new InlayHintClickEvent(
-          ht.line, ht.column, InlayType.Text, 0, screenPoint));
+          ht.line, ht.column, InlayType.Text, 0, locationInEditor));
         break;
       case HitTargetType.INLAY_HINT_COLOR:
         this.eventBus.emit('inlayHintClick', new InlayHintClickEvent(
-          ht.line, ht.column, InlayType.Color, ht.colorValue, screenPoint));
+          ht.line, ht.column, InlayType.Color, ht.colorValue, locationInEditor));
         break;
       case HitTargetType.GUTTER_ICON:
-        this.eventBus.emit('gutterIconClick', new GutterIconClickEvent(ht.line, ht.iconId, screenPoint));
+        this.eventBus.emit('gutterIconClick', new GutterIconClickEvent(ht.line, ht.iconId, locationInEditor));
         break;
       case HitTargetType.FOLD_PLACEHOLDER:
       case HitTargetType.FOLD_GUTTER:
         this.eventBus.emit('foldToggle', new FoldToggleEvent(
-          ht.line, ht.type === HitTargetType.FOLD_GUTTER, screenPoint));
+          ht.line, ht.type === HitTargetType.FOLD_GUTTER, locationInEditor));
         break;
       case HitTargetType.CODELENS:
         this.eventBus.emit('codeLensClick', new CodeLensClickEvent(
-          ht.line, ht.column, ht.iconId, screenPoint));
+          ht.line, ht.column, ht.iconId, locationInEditor));
         break;
       case HitTargetType.LINK:
         this.eventBus.emit('linkClick', new LinkClickEvent(
-          ht.line, ht.column, this.getLinkTargetAt(ht.line, ht.column), screenPoint));
+          ht.line, ht.column, this.getLinkTargetAt(ht.line, ht.column), locationInEditor));
         break;
     }
   }

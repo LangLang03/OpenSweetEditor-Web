@@ -13,12 +13,12 @@ public final class LinkClickEvent extends EditorEvent {
     public final int column;
     /** Link target payload returned by the core */
     public final String target;
-    public final PointF screenPoint;
+    public final PointF locationInEditor;
 
-    public LinkClickEvent(int line, int column, String target, PointF screenPoint) {
+    public LinkClickEvent(int line, int column, String target, PointF locationInEditor) {
         this.line = line;
         this.column = column;
         this.target = target;
-        this.screenPoint = screenPoint;
+        this.locationInEditor = locationInEditor;
     }
 }

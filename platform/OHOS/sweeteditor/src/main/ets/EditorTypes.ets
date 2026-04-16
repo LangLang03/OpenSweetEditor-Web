@@ -72,12 +72,12 @@ export class EditorTheme {
   currentLineNumberColor: number = 0xFF9CB3D6;
   currentLineColor: number = 0x163A4A66;
   guideColor: number = 0x2E56617A;
-  separatorColor: number = 0xFF4A8F7A;
+  separatorLineColor: number = 0xFF4A8F7A;
   splitLineColor: number = 0x3356617A;
   scrollbarTrackColor: number = 0x48FFFFFF;
   scrollbarThumbColor: number = 0xAA858585;
   scrollbarThumbActiveColor: number = 0xFFBBBBBB;
-  compositionColor: number = 0xFF7AA2F7;
+  compositionUnderlineColor: number = 0xFF7AA2F7;
   inlayHintBgColor: number = 0x223A4A66;
   inlayHintTextColor: number = 0xC0AFC2E0;
   inlayHintIconColor: number = 0xCC9CB0CD;
@@ -121,12 +121,12 @@ export class EditorTheme {
     theme.currentLineNumberColor = 0xFF9CB3D6;
     theme.currentLineColor = 0x163A4A66;
     theme.guideColor = 0x2E56617A;
-    theme.separatorColor = 0xFF4A8F7A;
+    theme.separatorLineColor = 0xFF4A8F7A;
     theme.splitLineColor = 0x3356617A;
     theme.scrollbarTrackColor = 0x2AFFFFFF;
     theme.scrollbarThumbColor = 0x9A7282A0;
     theme.scrollbarThumbActiveColor = 0xFFAABEDD;
-    theme.compositionColor = 0xFF7AA2F7;
+    theme.compositionUnderlineColor = 0xFF7AA2F7;
     theme.inlayHintBgColor = 0x223A4A66;
     theme.inlayHintTextColor = 0xC0AFC2E0;
     theme.inlayHintIconColor = 0xCC9CB0CD;
@@ -180,12 +180,12 @@ export class EditorTheme {
     theme.currentLineNumberColor = 0xFF3A5FA0;
     theme.currentLineColor = 0x120D3B66;
     theme.guideColor = 0x2229426B;
-    theme.separatorColor = 0xFF2F855A;
+    theme.separatorLineColor = 0xFF2F855A;
     theme.splitLineColor = 0x1F29426B;
     theme.scrollbarTrackColor = 0x1F2A3B55;
     theme.scrollbarThumbColor = 0x80446C9C;
     theme.scrollbarThumbActiveColor = 0xEE6A9AD0;
-    theme.compositionColor = 0xFF2563EB;
+    theme.compositionUnderlineColor = 0xFF2563EB;
     theme.inlayHintBgColor = 0x143B82F6;
     theme.inlayHintTextColor = 0xB0344A73;
     theme.inlayHintIconColor = 0xB04B607E;
@@ -229,4 +229,3 @@ export class EditorTheme {
     return theme;
   }
 }
-

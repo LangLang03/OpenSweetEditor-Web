@@ -15,7 +15,7 @@ import com.qiplat.sweeteditor.core.foundation.TextRange;
 public final class ContextMenuRequest {
     @NonNull public final ContextMenuTriggerKind triggerKind;
     @NonNull public final TextPosition cursorPosition;
-    @NonNull public final PointF locationInView;
+    @NonNull public final PointF locationInEditor;
     public final boolean hasSelection;
     @Nullable public final TextRange selection;
     @NonNull public final EditorCore.HitTarget hitTarget;
@@ -23,14 +23,14 @@ public final class ContextMenuRequest {
 
     public ContextMenuRequest(@NonNull ContextMenuTriggerKind triggerKind,
                               @NonNull TextPosition cursorPosition,
-                              @NonNull PointF locationInView,
+                              @NonNull PointF locationInEditor,
                               boolean hasSelection,
                               @Nullable TextRange selection,
                               @NonNull EditorCore.HitTarget hitTarget,
                               @NonNull String linkTarget) {
         this.triggerKind = triggerKind;
         this.cursorPosition = new TextPosition(cursorPosition.line, cursorPosition.column);
-        this.locationInView = new PointF(locationInView.x, locationInView.y);
+        this.locationInEditor = new PointF(locationInEditor.x, locationInEditor.y);
         this.hasSelection = hasSelection;
         this.selection = selection != null
                 ? new TextRange(

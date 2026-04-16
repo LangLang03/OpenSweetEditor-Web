@@ -1,6 +1,6 @@
 import {
   BracketGuide,
-  DiagnosticItem,
+  Diagnostic,
   FlowGuide,
   FoldRegion,
   GutterIcon,
@@ -90,7 +90,7 @@ export class DecorationResult {
   syntaxSpans: Map<number, StyleSpan[]> | null = null;
   semanticSpans: Map<number, StyleSpan[]> | null = null;
   inlayHints: Map<number, InlayHint[]> | null = null;
-  diagnostics: Map<number, DiagnosticItem[]> | null = null;
+  diagnostics: Map<number, Diagnostic[]> | null = null;
   indentGuides: IndentGuide[] | null = null;
   bracketGuides: BracketGuide[] | null = null;
   flowGuides: FlowGuide[] | null = null;
@@ -167,7 +167,7 @@ export class DecorationResultBuilder {
     return this;
   }
 
-  diagnostics(value: Map<number, DiagnosticItem[]> | null, mode: ApplyMode): DecorationResultBuilder {
+  diagnostics(value: Map<number, Diagnostic[]> | null, mode: ApplyMode): DecorationResultBuilder {
     this.result.diagnostics = value;
     this.result.diagnosticsMode = mode;
     return this;

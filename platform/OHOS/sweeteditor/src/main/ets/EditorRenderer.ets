@@ -234,6 +234,7 @@ export class EditorRenderer {
   private drawTextRun(ctx: CanvasRenderingContext2D, run: VisualRun, textSize: number): void {
     const fontStyle = run.style ? run.style.fontStyle : 0;
     let color = (run.style && run.style.color !== 0) ? run.style.color : this.theme.textColor;
+    let metrics: FontMetricsSnapshot | null = null;
     if (run.type === VisualRunType.CODELENS) {
       color = run.active ? this.getActiveLineNumberColor() : this.theme.inlayHintTextColor;
     } else if (run.type === VisualRunType.LINK) {
@@ -241,7 +242,7 @@ export class EditorRenderer {
     }
 
     if (run.style && run.style.backgroundColor !== 0) {
-      const metrics = this.getFontMetrics(ctx, fontStyle, textSize, this.fontFamily);
+      metrics = this.getFontMetrics(ctx, fontStyle, textSize, this.fontFamily);
       ctx.fillStyle = colorToString(run.style.backgroundColor);
       ctx.fillRect(run.x, run.y - metrics.ascent, run.width, metrics.ascent + metrics.descent);
     } else {
@@ -254,6 +255,18 @@ export class EditorRenderer {
       ctx.fillStyle = colorToString(color);
     }
     ctx.fillText(run.text, run.x, run.y);
+    if ((fontStyle & 4) !== 0) {
+      if (!metrics) {
+        metrics = this.getFontMetrics(ctx, fontStyle, textSize, this.fontFamily);
+      }
+      const strikeY = run.y - metrics.ascent * 0.35;
+      ctx.beginPath();
+      ctx.strokeStyle = colorToString(color);
+      ctx.lineWidth = 1;
+      ctx.moveTo(run.x, strikeY);
+      ctx.lineTo(run.x + run.width, strikeY);
+      ctx.stroke();
+    }
     if ((run.type === VisualRunType.CODELENS || run.type === VisualRunType.LINK) && run.active) {
       const underlineY = run.y + 1;
       ctx.beginPath();
@@ -567,7 +580,7 @@ export class EditorRenderer {
         continue;
       }
       const isSeparator = seg.type === GuideType.SEPARATOR;
-      ctx.strokeStyle = colorToString(isSeparator ? this.theme.separatorColor : this.theme.guideColor);
+      ctx.strokeStyle = colorToString(isSeparator ? this.theme.separatorLineColor : this.theme.guideColor);
       ctx.lineWidth = 1;
 
       if (seg.style === GuideStyle.DOUBLE) {
@@ -644,7 +657,7 @@ export class EditorRenderer {
       return;
     }
     const y = decoration.origin.y + decoration.height;
-    ctx.strokeStyle = colorToString(this.theme.compositionColor);
+    ctx.strokeStyle = colorToString(this.theme.compositionUnderlineColor);
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(decoration.origin.x, y);

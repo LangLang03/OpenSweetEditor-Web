@@ -13,12 +13,12 @@ public final class CodeLensClickEvent extends EditorEvent {
     public final int column;
     /** Command ID */
     public final int commandId;
-    public final PointF screenPoint;
+    public final PointF locationInEditor;
 
-    public CodeLensClickEvent(int line, int column, int commandId, PointF screenPoint) {
+    public CodeLensClickEvent(int line, int column, int commandId, PointF locationInEditor) {
         this.line = line;
         this.column = column;
         this.commandId = commandId;
-        this.screenPoint = screenPoint;
+        this.locationInEditor = locationInEditor;
     }
 }

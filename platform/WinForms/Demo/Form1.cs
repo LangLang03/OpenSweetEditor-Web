@@ -10,7 +10,7 @@ using SweetLineTextRange = SweetLine.TextRange;
 
 namespace Demo {
 	public partial class Form1 : Form {
-		private const int STYLE_COLOR = (int)EditorTheme.STYLE_USER_BASE + 1;
+		private const int STYLE_COLOR = EditorTheme.STYLE_USER_BASE + 1;
 		private const string DEFAULT_FILE_NAME = "example.cpp";
 		private const int CODELENS_RUN = 1;
 		private const int CODELENS_DEBUG = 2;
@@ -452,16 +452,13 @@ namespace Demo {
 						documentAnalyzer = highlightEngine.LoadDocument(sweetDoc);
 						cacheHighlight = documentAnalyzer?.Analyze();
 						analyzedFileName = currentFileName;
-					} else if (context.TextChanges.Count > 0 && documentAnalyzer != null) {
-						foreach (TextChange change in context.TextChanges) {
-							if (change.Range == null) {
-								continue;
+						} else if (context.TextChanges.Count > 0 && documentAnalyzer != null) {
+							foreach (TextChange change in context.TextChanges) {
+								string newText = change.NewText;
+								cacheHighlight = documentAnalyzer.AnalyzeIncremental(ConvertAsSLTextRange(change.Range), newText);
+								sourceText = ApplyTextChange(sourceText, change.Range, newText);
 							}
-							string newText = change.NewText ?? string.Empty;
-							cacheHighlight = documentAnalyzer.AnalyzeIncremental(ConvertAsSLTextRange(change.Range.Value), newText);
-							sourceText = ApplyTextChange(sourceText, change.Range.Value, newText);
 						}
-					}
 
 					analyzerSnapshot = documentAnalyzer;
 					highlightSnapshot = cacheHighlight;
@@ -562,21 +559,21 @@ namespace Demo {
 			}
 
 			private static void RegisterStyleMap(HighlightEngine engine) {
-				engine.RegisterStyleName("keyword", (int)EditorTheme.STYLE_KEYWORD);
-				engine.RegisterStyleName("type", (int)EditorTheme.STYLE_TYPE);
-				engine.RegisterStyleName("string", (int)EditorTheme.STYLE_STRING);
-				engine.RegisterStyleName("comment", (int)EditorTheme.STYLE_COMMENT);
-				engine.RegisterStyleName("preprocessor", (int)EditorTheme.STYLE_PREPROCESSOR);
-				engine.RegisterStyleName("macro", (int)EditorTheme.STYLE_PREPROCESSOR);
-				engine.RegisterStyleName("method", (int)EditorTheme.STYLE_FUNCTION);
-				engine.RegisterStyleName("function", (int)EditorTheme.STYLE_FUNCTION);
-				engine.RegisterStyleName("variable", (int)EditorTheme.STYLE_VARIABLE);
-				engine.RegisterStyleName("field", (int)EditorTheme.STYLE_VARIABLE);
-				engine.RegisterStyleName("number", (int)EditorTheme.STYLE_NUMBER);
-				engine.RegisterStyleName("class", (int)EditorTheme.STYLE_CLASS);
+				engine.RegisterStyleName("keyword", EditorTheme.STYLE_KEYWORD);
+				engine.RegisterStyleName("type", EditorTheme.STYLE_TYPE);
+				engine.RegisterStyleName("string", EditorTheme.STYLE_STRING);
+				engine.RegisterStyleName("comment", EditorTheme.STYLE_COMMENT);
+				engine.RegisterStyleName("preprocessor", EditorTheme.STYLE_PREPROCESSOR);
+				engine.RegisterStyleName("macro", EditorTheme.STYLE_PREPROCESSOR);
+				engine.RegisterStyleName("method", EditorTheme.STYLE_FUNCTION);
+				engine.RegisterStyleName("function", EditorTheme.STYLE_FUNCTION);
+				engine.RegisterStyleName("variable", EditorTheme.STYLE_VARIABLE);
+				engine.RegisterStyleName("field", EditorTheme.STYLE_VARIABLE);
+				engine.RegisterStyleName("number", EditorTheme.STYLE_NUMBER);
+				engine.RegisterStyleName("class", EditorTheme.STYLE_CLASS);
 				engine.RegisterStyleName("color", StyleColor);
-				engine.RegisterStyleName("builtin", (int)EditorTheme.STYLE_BUILTIN);
-				engine.RegisterStyleName("annotation", (int)EditorTheme.STYLE_ANNOTATION);
+				engine.RegisterStyleName("builtin", EditorTheme.STYLE_BUILTIN);
+				engine.RegisterStyleName("annotation", EditorTheme.STYLE_ANNOTATION);
 			}
 
 			private static string ResolveCurrentFileName(DecorationContext context) {
@@ -630,7 +627,7 @@ namespace Demo {
 			private static void AppendTextInlayHint(Dictionary<int, List<InlayHint>> inlayHints,
 													List<string> textLines,
 													TokenSpan token) {
-				if (token.StyleId != (int)EditorTheme.STYLE_KEYWORD) {
+				if (token.StyleId != EditorTheme.STYLE_KEYWORD) {
 					return;
 				}
 				TokenRangeInfo? range = ExtractSingleLineTokenRange(token);
@@ -651,7 +648,7 @@ namespace Demo {
 			private static void AppendSeparator(List<SeparatorGuide> separatorGuides,
 												List<string> textLines,
 												TokenSpan token) {
-				if (token.StyleId != (int)EditorTheme.STYLE_COMMENT) {
+				if (token.StyleId != EditorTheme.STYLE_COMMENT) {
 					return;
 				}
 				TokenRangeInfo? range = ExtractSingleLineTokenRange(token);
@@ -685,19 +682,19 @@ namespace Demo {
 						break;
 					}
 				}
-				if (count > 0) {
-					separatorGuides.Add(new SeparatorGuide(
-						range.Line,
-						isDouble ? 1 : 0,
-						count,
-						lineText.Length));
-				}
+					if (count > 0) {
+						separatorGuides.Add(new SeparatorGuide(
+							range.Line,
+							isDouble ? SeparatorStyle.DOUBLE : SeparatorStyle.SINGLE,
+							count,
+							lineText.Length));
+					}
 			}
 
 			private static void AppendGutterIcons(Dictionary<int, List<GutterIcon>> gutterIcons,
 												  List<string> textLines,
 												  TokenSpan token) {
-				if (token.StyleId != (int)EditorTheme.STYLE_KEYWORD) {
+				if (token.StyleId != EditorTheme.STYLE_KEYWORD) {
 					return;
 				}
 				TokenRangeInfo? range = ExtractSingleLineTokenRange(token);
@@ -716,7 +713,7 @@ namespace Demo {
 				if (codeLensItems.Count > 0) {
 					return;
 				}
-				if (token.StyleId != (int)EditorTheme.STYLE_KEYWORD) {
+				if (token.StyleId != EditorTheme.STYLE_KEYWORD) {
 					return;
 				}
 				TokenRangeInfo? range = ExtractSingleLineTokenRange(token);
@@ -750,7 +747,7 @@ namespace Demo {
 					return firstKeywordRange;
 				}
 
-				if (token.StyleId == (int)EditorTheme.STYLE_KEYWORD) {
+				if (token.StyleId == EditorTheme.STYLE_KEYWORD) {
 					firstKeywordRange ??= range;
 					if (phantomLines.Count == 0 && (literal == "class" || literal == "struct")) {
 						GetOrCreate(phantoms, range.Line)
@@ -764,7 +761,7 @@ namespace Demo {
 					return firstKeywordRange;
 				}
 
-				if (token.StyleId == (int)EditorTheme.STYLE_COMMENT) {
+				if (token.StyleId == EditorTheme.STYLE_COMMENT) {
 					int fixmeIndex = literal.IndexOf("FIXME", StringComparison.OrdinalIgnoreCase);
 					if (fixmeIndex >= 0) {
 						AppendDiagnostic(diagnostics, seenDiagnostics, ref diagnosticCount,
@@ -787,7 +784,7 @@ namespace Demo {
 					return firstKeywordRange;
 				}
 
-				if (token.StyleId == (int) EditorTheme.STYLE_ANNOTATION) {
+				if (token.StyleId == EditorTheme.STYLE_ANNOTATION) {
 					AppendDiagnostic(diagnostics, seenDiagnostics, ref diagnosticCount,
 						range.Line, range.StartColumn, range.Length, 3);
 				}

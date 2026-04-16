@@ -38,12 +38,12 @@ The Widget layer handles platform-native rendering, user interaction, and extens
 | **Widget** | `SweetEditor`, `SweetEditorController` *(declarative frameworks MUST; imperative frameworks MAY)*, `EditorTheme`, `EditorSettings`, `EditorIconProvider`, `EditorMetadata`, `LanguageConfiguration` | Widget entry, controller, theme, configuration |
 | **Decoration** | `DecorationProvider`, `DecorationProviderManager`, `DecorationContext`, `DecorationResult`, `DecorationType`; if the Receiver callback pattern is used, `DecorationReceiver` is the recommended name | Decoration provider system |
 | **Completion** | `CompletionProvider`, `CompletionProviderManager`, `CompletionContext`, `CompletionItem`, `CompletionResult`; if the Receiver callback pattern is used, `CompletionReceiver` is the recommended name | Completion provider system |
-| **Event** | A type-safe event mechanism, `EditorEvent`, `TextChangedEvent`, `CursorChangedEvent`, `SelectionChangedEvent`, `ScrollChangedEvent`, `ScaleChangedEvent`, `DocumentLoadedEvent`, `FoldToggleEvent`, `GutterIconClickEvent`, `InlayHintClickEvent`, `CodeLensClickEvent`, `LinkClickEvent`, `LongPressEvent`*(mobile only)*, `DoubleTapEvent`, `ContextMenuEvent`*(platforms with ContextMenu support)*; if an explicit event-bus/listener pattern is used, `EditorEventBus` and `EditorEventListener` are the recommended names | Event system |
+| **Event** | A type-safe event mechanism, `EditorEvent`, `TextChangedEvent`, `CursorChangedEvent`, `SelectionChangedEvent`, `ScrollChangedEvent`, `ScaleChangedEvent`, `DocumentLoadedEvent`, `FoldToggleEvent`, `GutterIconClickEvent`, `InlayHintClickEvent`, `CodeLensClickEvent`, `LinkClickEvent`, `LongPressEvent`*(mobile only)*, `DoubleTapEvent`, `ContextMenuEvent`*(platforms with an explicit context-menu gesture entry point)*; if an explicit event-bus/listener pattern is used, `EditorEventBus` and `EditorEventListener` are the recommended names | Event system |
 | **NewLine** | `NewLineActionProvider`, `NewLineActionProviderManager`, `NewLineAction`, `NewLineContext` | Newline action provider system |
 | **Keymap** | `EditorKeyMap` | Widget-layer keymap extension that binds command ids to host-side handlers |
 | **Copilot** *(SHOULD)* | `InlineSuggestion`, `InlineSuggestionListener` or an equivalent host-visible accept/dismiss callback mechanism; MAY: `InlineSuggestionController` | Inline suggestion data + callback; listener shape is the primary path when exposed |
-| **Selection** *(MAY, mobile-only)* | `SelectionMenuController`, `SelectionMenuItem`, `SelectionMenuItemProvider`, a host-visible custom-item click callback mechanism; MAY: `SelectionMenuListener` | Selection menu (MAY omit on desktop) |
-| **ContextMenu** *(MAY)* | `ContextMenuController`, `ContextMenuRequest`, `ContextMenuSection`, `ContextMenuItem`, `ContextMenuItemProvider`, a host-visible custom-item click callback mechanism; MAY: `ContextMenuPopup`, `ContextMenuTriggerKind` | Platform-side context menu / action menu (desktop SHOULD; mobile MAY) |
+| **Selection** *(SHOULD on mobile; desktop MAY omit)* | `SelectionMenuItem`, `SelectionMenuItemProvider`, a host-visible custom-item click callback mechanism; MAY: `SelectionMenuListener` | Selection menu (mobile SHOULD; desktop MAY omit) |
+| **ContextMenu** *(MAY)* | `ContextMenuRequest`, `ContextMenuSection`, `ContextMenuItem`, `ContextMenuItemProvider`, `ContextMenuTriggerKind`, a host-visible custom-item click callback mechanism; MAY: `ContextMenuPopup` | Platform-side context menu / action menu (desktop SHOULD; mobile MAY) |
 | **Perf** *(SHOULD)* | `PerfOverlay`, `MeasurePerfStats`, `PerfStepRecorder` | Performance overlay |
 
 > `TextChangeAction` is a SHOULD-level auxiliary event enum. Platforms MAY expose it to classify a text-change cycle at a coarse level (for example: `INSERT`, `DELETE`, `UNDO`, `REDO`, `KEY`, `COMPOSITION`), but it MUST NOT replace `changes: List<TextChange>` as the primary incremental payload.
@@ -57,7 +57,7 @@ The following types are **internal implementation details**, not part of the pub
 | **Renderer** | `EditorRenderer` | Separate rendering logic from the widget entry class | Single responsibility; rendering logic can be iterated and tested independently |
 | **Controller** | `CompletionPopupController`, `InlineSuggestionController`, `SelectionMenuController`, `ContextMenuController` | Manage popup / overlay lifecycle and interaction logic | Decouples UI popups from data logic; platforms may implement directly with Popup instead |
 
-> If adopting the above patterns, naming SHOULD follow the canonical names in Section 2.1.
+> If adopting the above patterns, platforms SHOULD use the recommended names shown above. Section 2.1 governs only host-facing public type names, not these internal controller pattern names.
 > Not adopting these patterns is not a violation, but equivalent functionality must be implemented elsewhere.
 
 ---
@@ -66,7 +66,7 @@ The following types are **internal implementation details**, not part of the pub
 
 ### 2.1 Class / Type Names (MUST)
 
-All platforms MUST use the following canonical names for public types. Language-specific prefixes or suffixes are allowed only where mandated by the language convention (e.g. C# interface `I` prefix).
+All platforms MUST use the following canonical names for the principal public types listed below. Additional host-facing public types introduced in later sections MUST follow the same naming rules and use the canonical names defined where those types are introduced. Language-specific prefixes or suffixes are allowed only where mandated by the language convention (e.g. C# interface `I` prefix).
 
 The widget entry class MUST use `SweetEditor` as prefix and MAY append the target platform's conventional UI component suffix:
 
@@ -87,7 +87,7 @@ Other public types:
 | Canonical Name | Allowed Variants | Notes |
 |---|---|---|
 | `EditorCore` | OC: `SEEditorCore` | Core bridge wrapper |
-| `TextMeasurer` | OC: `SETextMeasurer` | Can be struct in C# |
+| `TextMeasurer` | OC: `SETextMeasurer` | May appear in any platform-idiomatic form, including a top-level public type, nested type, internal bridge type, typealias, adapter, or C# struct, as long as the concept remains semantically aligned with the standard |
 | `EditorTheme` | OC: `SEEditorTheme` | Theme definition |
 | `EditorSettings` | OC: `SEEditorSettings` | Configuration |
 | `DecorationProvider` | C#/TS/Kotlin: `IDecorationProvider`; OC: `SEDecorationProvider` | Provider interface |
@@ -106,12 +106,12 @@ Other public types:
 | `EditorEventListener` | C#/TS/Kotlin: `IEditorEventListener`; OC: `SEEditorEventListener` | Listener interface; applies only when the platform exposes an explicit listener-interface pattern |
 | `InlineSuggestionListener` | C#/TS/Kotlin: `IInlineSuggestionListener`; OC: `SEInlineSuggestionListener` | Listener interface; only applicable when the platform exposes an explicit inline-suggestion listener |
 | `SelectionMenuItem` | OC: `SESelectionMenuItem` | Selection menu item data type |
-| `SelectionMenuItemProvider` | C#/TS/Kotlin: `ISelectionMenuItemProvider`; OC: `SESelectionMenuItemProvider` | Selection menu item provider; builds the full menu for the current editor state |
+| `SelectionMenuItemProvider` | C#/TS/Kotlin: `ISelectionMenuItemProvider`; OC: `SESelectionMenuItemProvider` | Selection menu item provider; builds the full menu from the current editor state |
 | `SelectionMenuListener` | C#/TS/Kotlin: `ISelectionMenuListener`; OC: `SESelectionMenuListener` | Listener interface; only applicable when the platform exposes an explicit selection-menu listener |
 | `ContextMenuItem` | OC: `SEContextMenuItem` | Context menu item data type |
 | `ContextMenuSection` | OC: `SEContextMenuSection` | One visual section inside the context menu |
 | `ContextMenuRequest` | OC: `SEContextMenuRequest` | Immutable request snapshot used to build a context menu |
-| `ContextMenuItemProvider` | C#/TS/Kotlin: `IContextMenuItemProvider`; OC: `SEContextMenuItemProvider` | Context menu item provider; builds the full menu for the current show cycle |
+| `ContextMenuItemProvider` | C#/TS/Kotlin: `IContextMenuItemProvider`; OC: `SEContextMenuItemProvider` | Context menu item provider; builds the full menu from the current context-menu request |
 | `ContextMenuTriggerKind` | OC: `SEContextMenuTriggerKind` | Trigger kind for opening the context menu |
 | `EditorIconProvider` | C#/TS/Kotlin: `IEditorIconProvider`; OC: `SEEditorIconProvider` | Icon provider interface |
 | `SweetEditorController` | OC: `SESweetEditorController` | External control entry for declarative frameworks (see Section 3.0) |
@@ -148,6 +148,8 @@ For host-facing public APIs (such as `SweetEditor`, `SweetEditorController`, `Ed
 
 - Host-facing public APIs MUST NOT prefer raw `int` values when the language already supports enums / strong typed constants
 - If platform or framework constraints force a host-facing public API to expose integer constants, that layer MUST handle invalid values explicitly (see Section 15)
+- Bitmask / flags fields MAY remain `int`-encoded in the public model when that representation is itself the intended cross-platform contract (for example `TextStyle.fontStyle`)
+- Compact numeric semantic fields MAY remain `int`-encoded in the public model when this standard explicitly defines that numeric encoding as part of the contract (for example `Diagnostic.severity`)
 - `EditorCore`, bridge layers, FFI layers, and other internal numeric transport layers are not considered host-facing public APIs for this rule
 
 ### 2.5 Geometry Carrier Types (MUST)
@@ -163,7 +165,11 @@ If a platform-native geometry type is used, coordinate basis, axis direction, an
 
 ## 3. Public API Contract (MUST)
 
-The following lists all public methods that `EditorCore` and `SweetEditor` MUST expose. All platforms MUST implement every listed method.
+The following defines two distinct public API layers:
+- Section 3.1 defines the `EditorCore` bridge/runtime API
+- Section 3.2 defines the host-facing editor API
+
+Platforms MUST implement every listed method on the appropriate API carrier. Section 3.1 methods belong to `EditorCore`; they are not implicitly part of the host-facing editor surface. In imperative frameworks the Section 3.2 carrier is the widget entry class itself (for example `SweetEditor`), while in declarative frameworks the Section 3.2 carrier is `SweetEditorController`. On declarative platforms, `SweetEditor` remains the runtime/session owner even though the host-facing API is exposed through the controller.
 
 > Lifecycle / memory management APIs (e.g. `create`, `destroy`, `freeBinaryData`) are not listed here; each platform implements them per its own conventions.
 
@@ -195,31 +201,41 @@ editor.applyTheme(EditorTheme.dark());
 
 In declarative frameworks (Flutter, Jetpack Compose, SwiftUI, ArkUI, etc.), Widgets/Composables are immutable description objects and host code cannot directly hold a widget instance.
 
+`SweetEditor` remains the runtime view/session owner in declarative frameworks. It owns `EditorCore`, provider managers, overlay/runtime objects, timers, listeners, receivers, and other session-scoped state. `SweetEditorController` is the host-owned forwarding entry point used to invoke that runtime; it is not the owner of the bound widget, render runtime, or `EditorCore` instance.
+
 - MUST provide a `SweetEditorController` class as the sole imperative entry point for external control of the editor
-- `SweetEditorController` MUST expose all APIs defined in Section 3.2, plus any module-specific public APIs from later sections for implemented optional modules
+- `SweetEditorController` MUST expose the host-facing APIs defined in Section 3.2, plus any module-specific host-facing public APIs from later sections for implemented optional modules
+- Section 3.1 `EditorCore` methods are bridge/runtime APIs and MUST NOT be treated as required `SweetEditorController` methods by default
 - The widget entry class (e.g. `SweetEditorWidget`, `SweetEditorView`) MUST accept `SweetEditorController` as a constructor parameter
-- The widget MUST internally bind itself to the Controller on mount and unbind on unmount
+- The controller-to-editor association MUST be established when the editor instance is constructed, and MUST remain fixed for the lifetime of that editor instance
+- The widget/session MAY use internal `bind(editorApi)` / `unbind()` hooks, but those hooks represent initial attachment and terminal detachment for that editor instance, not a reusable rebind cycle
 
 ```dart
 // Flutter
 final controller = SweetEditorController();
 SweetEditorWidget(controller: controller);
-controller.loadDocument(doc);
-controller.applyTheme(EditorTheme.dark());
+controller.whenReady(() {
+    controller.loadDocument(doc);
+    controller.applyTheme(EditorTheme.dark());
+});
 ```
 
 #### 3.0.3 `SweetEditorController` Specification
 
 | Rule | Constraint | Description |
 |---|---|---|
+| Controller role | **MUST** | `SweetEditorController` MUST be the host-facing forwarding handle for exactly one declarative editor instance. It MUST NOT be treated as the owner of the bound `View` / `Control` / `Widget`, render runtime, overlay runtime, `EditorCore` lifetime, provider registrations, or any other session-scoped runtime state |
 | Lifecycle callback | **MUST** | Provide `whenReady(callback)` method that fires when the widget finishes mounting; if already ready at call time, execute immediately |
-| Calls before mount | **SHOULD** | When calling Controller methods before the widget is mounted, SHOULD queue operations and execute them in order after mount; MAY choose to silently ignore (no-op) |
-| Bind / Unbind | **MUST** | Provide internal `bind(editorApi)` / `unbind()` mechanism (naming MAY vary by platform); widget calls `bind` on mount and `unbind` on unmount |
-| Multiple bindings | **MUST** | The same Controller instance MAY be bound to a new widget after the previous one unbinds; MUST NOT be bound to multiple widgets simultaneously |
-| API consistency | **MUST** | Method signatures exposed on the Controller MUST match the Public API table in Section 3.2 and any implemented module-specific public API tables in later sections (method name, parameters, return type) |
-| Getter methods | **SHOULD** | When the widget is not mounted, getter methods (e.g. `getDocument()`, `getCursorPosition()`) SHOULD return null or default values; MUST NOT throw exceptions |
-| Explicit teardown (if provided) | **MAY** | Platforms MAY provide an explicit controller teardown method such as `dispose()`, `close()`, or `release()`. For GC-managed languages, an extra explicit teardown API is not required when the controller can become inactive and collectible after `unbind()` |
-| Explicit teardown semantics | **MUST** | If the platform provides an explicit controller teardown method, it MUST release only controller-owned resources, unbind the widget, stop timers / listeners / receivers, and break reference chains. It MUST NOT assume ownership of the bound control and MUST NOT directly destroy the `View` / `Control` / `Widget` itself |
+| Calls before initial attachment | **MUST** | On declarative platforms, imperative controller calls are not yet available before the associated editor instance completes its initial attachment. Mutating calls MUST be ignored or rejected rather than queued. Getter calls, including `getSettings()`, SHOULD return `null` or default values and MUST NOT throw exceptions. Host code SHOULD invoke imperative controller APIs only after `whenReady()` or an equivalent ready signal. Initial document, theme, settings, key map, or other first-frame configuration that must exist before initial attachment MUST be supplied through declarative construction parameters or an equivalent platform-native initialization path. Platforms MUST NOT create a hidden runtime or hidden staging layer solely to satisfy pre-ready calls |
+| Internal attach / detach | **MUST** | Provide an internal attach/detach mechanism (for example `bind(editorApi)` / `unbind()`, though naming MAY vary). These hooks represent initial attachment and terminal detachment for the associated editor instance rather than a reusable rebind protocol |
+| Multiple bindings | **MUST** | The same Controller instance MUST NOT be bound to multiple widgets simultaneously, and MUST NOT be rebound to a different widget/session/editor instance after its initial association is established |
+| Public API coverage | **MUST** | The Controller MUST expose all required host-facing public operations defined in Section 3.2 and any implemented module-specific host-facing public API tables in later sections |
+| API consistency | **SHOULD** | Method names, semantics, and return behavior SHOULD follow the host-facing public API table in Section 3.2 and any implemented module-specific host-facing public API tables in later sections. Platforms MAY additionally provide platform-idiomatic overloads, convenience aliases, or equivalent entry shapes when the mapping to the standard API remains unambiguous |
+| Getter methods | **SHOULD** | Before the associated editor instance is ready, or after it reaches terminal teardown, getter methods (e.g. `getDocument()`, `getCursorPosition()`, `getSettings()`) SHOULD return `null` or default values; MUST NOT throw exceptions |
+| Explicit teardown (if provided) | **MAY** | Platforms MAY provide an explicit terminal controller teardown method such as `dispose()`, `close()`, or `release()`. This is optional for both GC-managed and non-GC platforms when terminal teardown is already guaranteed by the host lifecycle or by platform-native destruction semantics |
+| Explicit teardown semantics | **MUST** | If the platform provides an explicit controller teardown method, it MUST represent terminal controller teardown rather than normal widget lifecycle. It MUST first detach from the associated widget/session if still attached, then release only controller-owned readiness callbacks, internal pending callbacks, and reference chains. It MUST NOT assume ownership of session-owned provider registrations or runtime objects, and MUST NOT directly destroy the `View` / `Control` / `Widget` itself. After teardown, the Controller MUST become terminally inactive: further method calls MUST be no-ops or return default empty values |
+
+> Ordinary declarative rebuilds that preserve the same mounted editor runtime are not considered rebinding. Rebinding means attaching one `SweetEditorController` to a different `SweetEditor` instance, which is not allowed by this standard.
 
 #### 3.0.4 Platform Classification Reference
 
@@ -231,9 +247,28 @@ controller.applyTheme(EditorTheme.dark());
 
 > If a platform provides both imperative and declarative APIs (e.g. Apple has both UIKit and SwiftUI), the imperative API is exposed on the widget class, and the declarative wrapper MUST additionally provide a Controller.
 
+#### 3.0.5 Declarative Initialization Inputs
+
+On declarative platforms, the widget entry class MAY expose declarative initialization inputs in addition to the required `controller` constructor parameter. These inputs are part of the declarative widget/view description rather than part of the imperative controller API.
+
+| Input | Constraint | Description |
+|---|---|---|
+| `controller` | **MUST** | The `SweetEditorController` associated with the editor instance |
+| `document` | **MAY** | Initial `Document` object that should become available to the first attached editor session |
+| `text` | **MAY** | Initial plain-text content. If provided without `document`, the platform MUST materialize an equivalent `Document` for the first attached editor session from this text input |
+| `theme` | **MAY** | Initial theme that should be applied to the first attached editor session |
+| `settings` | **MAY** | Initial settings object or platform-equivalent settings snapshot used to configure the first attached editor session |
+| `keyMap` | **MAY** | Initial key map or platform-equivalent keyboard mapping used by the first attached editor session |
+
+The standard does not require identical constructor parameter names, property names, or widget syntax across declarative platforms, but the semantic mapping SHOULD remain unambiguous.
+
+If a declarative platform exposes any of these initialization inputs, they MUST be treated as declarative construction/configuration inputs rather than as pre-ready controller calls. They MUST NOT require a hidden runtime or hidden staging layer. If both `document` and `text` are provided, `document` MUST take precedence and `text` MUST be ignored. If `text` is used without `document`, the platform MUST materialize an equivalent current `Document` for the attached editor session, and `getDocument()` MUST return that materialized `Document` after the editor becomes ready. Subsequent changes to those inputs follow the platform's normal declarative update model. On the same mounted editor runtime, changing `text` has the same semantics as replacing the current document with a newly materialized `Document`. Platforms MAY apply them to the existing mounted editor runtime. If a platform instead requires creation of a new editor instance, host code MUST also provide a new `SweetEditorController` for that new instance. Reusing the same controller with a new editor instance would be controller rebinding and is not allowed by this standard.
+
 ---
 
 ### 3.1 `EditorCore` Public API
+
+Section 3.1 defines the bridge/runtime API carried by `EditorCore`. It includes low-level render snapshot, gesture loop, keyboard dispatch, and animation tick methods. These methods are not part of the default host-facing editor surface unless a platform explicitly chooses to expose `EditorCore` itself.
 
 | Function | Canonical Name | Allowed Variants |
 |---|---|---|
@@ -393,16 +428,18 @@ controller.applyTheme(EditorTheme.dark());
 | `touchSlop` | float | `10` | Gesture move threshold below which the interaction is still treated as a tap |
 | `doubleTapTimeout` | int64 | `300` | Double-tap recognition timeout in milliseconds |
 | `longPressMs` | int64 | `500` | Long-press recognition timeout in milliseconds |
-| `flingFriction` | float | `3.5` | Fling friction coefficient |
-| `flingMinVelocity` | float | `50.0` | Minimum fling velocity in px/s |
-| `flingMaxVelocity` | float | `8000.0` | Maximum fling velocity in px/s |
+| `flingFriction` | float | platform-defined | Fling friction coefficient; platforms MAY tune this to match native interaction feel |
+| `flingMinVelocity` | float | platform-defined | Minimum fling velocity in px/s; platforms MAY tune this to match native interaction feel |
+| `flingMaxVelocity` | float | platform-defined | Maximum fling velocity in px/s; platforms MAY tune this to match native interaction feel |
 | `maxUndoStackSize` | uint64 / size_t-aligned integer | `512` | Maximum undo stack depth; `0` means unlimited |
 | `keyChordTimeoutMs` | int64 | `2000` | Timeout for completing a pending multi-chord key binding |
 | `revealSelectionEndOnSelectAll` | boolean | `false` | When true, `selectAll()` SHOULD reveal the selection end after updating the selection |
 
 > If a platform serializes `EditorOptions` into a binary bridge payload, field order MUST stay aligned with Core: `touch_slop`, `double_tap_timeout`, `long_press_ms`, `fling_friction`, `fling_min_velocity`, `fling_max_velocity`, `max_undo_stack_size`, `key_chord_timeout_ms`, `reveal_selection_end_on_select_all`.
 
-### 3.2 `SweetEditor` Public API
+### 3.2 Host-Facing Editor Public API
+
+Section 3.2 defines the host-facing editor API. It intentionally excludes low-level `EditorCore` gesture-loop, animation-tick, and render-model production methods such as `handleGestureEvent(...)`, `tickEdgeScroll()`, and `buildRenderModel()`. `flush()` remains part of this layer as the host-triggered synchronization API. On imperative platforms this API is exposed directly by the widget entry class; on declarative platforms it is exposed by `SweetEditorController` and forwards to the associated `SweetEditor` runtime without implying controller-side ownership of editor/session state. Except for `whenReady(...)` itself and equivalent readiness helpers, imperative controller calls on declarative platforms are only valid after the associated editor instance becomes ready. Initial document, theme, settings, key map, or other first-frame configuration that must exist before initial attachment MUST be supplied through declarative construction parameters or an equivalent platform-native initialization path.
 
 | Function | Canonical Name | Allowed Variants |
 |---|---|---|
@@ -524,7 +561,7 @@ controller.applyTheme(EditorTheme.dark());
 
 > Event exposure does not require a uniform method shape. Platforms MUST provide a type-safe event mechanism per Section 11, and may use `subscribe` / `unsubscribe`, platform-native `event` / delegates, typed `Stream` getters, signals / observers, or equivalent forms.
 
-> Section 3.2 is the widget-entry public API index. Some module-specific interfaces, data models, and callback contracts are further specified in later sections (for example Sections 4, 5, 6, 7, and 10); Sections 4, 5, and 10 define required-module contracts, while Sections 6 and 7 define optional or conditional module contracts.
+> Section 3.2 is the host-facing editor public API index. Some module-specific interfaces, data models, and callback contracts are further specified in later sections (for example Sections 4, 5, 6, 7, and 10); Sections 4, 5, and 10 define required-module contracts, while Sections 6 and 7 define optional or conditional module contracts.
 
 ---
 
@@ -563,8 +600,7 @@ interface DecorationReceiver {
 
 | Field | Type | Description |
 |---|---|---|
-| `visibleStartLine` | int | Visible area start line (0-based) |
-| `visibleEndLine` | int | Visible area end line (0-based) |
+| `visibleLineRange` | IntRange | Line range for the current decoration context. It usually matches the visible lines, but platforms MAY expand it with overscan or other heuristics |
 | `totalLineCount` | int | Total line count of the document |
 | `textChanges` | List\<TextChange\> | Text changes accumulated during this refresh cycle; empty list means non-text-change trigger |
 | `languageConfiguration` | LanguageConfiguration? | Current language configuration (nullable) |
@@ -578,7 +614,7 @@ Each decoration data type MUST have a corresponding `ApplyMode` that controls ho
 |---|---|
 | `MERGE` | Merge with existing data (default) |
 | `REPLACE_ALL` | Replace all existing data |
-| `REPLACE_RANGE` | Replace only data within the visible range |
+| `REPLACE_RANGE` | Replace only data within `visibleLineRange` (the current decoration context range) |
 
 When multiple Providers return different ApplyModes, the Manager MUST use the highest priority: `REPLACE_ALL` > `REPLACE_RANGE` > `MERGE`.
 
@@ -613,7 +649,7 @@ Platforms MUST include `CODELENS` and `LINK` in `DecorationType` when exposing t
 The Manager iterates all registered Providers and merges each Provider's snapshot according to ApplyMode:
 - `MERGE`: append and merge same-type data from each Provider
 - `REPLACE_ALL`: clear all existing data first, then write new data
-- `REPLACE_RANGE`: clear only existing data within the visible range, then write new data
+- `REPLACE_RANGE`: clear only existing data within `visibleLineRange` (the current decoration context range), then write new data
 
 ### 4.2 CompletionProvider
 
@@ -772,14 +808,14 @@ The callback contract MUST satisfy all of the following:
 - For a single shown suggestion instance, `accepted` MUST fire at most once and `dismissed` MUST fire at most once
 - After either `accepted` or `dismissed` fires for a shown suggestion instance, no further callbacks for that same suggestion instance MAY be emitted
 - If `showInlineSuggestion()` replaces an already-visible suggestion, the platform MAY either emit `dismissed` for the previous suggestion before switching, or replace it quietly without a `dismissed` callback; in either case the previous suggestion instance MUST NOT emit further callbacks after replacement
-- After widget destruction, unbind, or controller disposal, no further host-visible inline-suggestion callbacks MAY be emitted
+- After terminal editor teardown, internal detach, or controller disposal, no further host-visible inline-suggestion callbacks MAY be emitted
 
 | Callback | Constraint | Trigger Condition |
 |---|---|---|
 | `onSuggestionAccepted` | **MUST** | When the user accepts the currently visible suggestion |
 | `onSuggestionDismissed` | **MUST** | When the user dismisses the currently visible suggestion |
 
-### 6.3 `SweetEditor` Copilot API
+### 6.3 Host-Facing Copilot API
 
 | Method | Constraint | Description |
 |---|---|---|
@@ -811,9 +847,9 @@ Platforms MAY choose not to use the Controller pattern, but MUST implement equiv
 
 ---
 
-## 7. Selection / SelectionMenu Interface Definition (MAY, mobile-only)
+## 7. Selection / SelectionMenu Interface Definition (SHOULD on mobile, desktop MAY omit)
 
-The selection menu module is MAY overall. Desktop platforms MAY omit it entirely. If implemented, it MUST follow the contract below.
+On mobile platforms, the selection menu module is SHOULD level. Desktop platforms MAY omit it entirely. If implemented, it MUST follow the contract below.
 
 ### 7.1 `SelectionMenuItem` Data Type
 
@@ -828,23 +864,27 @@ The selection menu module is MAY overall. Desktop platforms MAY omit it entirely
 
 ### 7.2 `SelectionMenuItemProvider`
 
-If the platform allows host code to customize selection-menu items, the recommended shape is:
+The standard provider shape is:
 
 ```
 interface SelectionMenuItemProvider {
-    provideMenuItems(editor: SweetEditor) -> List<SelectionMenuItem>
+    provideMenuItems(editor) -> List<SelectionMenuItem>
 }
 ```
 
-This capability SHOULD satisfy the following semantics:
+`editor` refers to the platform's host-facing editor/widget object. Platforms MAY expose
+additional provider parameters, but the provider is expected to build the full selection menu
+from the current editor state rather than from an incremental patch payload.
+
+Selection-menu semantics:
 - The provider returns the complete menu model for the current show cycle, rather than incremental appended items
 - When the provider is `null`, the platform SHOULD restore the default selection menu
 - When the provider returns an empty list, the platform MAY choose not to show a selection menu
-- The provider SHOULD be invoked again immediately before the menu is shown so items can reflect current editor state
+- The provider SHOULD be invoked again immediately before the menu is shown so items can reflect the current editor state
 
 ### 7.3 Selection Menu Callback Contract
 
-If the platform exposes `SelectionMenuItemProvider` or any other custom-item injection mechanism, it MUST provide a host-visible way to observe custom selection-menu item activation. Platforms MAY use an explicit listener interface, delegate / closure / callback setters, or platform-native events / typed streams / signals.
+Platforms that implement `SelectionMenu` MUST provide a host-visible way to observe custom selection-menu item activation. Platforms MAY use an explicit listener interface, delegate / closure / callback setters, or platform-native events / typed streams / signals.
 
 If a platform exposes an explicit listener interface, the recommended shape is:
 
@@ -858,9 +898,9 @@ The callback contract MUST satisfy all of the following:
 - Host-visible callbacks MAY cover custom menu items only; built-in cut / copy / paste / select-all actions are not required to emit a unified `item-selected` callback
 - The `item-selected` payload SHOULD include the selected custom item's `itemId`, or an equivalent payload from which that menu item can be unambiguously identified
 - The standard does not require a host-visible `dismissed` event for selection menus
-- After widget destruction, unbind, or controller disposal, no further host-visible custom selection-menu callbacks MAY be emitted
+- After terminal editor teardown, internal detach, or controller disposal, no further host-visible custom selection-menu callbacks MAY be emitted
 
-### 7.4 `SweetEditor` Selection API
+### 7.4 Host-Facing Selection API
 
 | Method | Constraint | Description |
 |---|---|---|
@@ -1014,7 +1054,7 @@ Every `EditorTheme` MUST contain a `textStyles` map (`Map<int, TextStyle>`) and 
 
 ## 9. EditorSettings (MUST)
 
-All editor appearance and behavior configuration MUST be centralized through the `EditorSettings` object. `SweetEditor` itself MUST NOT directly expose any configuration setters (e.g. `setWrapMode`, `setScale`, `setCompositionEnabled`). Instead, it exposes a `getSettings()` method that returns an `EditorSettings` instance, and callers configure the editor through that instance. This widget-layer rule does not change the `EditorCore` public API defined in Section 3.1.
+Editor options and behavior/layout configuration MUST be centralized through the `EditorSettings` object. This includes settings-like editor options such as wrap mode, scale, composition behavior, spacing, padding, and similar editor-option fields. `EditorTheme` and `EditorKeyMap` remain separate host-facing configuration objects and are not folded into `EditorSettings` by this rule. The host-facing API carrier MUST NOT directly expose settings-like configuration setters (e.g. `setWrapMode`, `setScale`, `setCompositionEnabled`). Instead, it exposes a `getSettings()` method, and callers configure those settings through that object once it is available. On imperative platforms the host-facing carrier is `SweetEditor`; on declarative platforms it is `SweetEditorController`. On declarative platforms, `getSettings()` becomes valid only after `whenReady()` or an equivalent ready signal. Before that point it SHOULD return `null` or a default unavailable value, MUST NOT create a hidden runtime or hidden staging object, and MUST NOT be treated as a pre-ready configuration channel. Initial settings required before first attachment MUST be supplied through declarative construction parameters or an equivalent platform-native initialization path. This host-facing rule does not change the `EditorCore` public API defined in Section 3.1.
 
 All platforms MUST expose the following settings through getter/setter pairs (or properties):
 
@@ -1119,7 +1159,7 @@ ScrollChangedEvent, ScaleChangedEvent, DocumentLoadedEvent,
 FoldToggleEvent, GutterIconClickEvent, InlayHintClickEvent, CodeLensClickEvent, LinkClickEvent,
 LongPressEvent,       // mobile only (iOS/Android)
 DoubleTapEvent,
-ContextMenuEvent      // platforms with ContextMenu support
+ContextMenuEvent      // platforms with an explicit context-menu gesture entry point
 ```
 
 > `LongPressEvent` is for mobile platforms (iOS/Android) and represents the raw long-press gesture itself. `ContextMenuEvent` is for platforms that expose an explicit context-menu gesture entry point (for example desktop right click or a framework-native context-menu gesture). Platform implementations SHOULD only register events relevant to their platform.
@@ -1140,14 +1180,14 @@ Event payloads MUST be defined per-event. Platforms MUST NOT assume or require a
 | `ScrollChangedEvent` | `scrollX: float`, `scrollY: float` | Current view scroll offset |
 | `ScaleChangedEvent` | `scale: float` | Current editor scale |
 | `DocumentLoadedEvent` | — | No payload fields are required |
-| `FoldToggleEvent` | `line: int`, `isGutter: boolean`, `locationInView: PointF or platform-native point type` | Toggled fold line, whether the click came from gutter, and pointer location relative to the editor view |
-| `GutterIconClickEvent` | `line: int`, `iconId: int`, `locationInView: PointF or platform-native point type` | Clicked gutter icon line, icon id, and pointer location relative to the editor view |
-| `InlayHintClickEvent` | `line: int`, `column: int`, `type: InlayType`, `intValue: int`, `locationInView: PointF or platform-native point type` | Clicked inlay hint position, inlay type, type-specific value, and pointer location relative to the editor view |
-| `CodeLensClickEvent` | `line: int`, `column: int`, `commandId: int`, `locationInView: PointF or platform-native point type` | Clicked CodeLens line/column anchor, unique command id, and pointer location relative to the editor view |
-| `LinkClickEvent` | `line: int`, `column: int`, `target: String`, `locationInView: PointF or platform-native point type` | Clicked link line/column anchor, resolved link target, and pointer location relative to the editor view |
-| `LongPressEvent` | `cursorPosition: TextPosition`, `locationInView: PointF or platform-native point type` | Raw long-press target position and pointer location relative to the editor view |
-| `DoubleTapEvent` | `cursorPosition: TextPosition`, `hasSelection: boolean`, `selection: TextRange?`, `locationInView: PointF or platform-native point type` | Double-tap target position, resulting selection state, and pointer location relative to the editor view |
-| `ContextMenuEvent` | `cursorPosition: TextPosition`, `locationInView: PointF or platform-native point type` | Explicit context-menu gesture target position and pointer location relative to the editor view |
+| `FoldToggleEvent` | `line: int`, `isGutter: boolean`, `locationInEditor: PointF or platform-native point type` | Toggled fold line, whether the click came from gutter, and pointer location relative to the editor's local coordinate space |
+| `GutterIconClickEvent` | `line: int`, `iconId: int`, `locationInEditor: PointF or platform-native point type` | Clicked gutter icon line, icon id, and pointer location relative to the editor's local coordinate space |
+| `InlayHintClickEvent` | `line: int`, `column: int`, `type: InlayType`, `intValue: int`, `locationInEditor: PointF or platform-native point type` | Clicked inlay hint position, inlay type, type-specific value, and pointer location relative to the editor's local coordinate space |
+| `CodeLensClickEvent` | `line: int`, `column: int`, `commandId: int`, `locationInEditor: PointF or platform-native point type` | Clicked CodeLens line/column anchor, unique command id, and pointer location relative to the editor's local coordinate space |
+| `LinkClickEvent` | `line: int`, `column: int`, `target: String`, `locationInEditor: PointF or platform-native point type` | Clicked link line/column anchor, resolved link target, and pointer location relative to the editor's local coordinate space |
+| `LongPressEvent` | `cursorPosition: TextPosition`, `locationInEditor: PointF or platform-native point type` | Raw long-press target position and pointer location relative to the editor's local coordinate space |
+| `DoubleTapEvent` | `cursorPosition: TextPosition`, `hasSelection: boolean`, `selection: TextRange?`, `locationInEditor: PointF or platform-native point type` | Double-tap target position, resulting selection state, and pointer location relative to the editor's local coordinate space |
+| `ContextMenuEvent` | `cursorPosition: TextPosition`, `locationInEditor: PointF or platform-native point type` | Explicit context-menu gesture target position and pointer location relative to the editor's local coordinate space |
 | `ContextMenuItemClickEvent` *(platform-specific)* | `item: ContextMenuItem`, `request: ContextMenuRequest` | Clicked custom context-menu item and the immutable request snapshot used to build that menu |
 | `SelectionMenuItemClickEvent` *(platform-specific)* | `item: SelectionMenuItem` | Clicked custom selection-menu item |
 
@@ -1158,13 +1198,13 @@ Platforms MAY expose the raw return value of `handleGestureEvent(...)` / `handle
 | Field | Type | MUST/MAY | Description |
 |---|---|---|---|
 | `hitTarget` | `HitTargetType` + platform-aligned payload | **MUST** | Hit-test result for the current gesture location |
-| `pointerCursorType` | `PointerCursorType` | **MUST** | Pointer cursor hint for the current mouse location |
+| `pointerCursorType` | `PointerCursorType` | **MUST** on desktop, **MAY** on touch-only platforms | Pointer cursor hint for the current mouse location |
 
-> Desktop platforms SHOULD apply `pointerCursorType` immediately after gesture processing for responsive cursor updates. Touch-only platforms MAY ignore the visual cursor change while still preserving enum and bridge compatibility.
+> Desktop platforms SHOULD apply `pointerCursorType` immediately after gesture processing for responsive cursor updates. Touch-only platforms MAY omit this field entirely, or ignore the visual cursor change if they still surface it for compatibility.
 
 ### 11.5 ContextMenu Standard Contract
 
-`ContextMenu` is a widget-layer, platform-side UI capability. It MUST NOT be modeled as a C++ Core render-model concept or serialized as a Core decoration type. If a platform implements context menus, it SHOULD expose the following standard data model and semantics.
+`ContextMenu` is a widget-layer, platform-side UI capability. It MUST NOT be modeled as a C++ Core render-model concept or serialized as a Core decoration type. If a platform implements context menus, it MUST follow the following standard data model and semantics.
 
 #### Recommended Types
 
@@ -1175,7 +1215,7 @@ enum ContextMenuTriggerKind {
 }
 
 interface ContextMenuItemProvider {
-    provideMenuItems(editor: SweetEditor, request: ContextMenuRequest) -> List<ContextMenuSection>
+    provideMenuItems(request: ContextMenuRequest) -> List<ContextMenuSection>
 }
 ```
 
@@ -1185,7 +1225,7 @@ interface ContextMenuItemProvider {
 |---|---|---|---|
 | `triggerKind` | `ContextMenuTriggerKind` | **MUST** | Trigger kind for the current menu show cycle |
 | `cursorPosition` | `TextPosition` | **MUST** | Caret position after the triggering gesture resolves |
-| `locationInView` | `PointF or platform-native point type` | **MUST** | Pointer location relative to the editor view |
+| `locationInEditor` | `PointF or platform-native point type` | **MUST** | Pointer location relative to the editor's local coordinate space |
 | `hasSelection` | boolean | **MUST** | Whether the editor has a non-empty selection |
 | `selection` | `TextRange?` | **MAY** | Current selection snapshot; `null` when `hasSelection == false` |
 | `hitTarget` | platform-aligned `HitTarget` payload | **MUST** | Hit-test result at the trigger location |
@@ -1207,27 +1247,27 @@ interface ContextMenuItemProvider {
 |---|---|---|---|
 | `items` | `List<ContextMenuItem>` | **MUST** | Full list of menu items in that section |
 
-The context-menu capability SHOULD satisfy the following semantics:
+Context-menu semantics:
 - `LongPressEvent` and/or `ContextMenuEvent` MAY be the trigger signal; `ContextMenuRequest` is the immutable snapshot used to build the actual menu model
 - The provider returns the complete menu model for the current show cycle, rather than incremental appended items
 - Passing `null` as the provider SHOULD restore the platform default context menu
 - Returning an empty list MAY suppress the menu for that show cycle
-- `locationInView` MUST remain view-local; platforms convert it to screen / window coordinates only when presenting a popup or native menu
+- `locationInEditor` MUST remain editor-local; platforms convert it to screen / window coordinates only when presenting a popup or native menu
 - A platform MAY open a context menu from `LongPressEvent` without publishing `ContextMenuEvent`; in that case `ContextMenuRequest.triggerKind` MUST still be `LONG_PRESS`
 - If `hitTarget == LINK` and `linkTarget` is non-empty, the default menu SHOULD include built-in actions `open_link` and `copy_link`
 - If `hasSelection == true`, the default menu SHOULD include built-in actions `cut` and `copy`
 - The general/default section SHOULD include built-in actions `paste` and `select_all`
 - `ContextMenuItem.icon` MAY be null; if a given menu contains any icon-bearing rows, platforms SHOULD reserve a consistent leading icon slot for visual alignment
-- If custom-item injection is supported, the platform MUST provide a host-visible way to observe custom item activation via `ContextMenuItemClickEvent` or an equivalent callback payload
+- The platform MUST provide a host-visible way to observe custom item activation via `ContextMenuItemClickEvent` or an equivalent callback payload
 - After command execution, text change, or another gesture that invalidates the current target, the menu SHOULD dismiss unless the platform intentionally supports a persistent multi-step workflow
 
-Platforms SHOULD expose a `SweetEditor`-level API equivalent to `setContextMenuItemProvider(provider)` when host code is allowed to customize context-menu content.
+Platforms that implement `ContextMenu` MUST expose a host-facing API equivalent to `setContextMenuItemProvider(provider)`.
 
 ---
 
 ## 12. Enumeration and Constant Values (MUST)
 
-Enum and enum-like constant values MUST match the C++ core definitions. The following groups MUST have identical members and numeric values across all platforms:
+Enum and enum-like constant values MUST match the C++ core definitions. The following groups MUST remain aligned with the C++ core across all platforms. When explicit numeric values are listed below, platforms MUST use those same values. When a row lists only member names or says it is aligned with the C++ core, platforms MUST still match the corresponding core definition.
 
 | Enum | Values |
 |---|---|
@@ -1328,7 +1368,7 @@ Public APIs use defensive handling for invalid inputs; managed-language host-fac
 | Line / column out of bounds | **MUST** | Automatically clamp to valid range `[0, max)`; MUST NOT throw exceptions |
 | null / empty parameters | **MUST** | Platforms MUST honor the nullable semantics of parameters that are defined as nullable. For MUST-non-null parameters, managed-language public APIs SHOULD fail fast using platform-idiomatic errors (for example Java `NullPointerException` / `IllegalArgumentException`, C# `ArgumentNullException`) and MUST NOT cause native / C++ crashes or undefined behavior; bridge / FFI boundaries MUST handle invalid input safely |
 | Invalid enum values | **MUST** | For host-facing public APIs that are forced to expose integer enum values, platforms MUST handle invalid values explicitly; managed-language public APIs SHOULD fail fast using platform-idiomatic errors (for example `IllegalArgumentException`), and MAY instead fall back to a default value. For raw integer enum values used by `EditorCore`, bridge layers, or FFI layers, platforms are not required to repeat host-level business validation, but MUST NOT allow invalid input to cause native / C++ crashes or undefined behavior |
-| Calls when widget not mounted | **SHOULD** | Getters return null or default values; imperative methods SHOULD queue or silently ignore (consistent with Section 3.0.3) |
+| Calls outside ready / active lifecycle | **SHOULD** | Platforms SHOULD follow the lifecycle rules in Sections 3.0.3 and 16.3. Before a declarative editor instance is ready, or after terminal teardown, getters SHOULD return `null` or default values. Mutating imperative calls MUST be ignored or rejected and MUST NOT be queued. After terminal teardown, runtime-affecting calls MUST be no-ops or return default values. This rule primarily applies to declarative controllers, explicit teardown APIs, or platforms with a defined terminal session lifecycle boundary |
 
 ### 15.2 Provider Exception Handling
 
@@ -1351,43 +1391,56 @@ Public APIs use defensive handling for invalid inputs; managed-language host-fac
 
 Resource creation and destruction follow explicit ordering constraints to prevent dangling references and memory leaks.
 
+For all platforms, the conformance target is terminal release-path safety plus eventual native-resource release. The standard does not require every platform to expose an explicit `dispose()` / `close()` / `release()` API, and it does not require a single cross-platform deterministic destruction moment. Platforms MAY satisfy the release-path requirement through an explicit teardown API, a host-managed lifecycle, widget or controller destruction, destructor / RAII / `Drop`, ARC / `deinit`, GC / finalizer-backed reclamation, or another platform-idiomatic cleanup mechanism. For GC-managed imperative widget platforms, the standard does not require inventing a synthetic terminal session-teardown hook solely for conformance; the primary requirement is eventual native-resource release plus safety after teardown or release.
+
 ### 16.1 `EditorCore` Lifecycle
 
 | Phase | Constraint | Rule |
 |---|---|---|
 | Creation | **MUST** | `EditorCore` instance MUST be created during widget initialization (imperative frameworks: constructor or init; declarative frameworks: on first widget mount) |
-| Release path | **MUST** | The platform MUST ensure that `EditorCore` and its native / C++ resources are eventually released. For GC-managed languages, the primary conformance target is logical teardown plus eventual native reclamation, not a mandatory explicit release method. The mechanism MAY be an explicit `dispose()` / `close()`, a host-managed lifecycle, GC / finalizer / ARC-backed automatic reclamation, an equivalent platform cleanup hook, or another platform-idiomatic strategy. View detachment, widget unmount, or temporary removal from the view tree is NOT by itself required to be the final reclamation moment |
-| Post-teardown calls | **MUST** | If the platform exposes an explicit release API, or otherwise keeps the object reachable after logical teardown or internal release, subsequent calls MUST NOT access freed native / C++ resources and MUST NOT trigger further editor side effects or callbacks. Mutating calls MUST be a no-op or throw an explicit "already destroyed" exception. Getter calls MAY return `null`, default values, or last-known managed snapshots, as long as they do not require released native state or trigger lazy recomputation against destroyed resources |
+| Release path | **MUST** | The platform MUST ensure that `EditorCore` and its native / C++ resources are eventually released. An explicit `dispose()` / `close()` / `release()` API is optional. Platforms MAY instead rely on a host-managed editor lifecycle, widget/session destruction, destructor / RAII / `Drop`, ARC / `deinit`, GC / finalizer-backed automatic reclamation, an equivalent platform cleanup hook, or another platform-idiomatic strategy. For GC-managed imperative widget platforms, eventual reclamation through GC, finalizer, Cleaner, or an equivalent runtime-backed cleanup mechanism is sufficient even when the platform does not expose a distinct terminal session callback. Controller destruction only counts when it is part of the associated editor instance's terminal cleanup path. View detachment, widget unmount, or temporary removal from the view tree is NOT by itself required to be the final reclamation moment |
+| Post-teardown calls | **MUST** | If the platform exposes an explicit terminal teardown API, or otherwise keeps the object reachable and callable after logical teardown or internal release, subsequent calls MUST NOT access invalid native / C++ resources and MUST NOT trigger further editor side effects or callbacks. Mutating calls MUST be no-ops or return default values. Getter calls MAY return `null`, default values, or last-known managed snapshots, as long as they do not require live native state or trigger lazy recomputation against released resources |
 | Repeated release | **MUST** | If the platform exposes explicit release logic, multiple invocations MUST be idempotent (no-op); MUST NOT cause double-free |
 
-> The standard requires eventual native-resource release, but does **not** require every managed-language `Document` / bridge wrapper to expose an additional explicit release API beyond the platform's own lifecycle model. For GC-managed languages, platforms SHOULD prioritize logical teardown: stop timers, detach listeners, cancel or stale-mark async receivers, and break reference chains that would otherwise keep the editor object graph alive. If a platform chooses to keep returning last-known managed snapshots after teardown, it SHOULD document that those values are stale snapshots rather than live editor state.
+> The standard requires eventual native-resource release, but does **not** require every platform, or every `Document` / bridge wrapper, to expose an additional explicit release API beyond its own lifecycle model. Platforms SHOULD prioritize logical teardown safety: stop timers, detach listeners, cancel or stale-mark async receivers, and break reference chains that would otherwise keep the editor object graph alive. If a platform exposes explicit teardown logic or another known terminal cleanup callback, it MUST perform the corresponding logical teardown cleanup. On GC-managed imperative widget platforms that do not expose such a terminal cleanup hook, proactive cleanup remains a SHOULD rather than a MUST. If a platform chooses to keep returning last-known managed snapshots after teardown, it SHOULD document that those values are stale snapshots rather than live editor state.
 
 ### 16.2 Provider Lifecycle
 
 | Rule | Constraint | Description |
 |---|---|---|
-| Registration timing | **SHOULD** | Providers SHOULD be registered after `loadDocument()` to ensure valid document data in the Context |
-| Cleanup during release | **MUST** | If the platform defines an explicit editor release / dispose / close / teardown phase, it MUST automatically unregister all registered Providers and cancel or mark stale all in-flight async requests so late results are ignored. On GC-managed platforms, an equivalent logical teardown MUST still detach listeners, stop timers, and cancel or stale-mark async receivers so late results cannot keep the editor object graph alive or mutate freed native resources / host-visible editor state |
+| Registration timing | **MUST** | Providers MUST be registerable at any time after the associated editor instance is ready. The standard MUST NOT require registration to occur after `loadDocument(...)` or after document availability |
+| Pre-attachment calls | **MUST** | On declarative platforms, provider registration calls are only valid after the associated editor instance completes its initial attachment. Host code SHOULD register providers from `whenReady()` or an equivalent ready signal. Calls before that point MAY be ignored or rejected, but MUST NOT be queued by `SweetEditorController` and MUST NOT create a hidden runtime |
+| Invocation prerequisites | **MUST** | Providers MAY be invoked only when the current session has the context/data required by that provider type. If prerequisite document/context data is unavailable, the platform MAY delay invocation, skip invocation, or follow the module-specific empty/default-context contract when such a contract exists |
+| Registration ownership | **MUST** | Provider registrations exposed to host code MUST belong to the currently associated `SweetEditor` session/runtime. They are session-scoped registrations, not controller-owned state |
+| Session cleanup | **MUST** | If the platform defines an explicit session teardown phase, internal detach hook, or another platform-native destruction callback that semantically represents terminal session cleanup, it MUST cancel or stale-mark all in-flight provider work associated with that session, stop related timers/listeners/receivers, ignore late results from the old session, and MUST clear or terminally deactivate session-owned provider registrations as part of that session teardown. If a GC-managed imperative platform does not expose such a terminal cleanup hook, proactive session cleanup is SHOULD rather than MUST; eventual reclamation by the managed runtime is acceptable, provided late results cannot access invalid native state after release |
+| Controller forwarding boundary | **MUST** | `SweetEditorController` MAY forward provider registration calls to the bound `SweetEditor`, but the standard MUST NOT require the controller to retain provider registrations across editor lifetimes or after terminal session teardown |
+| Cleanup during terminal teardown | **MUST** | If the platform defines an explicit controller `dispose()` / `close()` / `release()` phase, or another equivalent final logical teardown hook, it MUST clear controller-owned readiness callbacks and internal pending callbacks, and cancel or stale-mark any controller-owned async work so late results are ignored. It MUST NOT imply controller-side ownership of session provider registrations. On GC-managed platforms, when such an explicit or platform-native terminal cleanup hook exists, the equivalent logical teardown MUST still detach listeners, stop timers, and cancel or stale-mark async receivers so late results cannot keep the editor object graph alive or mutate freed native resources / host-visible editor state. If no such terminal cleanup hook exists on a GC-managed imperative platform, proactive cleanup remains SHOULD rather than MUST |
 | Provider references | **SHOULD** | Platform implementations SHOULD avoid Providers holding strong references to the widget instance to prevent circular references causing memory leaks (Java/Kotlin: WeakReference; Swift: weak/unowned; Dart: no special handling needed) |
 
 ### 16.3 `SweetEditorController` Lifecycle (Declarative Frameworks)
 
+`SweetEditorController` is associated with a single declarative editor instance. It is created by host code, passed to `SweetEditor` at construction time, and acts only as the host-facing forwarding entry for that editor instance. An explicit `close()` / `dispose()` / `release()` API is optional and, when present, represents terminal controller teardown rather than normal widget removal.
+
 | Phase | Constraint | Rule |
 |---|---|---|
-| Creation | **MUST** | Controller MUST be created by host code; lifecycle is managed by the host |
-| Binding | **MUST** | MUST call `bind()` on widget mount and `unbind()` on widget unmount (consistent with Section 3.0.3) |
-| Explicit teardown (if provided) | **MAY** | Platforms MAY provide an explicit controller teardown method such as `dispose()`, `close()`, or `release()`; for GC-managed languages this is not required when the controller no longer retains active resources or reference chains after `unbind()` |
-| Teardown ordering and boundary | **MUST** | If the platform provides an explicit controller teardown method, it MUST first unbind the widget (if still bound), then release controller-owned internal resources; any method call after teardown MUST be a no-op. The controller MUST NOT assume ownership of the bound widget and MUST NOT directly destroy the `View` / `Control` / `Widget` itself |
-| Widget rebuild | **SHOULD** | In declarative frameworks, widgets may be rebuilt due to state changes; the Controller SHOULD seamlessly `bind()` to the new widget after the old one calls `unbind()`, without losing queued operations |
+| Creation | **MUST** | Controller MUST be created by host code and provided to `SweetEditor` when that editor instance is constructed; lifecycle is managed by the host |
+| Association | **MUST** | The association between a `SweetEditorController` and a `SweetEditor` instance MUST be established during construction of that editor instance and MUST remain fixed for that editor lifetime |
+| Internal attachment | **MUST** | The widget/session MUST internally attach during initialization or mount, and internally detach during terminal cleanup of that editor instance |
+| Post-teardown state | **MUST** | After the associated editor instance reaches terminal teardown, the Controller MUST become inactive. Subsequent runtime-affecting operations MUST be no-ops or return default values |
+| Ownership boundary | **MUST** | The Controller MUST NOT own the bound widget/session runtime. `EditorCore`, render/runtime objects, overlay runtime, focus/gesture pipelines, and current binding timers/listeners belong to the currently bound widget/session |
+| Explicit teardown (if provided) | **MAY** | Platforms MAY provide an explicit terminal controller teardown method such as `dispose()`, `close()`, or `release()`. This is optional for both GC-managed and non-GC platforms when terminal teardown is already guaranteed by the host lifecycle or by platform-native destruction semantics |
+| Rebinding | **MUST NOT** | A `SweetEditorController` MUST NOT be rebound to another widget/session/editor instance after its initial association is established |
+| Teardown ordering and boundary | **MUST** | If the platform provides an explicit controller teardown method, it MUST first detach from the associated widget/session if still attached, then release controller-owned internal state, clear readiness callbacks and internal pending callbacks, cancel timers/listeners/receivers/in-flight async work, and break reference chains. Any method call after teardown MUST be a no-op or return a default empty value. The Controller MUST NOT assume ownership of the bound widget and MUST NOT directly destroy the `View` / `Control` / `Widget` itself |
+| Declarative rebuild | **SHOULD** | Ordinary declarative rebuilds that preserve the same mounted editor runtime SHOULD continue to use the same controller association and MUST NOT be treated as rebinding |
 
-> This section applies only to platforms that expose an independent controller object. It MUST NOT be interpreted as requiring every imperative `View` / `Control` / `Widget` / `Document` type to add a library-defined `dispose()` / `close()` method. Controller teardown means detachment and logical deactivation; it does not transfer ownership of, or destroy, the bound widget.
+> This section applies only to platforms that expose an independent controller object. It MUST NOT be interpreted as requiring every imperative `View` / `Control` / `Widget` / `Document` type to add a library-defined `dispose()` / `close()` method. Internal detach means the controller is no longer connected to its associated editor session. Controller teardown means terminal deactivation of the controller itself; it does not transfer ownership of, or destroy, the bound widget.
 
 ### 16.4 Resource Release Order
 
 When the platform performs editor release / dispose / close / final teardown, it MUST satisfy the following safety constraints. For GC-managed platforms, these constraints primarily apply to logical teardown and reference-chain cleanup; final native reclamation MAY happen later, as long as the torn-down object graph can no longer produce user-visible effects or touch invalid native state.
 
 - All in-flight async Provider requests MUST be cancelled or marked stale before their results can reach invalid native state
-- Provider registrations MUST be cleared before they can emit further callbacks into a destroyed editor
+- Provider registrations MUST be cleared or terminally deactivated before they can emit further callbacks into a destroyed editor
 - Host-visible event subscriptions / listeners / observers MUST be cleared before post-destruction callbacks can occur
 - `EditorCore` / native resources MUST be released exactly once and only after no further platform callbacks can legally use them
 - Platform-specific resources (textures, canvases, timers, etc.) MAY be released in platform-idiomatic order, as long as the constraints above are preserved
@@ -1492,7 +1545,6 @@ Multiple CodeLens items on the same code line **MUST** be ordered by `column` as
 | `column` | int | **MUST** | Start column (0-based, UTF-16 offset) |
 | `length` | int | **MUST** | Character length |
 | `severity` | int | **MUST** | Severity level: ERROR=0, WARNING=1, INFO=2, HINT=3 |
-| `color` | int | **MUST** | Custom color (ARGB), 0 means use severity default color |
 
 > `Diagnostic` in this standard is a minimal diagnostic decoration model. It is intended for diagnostic rendering and lightweight interactions, not as a full IDE diagnostic object.
 
@@ -1530,7 +1582,7 @@ Multiple CodeLens items on the same code line **MUST** be ordered by `column` as
 | Field | Type | MUST/MAY | Description |
 |---|---|---|---|
 | `line` | int | **MUST** | Line number (0-based) |
-| `style` | int | **MUST** | Style: SINGLE=0, DOUBLE=1 |
+| `style` | `SeparatorStyle` | **MUST** | Separator style |
 | `count` | int | **MUST** | Repeat count |
 | `textEndColumn` | int | **MUST** | Text end column (used to determine separator drawing start position) |
 
@@ -1542,11 +1594,11 @@ Multiple CodeLens items on the same code line **MUST** be ordered by `column` as
 
 | Field | Type | MUST/MAY | Description |
 |---|---|---|---|
-| `pointerCursorType` | PointerCursorType | **MUST** | Pointer cursor hint for the current mouse location in the snapshot |
+| `pointerCursorType` | PointerCursorType | **MUST** on desktop, **MAY** on touch-only platforms | Pointer cursor hint for the current mouse location in the snapshot |
 
 > Desktop platforms SHOULD map `pointerCursorType` to the native cursor shape, typically `TEXT` for text editing regions, `HAND` for clickable interactive content, and `DEFAULT` for neutral chrome such as scrollbars or gutter areas when appropriate.
 
-> `GestureResult.pointerCursorType` and `EditorRenderModel.pointerCursorType` SHOULD remain semantically consistent. Platforms MAY use the gesture result for immediate cursor updates and the render model as the latest stable snapshot state.
+> On platforms that surface both fields, `GestureResult.pointerCursorType` and `EditorRenderModel.pointerCursorType` SHOULD remain semantically consistent. Platforms MAY use the gesture result for immediate cursor updates and the render model as the latest stable snapshot state.
 
 **`VisualRun`** - One resolved render run
 
@@ -1595,7 +1647,7 @@ All platforms MUST support at least the following two construction methods:
 | Rule | Constraint | Description |
 |---|---|---|
 | Native document reference | **MUST** | `Document` MUST internally retain a bridge-layer reference to a C++ side document instance; whether this is represented as an opaque handle, pointer wrapper, object wrapper, or another mechanism is an implementation detail |
-| Resource release | **MUST** | When `Document` reaches its terminal platform lifecycle state, the bridge layer MUST eventually release the C++ side document memory; the exact cleanup mechanism is platform-specific, and an explicit `dispose()` / `close()` API is optional |
+| Resource release | **MUST** | When `Document` reaches its terminal platform lifecycle state, the bridge layer MUST eventually release the C++ side document memory. The exact cleanup mechanism is platform-specific, and an explicit `dispose()` / `close()` API is optional on both GC-managed and non-GC platforms |
 | Encoding model | **MUST** | Platform layers MUST NOT assume or expose a specific internal storage / layout encoding beyond the semantics guaranteed by the public APIs |
 | Line endings | **MUST** | C++ Core supports LF, CR, and CRLF line endings; text returned by `getLineText()` MUST NOT include line endings |
 
@@ -1603,8 +1655,8 @@ All platforms MUST support at least the following two construction methods:
 
 | Rule | Constraint | Description |
 |---|---|---|
-| Loading timing | **MUST** | After creation, `Document` MUST be loaded into the editor via `loadDocument(doc)`; an unloaded `Document` will not trigger any rendering or events |
-| Document replacement | **MUST** | Calling `loadDocument()` again replaces the current document; the old document reference is managed by host code |
+| Loading timing | **MUST** | After creation, `Document` MUST become the editor's current document either via `loadDocument(doc)` or, on declarative platforms, via declarative initialization inputs for the first attached editor session. If declarative initialization uses `text` instead of `document`, the platform MUST first materialize an equivalent `Document` from that text and treat the materialized `Document` as the current document. A `Document` that has not become the current document for any editor session will not trigger rendering or editor events |
+| Document replacement | **MUST** | Calling `loadDocument()` again replaces the current document. On declarative platforms, changing the declarative current-document input for the same mounted editor runtime has the equivalent effect. If the declarative update uses `text`, the replacement document is the newly materialized `Document` created from that text. The old document reference is managed by host code |
 | Document ownership | **SHOULD** | The same `Document` instance SHOULD NOT be loaded into multiple editor instances simultaneously |
 ## 19. `EditorMetadata` and `LanguageConfiguration` Field Definitions (MUST)
 

@@ -84,26 +84,26 @@ namespace SweetEditor {
 	/// All colors are in ARGB format.
 	/// Apply a theme via <see cref="SweetEditorControl.ApplyTheme(EditorTheme)"/>.
 	/// </summary>
-	public class EditorTheme {
-		public const uint STYLE_KEYWORD = 1;
-		public const uint STYLE_STRING = 2;
-		public const uint STYLE_COMMENT = 3;
-		public const uint STYLE_NUMBER = 4;
-		public const uint STYLE_BUILTIN = 5;
-		public const uint STYLE_TYPE = 6;
-		public const uint STYLE_CLASS = 7;
-		public const uint STYLE_FUNCTION = 8;
-		public const uint STYLE_VARIABLE = 9;
-		public const uint STYLE_PUNCTUATION = 10;
-		public const uint STYLE_ANNOTATION = 11;
-		public const uint STYLE_PREPROCESSOR = 12;
+		public class EditorTheme {
+			public const int STYLE_KEYWORD = 1;
+			public const int STYLE_STRING = 2;
+			public const int STYLE_COMMENT = 3;
+			public const int STYLE_NUMBER = 4;
+			public const int STYLE_BUILTIN = 5;
+			public const int STYLE_TYPE = 6;
+			public const int STYLE_CLASS = 7;
+			public const int STYLE_FUNCTION = 8;
+			public const int STYLE_VARIABLE = 9;
+			public const int STYLE_PUNCTUATION = 10;
+			public const int STYLE_ANNOTATION = 11;
+			public const int STYLE_PREPROCESSOR = 12;
 		/// <summary>
 		/// Base style ID reserved for application-defined/custom text styles.
 		/// Built-in styles in this library currently use low IDs (1..12); to avoid conflicts
 		/// with current/future built-in IDs and keep style IDs consistent across platform bindings,
 		/// allocate custom style IDs starting from <see cref="STYLE_USER_BASE"/> and above.
 		/// </summary>
-		public const uint STYLE_USER_BASE = 100;
+			public const int STYLE_USER_BASE = 100;
 
 		/// <summary>Editor background color (ARGB).</summary>
 		public Color BackgroundColor { get; set; }
@@ -117,13 +117,13 @@ namespace SweetEditor {
 		public Color LineNumberColor { get; set; }
 		/// <summary>Current line number text color (ARGB).</summary>
 		public Color CurrentLineNumberColor { get; set; }
-		/// <summary>Current line highlight background color (ARGB, typically semi-transparent).</summary>
-		public Color CurrentLineColor { get; set; }
+			/// <summary>Current line highlight background color (ARGB, typically semi-transparent).</summary>
+			public Color CurrentLineColor { get; set; }
 
-		/// <summary>Code structure line color (indent/bracket/flow guides, ARGB).</summary>
-		public Color GuideColor { get; set; }
-		/// <summary>Separator line color (SeparatorGuide, ARGB).</summary>
-		public Color SeparatorColor { get; set; }
+			/// <summary>Code structure line color (indent/bracket/flow guides, ARGB).</summary>
+			public Color GuideColor { get; set; }
+			/// <summary>Separator line color (SeparatorGuide, ARGB).</summary>
+			public Color SeparatorLineColor { get; set; }
 
 		/// <summary>Line number area split line color (ARGB).</summary>
 		public Color SplitLineColor { get; set; }
@@ -134,8 +134,8 @@ namespace SweetEditor {
 		/// <summary>Scrollbar thumb active (dragging) color (ARGB).</summary>
 		public Color ScrollbarThumbActiveColor { get; set; } = Color.FromArgb(unchecked((int)0xFFBBBBBB));
 
-		/// <summary>IME composition underline color (ARGB).</summary>
-		public Color CompositionColor { get; set; }
+			/// <summary>IME composition underline color (ARGB).</summary>
+			public Color CompositionUnderlineColor { get; set; }
 
 		/// <summary>InlayHint rounded background color (ARGB).</summary>
 		public Color InlayHintBgColor { get; set; }
@@ -188,7 +188,7 @@ namespace SweetEditor {
 		/// Key: style ID. Value: text style definition.
 		/// Applied to the C++ core when a theme is applied.
 		/// </summary>
-		public Dictionary<uint, TextStyle> TextStyles { get; set; } = new();
+			public Dictionary<int, TextStyle> TextStyles { get; set; } = new();
 
 		/// <summary>
 		/// Defines a text style in the theme.
@@ -196,10 +196,10 @@ namespace SweetEditor {
 		/// <param name="styleId">Style ID.</param>
 		/// <param name="style">Text style definition.</param>
 		/// <returns>This theme instance (for chaining).</returns>
-		public EditorTheme DefineTextStyle(uint styleId, TextStyle style) {
-			TextStyles[styleId] = style;
-			return this;
-		}
+			public EditorTheme DefineTextStyle(int styleId, TextStyle style) {
+				TextStyles[styleId] = style;
+				return this;
+			}
 
 		/// <summary>
 		/// Creates refined dark theme preset.
@@ -212,13 +212,13 @@ namespace SweetEditor {
 			LineNumberColor = Color.FromArgb(unchecked((int)0xFF5E6778)),
 			CurrentLineNumberColor = Color.FromArgb(unchecked((int)0xFF9CB3D6)),
 			CurrentLineColor = Color.FromArgb(unchecked((int)0x163A4A66)),
-			GuideColor = Color.FromArgb(unchecked((int)0x2E56617A)),
-			SeparatorColor = Color.FromArgb(unchecked((int)0xFF4A8F7A)),
+				GuideColor = Color.FromArgb(unchecked((int)0x2E56617A)),
+				SeparatorLineColor = Color.FromArgb(unchecked((int)0xFF4A8F7A)),
 			SplitLineColor = Color.FromArgb(unchecked((int)0x3356617A)),
 			ScrollbarTrackColor = Color.FromArgb(unchecked((int)0x2AFFFFFF)),
 			ScrollbarThumbColor = Color.FromArgb(unchecked((int)0x9A7282A0)),
-			ScrollbarThumbActiveColor = Color.FromArgb(unchecked((int)0xFFAABEDD)),
-			CompositionColor = Color.FromArgb(unchecked((int)0xFF7AA2F7)),
+				ScrollbarThumbActiveColor = Color.FromArgb(unchecked((int)0xFFAABEDD)),
+				CompositionUnderlineColor = Color.FromArgb(unchecked((int)0xFF7AA2F7)),
 			InlayHintBgColor = Color.FromArgb(unchecked((int)0x223A4A66)),
 			InlayHintTextColor = Color.FromArgb(unchecked((int)0xC0AFC2E0)),
 			InlayHintIconColor = Color.FromArgb(unchecked((int)0xCC9CB0CD)),
@@ -265,13 +265,13 @@ namespace SweetEditor {
 			LineNumberColor = Color.FromArgb(unchecked((int)0xFF8A94A6)),
 			CurrentLineNumberColor = Color.FromArgb(unchecked((int)0xFF3A5FA0)),
 			CurrentLineColor = Color.FromArgb(unchecked((int)0x120D3B66)),
-			GuideColor = Color.FromArgb(unchecked((int)0x2229426B)),
-			SeparatorColor = Color.FromArgb(unchecked((int)0xFF2F855A)),
+				GuideColor = Color.FromArgb(unchecked((int)0x2229426B)),
+				SeparatorLineColor = Color.FromArgb(unchecked((int)0xFF2F855A)),
 			SplitLineColor = Color.FromArgb(unchecked((int)0x1F29426B)),
 			ScrollbarTrackColor = Color.FromArgb(unchecked((int)0x1F2A3B55)),
 			ScrollbarThumbColor = Color.FromArgb(unchecked((int)0x80446C9C)),
-			ScrollbarThumbActiveColor = Color.FromArgb(unchecked((int)0xEE6A9AD0)),
-			CompositionColor = Color.FromArgb(unchecked((int)0xFF2563EB)),
+				ScrollbarThumbActiveColor = Color.FromArgb(unchecked((int)0xEE6A9AD0)),
+				CompositionUnderlineColor = Color.FromArgb(unchecked((int)0xFF2563EB)),
 			InlayHintBgColor = Color.FromArgb(unchecked((int)0x143B82F6)),
 			InlayHintTextColor = Color.FromArgb(unchecked((int)0xB0344A73)),
 			InlayHintIconColor = Color.FromArgb(unchecked((int)0xB04B607E)),
@@ -950,8 +950,8 @@ namespace SweetEditor {
 		/// <summary>Gets document.</summary>
 		public Document? GetDocument() => IsReleased ? null : editorCore.GetDocument();
 
-		/// <summary>Gets word range at cursor.</summary>
-		public TextRange? GetWordRangeAtCursor() => IsReleased ? null : editorCore.GetWordRangeAtCursor();
+			/// <summary>Gets word range at cursor.</summary>
+			public TextRange GetWordRangeAtCursor() => IsReleased ? default : editorCore.GetWordRangeAtCursor();
 
 		/// <summary>Gets word at cursor.</summary>
 		public string GetWordAtCursor() => IsReleased ? string.Empty : editorCore.GetWordAtCursor();
@@ -1017,31 +1017,31 @@ namespace SweetEditor {
 		/// <param name="color">Color value (ARGB).</param>
 		/// <param name="backgroundColor">Background color value (ARGB).</param>
 		/// <param name="fontStyle">Font style flags.</param>
-		public void registerTextStyle(uint styleId, int color, int backgroundColor, int fontStyle) =>
+		public void registerTextStyle(int styleId, int color, int backgroundColor, int fontStyle) =>
 			editorCore.registerTextStyle(styleId, color, backgroundColor, fontStyle);
 
 		/// <summary>Registers a text style.</summary>
-		public void RegisterTextStyle(uint styleId, int color, int backgroundColor, int fontStyle) =>
+		public void RegisterTextStyle(int styleId, int color, int backgroundColor, int fontStyle) =>
 			registerTextStyle(styleId, color, backgroundColor, fontStyle);
 
 		/// <summary>Register multiple styles in one batch call.</summary>
 		/// <param name="stylesById">Style definitions keyed by style identifier.</param>
-		public void registerBatchTextStyles(IReadOnlyDictionary<uint, TextStyle> stylesById) =>
+		public void registerBatchTextStyles(IReadOnlyDictionary<int, TextStyle> stylesById) =>
 			editorCore.registerBatchTextStyles(stylesById);
 
 		/// <summary>Registers multiple text styles in one batch call.</summary>
-		public void RegisterBatchTextStyles(IReadOnlyDictionary<uint, TextStyle> stylesById) =>
+		public void RegisterBatchTextStyles(IReadOnlyDictionary<int, TextStyle> stylesById) =>
 			registerBatchTextStyles(stylesById);
 
 		/// <summary>Register style.</summary>
 		/// <param name="styleId">Style identifier.</param>
 		/// <param name="color">Color value (ARGB).</param>
 		/// <param name="fontStyle">Font style flags.</param>
-		public void registerTextStyle(uint styleId, int color, int fontStyle) =>
+		public void registerTextStyle(int styleId, int color, int fontStyle) =>
 			editorCore.registerTextStyle(styleId, color, fontStyle);
 
 		/// <summary>Registers a text style.</summary>
-		public void RegisterTextStyle(uint styleId, int color, int fontStyle) =>
+		public void RegisterTextStyle(int styleId, int color, int fontStyle) =>
 			registerTextStyle(styleId, color, fontStyle);
 
 		/// <summary>Sets line spans.</summary>
@@ -1054,10 +1054,15 @@ namespace SweetEditor {
 			SetLineSpans(line, SpanLayer.SYNTAX, spans);
 		}
 
-		/// <summary>Sets batch line spans.</summary>
-		public void SetBatchLineSpans(SpanLayer layer, Dictionary<int, IList<StyleSpan>> spansByLine) {
-			editorCore.SetBatchLineSpans((int)layer, spansByLine);
-		}
+			/// <summary>Sets batch line spans.</summary>
+			public void SetBatchLineSpans(SpanLayer layer, Dictionary<int, IList<StyleSpan>> spansByLine) {
+				editorCore.SetBatchLineSpans((int)layer, spansByLine);
+			}
+
+			/// <summary>Clears line spans for the specified layer.</summary>
+			public void ClearLineSpans(int line, SpanLayer layer) {
+				editorCore.ClearLineSpans(line, (int)layer);
+			}
 
 		/// <summary>Sets line inlay hints.</summary>
 		public void SetLineInlayHints(int line, IList<InlayHint> hints) {
@@ -1328,6 +1333,7 @@ namespace SweetEditor {
 			editorCore.SetKeyMap(keyMap);
 
 			settings = new EditorSettings(this);
+			editorCore.SetAutoIndentMode((int)settings.GetAutoIndentMode());
 			editorCore.SetCompositionEnabled(settings.IsCompositionEnabled());
 			settings.SetContentStartPadding(DpToPx(DefaultContentStartPaddingDp));
 		}
@@ -1561,7 +1567,7 @@ namespace SweetEditor {
 		protected override void OnMouseDown(MouseEventArgs e) {
 			using var perf = StartInputPerf($"OnMouseDown({e.Button})");
 			Focus();
-			Modifier mods = GetCurrentModifiers();
+			KeyModifier mods = GetCurrentModifiers();
 			if (e.Button == MouseButtons.Left) {
 				GestureResult gestureResult = editorCore.HandleGestureEvent(new GestureEvent {
 					Type = EventType.MOUSE_DOWN,
@@ -1589,7 +1595,7 @@ namespace SweetEditor {
 
 		protected override void OnMouseMove(MouseEventArgs e) {
 			using var perf = StartInputPerf($"OnMouseMove({e.Button})");
-			Modifier mods = GetCurrentModifiers();
+			KeyModifier mods = GetCurrentModifiers();
 			GestureResult gestureResult = editorCore.HandleGestureEvent(new GestureEvent {
 				Type = EventType.MOUSE_MOVE,
 				Points = [new PointF(e.X, e.Y)],
@@ -1634,7 +1640,7 @@ namespace SweetEditor {
 		protected override void OnMouseUp(MouseEventArgs e) {
 			using var perf = StartInputPerf($"OnMouseUp({e.Button})");
 			if (e.Button == MouseButtons.Left) {
-				Modifier mods = GetCurrentModifiers();
+				KeyModifier mods = GetCurrentModifiers();
 				GestureResult gestureResult = editorCore.HandleGestureEvent(new GestureEvent {
 					Type = EventType.MOUSE_UP,
 					Points = [new PointF(e.X, e.Y)],
@@ -1650,7 +1656,7 @@ namespace SweetEditor {
 
 		protected override void OnMouseWheel(MouseEventArgs e) {
 			using var perf = StartInputPerf($"OnMouseWheel({e.Delta})");
-			Modifier mods = GetCurrentModifiers();
+			KeyModifier mods = GetCurrentModifiers();
 			float deltaY = e.Delta;
 			GestureResult gestureResult = editorCore.HandleGestureEvent(new GestureEvent {
 				Type = EventType.MOUSE_WHEEL,
@@ -1691,22 +1697,22 @@ namespace SweetEditor {
 			}
 		}
 
-		private static Modifier GetCurrentModifiers() {
-			Modifier mods = Modifier.NONE;
-			if ((Control.ModifierKeys & Keys.Shift) != 0) mods |= Modifier.SHIFT;
-			if ((Control.ModifierKeys & Keys.Control) != 0) mods |= Modifier.CTRL;
-			if ((Control.ModifierKeys & Keys.Alt) != 0) mods |= Modifier.ALT;
+		private static KeyModifier GetCurrentModifiers() {
+			KeyModifier mods = KeyModifier.NONE;
+			if ((Control.ModifierKeys & Keys.Shift) != 0) mods |= KeyModifier.SHIFT;
+			if ((Control.ModifierKeys & Keys.Control) != 0) mods |= KeyModifier.CTRL;
+			if ((Control.ModifierKeys & Keys.Alt) != 0) mods |= KeyModifier.ALT;
 			return mods;
 		}
 
 		#region Input Handling And Event Dispatch
 
 		/// <summary>Fire gesture events.</summary>
-		private void FireGestureEvents(GestureResult result, System.Drawing.PointF screenPoint) {
-			var sp = new PointF(screenPoint.X, screenPoint.Y);
+		private void FireGestureEvents(GestureResult result, System.Drawing.PointF locationInEditor) {
+			var point = new PointF(locationInEditor.X, locationInEditor.Y);
 			switch (result.Type) {
 				case GestureType.LONG_PRESS:
-					LongPress?.Invoke(this, new LongPressEventArgs(result.CursorPosition, sp));
+					LongPress?.Invoke(this, new LongPressEventArgs(result.CursorPosition, point));
 					CursorChanged?.Invoke(this, new CursorChangedEventArgs(result.CursorPosition));
 					break;
 				case GestureType.DOUBLE_TAP:
@@ -1714,7 +1720,7 @@ namespace SweetEditor {
 						result.CursorPosition,
 						result.HasSelection,
 						result.HasSelection ? result.Selection : (TextRange?)null,
-						sp));
+						point));
 					CursorChanged?.Invoke(this, new CursorChangedEventArgs(result.CursorPosition));
 					if (result.HasSelection) {
 						SelectionChanged?.Invoke(this, new SelectionChangedEventArgs(true, result.Selection, result.CursorPosition));
@@ -1735,7 +1741,7 @@ namespace SweetEditor {
 									result.HitTarget.Column,
 									InlayType.Text,
 									0,
-									sp));
+									point));
 								break;
 							case HitTargetType.INLAY_HINT_ICON:
 								InlayHintClick?.Invoke(this, new InlayHintClickEventArgs(
@@ -1743,7 +1749,7 @@ namespace SweetEditor {
 									result.HitTarget.Column,
 									InlayType.Icon,
 									result.HitTarget.IconId,
-									sp));
+									point));
 								break;
 							case HitTargetType.INLAY_HINT_COLOR:
 								InlayHintClick?.Invoke(this, new InlayHintClickEventArgs(
@@ -1751,34 +1757,34 @@ namespace SweetEditor {
 									result.HitTarget.Column,
 									InlayType.Color,
 									result.HitTarget.ColorValue,
-									sp));
+									point));
 								break;
 							case HitTargetType.GUTTER_ICON:
 								GutterIconClick?.Invoke(this, new GutterIconClickEventArgs(
 									result.HitTarget.Line,
 									result.HitTarget.IconId,
-									sp));
+									point));
 								break;
 							case HitTargetType.FOLD_PLACEHOLDER:
 							case HitTargetType.FOLD_GUTTER:
 								FoldToggle?.Invoke(this, new FoldToggleEventArgs(
 									result.HitTarget.Line,
 									result.HitTarget.Type == HitTargetType.FOLD_GUTTER,
-									sp));
+									point));
 								break;
 							case HitTargetType.CODELENS:
 								CodeLensClick?.Invoke(this, new CodeLensClickEventArgs(
 									result.HitTarget.Line,
 									result.HitTarget.Column,
 									result.HitTarget.IconId,
-									sp));
+									point));
 								break;
 							case HitTargetType.LINK:
 								LinkClick?.Invoke(this, new LinkClickEventArgs(
 									result.HitTarget.Line,
 									result.HitTarget.Column,
 									GetLinkTargetAt(result.HitTarget.Line, result.HitTarget.Column),
-									sp));
+									point));
 								break;
 						}
 					}
@@ -1804,14 +1810,14 @@ namespace SweetEditor {
 						result.CursorPosition));
 					break;
 				case GestureType.CONTEXT_MENU:
-					ContextMenu?.Invoke(this, new ContextMenuEventArgs(result.CursorPosition, sp));
+					ContextMenu?.Invoke(this, new ContextMenuEventArgs(result.CursorPosition, point));
 					break;
 			}
 		}
 
 		/// <summary>Applies completion item.</summary>
 		private void ApplyCompletionItem(CompletionItem item) {
-			var textEdit = item.TextEditValue;
+			var textEdit = item.TextEdit;
 			bool isSnippet = item.InsertTextFormat == CompletionItem.INSERT_TEXT_FORMAT_SNIPPET;
 			string text = item.InsertText ?? item.Label;
 
@@ -1823,13 +1829,10 @@ namespace SweetEditor {
 				text = textEdit.NewText;
 				hasReplaceRange = true;
 			} else {
-				var wr = GetWordRangeAtCursor();
-				if (wr.HasValue) {
-					TextRange wordRange = wr.Value;
-					if (wordRange.Start.Line != wordRange.End.Line || wordRange.Start.Column != wordRange.End.Column) {
-						replaceRange = wordRange;
-						hasReplaceRange = true;
-					}
+				TextRange wordRange = GetWordRangeAtCursor();
+				if (wordRange.Start.Line != wordRange.End.Line || wordRange.Start.Column != wordRange.End.Column) {
+					replaceRange = wordRange;
+					hasReplaceRange = true;
 				}
 			}
 

@@ -1,3 +1,5 @@
+import { SweetEditorController } from '../SweetEditorController';
+
 /**
  * Data class representing a single item in the selection context menu.
  */
@@ -29,6 +31,5 @@ export interface SelectionMenuState {
  * Implement this to customize the selection context menu.
  */
 export interface SelectionMenuItemProvider {
-  provideMenuItems(): SelectionMenuItem[];
+  provideMenuItems(editor: SweetEditorController): SelectionMenuItem[];
 }
-

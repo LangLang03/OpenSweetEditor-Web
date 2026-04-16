@@ -28,5 +28,5 @@ class NewLineContext {
 /// Return null to indicate the current provider does not handle this,
 /// pass to the next provider in the chain.
 abstract class NewLineActionProvider {
-  NewLineAction? provideNewLineAction(NewLineContext? context);
+  NewLineAction? provideNewLineAction(NewLineContext context);
 }

@@ -79,7 +79,7 @@ All settings are available via `editor.Settings` and take effect immediately.
 | `SetShowSplitLine(bool)` | Gutter split line |
 | `SetContentStartPadding(float)` | Extra padding after gutter |
 | `SetCurrentLineRenderMode(...)` | `NONE` / `BACKGROUND` / `BORDER` |
-| `SetAutoIndentMode(AutoIndentMode)` | `NONE` / `BASIC` / `ADVANCED` |
+| `SetAutoIndentMode(AutoIndentMode)` | `NONE` / `KEEP_INDENT` |
 | `SetBackspaceUnindent(bool)` | Smart backspace unindent |
 | `SetReadOnly(bool)` | Read-only mode |
 | `SetCompositionEnabled(bool)` | IME composition |
@@ -99,13 +99,13 @@ editor.ApplyTheme(theme);
 
 ```csharp
 editor.TextChanged      += (s, e) => { /* e.Action, e.Changes */ };
-editor.CursorChanged    += (s, e) => { /* e.Position */ };
+editor.CursorChanged    += (s, e) => { /* e.CursorPosition */ };
 editor.SelectionChanged += (s, e) => { /* selection info */ };
 editor.ScrollChanged    += (s, e) => { /* scroll info */ };
 editor.ScaleChanged     += (s, e) => { /* new scale */ };
 editor.DocumentLoaded   += (s, e) => { /* document ready */ };
-editor.FoldToggle       += (s, e) => { /* fold state changed */ };
-editor.ContextMenu      += (s, e) => { /* show context menu */ };
+editor.FoldToggle       += (s, e) => { /* e.LocationInEditor */ };
+editor.ContextMenu      += (s, e) => { /* e.LocationInEditor */ };
 ```
 
 ## Text Editing
@@ -126,6 +126,7 @@ editor.Redo();
 // Syntax spans
 editor.SetLineSpans(line, SpanLayer.SYNTAX, spans);
 editor.SetBatchLineSpans(SpanLayer.SYNTAX, spansByLine);
+editor.ClearLineSpans(line, SpanLayer.SYNTAX);
 
 // Diagnostics
 editor.SetLineDiagnostics(line, diagnostics);

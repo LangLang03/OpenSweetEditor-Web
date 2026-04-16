@@ -690,7 +690,7 @@ namespace SweetEditor {
 
 		private void DrawCompositionDecoration(Graphics g, CompositionDecoration comp) {
 			float y = comp.Origin.Y + comp.Height;
-			using var pen = new Pen(currentTheme.CompositionColor, 2f);
+			using var pen = new Pen(currentTheme.CompositionUnderlineColor, 2f);
 			g.DrawLine(pen, comp.Origin.X, y, comp.Origin.X + comp.Width, y);
 		}
 
@@ -771,7 +771,7 @@ namespace SweetEditor {
 			if (model.GuideSegments == null || model.GuideSegments.Count == 0) return;
 			foreach (var seg in model.GuideSegments) {
 				var color = seg.Type switch {
-					GuideType.SEPARATOR => currentTheme.SeparatorColor,
+					GuideType.SEPARATOR => currentTheme.SeparatorLineColor,
 					_ => currentTheme.GuideColor
 				};
 				float lineWidth = seg.Type == GuideType.INDENT ? 1f : 1.2f;

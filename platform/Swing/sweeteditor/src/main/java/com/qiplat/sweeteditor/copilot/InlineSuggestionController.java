@@ -91,6 +91,13 @@ public class InlineSuggestionController {
         this.listener = listener;
     }
 
+    public void close() {
+        if (showing) {
+            clearAndUnsubscribe();
+        }
+        listener = null;
+    }
+
     public void applyTheme(EditorTheme theme) {
         if (actionBar != null) {
             actionBar.applyTheme(theme);

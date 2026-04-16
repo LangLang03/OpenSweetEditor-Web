@@ -12,7 +12,7 @@ import { TextPosition, TextRange } from './CoreFoundation';
 import {
   BracketGuide,
   CodeLensItem,
-  DiagnosticItem,
+  Diagnostic,
   FlowGuide,
   FoldRegion,
   GutterIcon,
@@ -427,7 +427,7 @@ export class ProtocolEncoder {
     return writer.getBuffer();
   }
 
-  static packBatchLineDiagnostics(diagsByLine: Map<number, DiagnosticItem[]>): ArrayBuffer {
+  static packBatchLineDiagnostics(diagsByLine: Map<number, Diagnostic[]>): ArrayBuffer {
     let totalDiags = 0;
     diagsByLine.forEach(items => totalDiags += items.length);
     const writer = new BinaryWriter(4 + diagsByLine.size * 8 + totalDiags * 12);
@@ -507,7 +507,7 @@ export class ProtocolEncoder {
     return writer.getBuffer();
   }
 
-  static packLineDiagnostics(line: number, items: DiagnosticItem[]): ArrayBuffer {
+  static packLineDiagnostics(line: number, items: Diagnostic[]): ArrayBuffer {
     const writer = new BinaryWriter(8 + items.length * 12);
     writer.writeInt32(line);
     writer.writeInt32(items.length);
