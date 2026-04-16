@@ -179,6 +179,12 @@ public class EditorCore {
         }
     }
 
+    public IntRange getVisibleLineRange() {
+        try (Arena tempArena = Arena.ofConfined()) {
+            return EditorNative.getVisibleLineRange(nativeHandle, tempArena);
+        }
+    }
+
     // ===================== Gesture/Keyboard =====================
 
     public GestureResult handleGestureEvent(int type, float[] points, int modifiers,

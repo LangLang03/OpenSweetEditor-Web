@@ -4,6 +4,7 @@ import android.os.SystemClock;
 import android.view.MotionEvent;
 
 import com.qiplat.sweeteditor.core.Document;
+import com.qiplat.sweeteditor.core.foundation.IntRange;
 import com.qiplat.sweeteditor.core.foundation.ScrollBehavior;
 import com.qiplat.sweeteditor.core.visual.ScrollMetrics;
 
@@ -57,16 +58,16 @@ public class ScrollInteractionTest {
     public void testScrollToLineCenter() {
         editorRule.loadText(generateLongContent(200));
         editorRule.runOnEditor(editor -> editor.scrollToLine(100, ScrollBehavior.CENTER));
-        int[] visible = editorRule.runOnEditorSync(editor -> editor.getVisibleLineRange());
-        assertTrue("Line 100 should be visible", visible[0] <= 100 && visible[1] >= 100);
+        IntRange visible = editorRule.runOnEditorSync(editor -> editor.getVisibleLineRange());
+        assertTrue("Line 100 should be visible", visible.start <= 100 && visible.end >= 100);
     }
 
     @Test
     public void testScrollToLineTop() {
         editorRule.loadText(generateLongContent(200));
         editorRule.runOnEditor(editor -> editor.scrollToLine(50, ScrollBehavior.TOP));
-        int[] visible = editorRule.runOnEditorSync(editor -> editor.getVisibleLineRange());
-        assertTrue("Line 50 should be at or near top", visible[0] <= 50 && visible[1] >= 50);
+        IntRange visible = editorRule.runOnEditorSync(editor -> editor.getVisibleLineRange());
+        assertTrue("Line 50 should be at or near top", visible.start <= 50 && visible.end >= 50);
     }
 
     @Test

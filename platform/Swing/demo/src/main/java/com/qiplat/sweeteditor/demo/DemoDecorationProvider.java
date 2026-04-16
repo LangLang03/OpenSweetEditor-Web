@@ -188,8 +188,8 @@ public class DemoDecorationProvider implements DecorationProvider {
         }
 
         List<String> textLines = splitLines(textSnapshot);
-        int renderStartLine = Math.max(0, context.visibleStartLine);
-        int maxLine = Math.min(context.visibleEndLine, highlightSnapshot.lines().size() - 1);
+        int renderStartLine = Math.max(0, context.visibleLineRange.start());
+        int maxLine = Math.min(context.visibleLineRange.end(), highlightSnapshot.lines().size() - 1);
         for (int i = renderStartLine; i <= maxLine; i++) {
             LineHighlight lineHighlight = highlightSnapshot.lines().get(i);
             if (lineHighlight == null || lineHighlight.spans() == null) {

@@ -19,16 +19,14 @@ enum DecorationType {
 
 class DecorationContext {
   const DecorationContext({
-    required this.visibleStartLine,
-    required this.visibleEndLine,
+    required this.visibleLineRange,
     required this.totalLineCount,
     required this.textChanges,
     this.languageConfiguration,
     this.editorMetadata,
   });
 
-  final int visibleStartLine;
-  final int visibleEndLine;
+  final core.IntRange visibleLineRange;
   final int totalLineCount;
   final List<core.TextChange> textChanges;
   final LanguageConfiguration? languageConfiguration;

@@ -40,6 +40,24 @@ namespace NS_SWEETEDITOR {
 
 #pragma endregion
 
+#pragma region [Class: IntRange]
+  bool IntRange::isEmpty() const {
+    return end < start;
+  }
+
+  bool IntRange::contains(int32_t value) const {
+    return !isEmpty() && value >= start && value <= end;
+  }
+
+  int32_t IntRange::length() const {
+    return isEmpty() ? 0 : (end - start + 1);
+  }
+
+  U8String IntRange::dump() const {
+    return "IntRange {start = " + std::to_string(start) + ", end = " + std::to_string(end) + "}";
+  }
+#pragma endregion
+
 #pragma region [Class: PointF]
   float PointF::distance(const PointF& other) const {
     return sqrtf(powf(other.x - x, 2) + powf(other.y - y, 2));

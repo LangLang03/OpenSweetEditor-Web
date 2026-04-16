@@ -100,6 +100,9 @@ namespace NS_SWEETEDITOR {
     /// Get full metric data needed for scrollbar calculations
     ScrollMetrics getScrollMetrics() const;
 
+    /// Get cached visible logical line range from the most recent completed layout pass
+    IntRange getVisibleLineRange() const;
+
     /// Get editor layout metrics
     LayoutMetrics& getLayoutMetrics() const;
 
@@ -557,6 +560,7 @@ namespace NS_SWEETEDITOR {
 
     Viewport m_viewport_;
     ViewState m_view_state_;
+    IntRange m_visible_line_range_;
 
     /// Unified caret state: cursor position + selection
     CaretState m_caret_;

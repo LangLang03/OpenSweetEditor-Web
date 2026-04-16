@@ -26,6 +26,7 @@ import com.qiplat.sweeteditor.core.visual.EditorRenderModel;
 import com.qiplat.sweeteditor.core.visual.LayoutMetrics;
 import com.qiplat.sweeteditor.core.snippet.LinkedEditingModel;
 import com.qiplat.sweeteditor.core.visual.ScrollMetrics;
+import com.qiplat.sweeteditor.core.foundation.IntRange;
 import com.qiplat.sweeteditor.core.foundation.TextChange;
 import com.qiplat.sweeteditor.core.foundation.TextPosition;
 import com.qiplat.sweeteditor.core.foundation.TextRange;
@@ -943,6 +944,18 @@ public class EditorCore {
         } finally {
             nativeFreeBinaryData(data);
         }
+    }
+
+    @NonNull
+    public IntRange getVisibleLineRange() {
+        if (mNativeHandle == 0) {
+            return new IntRange(0, -1);
+        }
+        int[] visible = nativeGetVisibleLineRange(mNativeHandle);
+        if (visible == null || visible.length < 2) {
+            return new IntRange(0, -1);
+        }
+        return new IntRange(visible[0], visible[1]);
     }
 
     // ==================== Style Registration + Highlight Spans ====================
@@ -2185,6 +2198,9 @@ public class EditorCore {
 
     @FastNative
     private static native ByteBuffer nativeGetScrollMetrics(long handle);
+
+    @FastNative
+    private static native int[] nativeGetVisibleLineRange(long handle);
 
     @CriticalNative
     private static native void nativeRegisterTextStyle(long handle, int styleId, int color, int backgroundColor, int fontStyle);

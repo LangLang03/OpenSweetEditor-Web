@@ -6,6 +6,7 @@ import {
   DecorationResult,
   TextChange
 } from './DecorationTypes';
+import { IntRange } from '../core/CoreFoundation';
 import {
   BracketGuide,
   DiagnosticItem,
@@ -43,8 +44,7 @@ export class DecorationProviderManager {
   private pendingTextChanges: TextChange[] = [];
   private generation: number = 0;
   private applyScheduled: boolean = false;
-  private lastVisibleStartLine: number = 0;
-  private lastVisibleEndLine: number = -1;
+  private lastVisibleLineRange: IntRange = { start: 0, end: -1 };
   private scrollRefreshScheduled: boolean = false;
   private pendingScrollRefresh: boolean = false;
   private lastScrollRefreshTimeMs: number = 0;
@@ -160,22 +160,21 @@ export class DecorationProviderManager {
     const currentGeneration = this.generation;
 
     const visible = this.editor.getVisibleLineRange();
-    this.lastVisibleStartLine = visible[0];
-    this.lastVisibleEndLine = visible[1];
+    this.lastVisibleLineRange = visible;
     const total = this.editor.getTotalLineCount();
     const changes = [...this.pendingTextChanges];
     this.pendingTextChanges = [];
 
-    let contextStart = visible[0];
-    let contextEnd = visible[1];
-    if (total > 0 && visible[1] >= visible[0]) {
-      const overscanLines = this.calculateOverscanLines(visible[0], visible[1]);
-      contextStart = Math.max(0, visible[0] - overscanLines);
-      contextEnd = Math.min(total - 1, visible[1] + overscanLines);
+    let contextStart = visible.start;
+    let contextEnd = visible.end;
+    if (total > 0 && visible.end >= visible.start) {
+      const overscanLines = this.calculateOverscanLines(visible.start, visible.end);
+      contextStart = Math.max(0, visible.start - overscanLines);
+      contextEnd = Math.min(total - 1, visible.end + overscanLines);
     }
 
     const context = new DecorationContext(
-      contextStart, contextEnd, total, changes,
+      { start: contextStart, end: contextEnd }, total, changes,
       this.editor.getLanguageConfiguration(), this.editor.getMetadata()
     );
 
@@ -382,7 +381,7 @@ export class DecorationProviderManager {
     if (mode === ApplyMode.REPLACE_ALL) {
       this.editor.clearHighlights(layer);
     } else if (mode === ApplyMode.REPLACE_RANGE) {
-      this.clearSpanRange(layer, this.lastVisibleStartLine, this.lastVisibleEndLine);
+      this.clearSpanRange(layer, this.lastVisibleLineRange.start, this.lastVisibleLineRange.end);
     }
   }
 
@@ -390,7 +389,7 @@ export class DecorationProviderManager {
     if (mode === ApplyMode.REPLACE_ALL) {
       this.editor.clearInlayHints();
     } else if (mode === ApplyMode.REPLACE_RANGE) {
-      this.clearInlayRange(this.lastVisibleStartLine, this.lastVisibleEndLine);
+      this.clearInlayRange(this.lastVisibleLineRange.start, this.lastVisibleLineRange.end);
     }
   }
 
@@ -398,7 +397,7 @@ export class DecorationProviderManager {
     if (mode === ApplyMode.REPLACE_ALL) {
       this.editor.clearDiagnostics();
     } else if (mode === ApplyMode.REPLACE_RANGE) {
-      this.clearDiagnosticRange(this.lastVisibleStartLine, this.lastVisibleEndLine);
+      this.clearDiagnosticRange(this.lastVisibleLineRange.start, this.lastVisibleLineRange.end);
     }
   }
 
@@ -406,7 +405,7 @@ export class DecorationProviderManager {
     if (mode === ApplyMode.REPLACE_ALL) {
       this.editor.clearGutterIcons();
     } else if (mode === ApplyMode.REPLACE_RANGE) {
-      this.clearGutterRange(this.lastVisibleStartLine, this.lastVisibleEndLine);
+      this.clearGutterRange(this.lastVisibleLineRange.start, this.lastVisibleLineRange.end);
     }
   }
 
@@ -414,7 +413,7 @@ export class DecorationProviderManager {
     if (mode === ApplyMode.REPLACE_ALL) {
       this.editor.clearPhantomTexts();
     } else if (mode === ApplyMode.REPLACE_RANGE) {
-      this.clearPhantomRange(this.lastVisibleStartLine, this.lastVisibleEndLine);
+      this.clearPhantomRange(this.lastVisibleLineRange.start, this.lastVisibleLineRange.end);
     }
   }
 
@@ -422,7 +421,7 @@ export class DecorationProviderManager {
     if (mode === ApplyMode.REPLACE_ALL) {
       this.editor.clearCodeLens();
     } else if (mode === ApplyMode.REPLACE_RANGE) {
-      this.clearCodeLensRange(this.lastVisibleStartLine, this.lastVisibleEndLine);
+      this.clearCodeLensRange(this.lastVisibleLineRange.start, this.lastVisibleLineRange.end);
     }
   }
 
@@ -430,7 +429,7 @@ export class DecorationProviderManager {
     if (mode === ApplyMode.REPLACE_ALL) {
       this.editor.clearLinks();
     } else if (mode === ApplyMode.REPLACE_RANGE) {
-      this.clearLinksRange(this.lastVisibleStartLine, this.lastVisibleEndLine);
+      this.clearLinksRange(this.lastVisibleLineRange.start, this.lastVisibleLineRange.end);
     }
   }
 
@@ -721,4 +720,3 @@ function appendMapOfArrays<T>(out: Map<number, T[]>, patch: Map<number, T[]>): v
     target.push(...(src || []));
   });
 }
-

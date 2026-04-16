@@ -60,8 +60,6 @@ public class SweetEditor extends JPanel {
     private EditorRenderModel renderModel;
     private boolean renderModelDirty = true;
     private boolean fontMetricsDirty = true;
-    private int cachedVisibleStartLine;
-    private int cachedVisibleEndLine = -1;
     private EditorRenderer renderer;
     private AnimationHolder animationHolder;
 
@@ -147,8 +145,6 @@ public class SweetEditor extends JPanel {
         if (document == null) return;
         editorCore.loadDocument(document);
         renderModel = null;
-        cachedVisibleStartLine = 0;
-        cachedVisibleEndLine = -1;
         decorationProviderManager.onDocumentLoaded();
         eventBus.publish(new DocumentLoadedEvent());
         flush();
@@ -199,11 +195,11 @@ public class SweetEditor extends JPanel {
         flush();
     }
 
-    public int[] getVisibleLineRange() {
-        if ((renderModel == null || cachedVisibleEndLine < 0) && renderModelDirty) {
+    public IntRange getVisibleLineRange() {
+        if (renderModelDirty) {
             ensureRenderModelUpToDate();
         }
-        return new int[]{cachedVisibleStartLine, cachedVisibleEndLine};
+        return editorCore.getVisibleLineRange();
     }
 
     public int getTotalLineCount() {
@@ -1469,7 +1465,6 @@ public class SweetEditor extends JPanel {
         if (renderModel != null) {
             updateMouseCursor(renderModel.pointerCursorType);
         }
-        updateVisibleLineRangeCache(renderModel);
         if (buildPerf != null) {
             buildPerf.mark(PerfStepRecorder.STEP_BUILD);
             buildPerf.finish();
@@ -1508,22 +1503,6 @@ public class SweetEditor extends JPanel {
             inlineSuggestionController.updatePosition(
                     renderModel.cursor.position.x, renderModel.cursor.position.y, renderModel.cursor.height);
         }
-    }
-
-    private void updateVisibleLineRangeCache(EditorRenderModel model) {
-        if (model == null || model.lines == null || model.lines.isEmpty()) {
-            cachedVisibleStartLine = 0;
-            cachedVisibleEndLine = -1;
-            return;
-        }
-        int start = Integer.MAX_VALUE;
-        int end = -1;
-        for (VisualLine line : model.lines) {
-            if (line.logicalLine < start) start = line.logicalLine;
-            if (line.logicalLine > end) end = line.logicalLine;
-        }
-        cachedVisibleStartLine = start == Integer.MAX_VALUE ? 0 : start;
-        cachedVisibleEndLine = end;
     }
 
     private long startInputPerf() {

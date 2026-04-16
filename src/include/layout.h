@@ -145,7 +145,7 @@ namespace NS_SWEETEDITOR {
 
     void layoutLine(size_t index, LogicalLine& logical_line);
 
-    void layoutVisibleLines(EditorRenderModel& model, const PresentationContext& presentation_context);
+    VisibleLineInfo layoutVisibleLines(EditorRenderModel& model, const PresentationContext& presentation_context);
 
     /// Pointer hit test: convert screen point to text position (for cursor placement / tap)
     /// @param screen_point Screen point (relative to editor view top-left)

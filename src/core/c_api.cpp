@@ -1985,6 +1985,17 @@ int editor_is_line_visible(intptr_t editor_handle, size_t line) {
   return editor_core->isLineVisible(line) ? 1 : 0;
 }
 
+void editor_get_visible_line_range(intptr_t editor_handle, int32_t* out_start_line, int32_t* out_end_line) {
+  if (out_start_line == nullptr || out_end_line == nullptr) return;
+  *out_start_line = 0;
+  *out_end_line = -1;
+  SharedPtr<EditorCore> editor_core = getCPtrHolderValue<EditorCore>(editor_handle);
+  if (editor_core == nullptr) return;
+  IntRange range = editor_core->getVisibleLineRange();
+  *out_start_line = range.start;
+  *out_end_line = range.end;
+}
+
 void editor_clear_highlights(intptr_t editor_handle) {
   SharedPtr<EditorCore> editor_core = getCPtrHolderValue<EditorCore>(editor_handle);
   if (editor_core == nullptr) return;

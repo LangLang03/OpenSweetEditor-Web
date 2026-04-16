@@ -488,8 +488,8 @@ namespace Demo {
 				}
 
 				List<string> textLines = SplitLines(textSnapshot);
-				int renderStartLine = Math.Max(0, context.VisibleStartLine);
-				int maxLine = Math.Min(context.VisibleEndLine, highlightSnapshot.Lines.Count - 1);
+				int renderStartLine = Math.Max(0, context.VisibleLineRange.Start);
+				int maxLine = Math.Min(context.VisibleLineRange.End, highlightSnapshot.Lines.Count - 1);
 				for (int i = renderStartLine; i <= maxLine; i++) {
 					LineHighlight lineHighlight = highlightSnapshot.Lines[i];
 					if (lineHighlight?.Spans == null) {

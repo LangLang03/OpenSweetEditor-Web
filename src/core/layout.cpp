@@ -115,14 +115,14 @@ namespace NS_SWEETEDITOR {
     logical_line.is_layout_dirty = false;
   }
 
-  void TextLayout::layoutVisibleLines(EditorRenderModel& model, const PresentationContext& presentation_context) {
+  VisibleLineInfo TextLayout::layoutVisibleLines(EditorRenderModel& model, const PresentationContext& presentation_context) {
     PERF_TIMER("layoutVisibleLines");
     if (!m_viewport_.valid() || m_document_ == nullptr) {
-      return;
+      return {};
     }
     Vector<LogicalLine>& logical_lines = m_document_->getLogicalLines();
     if (logical_lines.empty()) {
-      return;
+      return {};
     }
     // Compute line number width
     m_layout_metrics_.line_number_width = computeLineNumberWidth();
@@ -199,6 +199,7 @@ namespace NS_SWEETEDITOR {
     model.scroll_y = scroll_y;
     model.viewport_width = m_viewport_.width;
     model.viewport_height = m_viewport_.height;
+    return visible_line_info;
   }
 
   TextPosition TextLayout::hitTestPointer(const PointF& screen_point) {

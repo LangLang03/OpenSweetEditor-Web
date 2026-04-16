@@ -1106,6 +1106,22 @@ external ffi.Pointer<ffi.Uint8> editor_get_scroll_metrics(
   ffi.Pointer<ffi.Size> out_size,
 );
 
+/// Get visible logical line range from the most recent completed layout pass
+/// @param out_start_line Output first visible logical line (inclusive)
+/// @param out_end_line Output last visible logical line (inclusive), or -1 when empty
+@ffi.Native<
+  ffi.Void Function(
+    ffi.IntPtr,
+    ffi.Pointer<ffi.Int32>,
+    ffi.Pointer<ffi.Int32>,
+  )
+>(assetId: _sweeteditorAssetId)
+external void editor_get_visible_line_range(
+  int editor_handle,
+  ffi.Pointer<ffi.Int32> out_start_line,
+  ffi.Pointer<ffi.Int32> out_end_line,
+);
+
 /// Get screen coordinate rect for any text position (for floating panel positioning)
 /// @param line Line number(0-based)
 /// @param column Column number (0-based)

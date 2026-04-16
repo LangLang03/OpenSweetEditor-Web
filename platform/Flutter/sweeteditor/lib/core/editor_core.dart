@@ -939,6 +939,20 @@ class EditorCore {
     );
   }
 
+  IntRange getVisibleLineRange() {
+    _ensureOpen();
+    return using((arena) {
+      final outStartLine = arena.allocate<ffi.Int32>(ffi.sizeOf<ffi.Int32>());
+      final outEndLine = arena.allocate<ffi.Int32>(ffi.sizeOf<ffi.Int32>());
+      bindings.editor_get_visible_line_range(
+        _handle,
+        outStartLine,
+        outEndLine,
+      );
+      return IntRange(outStartLine.value, outEndLine.value);
+    });
+  }
+
   CursorRect getPositionRect(int line, int column) {
     _ensureOpen();
     return using((arena) {

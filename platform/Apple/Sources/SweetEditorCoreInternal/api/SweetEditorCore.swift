@@ -1391,6 +1391,15 @@ class SweetEditorCore {
         }
     }
 
+    func getVisibleLineRange() -> IntRange {
+        return performCoreCall {
+            var startLine: Int32 = 0
+            var endLine: Int32 = -1
+            editor_get_visible_line_range(handle, &startLine, &endLine)
+            return IntRange(start: Int(startLine), end: Int(endLine))
+        }
+    }
+
     func onFontMetricsChanged() {
         performCoreCall {
             editor_on_font_metrics_changed(handle)

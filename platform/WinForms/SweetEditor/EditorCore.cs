@@ -1069,6 +1069,25 @@ namespace SweetEditor {
 		public TextPosition End { get; set; }
 	}
 
+	/// <summary>
+	/// Inclusive integer range.
+	/// </summary>
+	public struct IntRange {
+		[JsonPropertyName("start")]
+		public int Start { get; set; }
+		[JsonPropertyName("end")]
+		public int End { get; set; }
+
+		public bool IsEmpty => End < Start;
+
+		public IntRange(int start, int end) {
+			Start = start;
+			End = end;
+		}
+
+		public override string ToString() => $"IntRange(Start={Start}, End={End})";
+	}
+
 	#region Editor event system
 
 	/// <summary>
@@ -1981,6 +2000,9 @@ namespace SweetEditor {
 		[DllImport(LibraryName, EntryPoint = "editor_is_line_visible", CallingConvention = CallingConvention.Cdecl)]
 		internal static extern int IsLineVisible(IntPtr handle, nuint line);
 
+		[DllImport(LibraryName, EntryPoint = "editor_get_visible_line_range", CallingConvention = CallingConvention.Cdecl)]
+		internal static extern void GetVisibleLineRange(IntPtr handle, out int outStartLine, out int outEndLine);
+
 		[DllImport(LibraryName, EntryPoint = "editor_clear_highlights", CallingConvention = CallingConvention.Cdecl)]
 		internal static extern void ClearHighlights(IntPtr handle);
 
@@ -2784,6 +2806,13 @@ namespace SweetEditor {
 			if (IsReleased) return default;
 			IntPtr payloadPtr = NativeMethods.GetScrollMetrics(nativeHandle, out UIntPtr payloadSize);
 			return ProtocolDecoder.ParseScrollMetrics(payloadPtr, payloadSize);
+		}
+
+		/// <summary>Gets the visible logical line range from the last completed layout pass.</summary>
+		public IntRange GetVisibleLineRange() {
+			if (IsReleased) return new IntRange(0, -1);
+			NativeMethods.GetVisibleLineRange(nativeHandle, out int startLine, out int endLine);
+			return new IntRange(startLine, endLine);
 		}
 		#endregion
 

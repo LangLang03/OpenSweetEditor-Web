@@ -948,6 +948,11 @@ EDITOR_API void editor_unfold_all(intptr_t editor_handle);
 /// @return 1=visible, 0=hidden
 EDITOR_API int editor_is_line_visible(intptr_t editor_handle, size_t line);
 
+/// Get visible logical line range from the most recent completed layout pass
+/// @param out_start_line Output first visible logical line (inclusive)
+/// @param out_end_line Output last visible logical line (inclusive), or -1 when empty
+EDITOR_API void editor_get_visible_line_range(intptr_t editor_handle, int32_t* out_start_line, int32_t* out_end_line);
+
 /// Clear all highlight spans
 EDITOR_API void editor_clear_highlights(intptr_t editor_handle);
 

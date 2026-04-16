@@ -181,6 +181,7 @@ static napi_value Init(napi_env env, napi_value exports)
         NAPI_METHOD("editorFoldAll", EditorCoreNapi::foldAll),
         NAPI_METHOD("editorUnfoldAll", EditorCoreNapi::unfoldAll),
         NAPI_METHOD("editorIsLineVisible", EditorCoreNapi::isLineVisible),
+        NAPI_METHOD("editorGetVisibleLineRange", EditorCoreNapi::getVisibleLineRange),
 
         // Clear all
         NAPI_METHOD("editorClearAllDecorations", EditorCoreNapi::clearAllDecorations),

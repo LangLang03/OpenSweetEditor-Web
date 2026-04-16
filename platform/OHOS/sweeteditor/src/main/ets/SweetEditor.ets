@@ -19,6 +19,7 @@ import {
   AutoIndentMode,
   CurrentLineRenderMode,
   FoldArrowMode,
+  IntRange,
   ScrollBehavior,
   TextPosition,
   TextRange,
@@ -974,25 +975,14 @@ export struct SweetEditor {
     this.flush();
   }
 
-  getVisibleLineRange(): number[] {
-    const model = this.cachedModel;
-    if (!model || !model.visualLines || model.visualLines.length === 0) {
-      return [0, -1];
+  getVisibleLineRange(): IntRange {
+    if (!this.editorCore) {
+      return { start: 0, end: -1 };
     }
-    let start = Number.MAX_SAFE_INTEGER;
-    let end = -1;
-    for (const line of model.visualLines) {
-      if (line.logicalLine < start) {
-        start = line.logicalLine;
-      }
-      if (line.logicalLine > end) {
-        end = line.logicalLine;
-      }
+    if (!this.cachedModel) {
+      this.editorCore.buildRenderModel();
     }
-    if (start === Number.MAX_SAFE_INTEGER) {
-      start = 0;
-    }
-    return [start, end];
+    return this.editorCore.getVisibleLineRange();
   }
 
   getTotalLineCount(): number {

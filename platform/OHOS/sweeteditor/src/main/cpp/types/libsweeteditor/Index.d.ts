@@ -172,6 +172,7 @@ export const editorUnfoldAt: (handle: number, line: number) => boolean;
 export const editorFoldAll: (handle: number) => void;
 export const editorUnfoldAll: (handle: number) => void;
 export const editorIsLineVisible: (handle: number, line: number) => boolean;
+export const editorGetVisibleLineRange: (handle: number) => number[];
 
 // Clear all
 export const editorClearAllDecorations: (handle: number) => void;

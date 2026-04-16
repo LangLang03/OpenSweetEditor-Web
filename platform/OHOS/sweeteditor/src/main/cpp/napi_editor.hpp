@@ -1159,6 +1159,23 @@ public:
     return napi_create_bool_value(env, result != 0);
   }
 
+  static napi_value getVisibleLineRange(napi_env env, napi_callback_info info) {
+    size_t argc = 1;
+    napi_value args[1];
+    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+    int32_t start_line = 0;
+    int32_t end_line = -1;
+    editor_get_visible_line_range(static_cast<intptr_t>(napi_get_handle(env, args[0])), &start_line, &end_line);
+    napi_value result;
+    napi_create_array_with_length(env, 2, &result);
+    napi_value value;
+    napi_create_int32(env, start_line, &value);
+    napi_set_element(env, result, 0, value);
+    napi_create_int32(env, end_line, &value);
+    napi_set_element(env, result, 1, value);
+    return result;
+  }
+
   static napi_value setMaxGutterIcons(napi_env env, napi_callback_info info) {
     size_t argc = 2;
     napi_value args[2];

@@ -145,11 +145,11 @@ class DemoDecorationProvider implements DecorationProvider {
 
     final cacheHighlight = _cacheHighlight;
     if (cacheHighlight != null && cacheHighlight.lines.isNotEmpty) {
-      final startLine = context.visibleStartLine.clamp(
+      final startLine = context.visibleLineRange.start.clamp(
         0,
         cacheHighlight.lines.length - 1,
       );
-      final endLine = context.visibleEndLine.clamp(
+      final endLine = context.visibleLineRange.end.clamp(
         0,
         cacheHighlight.lines.length - 1,
       );

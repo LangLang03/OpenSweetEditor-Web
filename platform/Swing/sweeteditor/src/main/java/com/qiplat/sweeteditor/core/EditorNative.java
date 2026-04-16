@@ -1,5 +1,7 @@
 package com.qiplat.sweeteditor.core;
 
+import com.qiplat.sweeteditor.core.foundation.IntRange;
+
 import java.lang.foreign.*;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
@@ -571,6 +573,9 @@ public final class EditorNative {
     private static final MethodHandle GET_SCROLL_METRICS = downcall("editor_get_scroll_metrics",
             FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
 
+    private static final MethodHandle GET_VISIBLE_LINE_RANGE = downcall("editor_get_visible_line_range",
+            FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+
 
     private static final MethodHandle SET_MAX_GUTTER_ICONS = downcall("editor_set_max_gutter_icons",
             FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT));
@@ -1128,6 +1133,17 @@ public final class EditorNative {
             throw new RuntimeException(t);
         }
         return new float[]{px.get(ValueLayout.JAVA_FLOAT, 0), py.get(ValueLayout.JAVA_FLOAT, 0), ph.get(ValueLayout.JAVA_FLOAT, 0)};
+    }
+
+    public static IntRange getVisibleLineRange(long handle, Arena arena) {
+        MemorySegment startLine = arena.allocate(ValueLayout.JAVA_INT);
+        MemorySegment endLine = arena.allocate(ValueLayout.JAVA_INT);
+        try {
+            GET_VISIBLE_LINE_RANGE.invokeExact(handle, startLine, endLine);
+        } catch (Throwable t) {
+            throw new RuntimeException(t);
+        }
+        return new IntRange(startLine.get(ValueLayout.JAVA_INT, 0), endLine.get(ValueLayout.JAVA_INT, 0));
     }
 
     // ===================== Linked Editing =====================

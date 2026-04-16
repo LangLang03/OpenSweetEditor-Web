@@ -56,6 +56,7 @@ import com.qiplat.sweeteditor.core.adornment.TextStyle;
 
 import com.qiplat.sweeteditor.core.TextMeasurer;
 import com.qiplat.sweeteditor.core.foundation.ScrollBehavior;
+import com.qiplat.sweeteditor.core.foundation.IntRange;
 import com.qiplat.sweeteditor.core.adornment.SpanLayer;
 import com.qiplat.sweeteditor.core.foundation.TextChange;
 import com.qiplat.sweeteditor.core.foundation.TextPosition;
@@ -585,24 +586,12 @@ public class SweetEditor extends View {
         return mEditorCore;
     }
 
-    public int[] getVisibleLineRange() {
+    public IntRange getVisibleLineRange() {
         // Reuse cached model, build once if not exists
-        EditorRenderModel model = mCachedModel;
-        if (model == null) {
-            model = mEditorCore.buildRenderModel();
+        if (mCachedModel == null) {
+            mEditorCore.buildRenderModel();
         }
-        if (model == null || model.lines == null || model.lines.isEmpty()) {
-            return new int[]{0, -1};
-        }
-        int start = Integer.MAX_VALUE;
-        int end = -1;
-        for (VisualLine line : model.lines) {
-            if (line == null) continue;
-            if (line.logicalLine < start) start = line.logicalLine;
-            if (line.logicalLine > end) end = line.logicalLine;
-        }
-        if (start == Integer.MAX_VALUE) start = 0;
-        return new int[]{start, end};
+        return mEditorCore.getVisibleLineRange();
     }
 
     public int getTotalLineCount() {

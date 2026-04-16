@@ -13,6 +13,7 @@ import {
   StyleSpan
 } from '../core/CoreAdornments';
 import { TextChange } from '../core/EditorCore';
+import { IntRange } from '../core/CoreFoundation';
 import { EditorMetadata, LanguageConfiguration } from '../EditorTypes';
 
 export enum DecorationType {
@@ -34,19 +35,17 @@ export enum DecorationType {
 export { TextChange } from '../core/EditorCore';
 
 export class DecorationContext {
-  readonly visibleStartLine: number;
-  readonly visibleEndLine: number;
+  readonly visibleLineRange: IntRange;
   readonly totalLineCount: number;
   readonly textChanges: TextChange[];
   readonly languageConfiguration: LanguageConfiguration | null;
   readonly editorMetadata: EditorMetadata | null;
 
-  constructor(visibleStartLine: number, visibleEndLine: number, totalLineCount: number,
+  constructor(visibleLineRange: IntRange, totalLineCount: number,
     textChanges: TextChange[],
     languageConfiguration: LanguageConfiguration | null,
     editorMetadata: EditorMetadata | null) {
-    this.visibleStartLine = visibleStartLine;
-    this.visibleEndLine = visibleEndLine;
+    this.visibleLineRange = visibleLineRange;
     this.totalLineCount = totalLineCount;
     this.textChanges = [...textChanges];
     this.languageConfiguration = languageConfiguration;
@@ -243,4 +242,3 @@ function copyMapOfArrays<T>(source: Map<number, T[]> | null): Map<number, T[]> |
   });
   return out;
 }
-

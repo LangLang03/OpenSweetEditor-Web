@@ -616,8 +616,6 @@ namespace SweetEditor {
 		private EditorCore editorCore;
 		private EditorRenderModel? renderModel;
 		private bool renderModelDirty = true;
-		private int cachedVisibleStartLine;
-		private int cachedVisibleEndLine = -1;
 		private DecorationProviderManager? decorationProviderManager;
 		private CompletionProviderManager? completionProviderManager;
 		private CompletionPopupController? completionPopupController;
@@ -1153,10 +1151,10 @@ namespace SweetEditor {
 		/// <summary>Sets completion item renderer.</summary>
 		public void SetCompletionItemRenderer(ICompletionItemRenderer? renderer) => completionPopupController?.SetRenderer(renderer);
 
-		public (int start, int end) GetVisibleLineRange() {
-			if (IsReleased) return default;
+		public IntRange GetVisibleLineRange() {
+			if (IsReleased) return new IntRange(0, -1);
 			EnsureRenderModelUpToDate();
-			return (cachedVisibleStartLine, cachedVisibleEndLine);
+			return editorCore.GetVisibleLineRange();
 		}
 
 		public int GetTotalLineCount() => IsReleased ? 0 : (editorCore.GetDocument()?.GetLineCount() ?? 0);
@@ -1933,7 +1931,6 @@ namespace SweetEditor {
 			if (renderModel.HasValue) {
 				UpdateMouseCursor(renderModel.Value.PointerCursorType);
 			}
-			UpdateVisibleLineRangeCache(renderModel);
 			perf.Mark(PerfStepRecorder.StepBuild);
 			perf.Mark(PerfStepRecorder.StepMetrics);
 			perf.Finish();
@@ -1957,25 +1954,6 @@ namespace SweetEditor {
 				PointerCursorType.DEFAULT => Cursors.Default,
 				_ => Cursors.IBeam,
 			};
-		}
-
-		private void UpdateVisibleLineRangeCache(EditorRenderModel? model) {
-			var visualLines = model?.VisualLines;
-			if (visualLines == null || visualLines.Count == 0) {
-				cachedVisibleStartLine = 0;
-				cachedVisibleEndLine = -1;
-				return;
-			}
-
-			int start = int.MaxValue;
-			int end = -1;
-			foreach (var line in visualLines) {
-				if (line.LogicalLine < start) start = line.LogicalLine;
-				if (line.LogicalLine > end) end = line.LogicalLine;
-			}
-
-			cachedVisibleStartLine = start == int.MaxValue ? 0 : start;
-			cachedVisibleEndLine = end;
 		}
 
 		/// <summary>Internal: rebuild fonts and notify core after font-related settings change.</summary>

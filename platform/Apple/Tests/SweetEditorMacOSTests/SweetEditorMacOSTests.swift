@@ -599,7 +599,7 @@ final class SweetEditorMacOSTests: XCTestCase {
 
     func testDecorationProviderDoesNotRefreshOnScrollWhenVisibleRangeUnchanged() {
         let core = SweetEditorCore(fontSize: 14.0, fontName: "Menlo")
-        var visibleRange = (0, 10)
+        var visibleRange = IntRange(start: 0, end: 10)
         let provider = CountingDecorationProvider()
 
         let firstCall = expectation(description: "initial provider call")
@@ -621,7 +621,7 @@ final class SweetEditorMacOSTests: XCTestCase {
         wait(for: [firstCall], timeout: 1.0)
         let baselineCalls = provider.callCount
 
-        visibleRange = (0, 10)
+        visibleRange = IntRange(start: 0, end: 10)
         manager.onScrollChanged()
         RunLoop.main.run(until: Date().addingTimeInterval(0.2))
 
@@ -630,7 +630,7 @@ final class SweetEditorMacOSTests: XCTestCase {
 
     func testDecorationProviderRefreshesOnScrollWhenVisibleRangeChanged() {
         let core = SweetEditorCore(fontSize: 14.0, fontName: "Menlo")
-        var visibleRange = (0, 10)
+        var visibleRange = IntRange(start: 0, end: 10)
         let provider = CountingDecorationProvider()
 
         let initialCall = expectation(description: "initial provider call")
@@ -658,14 +658,14 @@ final class SweetEditorMacOSTests: XCTestCase {
             }
         }
 
-        visibleRange = (1, 11)
+        visibleRange = IntRange(start: 1, end: 11)
         manager.onScrollChanged()
         wait(for: [scrollCall], timeout: 1.0)
     }
 
     func testDecorationProviderRefreshesOnTextChangedEvenWhenVisibleRangeUnchanged() {
         let core = SweetEditorCore(fontSize: 14.0, fontName: "Menlo")
-        let visibleRange = (0, 10)
+        let visibleRange = IntRange(start: 0, end: 10)
         let provider = CountingDecorationProvider()
 
         let initialCall = expectation(description: "initial provider call")
@@ -699,7 +699,7 @@ final class SweetEditorMacOSTests: XCTestCase {
 
     func testDecorationContextAccumulatesTextChangesDuringDebounceWindow() {
         let core = SweetEditorCore(fontSize: 14.0, fontName: "Menlo")
-        let visibleRange = (0, 10)
+        let visibleRange = IntRange(start: 0, end: 10)
         let provider = CountingDecorationProvider()
         var capturedContext: DecorationContext?
 

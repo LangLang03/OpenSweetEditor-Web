@@ -176,8 +176,8 @@ public class DemoDecorationProvider implements DecorationProvider {
                     .links(links, DecorationResult.ApplyMode.REPLACE_RANGE)
                     .build();
         }
-        int renderStartLine = Math.max(0, context.visibleStartLine);
-        int maxLine = Math.min(context.visibleEndLine, cacheHighlight.lines.size() - 1);
+        int renderStartLine = Math.max(0, context.visibleLineRange.start);
+        int maxLine = Math.min(context.visibleLineRange.end, cacheHighlight.lines.size() - 1);
         for (int i = renderStartLine; i <= maxLine; i++) {
             LineHighlight lineHighlight = cacheHighlight.lines.get(i);
             for (TokenSpan token : lineHighlight.spans) {

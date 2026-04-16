@@ -1,5 +1,5 @@
 import { Document, TextEditResult } from './core/EditorCore';
-import { ScrollBehavior, TextPosition, TextRange } from './core/CoreFoundation';
+import { IntRange, ScrollBehavior, TextPosition, TextRange } from './core/CoreFoundation';
 import { CursorRect, ScrollMetrics } from './core/CoreVisual';
 import {
   BracketGuide,
@@ -346,8 +346,8 @@ export class SweetEditorController {
     return this.api ? this.api.getCursorRect() : { x: 0, y: 0, height: 0 };
   }
 
-  getVisibleLineRange(): number[] {
-    return this.api ? this.api.getVisibleLineRange() : [0, -1];
+  getVisibleLineRange(): IntRange {
+    return this.api ? this.api.getVisibleLineRange() : { start: 0, end: -1 };
   }
 
   getTotalLineCount(): number {

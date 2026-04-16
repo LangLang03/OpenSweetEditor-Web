@@ -158,8 +158,8 @@ export class DemoDecorationProvider implements DecorationProvider {
       return this.buildEmptyResult();
     }
 
-    const renderStartLine = Math.max(0, context.visibleStartLine);
-    const maxLine = Math.min(context.visibleEndLine, this.cacheHighlight.lines.length - 1);
+    const renderStartLine = Math.max(0, context.visibleLineRange.start);
+    const maxLine = Math.min(context.visibleLineRange.end, this.cacheHighlight.lines.length - 1);
     for (let line = renderStartLine; line <= maxLine; line++) {
       const lineHighlight = this.cacheHighlight.lines[line];
       for (let spanIndex = 0; spanIndex < lineHighlight.spans.length; spanIndex++) {

@@ -18,8 +18,7 @@ class DecorationProviderManager {
   final List<core.TextChange> _pendingTextChanges = [];
   int _generation = 0;
   bool _applyScheduled = false;
-  int _lastVisibleStartLine = 0;
-  int _lastVisibleEndLine = -1;
+  core.IntRange _lastVisibleLineRange = const core.IntRange(0, -1);
   bool _pendingScrollRefresh = false;
   int _lastScrollRefreshTimeMs = 0;
   bool _disposed = false;
@@ -113,27 +112,23 @@ class DecorationProviderManager {
     _generation++;
     final currentGeneration = _generation;
 
-    final visualLines = session.renderModel.visualLines;
-    final visible = visualLines.isEmpty
-        ? [0, -1]
-        : [visualLines.first.logicalLine, visualLines.last.logicalLine];
-    _lastVisibleStartLine = visible[0];
-    _lastVisibleEndLine = visible[1];
+    final visible =
+        session.editorCore?.getVisibleLineRange() ?? const core.IntRange(0, -1);
+    _lastVisibleLineRange = visible;
     final total = session.document?.lineCount ?? 0;
     final changes = List<core.TextChange>.of(_pendingTextChanges);
     _pendingTextChanges.clear();
 
-    var contextStart = visible[0];
-    var contextEnd = visible[1];
-    if (total > 0 && visible[1] >= visible[0]) {
-      final overscanLines = _calculateOverscanLines(visible[0], visible[1]);
-      contextStart = (visible[0] - overscanLines).clamp(0, total - 1);
-      contextEnd = (visible[1] + overscanLines).clamp(0, total - 1);
+    var contextStart = visible.start;
+    var contextEnd = visible.end;
+    if (total > 0 && visible.end >= visible.start) {
+      final overscanLines = _calculateOverscanLines(visible.start, visible.end);
+      contextStart = (visible.start - overscanLines).clamp(0, total - 1);
+      contextEnd = (visible.end + overscanLines).clamp(0, total - 1);
     }
 
     final context = DecorationContext(
-      visibleStartLine: contextStart,
-      visibleEndLine: contextEnd,
+      visibleLineRange: core.IntRange(contextStart, contextEnd),
       totalLineCount: total,
       textChanges: changes,
       languageConfiguration: session.languageConfiguration,
@@ -299,7 +294,7 @@ class DecorationProviderManager {
     if (mode == ApplyMode.replaceAll) {
       _clearHighlights(layer);
     } else if (mode == ApplyMode.replaceRange) {
-      _clearSpanRange(layer, _lastVisibleStartLine, _lastVisibleEndLine);
+      _clearSpanRange(layer, _lastVisibleLineRange.start, _lastVisibleLineRange.end);
     }
   }
 
@@ -307,7 +302,7 @@ class DecorationProviderManager {
     if (mode == ApplyMode.replaceAll) {
       _clearInlayHints();
     } else if (mode == ApplyMode.replaceRange) {
-      _clearInlayRange(_lastVisibleStartLine, _lastVisibleEndLine);
+      _clearInlayRange(_lastVisibleLineRange.start, _lastVisibleLineRange.end);
     }
   }
 
@@ -315,7 +310,7 @@ class DecorationProviderManager {
     if (mode == ApplyMode.replaceAll) {
       _clearDiagnostics();
     } else if (mode == ApplyMode.replaceRange) {
-      _clearDiagnosticRange(_lastVisibleStartLine, _lastVisibleEndLine);
+      _clearDiagnosticRange(_lastVisibleLineRange.start, _lastVisibleLineRange.end);
     }
   }
 
@@ -323,7 +318,7 @@ class DecorationProviderManager {
     if (mode == ApplyMode.replaceAll) {
       _clearGutterIcons();
     } else if (mode == ApplyMode.replaceRange) {
-      _clearGutterRange(_lastVisibleStartLine, _lastVisibleEndLine);
+      _clearGutterRange(_lastVisibleLineRange.start, _lastVisibleLineRange.end);
     }
   }
 
@@ -331,7 +326,7 @@ class DecorationProviderManager {
     if (mode == ApplyMode.replaceAll) {
       _clearPhantomTexts();
     } else if (mode == ApplyMode.replaceRange) {
-      _clearPhantomRange(_lastVisibleStartLine, _lastVisibleEndLine);
+      _clearPhantomRange(_lastVisibleLineRange.start, _lastVisibleLineRange.end);
     }
   }
 
@@ -339,7 +334,7 @@ class DecorationProviderManager {
     if (mode == ApplyMode.replaceAll) {
       _clearCodeLens();
     } else if (mode == ApplyMode.replaceRange) {
-      _clearCodeLensRange(_lastVisibleStartLine, _lastVisibleEndLine);
+      _clearCodeLensRange(_lastVisibleLineRange.start, _lastVisibleLineRange.end);
     }
   }
 
@@ -347,7 +342,7 @@ class DecorationProviderManager {
     if (mode == ApplyMode.replaceAll) {
       _clearLinks();
     } else if (mode == ApplyMode.replaceRange) {
-      _clearLinksRange(_lastVisibleStartLine, _lastVisibleEndLine);
+      _clearLinksRange(_lastVisibleLineRange.start, _lastVisibleLineRange.end);
     }
   }
 

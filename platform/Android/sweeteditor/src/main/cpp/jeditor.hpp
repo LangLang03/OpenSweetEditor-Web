@@ -765,6 +765,17 @@ public:
     return toJBoolean(editor_is_line_visible(static_cast<intptr_t>(handle), static_cast<size_t>(line)));
   }
 
+  static jintArray getVisibleLineRange(JNIEnv* env, jclass clazz, jlong handle) {
+    int32_t start_line = 0;
+    int32_t end_line = -1;
+    editor_get_visible_line_range(static_cast<intptr_t>(handle), &start_line, &end_line);
+    const jint values[2] = {static_cast<jint>(start_line), static_cast<jint>(end_line)};
+    jintArray result = env->NewIntArray(2);
+    if (result == nullptr) return nullptr;
+    env->SetIntArrayRegion(result, 0, 2, values);
+    return result;
+  }
+
   static void setLineGutterIcons(JNIEnv* env, jclass clazz, jlong handle, jobject buffer, jint size) {
     auto* ptr = env->GetDirectBufferAddress(buffer);
     editor_set_line_gutter_icons(static_cast<intptr_t>(handle), reinterpret_cast<const uint8_t*>(ptr), static_cast<size_t>(size));
@@ -1083,6 +1094,7 @@ public:
       {"nativeFoldAll", "(J)V", (void*) foldAll},
       {"nativeUnfoldAll", "(J)V", (void*) unfoldAll},
       {"nativeIsLineVisible", "(JI)Z", (void*) isLineVisible},
+      {"nativeGetVisibleLineRange", "(J)[I", (void*) getVisibleLineRange},
       {"nativeSetLineGutterIcons", "(JLjava/nio/ByteBuffer;I)V", (void*) setLineGutterIcons},
       {"nativeSetMaxGutterIcons", "(JI)V", (void*) setMaxGutterIcons},
       {"nativeSetFoldArrowMode", "(JI)V", (void*) setFoldArrowMode},

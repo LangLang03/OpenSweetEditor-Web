@@ -175,6 +175,7 @@ namespace NS_SWEETEDITOR {
     setCursorPosition({});
     m_view_state_.scroll_x = 0.0f;
     m_view_state_.scroll_y = 0.0f;
+    m_visible_line_range_ = {};
     normalizeScrollState();
     LOGD("EditorCore::loadDocument()");
   }
@@ -425,7 +426,12 @@ namespace NS_SWEETEDITOR {
     if (m_caret_.has_selection) {
       presentation_context.selection_range = m_caret_.selection;
     }
-    m_text_layout_->layoutVisibleLines(model, presentation_context);
+    m_visible_line_range_ = {};
+    VisibleLineInfo visible_line_info = m_text_layout_->layoutVisibleLines(model, presentation_context);
+    if (!model.lines.empty()) {
+      m_visible_line_range_.start = static_cast<int32_t>(visible_line_info.first_line);
+      m_visible_line_range_.end = static_cast<int32_t>(visible_line_info.last_line);
+    }
     model.split_line_visible = m_settings_.show_split_line;
     model.current_line_render_mode = m_settings_.current_line_render_mode;
     model.gutter_sticky = m_settings_.gutter_sticky;
@@ -489,6 +495,10 @@ namespace NS_SWEETEDITOR {
     metrics.can_scroll_x = bounds.max_scroll_x > 0.0f;
     metrics.can_scroll_y = bounds.max_scroll_y > 0.0f;
     return metrics;
+  }
+
+  IntRange EditorCore::getVisibleLineRange() const {
+    return m_visible_line_range_;
   }
 
   LayoutMetrics& EditorCore::getLayoutMetrics() const {

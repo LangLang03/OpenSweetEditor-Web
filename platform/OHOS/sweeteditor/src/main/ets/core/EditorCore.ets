@@ -4,6 +4,7 @@ import {
   AutoIndentMode,
   CurrentLineRenderMode,
   FoldArrowMode,
+  IntRange,
   ScrollBehavior,
   TextPosition,
   TextRange,
@@ -659,6 +660,14 @@ export class EditorCore {
 
   getScrollMetrics(): ScrollMetrics {
     return ProtocolDecoder.decodeScrollMetrics(native.editorGetScrollMetrics(this.handle));
+  }
+
+  getVisibleLineRange(): IntRange {
+    const visible = native.editorGetVisibleLineRange(this.handle);
+    return {
+      start: visible && visible.length > 0 ? visible[0] : 0,
+      end: visible && visible.length > 1 ? visible[1] : -1
+    };
   }
 
   // ==================== Style Registration + Highlight Spans ====================

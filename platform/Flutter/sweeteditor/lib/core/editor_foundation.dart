@@ -22,6 +22,23 @@ class TextRange {
   String toString() => 'TextRange(start: $start, end: $end)';
 }
 
+/// Inclusive integer range.
+class IntRange {
+  const IntRange(this.start, this.end);
+
+  final int start;
+  final int end;
+
+  bool get isEmpty => end < start;
+
+  bool contains(int value) => !isEmpty && value >= start && value <= end;
+
+  int get length => isEmpty ? 0 : (end - start + 1);
+
+  @override
+  String toString() => 'IntRange(start: $start, end: $end)';
+}
+
 /// Fold arrow display mode.
 enum FoldArrowMode {
   auto_(0),

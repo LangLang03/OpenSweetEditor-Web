@@ -14,6 +14,7 @@ import com.qiplat.sweeteditor.core.adornment.CodeLensItem;
 import com.qiplat.sweeteditor.core.adornment.LinkSpan;
 import com.qiplat.sweeteditor.core.adornment.PhantomText;
 import com.qiplat.sweeteditor.core.adornment.StyleSpan;
+import com.qiplat.sweeteditor.core.foundation.IntRange;
 import com.qiplat.sweeteditor.core.foundation.TextChange;
 
 import javax.swing.SwingUtilities;
@@ -42,8 +43,7 @@ public final class DecorationProviderManager {
     private final List<TextChange> pendingTextChanges = new ArrayList<>();
     private volatile boolean applyScheduled;
     private volatile int generation;
-    private volatile int lastVisibleStartLine;
-    private volatile int lastVisibleEndLine = -1;
+    private volatile IntRange lastVisibleLineRange = new IntRange(0, -1);
     private volatile boolean scrollRefreshScheduled;
     private volatile boolean pendingScrollRefresh;
     private volatile long lastScrollRefreshUptimeMs;
@@ -143,22 +143,20 @@ public final class DecorationProviderManager {
         generation++;
         int currentGeneration = generation;
 
-        int[] visible = editor.getVisibleLineRange();
-        lastVisibleStartLine = visible[0];
-        lastVisibleEndLine = visible[1];
+        IntRange visible = editor.getVisibleLineRange();
+        lastVisibleLineRange = visible;
         int total = editor.getTotalLineCount();
         List<TextChange> changes = new ArrayList<>(pendingTextChanges);
         pendingTextChanges.clear();
-        int contextStart = visible[0];
-        int contextEnd = visible[1];
-        if (total > 0 && visible[1] >= visible[0]) {
-            int overscanLines = calculateOverscanLines(visible[0], visible[1]);
-            contextStart = Math.max(0, visible[0] - overscanLines);
-            contextEnd = Math.min(total - 1, visible[1] + overscanLines);
+        int contextStart = visible.start();
+        int contextEnd = visible.end();
+        if (total > 0 && visible.end() >= visible.start()) {
+            int overscanLines = calculateOverscanLines(visible.start(), visible.end());
+            contextStart = Math.max(0, visible.start() - overscanLines);
+            contextEnd = Math.min(total - 1, visible.end() + overscanLines);
         }
         DecorationContext context = new DecorationContext(
-                contextStart,
-                contextEnd,
+                new IntRange(contextStart, contextEnd),
                 total,
                 changes,
                 editor.getLanguageConfiguration(),
@@ -332,7 +330,7 @@ public final class DecorationProviderManager {
         if (mode == DecorationResult.ApplyMode.REPLACE_ALL) {
             editor.clearHighlights(layer);
         } else if (mode == DecorationResult.ApplyMode.REPLACE_RANGE) {
-            clearSpanRange(layer, lastVisibleStartLine, lastVisibleEndLine);
+            clearSpanRange(layer, lastVisibleLineRange.start(), lastVisibleLineRange.end());
         }
     }
 
@@ -340,7 +338,7 @@ public final class DecorationProviderManager {
         if (mode == DecorationResult.ApplyMode.REPLACE_ALL) {
             editor.clearInlayHints();
         } else if (mode == DecorationResult.ApplyMode.REPLACE_RANGE) {
-            clearInlayRange(lastVisibleStartLine, lastVisibleEndLine);
+            clearInlayRange(lastVisibleLineRange.start(), lastVisibleLineRange.end());
         }
     }
 
@@ -348,7 +346,7 @@ public final class DecorationProviderManager {
         if (mode == DecorationResult.ApplyMode.REPLACE_ALL) {
             editor.clearDiagnostics();
         } else if (mode == DecorationResult.ApplyMode.REPLACE_RANGE) {
-            clearDiagnosticRange(lastVisibleStartLine, lastVisibleEndLine);
+            clearDiagnosticRange(lastVisibleLineRange.start(), lastVisibleLineRange.end());
         }
     }
 
@@ -356,7 +354,7 @@ public final class DecorationProviderManager {
         if (mode == DecorationResult.ApplyMode.REPLACE_ALL) {
             editor.clearGutterIcons();
         } else if (mode == DecorationResult.ApplyMode.REPLACE_RANGE) {
-            clearGutterRange(lastVisibleStartLine, lastVisibleEndLine);
+            clearGutterRange(lastVisibleLineRange.start(), lastVisibleLineRange.end());
         }
     }
 
@@ -364,7 +362,7 @@ public final class DecorationProviderManager {
         if (mode == DecorationResult.ApplyMode.REPLACE_ALL) {
             editor.clearPhantomTexts();
         } else if (mode == DecorationResult.ApplyMode.REPLACE_RANGE) {
-            clearPhantomRange(lastVisibleStartLine, lastVisibleEndLine);
+            clearPhantomRange(lastVisibleLineRange.start(), lastVisibleLineRange.end());
         }
     }
 
@@ -372,7 +370,7 @@ public final class DecorationProviderManager {
         if (mode == DecorationResult.ApplyMode.REPLACE_ALL) {
             editor.clearCodeLens();
         } else if (mode == DecorationResult.ApplyMode.REPLACE_RANGE) {
-            clearCodeLensRange(lastVisibleStartLine, lastVisibleEndLine);
+            clearCodeLensRange(lastVisibleLineRange.start(), lastVisibleLineRange.end());
         }
     }
 
@@ -380,7 +378,7 @@ public final class DecorationProviderManager {
         if (mode == DecorationResult.ApplyMode.REPLACE_ALL) {
             editor.clearLinks();
         } else if (mode == DecorationResult.ApplyMode.REPLACE_RANGE) {
-            clearLinksRange(lastVisibleStartLine, lastVisibleEndLine);
+            clearLinksRange(lastVisibleLineRange.start(), lastVisibleLineRange.end());
         }
     }
 
