@@ -88,6 +88,10 @@ export class EditorTheme {
   diagnosticWarningColor: number = 0xFFE0AF68;
   diagnosticInfoColor: number = 0xFF7DCFFF;
   diagnosticHintColor: number = 0xFF8FA3BF;
+  codeLensColor: number = 0;
+  codeLensActiveColor: number = 0;
+  linkColor: number = 0;
+  linkActiveColor: number = 0;
   linkedEditingActiveColor: number = 0xCC7AA2F7;
   linkedEditingInactiveColor: number = 0x667AA2F7;
   bracketHighlightBorderColor: number = 0xCC9ECE6A;
@@ -137,6 +141,10 @@ export class EditorTheme {
     theme.diagnosticWarningColor = 0xFFE0AF68;
     theme.diagnosticInfoColor = 0xFF7DCFFF;
     theme.diagnosticHintColor = 0xFF8FA3BF;
+    theme.codeLensColor = 0xC0AFC2E0;
+    theme.codeLensActiveColor = 0xFF9CB3D6;
+    theme.linkColor = 0xFF4C9DFF;
+    theme.linkActiveColor = 0xFF7DCFFF;
     theme.linkedEditingActiveColor = 0xCC7AA2F7;
     theme.linkedEditingInactiveColor = 0x667AA2F7;
     theme.bracketHighlightBorderColor = 0xCC9ECE6A;
@@ -196,6 +204,10 @@ export class EditorTheme {
     theme.diagnosticWarningColor = 0xFFD97706;
     theme.diagnosticInfoColor = 0xFF0EA5E9;
     theme.diagnosticHintColor = 0xFF64748B;
+    theme.codeLensColor = 0xB0344A73;
+    theme.codeLensActiveColor = 0xFF3A5FA0;
+    theme.linkColor = 0xFF005FB8;
+    theme.linkActiveColor = 0xFF1A73E8;
     theme.linkedEditingActiveColor = 0xCC2563EB;
     theme.linkedEditingInactiveColor = 0x662563EB;
     theme.bracketHighlightBorderColor = 0xCC0F766E;

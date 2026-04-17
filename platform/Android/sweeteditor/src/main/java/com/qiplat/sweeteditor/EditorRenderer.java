@@ -34,7 +34,6 @@ final class EditorRenderer {
     private static final float HANDLE_DROP_RADIUS = 10.0f;
     private static final float HANDLE_CENTER_DIST = 24.0f;
     private static final int DEFAULT_TEXT_SIZE = 28;
-    private static final int TEMP_LINK_COLOR = 0xFF4C9DFF;
 
     private EditorTheme mTheme;
     private final float mDensity;
@@ -507,9 +506,9 @@ final class EditorRenderer {
                     int fontStyle = run.style != null ? run.style.fontStyle : 0;
                     int color = (run.style != null && run.style.color != 0) ? run.style.color : mTheme.textColor;
                     if (run.type == VisualRunType.CODELENS) {
-                        color = run.active ? getActiveLineNumberColor() : mTheme.inlayHintTextColor;
+                        color = resolveCodeLensColor(run.active);
                     } else if (run.type == VisualRunType.LINK) {
-                        color = TEMP_LINK_COLOR;
+                        color = resolveLinkColor(run.active);
                     }
 
                     if (fontStyle != lastFontStyle) {
@@ -685,6 +684,33 @@ final class EditorRenderer {
         int color = mTheme.currentLineNumberColor;
         if (color == 0) color = mTheme.lineNumberColor;
         return (color & 0x00FFFFFF) | 0xFF000000;
+    }
+
+    private int resolveCodeLensColor(boolean active) {
+        if (active) {
+            int color = mTheme.codeLensActiveColor;
+            if (color == 0) color = getActiveLineNumberColor();
+            if (color == 0) color = mTheme.codeLensColor;
+            if (color == 0) color = mTheme.inlayHintTextColor;
+            if (color == 0) color = mTheme.textColor;
+            return color;
+        }
+        int color = mTheme.codeLensColor;
+        if (color == 0) color = mTheme.inlayHintTextColor;
+        if (color == 0) color = mTheme.textColor;
+        return color;
+    }
+
+    private int resolveLinkColor(boolean active) {
+        if (active) {
+            int color = mTheme.linkActiveColor;
+            if (color == 0) color = mTheme.linkColor;
+            if (color == 0) color = resolveCodeLensColor(true);
+            return color;
+        }
+        int color = mTheme.linkColor;
+        if (color == 0) color = resolveCodeLensColor(false);
+        return color;
     }
 
     private int getCurrentLineBorderColor() {

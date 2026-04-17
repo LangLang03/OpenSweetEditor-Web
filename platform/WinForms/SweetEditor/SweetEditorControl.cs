@@ -137,6 +137,15 @@ namespace SweetEditor {
 			/// <summary>IME composition underline color (ARGB).</summary>
 			public Color CompositionUnderlineColor { get; set; }
 
+		/// <summary>CodeLens text color (ARGB); Color.Empty falls back to a compatible theme color.</summary>
+		public Color CodeLensColor { get; set; } = Color.Empty;
+		/// <summary>CodeLens active text color (ARGB); Color.Empty falls back to a compatible theme color.</summary>
+		public Color CodeLensActiveColor { get; set; } = Color.Empty;
+		/// <summary>Link text color (ARGB); Color.Empty falls back to a compatible theme color.</summary>
+		public Color LinkColor { get; set; } = Color.Empty;
+		/// <summary>Link active text color (ARGB); Color.Empty falls back to a compatible theme color.</summary>
+		public Color LinkActiveColor { get; set; } = Color.Empty;
+
 		/// <summary>InlayHint rounded background color (ARGB).</summary>
 		public Color InlayHintBgColor { get; set; }
 
@@ -219,6 +228,10 @@ namespace SweetEditor {
 			ScrollbarThumbColor = Color.FromArgb(unchecked((int)0x9A7282A0)),
 				ScrollbarThumbActiveColor = Color.FromArgb(unchecked((int)0xFFAABEDD)),
 				CompositionUnderlineColor = Color.FromArgb(unchecked((int)0xFF7AA2F7)),
+			CodeLensColor = Color.FromArgb(unchecked((int)0x8CD4D4D4)),
+			CodeLensActiveColor = Color.FromArgb(unchecked((int)0xFFAEAFAD)),
+			LinkColor = Color.FromArgb(unchecked((int)0xFF4C9DFF)),
+			LinkActiveColor = Color.FromArgb(unchecked((int)0xFF7DCFFF)),
 			InlayHintBgColor = Color.FromArgb(unchecked((int)0x223A4A66)),
 			InlayHintTextColor = Color.FromArgb(unchecked((int)0xC0AFC2E0)),
 			InlayHintIconColor = Color.FromArgb(unchecked((int)0xCC9CB0CD)),
@@ -272,6 +285,10 @@ namespace SweetEditor {
 			ScrollbarThumbColor = Color.FromArgb(unchecked((int)0x80446C9C)),
 				ScrollbarThumbActiveColor = Color.FromArgb(unchecked((int)0xEE6A9AD0)),
 				CompositionUnderlineColor = Color.FromArgb(unchecked((int)0xFF2563EB)),
+			CodeLensColor = Color.FromArgb(unchecked((int)0x8C000000)),
+			CodeLensActiveColor = Color.FromArgb(unchecked((int)0xFF237893)),
+			LinkColor = Color.FromArgb(unchecked((int)0xFF005FB8)),
+			LinkActiveColor = Color.FromArgb(unchecked((int)0xFF4C9DFF)),
 			InlayHintBgColor = Color.FromArgb(unchecked((int)0x143B82F6)),
 			InlayHintTextColor = Color.FromArgb(unchecked((int)0xB0344A73)),
 			InlayHintIconColor = Color.FromArgb(unchecked((int)0xB04B607E)),

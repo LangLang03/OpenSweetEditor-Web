@@ -23,6 +23,10 @@ struct EditorTheme {
     var scrollbarTrackColor: CGColor
     var scrollbarThumbColor: CGColor
     var compositionUnderlineColor: CGColor
+    var codeLensColor: CGColor?
+    var codeLensActiveColor: CGColor?
+    var linkColor: CGColor?
+    var linkActiveColor: CGColor?
     var inlayHintBgColor: CGColor
     var inlayHintTextColor: CGColor
     var inlayHintIconColor: CGColor
@@ -77,6 +81,10 @@ struct EditorTheme {
             scrollbarTrackColor:      CGColor(srgbRed: 1.0, green: 1.0, blue: 1.0, alpha: 0x18/255.0),
             scrollbarThumbColor:      CGColor(srgbRed: 0xA8/255.0, green: 0xA8/255.0, blue: 0xA8/255.0, alpha: 0xD0/255.0),
             compositionUnderlineColor: CGColor(srgbRed: 1.0, green: 0xCC/255.0, blue: 0.0, alpha: 1.0),
+            codeLensColor:            CGColor(srgbRed: 0xD4/255.0, green: 0xD4/255.0, blue: 0xD4/255.0, alpha: 0.55),
+            codeLensActiveColor:      CGColor(srgbRed: 0xAE/255.0, green: 0xAF/255.0, blue: 0xAD/255.0, alpha: 1.0),
+            linkColor:                CGColor(srgbRed: 0x4C/255.0, green: 0x9D/255.0, blue: 0xFF/255.0, alpha: 1.0),
+            linkActiveColor:          CGColor(srgbRed: 0x7D/255.0, green: 0xCF/255.0, blue: 0xFF/255.0, alpha: 1.0),
             inlayHintBgColor:         CGColor(srgbRed: 1.0, green: 1.0, blue: 1.0, alpha: 0x20/255.0),
             inlayHintTextColor:       CGColor(srgbRed: 0xD4/255.0, green: 0xD4/255.0, blue: 0xD4/255.0, alpha: 0.55),
             inlayHintIconColor:       CGColor(srgbRed: 0xD4/255.0, green: 0xD4/255.0, blue: 0xD4/255.0, alpha: 0xB2/255.0),
@@ -120,6 +128,10 @@ struct EditorTheme {
             scrollbarTrackColor:      CGColor(srgbRed: 0x2A/255.0, green: 0x3B/255.0, blue: 0x55/255.0, alpha: 0x12/255.0),
             scrollbarThumbColor:      CGColor(srgbRed: 0x5C/255.0, green: 0x6A/255.0, blue: 0x7A/255.0, alpha: 0x96/255.0),
             compositionUnderlineColor: CGColor(srgbRed: 0.0, green: 0x66/255.0, blue: 1.0, alpha: 1.0),
+            codeLensColor:            CGColor(srgbRed: 0.0, green: 0.0, blue: 0.0, alpha: 0.55),
+            codeLensActiveColor:      CGColor(srgbRed: 0x23/255.0, green: 0x78/255.0, blue: 0x93/255.0, alpha: 1.0),
+            linkColor:                CGColor(srgbRed: 0x00/255.0, green: 0x5F/255.0, blue: 0xB8/255.0, alpha: 1.0),
+            linkActiveColor:          CGColor(srgbRed: 0x4C/255.0, green: 0x9D/255.0, blue: 0xFF/255.0, alpha: 1.0),
             inlayHintBgColor:         CGColor(srgbRed: 0.0, green: 0.0, blue: 0.0, alpha: 0x20/255.0),
             inlayHintTextColor:       CGColor(srgbRed: 0.0, green: 0.0, blue: 0.0, alpha: 0.55),
             inlayHintIconColor:       CGColor(srgbRed: 0.0, green: 0.0, blue: 0.0, alpha: 0xB2/255.0),

@@ -1010,6 +1010,20 @@ interface SelectionMenuListener {
 |---|---|
 | `phantomTextColor` | PhantomText 颜色（通常含透明度） |
 
+**CodeLens**
+
+| 字段 | 说明 |
+|---|---|
+| `codeLensColor` | CodeLens 文本颜色 |
+| `codeLensActiveColor` | CodeLens 激活文本颜色 |
+
+**Link**
+
+| 字段 | 说明 |
+|---|---|
+| `linkColor` | 链接文本颜色 |
+| `linkActiveColor` | 链接激活文本颜色 |
+
 **诊断装饰**
 
 | 字段 | 说明 |
@@ -1045,7 +1059,7 @@ interface SelectionMenuListener {
 
 ### 8.3 工厂方法
 
-每个平台 MUST 至少提供 `dark()` 和 `light()` 工厂方法，返回预配置的主题。
+每个平台 MUST 至少提供 `dark()` 和 `light()` 工厂方法，返回预配置的主题；内建主题 MUST 为 8.2 中全部必需颜色字段显式赋值，包括 `codeLensColor`、`codeLensActiveColor`、`linkColor`、`linkActiveColor`。
 
 ### 8.4 TextStyle 映射
 

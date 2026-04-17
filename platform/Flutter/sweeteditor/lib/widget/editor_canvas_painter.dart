@@ -8,8 +8,6 @@ import '../editor_types.dart';
 
 import 'editor_text_measurer.dart';
 
-const int _linkColor = 0xFF4C9DFF;
-
 class EditorCanvasPainter extends ChangeNotifier implements CustomPainter {
   EditorCanvasPainter({
     required EditorTheme theme,
@@ -240,13 +238,9 @@ class EditorCanvasPainter extends ChangeNotifier implements CustomPainter {
     final baselineY = run.y;
     int? overrideColor;
     if (run.type == core.VisualRunType.codelens) {
-      overrideColor = run.active
-          ? (_theme.currentLineNumberColor != 0
-                ? _theme.currentLineNumberColor
-                : _theme.lineNumberColor)
-          : _theme.inlayHintTextColor;
+      overrideColor = _resolveCodeLensColor(run.active);
     } else if (run.type == core.VisualRunType.link) {
-      overrideColor = _linkColor;
+      overrideColor = _resolveLinkColor(run.active);
     }
     final style = _measurer
         .buildRunStyle(run.style, overrideColor ?? _theme.textColor)
@@ -284,6 +278,24 @@ class EditorCanvasPainter extends ChangeNotifier implements CustomPainter {
       baselineY,
       fontMetrics.ascent,
     );
+  }
+
+  int _resolveCodeLensColor(bool active) {
+    if (active) {
+      if (_theme.codeLensActiveColor != 0) return _theme.codeLensActiveColor;
+      if (_theme.currentLineNumberColor != 0) {
+        return _theme.currentLineNumberColor;
+      }
+      return _theme.lineNumberColor;
+    }
+    if (_theme.codeLensColor != 0) return _theme.codeLensColor;
+    return _theme.inlayHintTextColor;
+  }
+
+  int _resolveLinkColor(bool active) {
+    if (active && _theme.linkActiveColor != 0) return _theme.linkActiveColor;
+    if (_theme.linkColor != 0) return _theme.linkColor;
+    return _resolveCodeLensColor(active);
   }
 
   void _drawPhantomTextRun(Canvas canvas, core.VisualRun run) {

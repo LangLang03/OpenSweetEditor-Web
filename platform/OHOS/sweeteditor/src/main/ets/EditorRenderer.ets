@@ -33,7 +33,6 @@ const HANDLE_LINE_WIDTH = 1.5;
 const HANDLE_DROP_RADIUS = 10.0;
 const HANDLE_CENTER_DIST = 24.0;
 const DEFAULT_TEXT_SIZE = 28;
-const TEMP_LINK_COLOR = 0xFF4C9DFF;
 
 interface FontMetricsSnapshot {
   ascent: number;
@@ -236,9 +235,9 @@ export class EditorRenderer {
     let color = (run.style && run.style.color !== 0) ? run.style.color : this.theme.textColor;
     let metrics: FontMetricsSnapshot | null = null;
     if (run.type === VisualRunType.CODELENS) {
-      color = run.active ? this.getActiveLineNumberColor() : this.theme.inlayHintTextColor;
+      color = this.getCodeLensColor(run.active);
     } else if (run.type === VisualRunType.LINK) {
-      color = TEMP_LINK_COLOR;
+      color = this.getLinkColor(run.active);
     }
 
     if (run.style && run.style.backgroundColor !== 0) {
@@ -835,6 +834,52 @@ export class EditorRenderer {
       return -1;
     }
     return model.cursor.textPosition.line;
+  }
+
+  private getCodeLensColor(active: boolean): number {
+    if (active) {
+      if (this.theme.codeLensActiveColor !== 0) {
+        return this.theme.codeLensActiveColor;
+      }
+      if (this.theme.currentLineNumberColor !== 0) {
+        return this.theme.currentLineNumberColor;
+      }
+      if (this.theme.lineNumberColor !== 0) {
+        return this.theme.lineNumberColor;
+      }
+      return this.theme.textColor;
+    }
+
+    if (this.theme.codeLensColor !== 0) {
+      return this.theme.codeLensColor;
+    }
+    if (this.theme.inlayHintTextColor !== 0) {
+      return this.theme.inlayHintTextColor;
+    }
+    return this.theme.textColor;
+  }
+
+  private getLinkColor(active: boolean): number {
+    if (active) {
+      if (this.theme.linkActiveColor !== 0) {
+        return this.theme.linkActiveColor;
+      }
+      if (this.theme.linkColor !== 0) {
+        return this.theme.linkColor;
+      }
+      return this.getCodeLensColor(true);
+    }
+
+    if (this.theme.linkColor !== 0) {
+      return this.theme.linkColor;
+    }
+    if (this.theme.codeLensColor !== 0) {
+      return this.theme.codeLensColor;
+    }
+    if (this.theme.inlayHintTextColor !== 0) {
+      return this.theme.inlayHintTextColor;
+    }
+    return this.theme.textColor;
   }
 
   private getActiveLineNumberColor(): number {

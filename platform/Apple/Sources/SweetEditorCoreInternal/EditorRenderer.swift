@@ -5,7 +5,6 @@ struct EditorRenderer {
     // MARK: - Theme (mutable, call applyTheme to switch)
 
     static var theme: EditorTheme = .light()
-    private static let linkColor = CGColor(srgbRed: 0x4C / 255.0, green: 0x9D / 255.0, blue: 0xFF / 255.0, alpha: 1.0)
 
     /// Switches theme and returns the new background color for view-layer updates.
     /// Also re-registers syntax highlight styles to the C++ core.
@@ -269,9 +268,9 @@ struct EditorRenderer {
 
         let textColor: CGColor
         if run.type == .CODELENS {
-            textColor = run.active ? t.currentLineNumberColor : t.inlayHintTextColor
+            textColor = run.active ? resolvedCodeLensActiveColor(theme: t) : resolvedCodeLensColor(theme: t)
         } else if run.type == .LINK {
-            textColor = linkColor
+            textColor = run.active ? resolvedLinkActiveColor(theme: t) : resolvedLinkColor(theme: t)
         } else if run.style.color != 0 {
             textColor = cgColorFromARGB(run.style.color)
         } else {
@@ -553,6 +552,22 @@ struct EditorRenderer {
     }
 
     // MARK: - Color Helpers
+
+    private static func resolvedCodeLensColor(theme: EditorTheme) -> CGColor {
+        theme.codeLensColor ?? theme.inlayHintTextColor
+    }
+
+    private static func resolvedCodeLensActiveColor(theme: EditorTheme) -> CGColor {
+        theme.codeLensActiveColor ?? theme.currentLineNumberColor
+    }
+
+    private static func resolvedLinkColor(theme: EditorTheme) -> CGColor {
+        theme.linkColor ?? resolvedCodeLensColor(theme: theme)
+    }
+
+    private static func resolvedLinkActiveColor(theme: EditorTheme) -> CGColor {
+        theme.linkActiveColor ?? theme.linkColor ?? resolvedCodeLensActiveColor(theme: theme)
+    }
 
     static func cgColorFromARGB(_ argb: Int32) -> CGColor {
         let a = CGFloat((argb >> 24) & 0xFF) / 255.0

@@ -996,6 +996,13 @@ All color fields use the platform color type (ARGB). Grouped by function:
 | `inlayHintTextColor` | InlayHint text color (typically with alpha) |
 | `inlayHintIconColor` | InlayHint icon tint color (typically with alpha) |
 
+**CodeLens**
+
+| Field | Description |
+|---|---|
+| `codeLensColor` | CodeLens text color |
+| `codeLensActiveColor` | CodeLens active text color |
+
 **Fold Placeholder**
 
 | Field | Description |
@@ -1008,6 +1015,13 @@ All color fields use the platform color type (ARGB). Grouped by function:
 | Field | Description |
 |---|---|
 | `phantomTextColor` | PhantomText color (typically with alpha) |
+
+**Link**
+
+| Field | Description |
+|---|---|
+| `linkColor` | Link text color |
+| `linkActiveColor` | Link active text color |
 
 **Diagnostics**
 
@@ -1044,7 +1058,7 @@ All color fields use the platform color type (ARGB). Grouped by function:
 
 ### 8.3 Factory Methods
 
-Every platform MUST provide at least `dark()` and `light()` factory methods that return pre-configured themes.
+Every platform MUST provide at least `dark()` and `light()` factory methods that return pre-configured themes. Built-in themes MUST assign explicit values for all required color fields, including `codeLensColor`, `codeLensActiveColor`, `linkColor`, and `linkActiveColor`.
 
 ### 8.4 TextStyle Map
 
