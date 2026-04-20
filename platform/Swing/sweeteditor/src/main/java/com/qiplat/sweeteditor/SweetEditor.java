@@ -1182,28 +1182,43 @@ public class SweetEditor extends JPanel {
                 break;
             case SCROLL:
             case FAST_SCROLL:
-                eventBus.publish(new ScrollChangedEvent(result.viewScrollX, result.viewScrollY));
-                decorationProviderManager.onScrollChanged();
-                // Close completion panel on scroll
-                if (completionPopupController != null && completionPopupController.isShowing()) {
-                    completionProviderManager.dismiss();
-                }
-                if (settings.isCursorAnimationEnabled()) {
-                    ensureRenderModelUpToDate();
-                    animationHolder.cursorAnimatedX = renderModel.cursor.position.x;
-                    animationHolder.cursorAnimatedY = renderModel.cursor.position.y;
-                }
+                handleScrollChanged(result);
                 break;
             case SCALE:
                 eventBus.publish(new ScaleChangedEvent(result.viewScale));
                 break;
             case DRAG_SELECT:
+                if (didScrollSinceLastFrame(result)) {
+                    handleScrollChanged(result);
+                }
                 eventBus.publish(new SelectionChangedEvent(result.hasSelection, result.selection, result.cursorPosition));
                 break;
             case CONTEXT_MENU:
                 eventBus.publish(new ContextMenuEvent(result.cursorPosition, locationInEditor));
                 break;
         }
+    }
+
+    private void handleScrollChanged(GestureResult result) {
+        eventBus.publish(new ScrollChangedEvent(result.viewScrollX, result.viewScrollY));
+        decorationProviderManager.onScrollChanged();
+        if (completionPopupController != null && completionPopupController.isShowing()) {
+            completionProviderManager.dismiss();
+        }
+        if (settings.isCursorAnimationEnabled()) {
+            ensureRenderModelUpToDate();
+            animationHolder.cursorAnimatedX = renderModel.cursor.position.x;
+            animationHolder.cursorAnimatedY = renderModel.cursor.position.y;
+        }
+    }
+
+    private boolean didScrollSinceLastFrame(GestureResult result) {
+        if (renderModel == null) {
+            return Float.compare(result.viewScrollX, 0f) != 0
+                    || Float.compare(result.viewScrollY, 0f) != 0;
+        }
+        return Float.compare(renderModel.scrollX, result.viewScrollX) != 0
+                || Float.compare(renderModel.scrollY, result.viewScrollY) != 0;
     }
 
     private void applyCompletionItem(CompletionItem item) {

@@ -2375,19 +2375,15 @@ export struct SweetEditor {
         break;
       case GestureType.SCROLL:
       case GestureType.FAST_SCROLL:
-        this.eventBus.emit('scrollChanged', new ScrollChangedEvent(result.viewScrollX, result.viewScrollY));
-        if (this.decorationProviderManager) {
-          this.decorationProviderManager.onScrollChanged();
-        }
-        if (this.completionPopupController && this.completionPopupController.isShowing() &&
-          this.completionProviderManager) {
-          this.completionProviderManager.dismiss();
-        }
+        this.handleScrollChanged(result);
         break;
       case GestureType.SCALE:
         this.eventBus.emit('scaleChanged', new ScaleChangedEvent(result.viewScale));
         break;
       case GestureType.DRAG_SELECT:
+        if (this.didScrollSinceLastFrame(result)) {
+          this.handleScrollChanged(result);
+        }
         this.eventBus.emit('selectionChanged', new SelectionChangedEvent(
           result.hasSelection, result.selection, result.cursorPosition));
         break;
@@ -2395,6 +2391,25 @@ export struct SweetEditor {
         this.eventBus.emit('contextMenu', new ContextMenuEvent(result.cursorPosition, locationInEditor));
         break;
     }
+  }
+
+  private handleScrollChanged(result: GestureResult): void {
+    this.eventBus.emit('scrollChanged', new ScrollChangedEvent(result.viewScrollX, result.viewScrollY));
+    if (this.decorationProviderManager) {
+      this.decorationProviderManager.onScrollChanged();
+    }
+    if (this.completionPopupController && this.completionPopupController.isShowing() &&
+      this.completionProviderManager) {
+      this.completionProviderManager.dismiss();
+    }
+  }
+
+  private didScrollSinceLastFrame(result: GestureResult): boolean {
+    if (!this.cachedModel) {
+      return result.viewScrollX !== 0 || result.viewScrollY !== 0;
+    }
+    return this.cachedModel.scrollX !== result.viewScrollX ||
+      this.cachedModel.scrollY !== result.viewScrollY;
   }
 
   private fireHitTargetEvent(result: GestureResult, locationInEditor: PointF): void {

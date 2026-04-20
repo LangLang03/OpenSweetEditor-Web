@@ -1900,23 +1900,15 @@ public class SweetEditor extends View {
                 break;
             case SCROLL:
             case FAST_SCROLL:
-                mEventBus.publish(new ScrollChangedEvent(result.viewScrollX, result.viewScrollY));
-                if (mDecorationProviderManager != null) {
-                    mDecorationProviderManager.onScrollChanged();
-                }
-                // Dismiss completion panel on scroll
-                if (mCompletionPopupController != null && mCompletionPopupController.isShowing()) {
-                    mCompletionProviderManager.dismiss();
-                }
-                if (mSettings.isCursorAnimationEnabled()) {
-                    animationHolder.cursorAnimatedX = -1f;
-                    animationHolder.cursorAnimatedY = -1f;
-                }
+                handleScrollChanged(result);
                 break;
             case SCALE:
                 mEventBus.publish(new ScaleChangedEvent(result.viewScale));
                 break;
             case DRAG_SELECT:
+                if (didScrollSinceLastFrame(result)) {
+                    handleScrollChanged(result);
+                }
                 mEventBus.publish(new SelectionChangedEvent(result.hasSelection, result.selection, result.cursorPosition));
                 break;
             case CONTEXT_MENU:
@@ -1938,6 +1930,28 @@ public class SweetEditor extends View {
         if (mContextMenuController != null) {
             mContextMenuController.onGestureResult(result, locationInEditor);
         }
+    }
+
+    private void handleScrollChanged(@NonNull EditorCore.GestureResult result) {
+        mEventBus.publish(new ScrollChangedEvent(result.viewScrollX, result.viewScrollY));
+        if (mDecorationProviderManager != null) {
+            mDecorationProviderManager.onScrollChanged();
+        }
+        if (mCompletionPopupController != null && mCompletionPopupController.isShowing()) {
+            mCompletionProviderManager.dismiss();
+        }
+        if (mSettings.isCursorAnimationEnabled()) {
+            animationHolder.cursorAnimatedX = -1f;
+            animationHolder.cursorAnimatedY = -1f;
+        }
+    }
+
+    private boolean didScrollSinceLastFrame(@NonNull EditorCore.GestureResult result) {
+        if (mCachedModel == null) {
+            return result.viewScrollX != 0f || result.viewScrollY != 0f;
+        }
+        return Float.compare(mCachedModel.scrollX, result.viewScrollX) != 0
+                || Float.compare(mCachedModel.scrollY, result.viewScrollY) != 0;
     }
 
     private void dispatchKeyEventResult(@NonNull EditorCore.KeyEventResult result) {

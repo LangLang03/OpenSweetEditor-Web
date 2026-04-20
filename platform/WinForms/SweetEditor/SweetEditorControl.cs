@@ -1808,12 +1808,7 @@ namespace SweetEditor {
 					break;
 				case GestureType.SCROLL:
 				case GestureType.FAST_SCROLL:
-					ScrollChanged?.Invoke(this, new ScrollChangedEventArgs(result.ViewScrollX, result.ViewScrollY));
-					decorationProviderManager?.OnScrollChanged();
-					// Dismiss completion while scrolling.
-					if (completionPopupController != null && completionPopupController.IsShowing) {
-						completionProviderManager?.Dismiss();
-					}
+					HandleScrollChanged(result);
 					break;
 				case GestureType.SCALE:
 					// C++ core already applied scale during gesture handling; only sync platform fonts/measurer.
@@ -1821,6 +1816,9 @@ namespace SweetEditor {
 					ScaleChanged?.Invoke(this, new ScaleChangedEventArgs(result.ViewScale));
 					break;
 				case GestureType.DRAG_SELECT:
+					if (DidScrollSinceLastFrame(result)) {
+						HandleScrollChanged(result);
+					}
 					SelectionChanged?.Invoke(this, new SelectionChangedEventArgs(
 						result.HasSelection,
 						result.HasSelection ? result.Selection : (TextRange?)null,
@@ -1830,6 +1828,23 @@ namespace SweetEditor {
 					ContextMenu?.Invoke(this, new ContextMenuEventArgs(result.CursorPosition, point));
 					break;
 			}
+		}
+
+		private void HandleScrollChanged(GestureResult result) {
+			ScrollChanged?.Invoke(this, new ScrollChangedEventArgs(result.ViewScrollX, result.ViewScrollY));
+			decorationProviderManager?.OnScrollChanged();
+			if (completionPopupController != null && completionPopupController.IsShowing) {
+				completionProviderManager?.Dismiss();
+			}
+		}
+
+		private bool DidScrollSinceLastFrame(GestureResult result) {
+			if (!renderModel.HasValue) {
+				return result.ViewScrollX != 0f || result.ViewScrollY != 0f;
+			}
+
+			EditorRenderModel model = renderModel.Value;
+			return result.ViewScrollX != model.ScrollX || result.ViewScrollY != model.ScrollY;
 		}
 
 		/// <summary>Applies completion item.</summary>

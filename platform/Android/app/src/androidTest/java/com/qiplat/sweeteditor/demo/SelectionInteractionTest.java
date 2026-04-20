@@ -1,16 +1,30 @@
 package com.qiplat.sweeteditor.demo;
 
 import android.os.SystemClock;
+import android.util.SparseArray;
 import android.view.MotionEvent;
 
+import androidx.annotation.NonNull;
 import com.qiplat.sweeteditor.core.foundation.TextPosition;
 import com.qiplat.sweeteditor.core.foundation.TextRange;
+import com.qiplat.sweeteditor.core.EditorCore;
+import com.qiplat.sweeteditor.core.visual.EditorRenderModel;
+import com.qiplat.sweeteditor.decoration.DecorationContext;
+import com.qiplat.sweeteditor.decoration.DecorationProvider;
+import com.qiplat.sweeteditor.decoration.DecorationReceiver;
+import com.qiplat.sweeteditor.decoration.DecorationResult;
+import com.qiplat.sweeteditor.decoration.DecorationType;
 
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.util.EnumSet;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.*;
 
@@ -19,6 +33,14 @@ public class SelectionInteractionTest {
 
     @Rule
     public EditorTestRule editorRule = new EditorTestRule();
+
+    private String generateLongContent(int lines) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < lines; i++) {
+            sb.append("line ").append(i).append(": some content that fills the editor viewport\n");
+        }
+        return sb.toString();
+    }
 
     @Test
     public void testSetSelection() {
@@ -119,5 +141,71 @@ public class SelectionInteractionTest {
         editorRule.runOnEditor(editor -> editor.setCursorPosition(new TextPosition(0, 0)));
         boolean has = editorRule.runOnEditorSync(editor -> editor.hasSelection());
         assertFalse("Setting cursor should clear selection", has);
+    }
+
+    @Test
+    public void testDragSelectScrollRefreshesDecorationProviders() {
+        AtomicInteger refreshCount = new AtomicInteger();
+        DecorationProvider provider = new DecorationProvider() {
+            @NonNull
+            @Override
+            public EnumSet<DecorationType> getCapabilities() {
+                return EnumSet.of(DecorationType.SYNTAX_HIGHLIGHT);
+            }
+
+            @Override
+            public void provideDecorations(@NonNull DecorationContext context, @NonNull DecorationReceiver receiver) {
+                refreshCount.incrementAndGet();
+                receiver.accept(new DecorationResult.Builder()
+                        .syntaxSpans(new SparseArray<>(), DecorationResult.ApplyMode.REPLACE_RANGE)
+                        .build());
+            }
+        };
+
+        editorRule.loadText(generateLongContent(200));
+        editorRule.runOnEditor(editor -> editor.addDecorationProvider(provider));
+        editorRule.waitForIdle();
+        refreshCount.set(0);
+
+        editorRule.runOnEditor(editor -> {
+            try {
+                Field cachedModelField = editor.getClass().getDeclaredField("mCachedModel");
+                cachedModelField.setAccessible(true);
+                cachedModelField.set(editor, null);
+                editor.getVisibleLineRange();
+
+                EditorRenderModel cachedModel = new EditorRenderModel();
+                cachedModel.scrollX = 0f;
+                cachedModel.scrollY = 0f;
+                cachedModelField.set(editor, cachedModel);
+
+                Method fireGestureEvents = editor.getClass().getDeclaredMethod(
+                        "fireGestureEvents",
+                        EditorCore.GestureResult.class,
+                        android.graphics.PointF.class,
+                        int.class);
+                fireGestureEvents.setAccessible(true);
+                EditorCore.GestureResult result = new EditorCore.GestureResult(
+                        EditorCore.GestureType.DRAG_SELECT,
+                        new android.graphics.PointF(10f, 10f),
+                        new TextPosition(20, 0),
+                        true,
+                        new TextRange(new TextPosition(0, 0), new TextPosition(20, 0)),
+                        0f,
+                        240f,
+                        1f,
+                        EditorCore.HitTarget.NONE,
+                        true,
+                        false,
+                        true,
+                        false);
+                fireGestureEvents.invoke(editor, result, null, -1);
+            } catch (ReflectiveOperationException e) {
+                throw new AssertionError(e);
+            }
+        });
+        editorRule.waitForIdle();
+
+        assertTrue("Drag-select scrolling should trigger decoration refresh", refreshCount.get() > 0);
     }
 }

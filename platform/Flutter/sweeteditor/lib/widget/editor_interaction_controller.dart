@@ -306,17 +306,13 @@ class EditorInteractionController {
         _session.eventBus.publish(CursorChangedEvent(cursorPosition: pos));
       case core.GestureType.scroll:
       case core.GestureType.fastScroll:
-        _session.eventBus.publish(
-          ScrollChangedEvent(
-            scrollX: result.viewScrollX,
-            scrollY: result.viewScrollY,
-          ),
-        );
-        _session.decorationProviderManager.onScrollChanged();
-        _session.completionProviderManager.dismiss();
+        _handleScrollChanged(result);
       case core.GestureType.scale:
         _session.eventBus.publish(ScaleChangedEvent(scale: result.viewScale));
       case core.GestureType.dragSelect:
+        if (_didScrollSinceLastFrame(result)) {
+          _handleScrollChanged(result);
+        }
         if (result.hasSelection) {
           _session.eventBus.publish(
             SelectionChangedEvent(
@@ -329,6 +325,23 @@ class EditorInteractionController {
       default:
         break;
     }
+  }
+
+  void _handleScrollChanged(core.GestureResult result) {
+    _session.eventBus.publish(
+      ScrollChangedEvent(
+        scrollX: result.viewScrollX,
+        scrollY: result.viewScrollY,
+      ),
+    );
+    _session.decorationProviderManager.onScrollChanged();
+    _session.completionProviderManager.dismiss();
+  }
+
+  bool _didScrollSinceLastFrame(core.GestureResult result) {
+    final model = _session.renderModel;
+    return model.scrollX != result.viewScrollX ||
+        model.scrollY != result.viewScrollY;
   }
 
   void _publishHitTargetEvent(
