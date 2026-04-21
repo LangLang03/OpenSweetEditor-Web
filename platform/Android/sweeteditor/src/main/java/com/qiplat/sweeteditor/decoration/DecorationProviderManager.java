@@ -104,9 +104,18 @@ public final class DecorationProviderManager {
     private void scheduleRefresh(long delayMs, @Nullable List<TextChange> changes) {
         if (changes != null) {
             pendingTextChanges.addAll(changes);
+            cancelActiveReceivers();
         }
         mainHandler.removeCallbacks(refreshRunnable);
         mainHandler.postDelayed(refreshRunnable, delayMs);
+    }
+
+    private void cancelActiveReceivers() {
+        for (ProviderState state : providerStates.values()) {
+            if (state != null && state.activeReceiver != null) {
+                state.activeReceiver.cancel();
+            }
+        }
     }
 
     private void scheduleScrollRefresh() {

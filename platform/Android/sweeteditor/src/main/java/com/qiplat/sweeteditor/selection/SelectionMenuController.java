@@ -230,12 +230,14 @@ public class SelectionMenuController {
     private void onItemClicked(@NonNull SelectionMenuItem item) {
         switch (item.id) {
             case SelectionMenuItem.ACTION_CUT:
-                editor.cutToClipboard();
-                hide();
+                if (editor.cutToClipboard()) {
+                    hide();
+                }
                 break;
             case SelectionMenuItem.ACTION_COPY:
-                editor.copyToClipboard();
-                hide();
+                if (editor.copyToClipboard()) {
+                    hide();
+                }
                 break;
             case SelectionMenuItem.ACTION_PASTE:
                 editor.pasteFromClipboard();

@@ -96,16 +96,13 @@ public class DemoDecorationProvider implements DecorationProvider {
 
     @Override
     public void provideDecorations(@NonNull DecorationContext context, @NonNull DecorationReceiver receiver) {
-        SparseArray<List<Diagnostic>> diagnostics = new SparseArray<>();
-
-        DecorationResult sweetLineResult = buildSweetLineDecorationResult(context, diagnostics);
-        receiver.accept(sweetLineResult);
-
         executor.submit(() -> {
-            try {
-                Thread.sleep(500);
-            } catch (InterruptedException ignored) {
+            SparseArray<List<Diagnostic>> diagnostics = new SparseArray<>();
+            DecorationResult sweetLineResult = buildSweetLineDecorationResult(context, diagnostics, receiver);
+            if (receiver.isCancelled()) {
+                return;
             }
+            receiver.accept(sweetLineResult);
 
             if (receiver.isCancelled()) {
                 return;
@@ -119,7 +116,8 @@ public class DemoDecorationProvider implements DecorationProvider {
 
     @NonNull
     private DecorationResult buildSweetLineDecorationResult(@NonNull DecorationContext context,
-                                                            @NonNull SparseArray<List<Diagnostic>> dynamicDiagnostics) {
+                                                            @NonNull SparseArray<List<Diagnostic>> dynamicDiagnostics,
+                                                            @NonNull DecorationReceiver receiver) {
         if (highlightEngine == null) {
             return new DecorationResult.Builder().build();
         }
@@ -179,22 +177,29 @@ public class DemoDecorationProvider implements DecorationProvider {
         int renderStartLine = Math.max(0, context.visibleLineRange.start);
         int maxLine = Math.min(context.visibleLineRange.end, cacheHighlight.lines.size() - 1);
         for (int i = renderStartLine; i <= maxLine; i++) {
+            if (receiver.isCancelled()) {
+                return new DecorationResult.Builder().build();
+            }
             LineHighlight lineHighlight = cacheHighlight.lines.get(i);
             for (TokenSpan token : lineHighlight.spans) {
+                if (receiver.isCancelled()) {
+                    return new DecorationResult.Builder().build();
+                }
                 appendStyleSpan(syntaxSpans, token);
-                appendColorInlayHint(colorInlayHints, seenColorHints, editorDocument, token);
-                appendTextInlayHint(colorInlayHints, editorDocument, token);
-                appendSeparator(separatorGuides, editorDocument, token);
-                appendGutterIcons(gutterIcons, editorDocument, token);
-                appendCodeLens(codeLensItems, editorDocument, token);
-                appendLink(links, editorDocument, token);
+                appendColorInlayHint(colorInlayHints, seenColorHints, editorDocument, token, receiver);
+                appendTextInlayHint(colorInlayHints, editorDocument, token, receiver);
+                appendSeparator(separatorGuides, editorDocument, token, receiver);
+                appendGutterIcons(gutterIcons, editorDocument, token, receiver);
+                appendCodeLens(codeLensItems, editorDocument, token, receiver);
+                appendLink(links, editorDocument, token, receiver);
                 firstKeywordRange = appendDynamicDemoDecorations(
                         dynamicDiagnostics,
                         seenDiagnostics,
                         diagnosticCount,
                         firstKeywordRange,
                         editorDocument,
-                        token
+                        token,
+                        receiver
                 );
             }
         }
@@ -241,12 +246,13 @@ public class DemoDecorationProvider implements DecorationProvider {
                                                         @NonNull int[] diagnosticCount,
                                                         TokenRangeInfo firstKeywordRange,
                                                         @NonNull Document editorDocument,
-                                                        TokenSpan token) {
+                                                        TokenSpan token,
+                                                        @NonNull DecorationReceiver receiver) {
         TokenRangeInfo range = extractSingleLineTokenRange(token);
         if (range == null) {
             return firstKeywordRange;
         }
-        String literal = getTokenLiteral(editorDocument, range);
+        String literal = getTokenLiteral(editorDocument, range, receiver);
         if (literal.isEmpty()) {
             return firstKeywordRange;
         }
@@ -361,7 +367,8 @@ public class DemoDecorationProvider implements DecorationProvider {
     private void appendColorInlayHint(@NonNull SparseArray<List<InlayHint>> colorHints,
                                       @NonNull Set<String> seenHints,
                                       @NonNull Document editorDocument,
-                                      TokenSpan token) {
+                                      TokenSpan token,
+                                      @NonNull DecorationReceiver receiver) {
         if (token.styleId != STYLE_COLOR) {
             return;
         }
@@ -369,7 +376,7 @@ public class DemoDecorationProvider implements DecorationProvider {
         if (range == null) {
             return;
         }
-        String literal = getTokenLiteral(editorDocument, range);
+        String literal = getTokenLiteral(editorDocument, range, receiver);
         Integer color = parseColorLiteral(literal);
         if (color == null) {
             return;
@@ -403,7 +410,9 @@ public class DemoDecorationProvider implements DecorationProvider {
     }
 
     private void appendTextInlayHint(@NonNull SparseArray<List<InlayHint>> colorHints,
-                                     @NonNull Document editorDocument, TokenSpan token) {
+                                     @NonNull Document editorDocument,
+                                     TokenSpan token,
+                                     @NonNull DecorationReceiver receiver) {
         if (token.styleId != EditorTheme.STYLE_KEYWORD) {
             return;
         }
@@ -411,7 +420,7 @@ public class DemoDecorationProvider implements DecorationProvider {
         if (range == null) {
             return;
         }
-        String literal = getTokenLiteral(editorDocument, range);
+        String literal = getTokenLiteral(editorDocument, range, receiver);
         List<InlayHint> lineHints = colorHints.get(range.line);
         if (lineHints == null) {
             lineHints = new ArrayList<>();
@@ -427,12 +436,17 @@ public class DemoDecorationProvider implements DecorationProvider {
     }
 
     private void appendSeparator(@NonNull List<SeparatorGuide> separatorGuides,
-                                 @NonNull Document editorDocument, TokenSpan token) {
+                                 @NonNull Document editorDocument,
+                                 TokenSpan token,
+                                 @NonNull DecorationReceiver receiver) {
         if (token.styleId != EditorTheme.STYLE_COMMENT) {
             return;
         }
         TokenRangeInfo range = extractSingleLineTokenRange(token);
         if (range == null) {
+            return;
+        }
+        if (receiver.isCancelled()) {
             return;
         }
         String lineText = editorDocument.getLineText(range.line);
@@ -472,7 +486,9 @@ public class DemoDecorationProvider implements DecorationProvider {
     }
 
     private void appendGutterIcons(@NonNull SparseArray<List<GutterIcon>> gutterIcons,
-                                   @NonNull Document editorDocument, TokenSpan token) {
+                                   @NonNull Document editorDocument,
+                                   TokenSpan token,
+                                   @NonNull DecorationReceiver receiver) {
         if (token.styleId != EditorTheme.STYLE_KEYWORD && token.styleId != EditorTheme.STYLE_ANNOTATION) {
             return;
         }
@@ -481,7 +497,7 @@ public class DemoDecorationProvider implements DecorationProvider {
             return;
         }
         if (token.styleId == EditorTheme.STYLE_KEYWORD) {
-            String literal = getTokenLiteral(editorDocument, range);
+            String literal = getTokenLiteral(editorDocument, range, receiver);
             if ("class".equals(literal) || "struct".equals(literal)) {
                 List<GutterIcon> lineIcons = gutterIcons.get(range.line);
                 if (lineIcons == null) {
@@ -501,7 +517,9 @@ public class DemoDecorationProvider implements DecorationProvider {
     }
 
     private void appendCodeLens(@NonNull SparseArray<List<CodeLensItem>> codeLensItems,
-                                @NonNull Document editorDocument, TokenSpan token) {
+                                @NonNull Document editorDocument,
+                                TokenSpan token,
+                                @NonNull DecorationReceiver receiver) {
         if (codeLensItems.size() > 0) {
             return;
         }
@@ -512,7 +530,7 @@ public class DemoDecorationProvider implements DecorationProvider {
         if (range == null) {
             return;
         }
-        String literal = getTokenLiteral(editorDocument, range);
+        String literal = getTokenLiteral(editorDocument, range, receiver);
         if ("class".equals(literal) || "struct".equals(literal)) {
             List<CodeLensItem> lineItems = codeLensItems.get(range.line);
             if (lineItems == null) {
@@ -526,7 +544,8 @@ public class DemoDecorationProvider implements DecorationProvider {
 
     private void appendLink(@NonNull SparseArray<List<LinkSpan>> linksByLine,
                             @NonNull Document editorDocument,
-                            TokenSpan token) {
+                            TokenSpan token,
+                            @NonNull DecorationReceiver receiver) {
         if (token.styleId != STYLE_LINK) {
             return;
         }
@@ -534,7 +553,7 @@ public class DemoDecorationProvider implements DecorationProvider {
         if (range == null) {
             return;
         }
-        String target = getTokenLiteral(editorDocument, range);
+        String target = getTokenLiteral(editorDocument, range, receiver);
         if (target.isEmpty()) {
             return;
         }
@@ -577,7 +596,12 @@ public class DemoDecorationProvider implements DecorationProvider {
         return new TokenRangeInfo(startLine, startColumn, endColumn);
     }
 
-    private static String getTokenLiteral(@NonNull Document editorDocument, @NonNull TokenRangeInfo range) {
+    private static String getTokenLiteral(@NonNull Document editorDocument,
+                                          @NonNull TokenRangeInfo range,
+                                          @NonNull DecorationReceiver receiver) {
+        if (receiver.isCancelled()) {
+            return "";
+        }
         String lineText = editorDocument.getLineText(range.line);
         if (lineText == null || range.endColumn > lineText.length()) {
             return "";

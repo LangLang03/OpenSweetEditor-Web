@@ -259,12 +259,14 @@ public final class ContextMenuController {
                 dismissImmediate();
                 break;
             case ContextMenuItem.ACTION_CUT:
-                editor.cutToClipboard();
-                dismissImmediate();
+                if (editor.cutToClipboard()) {
+                    dismissImmediate();
+                }
                 break;
             case ContextMenuItem.ACTION_COPY:
-                editor.copyToClipboard();
-                dismissImmediate();
+                if (editor.copyToClipboard()) {
+                    dismissImmediate();
+                }
                 break;
             case ContextMenuItem.ACTION_PASTE:
                 editor.pasteFromClipboard();

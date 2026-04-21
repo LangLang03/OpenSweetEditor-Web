@@ -116,6 +116,7 @@ public class SweetEditor extends View {
     private static final String TAG = SweetEditor.class.getSimpleName();
     private static final boolean ENABLE_PERF_LOG = true;
     private static final int PERF_LOG_INTERVAL = 60;
+    private static final int MAX_CLIPBOARD_SELECTION_CHARS = 100_000;
     private static final float DEFAULT_CONTENT_START_PADDING_DP = 3.0f;
 
     private EditorRenderer mRenderer;
@@ -316,7 +317,7 @@ public class SweetEditor extends View {
             PointF locationInView = new PointF(event.getX(), event.getY());
             EditorCore.GestureResult result = mEditorCore.handleGestureEventEx(
                     EditorCore.EVENT_TYPE_MOUSE_RIGHT_DOWN,
-                    new PointF[] {locationInView},
+                    new PointF[]{locationInView},
                     getMotionEventModifiers(event),
                     0,
                     0,
@@ -355,6 +356,9 @@ public class SweetEditor extends View {
     public InputConnection onCreateInputConnection(EditorInfo outAttrs) {
         outAttrs.inputType = EditorInfo.TYPE_CLASS_TEXT | EditorInfo.TYPE_TEXT_FLAG_MULTI_LINE;
         outAttrs.imeOptions = EditorInfo.IME_FLAG_NO_EXTRACT_UI | EditorInfo.IME_ACTION_NONE;
+        IntRange selectionOffsets = getImeSelectionOffsets();
+        outAttrs.initialSelStart = selectionOffsets.start;
+        outAttrs.initialSelEnd = selectionOffsets.end;
         return new SweetEditorInputConnection(this, true);
     }
 
@@ -496,6 +500,7 @@ public class SweetEditor extends View {
             mDecorationProviderManager.onDocumentLoaded();
         }
         mEventBus.publish(new DocumentLoadedEvent());
+        restartImeInput();
         flush();
     }
 
@@ -645,7 +650,9 @@ public class SweetEditor extends View {
 
     // ==================== Line Operations ====================
 
-    /** Move current line (or lines covered by selection) up by one. */
+    /**
+     * Move current line (or lines covered by selection) up by one.
+     */
     public EditorCore.TextEditResult moveLineUp() {
         EditorCore.TextEditResult result = mEditorCore.moveLineUp();
         dispatchTextChanged(TextChangeAction.INSERT, result);
@@ -654,7 +661,9 @@ public class SweetEditor extends View {
         return result;
     }
 
-    /** Move current line (or lines covered by selection) down by one. */
+    /**
+     * Move current line (or lines covered by selection) down by one.
+     */
     public EditorCore.TextEditResult moveLineDown() {
         EditorCore.TextEditResult result = mEditorCore.moveLineDown();
         dispatchTextChanged(TextChangeAction.INSERT, result);
@@ -663,7 +672,9 @@ public class SweetEditor extends View {
         return result;
     }
 
-    /** Duplicate current line (or lines covered by selection) above. */
+    /**
+     * Duplicate current line (or lines covered by selection) above.
+     */
     public EditorCore.TextEditResult copyLineUp() {
         EditorCore.TextEditResult result = mEditorCore.copyLineUp();
         dispatchTextChanged(TextChangeAction.INSERT, result);
@@ -672,7 +683,9 @@ public class SweetEditor extends View {
         return result;
     }
 
-    /** Duplicate current line (or lines covered by selection) below. */
+    /**
+     * Duplicate current line (or lines covered by selection) below.
+     */
     public EditorCore.TextEditResult copyLineDown() {
         EditorCore.TextEditResult result = mEditorCore.copyLineDown();
         dispatchTextChanged(TextChangeAction.INSERT, result);
@@ -681,7 +694,9 @@ public class SweetEditor extends View {
         return result;
     }
 
-    /** Delete current line (or all lines covered by selection). */
+    /**
+     * Delete current line (or all lines covered by selection).
+     */
     public EditorCore.TextEditResult deleteLine() {
         EditorCore.TextEditResult result = mEditorCore.deleteLine();
         dispatchTextChanged(TextChangeAction.INSERT, result);
@@ -690,7 +705,9 @@ public class SweetEditor extends View {
         return result;
     }
 
-    /** Insert empty line above current line. */
+    /**
+     * Insert empty line above current line.
+     */
     public EditorCore.TextEditResult insertLineAbove() {
         EditorCore.TextEditResult result = mEditorCore.insertLineAbove();
         dispatchTextChanged(TextChangeAction.INSERT, result);
@@ -699,7 +716,9 @@ public class SweetEditor extends View {
         return result;
     }
 
-    /** Insert empty line below current line. */
+    /**
+     * Insert empty line below current line.
+     */
     public EditorCore.TextEditResult insertLineBelow() {
         EditorCore.TextEditResult result = mEditorCore.insertLineBelow();
         dispatchTextChanged(TextChangeAction.INSERT, result);
@@ -895,7 +914,7 @@ public class SweetEditor extends View {
 
     /**
      * Set cursor position (does not scroll viewport, only moves cursor).
-     * To scroll viewport simultaneously, use {@link #gotoPosition(int,int)}.
+     * To scroll viewport simultaneously, use {@link #gotoPosition(int, int)}.
      *
      * @param position target position
      */
@@ -908,16 +927,24 @@ public class SweetEditor extends View {
 
     /**
      * Copy current selection text to system clipboard.
+     *
+     * @return true if text was copied, false otherwise
      */
-    public void copyToClipboard() {
+    public boolean copyToClipboard() {
+        if (isSelectionTooLargeForClipboard()) {
+            Log.w(TAG, "Skip copy: selection exceeds clipboard safety threshold");
+            return false;
+        }
         String selected = getSelectedText();
         if (selected != null && !selected.isEmpty()) {
             ClipboardManager clipboard = (ClipboardManager) getContext()
                     .getSystemService(Context.CLIPBOARD_SERVICE);
             if (clipboard != null) {
                 clipboard.setPrimaryClip(ClipData.newPlainText("SweetEditor", selected));
+                return true;
             }
         }
+        return false;
     }
 
     /**
@@ -939,19 +966,44 @@ public class SweetEditor extends View {
 
     /**
      * Cut current selection text to system clipboard.
+     *
+     * @return true if text was cut, false otherwise
      */
-    public void cutToClipboard() {
+    public boolean cutToClipboard() {
+        if (isSelectionTooLargeForClipboard()) {
+            Log.w(TAG, "Skip cut: selection exceeds clipboard safety threshold");
+            return false;
+        }
         String selected = getSelectedText();
         if (selected != null && !selected.isEmpty()) {
             ClipboardManager clipboard = (ClipboardManager) getContext()
                     .getSystemService(Context.CLIPBOARD_SERVICE);
             if (clipboard != null) {
                 clipboard.setPrimaryClip(ClipData.newPlainText("SweetEditor", selected));
+                insertText("");
+                return true;
             }
-            insertText("");
         }
+        return false;
     }
 
+    private boolean isSelectionTooLargeForClipboard() {
+        if (mDocument == null) {
+            return false;
+        }
+        TextRange selection = getSelection();
+        if (selection == null) {
+            return false;
+        }
+        int start = mDocument.getCharIndexFromPosition(selection.start);
+        int end = mDocument.getCharIndexFromPosition(selection.end);
+        if (end < start) {
+            int tmp = start;
+            start = end;
+            end = tmp;
+        }
+        return end - start > MAX_CLIPBOARD_SELECTION_CHARS;
+    }
 
 
     // ==================== Position/Coordinate Query API ====================
@@ -1071,7 +1123,6 @@ public class SweetEditor extends View {
     }
 
 
-
     /**
      * Batch set highlight spans for multiple lines (reduces JNI calls, single dirty mark).
      *
@@ -1124,7 +1175,6 @@ public class SweetEditor extends View {
     }
 
     // -------------------- Gutter Icons --------------------
-
 
 
     /**
@@ -1266,7 +1316,6 @@ public class SweetEditor extends View {
     public void setFoldRegions(@NonNull List<? extends FoldRegion> regions) {
         mEditorCore.setFoldRegions(regions);
     }
-
 
 
     /**
@@ -1752,7 +1801,41 @@ public class SweetEditor extends View {
         long t0 = ENABLE_PERF_LOG ? System.nanoTime() : 0;
         mEditorCore.compositionUpdate(text);
         flush();
+        updateImeSelectionState();
         logInputPerf(t0, "ime-update");
+    }
+
+    @NonNull
+    IntRange getImeSelectionOffsets() {
+        if (mDocument == null) {
+            return new IntRange(0, 0);
+        }
+
+        TextRange selection = getSelection();
+        if (selection != null) {
+            int start = mDocument.getCharIndexFromPosition(selection.start);
+            int end = mDocument.getCharIndexFromPosition(selection.end);
+            return start <= end ? new IntRange(start, end) : new IntRange(end, start);
+        }
+
+        int cursor = mDocument.getCharIndexFromPosition(mEditorCore.getCursorPosition());
+        return new IntRange(cursor, cursor);
+    }
+
+    void updateImeSelectionState() {
+        InputMethodManager imm = getInputMethodManager();
+        if (imm == null) {
+            return;
+        }
+        IntRange selectionOffsets = getImeSelectionOffsets();
+        imm.updateSelection(this, selectionOffsets.start, selectionOffsets.end, -1, -1);
+    }
+
+    void restartImeInput() {
+        InputMethodManager imm = getInputMethodManager();
+        if (imm != null) {
+            imm.restartInput(this);
+        }
     }
 
     // ==================== Event Dispatch (Internal) ====================
@@ -1819,7 +1902,7 @@ public class SweetEditor extends View {
     /**
      * Dispatch corresponding editor events based on gesture result.
      *
-     * @param result      Gesture processing result
+     * @param result           Gesture processing result
      * @param locationInEditor Pointer location relative to the editor
      */
     private void fireGestureEvents(EditorCore.GestureResult result, PointF locationInEditor, int actionMasked) {
@@ -1984,6 +2067,7 @@ public class SweetEditor extends View {
         EditorCore.TextEditResult result = mEditorCore.compositionEnd(text);
         dispatchTextChanged(TextChangeAction.COMPOSITION, result);
         flush();
+        updateImeSelectionState();
         logInputPerf(t0, "ime-commit");
     }
 
@@ -2015,7 +2099,7 @@ public class SweetEditor extends View {
                 NewLineAction action = mNewLineActionProviderManager.provideNewLineAction();
                 if (action != null) {
                     EditorCore.TextEditResult editResult = mEditorCore.insertText(action.text);
-        dispatchTextChanged(TextChangeAction.KEY, editResult);
+                    dispatchTextChanged(TextChangeAction.KEY, editResult);
                     resetCursorBlink();
                     flush();
                     logInputPerf(t0, "key-enter");
@@ -2071,7 +2155,7 @@ public class SweetEditor extends View {
         PointF probePoint = point != null ? point : new PointF(-1f, -1f);
         EditorCore.GestureResult result = mEditorCore.handleGestureEventEx(
                 EditorCore.EVENT_TYPE_MOUSE_MOVE,
-                new PointF[] {probePoint},
+                new PointF[]{probePoint},
                 modifiers,
                 0,
                 0,
@@ -2268,30 +2352,50 @@ public class SweetEditor extends View {
     }
 
     private void showSoftKeyboard() {
-        InputMethodManager imm = (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+        InputMethodManager imm = getInputMethodManager();
         if (imm != null) {
             imm.showSoftInput(this, InputMethodManager.SHOW_IMPLICIT);
         }
         requestApplyInsets();
     }
 
+    @Nullable
+    private InputMethodManager getInputMethodManager() {
+        return (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+    }
+
     private static int mapAndroidKeyCode(int androidKeyCode) {
         switch (androidKeyCode) {
-            case KeyEvent.KEYCODE_DEL:         return KeyCode.BACKSPACE;
-            case KeyEvent.KEYCODE_TAB:         return KeyCode.TAB;
-            case KeyEvent.KEYCODE_ENTER:       return KeyCode.ENTER;
-            case KeyEvent.KEYCODE_ESCAPE:      return KeyCode.ESCAPE;
-            case KeyEvent.KEYCODE_FORWARD_DEL: return KeyCode.DELETE_KEY;
-            case KeyEvent.KEYCODE_DPAD_LEFT:   return KeyCode.LEFT;
-            case KeyEvent.KEYCODE_DPAD_UP:     return KeyCode.UP;
-            case KeyEvent.KEYCODE_DPAD_RIGHT:  return KeyCode.RIGHT;
-            case KeyEvent.KEYCODE_DPAD_DOWN:   return KeyCode.DOWN;
-            case KeyEvent.KEYCODE_MOVE_HOME:   return KeyCode.HOME;
-            case KeyEvent.KEYCODE_MOVE_END:    return KeyCode.END;
-            case KeyEvent.KEYCODE_PAGE_UP:     return KeyCode.PAGE_UP;
-            case KeyEvent.KEYCODE_PAGE_DOWN:   return KeyCode.PAGE_DOWN;
-            case KeyEvent.KEYCODE_SPACE:        return KeyCode.SPACE;
-            default:                           return KeyCode.NONE;
+            case KeyEvent.KEYCODE_DEL:
+                return KeyCode.BACKSPACE;
+            case KeyEvent.KEYCODE_TAB:
+                return KeyCode.TAB;
+            case KeyEvent.KEYCODE_ENTER:
+                return KeyCode.ENTER;
+            case KeyEvent.KEYCODE_ESCAPE:
+                return KeyCode.ESCAPE;
+            case KeyEvent.KEYCODE_FORWARD_DEL:
+                return KeyCode.DELETE_KEY;
+            case KeyEvent.KEYCODE_DPAD_LEFT:
+                return KeyCode.LEFT;
+            case KeyEvent.KEYCODE_DPAD_UP:
+                return KeyCode.UP;
+            case KeyEvent.KEYCODE_DPAD_RIGHT:
+                return KeyCode.RIGHT;
+            case KeyEvent.KEYCODE_DPAD_DOWN:
+                return KeyCode.DOWN;
+            case KeyEvent.KEYCODE_MOVE_HOME:
+                return KeyCode.HOME;
+            case KeyEvent.KEYCODE_MOVE_END:
+                return KeyCode.END;
+            case KeyEvent.KEYCODE_PAGE_UP:
+                return KeyCode.PAGE_UP;
+            case KeyEvent.KEYCODE_PAGE_DOWN:
+                return KeyCode.PAGE_DOWN;
+            case KeyEvent.KEYCODE_SPACE:
+                return KeyCode.SPACE;
+            default:
+                return KeyCode.NONE;
         }
     }
 }
