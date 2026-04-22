@@ -100,6 +100,9 @@ namespace NS_SWEETEDITOR {
     /// Get full metric data needed for scrollbar calculations
     ScrollMetrics getScrollMetrics() const;
 
+    /// Get cached visible logical line range from the most recent completed layout pass
+    IntRange getVisibleLineRange() const;
+
     /// Get editor layout metrics
     LayoutMetrics& getLayoutMetrics() const;
 
@@ -450,7 +453,8 @@ namespace NS_SWEETEDITOR {
     /// Clear all link ranges
     void clearLinks();
 
-    /// Resolve link target by logical line and column inside that link
+    /// Resolve link target by logical line and column inside that link.
+    /// Returns an empty string when no link matches the requested position.
     U8String getLinkTargetAt(size_t line, size_t column) const;
 
     /// Set diagnostic decorations for given line (wavy underline/underline)
@@ -556,6 +560,7 @@ namespace NS_SWEETEDITOR {
 
     Viewport m_viewport_;
     ViewState m_view_state_;
+    IntRange m_visible_line_range_;
 
     /// Unified caret state: cursor position + selection
     CaretState m_caret_;
@@ -583,7 +588,7 @@ namespace NS_SWEETEDITOR {
     TextPosition m_external_bracket_close_;
     bool m_has_external_brackets_ {false};
 
-    /// Hovered clickable hit target (currently used by CodeLens).
+    /// Hovered clickable hit target for interactive runs such as CodeLens and Link.
     HitTarget m_hover_hit_target_;
     /// Pressed clickable hit target.
     HitTarget m_press_hit_target_;
@@ -628,7 +633,7 @@ namespace NS_SWEETEDITOR {
     void clearHoverHitTarget();
     void clearPressHitTarget();
     HitTarget getActiveHitTarget() const;
-    PointerProbeResult probePointer(const PointF& point) const;
+    PointerProbeResult probePointer(const PointF& point, KeyModifier modifiers) const;
     void finalizeGestureResult(GestureResult& result) const;
     /// Reset composition state (clear composing flag and text)
     void resetCompositionState();

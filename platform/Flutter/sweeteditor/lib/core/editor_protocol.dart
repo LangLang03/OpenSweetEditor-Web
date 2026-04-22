@@ -311,7 +311,8 @@ class ProtocolEncoder {
     for (final item in items) {
       final tb = utf8.encode(item.text);
       allTextBytes.add(tb);
-      totalSize += 12 + tb.length; // column(4) + command_id(4) + text_len(4) + text
+      totalSize +=
+          12 + tb.length; // column(4) + command_id(4) + text_len(4) + text
     }
     final buf = ByteData(totalSize);
     var offset = 0;
@@ -366,6 +367,78 @@ class ProtocolEncoder {
         buf.setInt32(offset, items[i].commandId, Endian.little);
         offset += 4;
         final tb = lineTexts[i];
+        buf.setInt32(offset, tb.length, Endian.little);
+        offset += 4;
+        if (tb.isNotEmpty) {
+          buf.buffer.asUint8List().setAll(offset, tb);
+          offset += tb.length;
+        }
+      }
+    });
+    return buf.buffer.asUint8List();
+  }
+
+  static Uint8List packLineLinks(int line, List<LinkSpan> links) {
+    final allTargetBytes = <Uint8List>[];
+    var totalSize = 8;
+    for (final link in links) {
+      final tb = Uint8List.fromList(utf8.encode(link.target));
+      allTargetBytes.add(tb);
+      totalSize += 12 + tb.length;
+    }
+    final buf = ByteData(totalSize);
+    var offset = 0;
+    buf.setInt32(offset, line, Endian.little);
+    offset += 4;
+    buf.setInt32(offset, links.length, Endian.little);
+    offset += 4;
+    for (var i = 0; i < links.length; i++) {
+      final link = links[i];
+      buf.setInt32(offset, link.column, Endian.little);
+      offset += 4;
+      buf.setInt32(offset, link.length, Endian.little);
+      offset += 4;
+      final tb = allTargetBytes[i];
+      buf.setInt32(offset, tb.length, Endian.little);
+      offset += 4;
+      if (tb.isNotEmpty) {
+        buf.buffer.asUint8List().setAll(offset, tb);
+        offset += tb.length;
+      }
+    }
+    return buf.buffer.asUint8List();
+  }
+
+  static Uint8List packBatchLineLinks(Map<int, List<LinkSpan>> linksByLine) {
+    final allTargetBytes = <int, List<Uint8List>>{};
+    var totalSize = 4;
+    linksByLine.forEach((line, links) {
+      totalSize += 8;
+      final lineTargets = <Uint8List>[];
+      for (final link in links) {
+        final tb = Uint8List.fromList(utf8.encode(link.target));
+        lineTargets.add(tb);
+        totalSize += 12 + tb.length;
+      }
+      allTargetBytes[line] = lineTargets;
+    });
+    final buf = ByteData(totalSize);
+    var offset = 0;
+    buf.setInt32(offset, linksByLine.length, Endian.little);
+    offset += 4;
+    linksByLine.forEach((line, links) {
+      buf.setInt32(offset, line, Endian.little);
+      offset += 4;
+      buf.setInt32(offset, links.length, Endian.little);
+      offset += 4;
+      final lineTargets = allTargetBytes[line]!;
+      for (var i = 0; i < links.length; i++) {
+        final link = links[i];
+        buf.setInt32(offset, link.column, Endian.little);
+        offset += 4;
+        buf.setInt32(offset, link.length, Endian.little);
+        offset += 4;
+        final tb = lineTargets[i];
         buf.setInt32(offset, tb.length, Endian.little);
         offset += 4;
         if (tb.isNotEmpty) {
@@ -677,6 +750,10 @@ class ProtocolDecoder {
     if (r.hasRemaining(4)) needsAnimation = r.readInt32() != 0;
     var isHandleDrag = false;
     if (r.hasRemaining(4)) isHandleDrag = r.readInt32() != 0;
+    var pointerCursorType = PointerCursorType.text;
+    if (r.hasRemaining(4)) {
+      pointerCursorType = PointerCursorType.fromValue(r.readInt32());
+    }
     return GestureResult(
       type: gestureType,
       tapPoint: tapPoint,
@@ -691,6 +768,7 @@ class ProtocolDecoder {
       needsFling: needsFling,
       needsAnimation: needsAnimation,
       isHandleDrag: isHandleDrag,
+      pointerCursorType: pointerCursorType,
     );
   }
 
@@ -830,6 +908,11 @@ class ProtocolDecoder {
       gutterVisible = r.readInt32() != 0;
     }
 
+    var pointerCursorType = PointerCursorType.text;
+    if (r.hasRemaining(4)) {
+      pointerCursorType = PointerCursorType.fromValue(r.readInt32());
+    }
+
     return EditorRenderModel(
       splitX: splitX,
       splitLineVisible: splitLineVisible,
@@ -856,6 +939,7 @@ class ProtocolDecoder {
       horizontalScrollbar: horizontalScrollbar,
       gutterSticky: gutterSticky,
       gutterVisible: gutterVisible,
+      pointerCursorType: pointerCursorType,
     );
   }
 

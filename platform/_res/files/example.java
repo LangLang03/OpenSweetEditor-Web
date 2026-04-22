@@ -21,6 +21,10 @@ import java.io.*;
 // colors (you can click the color block)
 static int[] colors = {0xFF5B9BD5, 0xFFED7D31, 0xFF70AD47};
 
+// links
+static String sweetEditorUrl = "https://github.com/FinalScave/OpenSweetEditor";
+static String sweetLineUrl = "https://github.com/FinalScave/SweetLine";
+
 // enum type
 enum Color {
     RED, GREEN, BLUE

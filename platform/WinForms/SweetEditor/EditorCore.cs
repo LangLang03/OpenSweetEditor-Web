@@ -150,21 +150,9 @@ namespace SweetEditor {
 		DIRECT_SCROLL = 13
 	}
 
-	/// <summary>
-	/// Keyboard modifier flags.
-	/// </summary>
-	[Flags]
-	public enum Modifier : byte {
-		NONE = 0,
-		SHIFT = 1 << 0,
-		CTRL = 1 << 1,
-		ALT = 1 << 2,
-		META = 1 << 3
-	}
-
-	/// <summary>
-	/// Keyboard key code constants matching the C++ KeyCode enum.
-	/// </summary>
+		/// <summary>
+		/// Keyboard key code constants matching the C++ KeyCode enum.
+		/// </summary>
 	public enum KeyCode : ushort {
 		NONE = 0,
 		BACKSPACE = 8,
@@ -324,15 +312,15 @@ namespace SweetEditor {
 	/// <summary>
 	/// Gesture input event.
 	/// </summary>
-	public struct GestureEvent {
-		/// <summary>Event type.</summary>
-		public EventType Type { get; set; }
-		/// <summary>Touch point list.</summary>
-		public List<PointF> Points { get; set; }
-		/// <summary>Modifier key state.</summary>
-		public Modifier Modifiers { get; set; }
-		/// <summary>Mouse wheel horizontal delta.</summary>
-		public float WheelDeltaX { get; set; }
+		public struct GestureEvent {
+			/// <summary>Event type.</summary>
+			public EventType Type { get; set; }
+			/// <summary>Touch point list.</summary>
+			public List<PointF> Points { get; set; }
+			/// <summary>Modifier key state.</summary>
+			public KeyModifier Modifiers { get; set; }
+			/// <summary>Mouse wheel horizontal delta.</summary>
+			public float WheelDeltaX { get; set; }
 		/// <summary>Mouse wheel vertical delta.</summary>
 		public float WheelDeltaY { get; set; }
 		/// <summary>Direct scale factor.</summary>
@@ -478,7 +466,7 @@ namespace SweetEditor {
 	/// <summary>
 	/// Construction-time immutable options for EditorCore.
 	/// Fields mirror the C++ EditorOptions struct.
-	/// Binary layout (LE): f32 touch_slop, i64 double_tap_timeout, i64 long_press_ms, f32 fling_friction, f32 fling_min_velocity, f32 fling_max_velocity, u64 max_undo_stack_size
+	/// Binary layout (LE): f32 touch_slop, i64 double_tap_timeout, i64 long_press_ms, f32 fling_friction, f32 fling_min_velocity, f32 fling_max_velocity, u64 max_undo_stack_size, i64 key_chord_timeout_ms, u8 reveal_selection_end_on_select_all
 	/// </summary>
 	public class EditorOptions {
 		/// <summary>Threshold to determine if a gesture is a move (default 10)</summary>
@@ -495,6 +483,10 @@ namespace SweetEditor {
 		public float FlingMaxVelocity { get; set; } = 12000f;
 		/// <summary>Max undo stack size, 0 = unlimited (default 512)</summary>
 		public ulong MaxUndoStackSize { get; set; } = 512;
+		/// <summary>Key chord pending timeout in ms (default 2000)</summary>
+		public long KeyChordTimeoutMs { get; set; } = 2000;
+		/// <summary>Whether selectAll() should reveal the selection end after selecting the full document.</summary>
+		public bool RevealSelectionEndOnSelectAll { get; set; } = false;
 	}
 
 	/// <summary>
@@ -733,13 +725,17 @@ namespace SweetEditor {
 				   new TextPosition { Line = endLine, Column = endColumn }) { }
 	}
 
-	/// <summary>Immutable value object describing a bracket branch line.</summary>
-	public sealed class BracketGuide {
-		public TextPosition Parent { get; }
-		public TextPosition End { get; }
-		public TextPosition[]? Children { get; }
-		public BracketGuide(TextPosition parent, TextPosition end, TextPosition[]? children) { Parent = parent; End = end; Children = children; }
-	}
+		/// <summary>Immutable value object describing a bracket branch line.</summary>
+		public sealed class BracketGuide {
+			public TextPosition Parent { get; }
+			public TextPosition End { get; }
+			public IReadOnlyList<TextPosition> Children { get; }
+			public BracketGuide(TextPosition parent, TextPosition end, IReadOnlyList<TextPosition> children) {
+				Parent = parent;
+				End = end;
+				Children = children ?? Array.Empty<TextPosition>();
+			}
+		}
 
 	/// <summary>Immutable value object describing a control-flow back-edge arrow.</summary>
 	public sealed class FlowGuide {
@@ -751,18 +747,23 @@ namespace SweetEditor {
 				   new TextPosition { Line = endLine, Column = endColumn }) { }
 	}
 
-	/// <summary>Immutable value object describing a horizontal separator line.</summary>
-	public sealed class SeparatorGuide {
-		/// <summary>Line number (0-based)</summary>
-		public int Line { get; }
-		/// <summary>Separator style (0=Single line, 1=Double line)</summary>
-		public int Style { get; }
-		/// <summary>Symbol count</summary>
-		public int Count { get; }
-		/// <summary>Comment text end column</summary>
-		public int TextEndColumn { get; }
-		public SeparatorGuide(int line, int style, int count, int textEndColumn) { Line = line; Style = style; Count = count; TextEndColumn = textEndColumn; }
-	}
+		/// <summary>Immutable value object describing a horizontal separator line.</summary>
+		public sealed class SeparatorGuide {
+			/// <summary>Line number (0-based)</summary>
+			public int Line { get; }
+			/// <summary>Separator style.</summary>
+			public SeparatorStyle Style { get; }
+			/// <summary>Symbol count</summary>
+			public int Count { get; }
+			/// <summary>Comment text end column</summary>
+			public int TextEndColumn { get; }
+			public SeparatorGuide(int line, SeparatorStyle style, int count, int textEndColumn) {
+				Line = line;
+				Style = style;
+				Count = count;
+				TextEndColumn = textEndColumn;
+			}
+		}
 
 	#endregion
 
@@ -1065,6 +1066,25 @@ namespace SweetEditor {
 		public TextPosition End { get; set; }
 	}
 
+	/// <summary>
+	/// Inclusive integer range.
+	/// </summary>
+	public struct IntRange {
+		[JsonPropertyName("start")]
+		public int Start { get; set; }
+		[JsonPropertyName("end")]
+		public int End { get; set; }
+
+		public bool IsEmpty => End < Start;
+
+		public IntRange(int start, int end) {
+			Start = start;
+			End = end;
+		}
+
+		public override string ToString() => $"IntRange(Start={Start}, End={End})";
+	}
+
 	#region Editor event system
 
 	/// <summary>
@@ -1082,13 +1102,18 @@ namespace SweetEditor {
 	/// <summary>
 	/// Single text change (precise change info for one edit location).
 	/// </summary>
-	public class TextChange {
+	public sealed class TextChange {
 		/// <summary>Replaced/deleted text range (pre-operation coordinates).</summary>
 		[JsonPropertyName("range")]
-		public TextRange? Range { get; set; }
+		public TextRange Range { get; }
 		/// <summary>New text after change (inserted/replaced content).</summary>
 		[JsonPropertyName("new_text")]
-		public string? NewText { get; set; }
+		public string NewText { get; }
+
+		public TextChange(TextRange range, string newText) {
+			Range = range;
+			NewText = newText ?? string.Empty;
+		}
 	}
 
 	/// <summary>
@@ -1159,131 +1184,138 @@ namespace SweetEditor {
 	/// <summary>
 	/// Document loaded event args.
 	/// </summary>
-	public class DocumentLoadedEventArgs : EventArgs { }
+		public class DocumentLoadedEventArgs : EventArgs { }
 
-	/// <summary>
-	/// Long-press event args.
-	/// </summary>
-	public class LongPressEventArgs : EventArgs {
-		public TextPosition CursorPosition { get; }
-		public PointF ScreenPoint { get; }
-		public LongPressEventArgs(TextPosition cursor, PointF point) { CursorPosition = cursor; ScreenPoint = point; }
-	}
-
-	/// <summary>
-	/// Double-click selection event args.
-	/// </summary>
-	public class DoubleTapEventArgs : EventArgs {
-		public TextPosition CursorPosition { get; }
-		public bool HasSelection { get; }
-		public TextRange? Selection { get; }
-		public PointF ScreenPoint { get; }
-		public DoubleTapEventArgs(TextPosition cursor, bool has, TextRange? sel, PointF point) {
-			CursorPosition = cursor;
-			HasSelection = has;
-			Selection = sel;
-			ScreenPoint = point;
+		/// <summary>
+		/// Long-press event args.
+		/// </summary>
+		public class LongPressEventArgs : EventArgs {
+			public TextPosition CursorPosition { get; }
+			public PointF LocationInEditor { get; }
+			public LongPressEventArgs(TextPosition cursor, PointF point) { CursorPosition = cursor; LocationInEditor = point; }
 		}
-	}
 
-	/// <summary>
-	/// Context-menu event args.
-	/// </summary>
-	public class ContextMenuEventArgs : EventArgs {
-		public TextPosition CursorPosition { get; }
-		public PointF ScreenPoint { get; }
-		public ContextMenuEventArgs(TextPosition cursor, PointF point) { CursorPosition = cursor; ScreenPoint = point; }
-	}
-
-	/// <summary>
-	/// InlayHint click event args.
-	/// </summary>
-	public class InlayHintClickEventArgs : EventArgs {
-		/// <summary>Hit logical line (0-based)</summary>
-		public int Line { get; }
-		/// <summary>Hit column (0-based)</summary>
-		public int Column { get; }
-		/// <summary>Inlay type.</summary>
-		public InlayType Type { get; }
-		/// <summary>Type-specific integer payload. Icon uses icon id, color uses ARGB, text uses 0.</summary>
-		public int IntValue { get; }
-		/// <summary>Tap screen position</summary>
-		public PointF ScreenPoint { get; }
-		public InlayHintClickEventArgs(int line, int column, InlayType type, int intValue, PointF point) {
-			Line = line;
-			Column = column;
-			Type = type;
-			IntValue = intValue;
-			ScreenPoint = point;
+		/// <summary>
+		/// Double-click selection event args.
+		/// </summary>
+		public class DoubleTapEventArgs : EventArgs {
+			public TextPosition CursorPosition { get; }
+			public bool HasSelection { get; }
+			public TextRange? Selection { get; }
+			public PointF LocationInEditor { get; }
+			public DoubleTapEventArgs(TextPosition cursor, bool has, TextRange? sel, PointF point) {
+				CursorPosition = cursor;
+				HasSelection = has;
+				Selection = sel;
+				LocationInEditor = point;
+			}
 		}
-	}
 
-	/// <summary>
-	/// GutterIcon click event args.
-	/// </summary>
-	public class GutterIconClickEventArgs : EventArgs {
-		/// <summary>Hit logical line (0-based)</summary>
-		public int Line { get; }
-		/// <summary>Icon ID</summary>
-		public int IconId { get; }
-		/// <summary>Tap screen position</summary>
-		public PointF ScreenPoint { get; }
-		public GutterIconClickEventArgs(int line, int iconId, PointF point) {
-			Line = line; IconId = iconId; ScreenPoint = point;
+		/// <summary>
+		/// Context-menu event args.
+		/// </summary>
+		public class ContextMenuEventArgs : EventArgs {
+			public TextPosition CursorPosition { get; }
+			public PointF LocationInEditor { get; }
+			public ContextMenuEventArgs(TextPosition cursor, PointF point) { CursorPosition = cursor; LocationInEditor = point; }
 		}
-	}
 
-	/// <summary>
-	/// Fold region click event args (toggleFold is already executed by the C++ layer).
-	/// </summary>
-	public class FoldToggleEventArgs : EventArgs {
-		/// <summary>Line index of the fold region (0-based).</summary>
-		public int Line { get; }
-		/// <summary>Whether the click hit the gutter fold arrow (false means the fold placeholder was clicked).</summary>
-		public bool IsGutter { get; }
-		/// <summary>Tap screen position</summary>
-		public PointF ScreenPoint { get; }
-		public FoldToggleEventArgs(int line, bool isGutter, PointF point) {
-			Line = line; IsGutter = isGutter; ScreenPoint = point;
+		/// <summary>
+		/// InlayHint click event args.
+		/// </summary>
+		public class InlayHintClickEventArgs : EventArgs {
+			/// <summary>Hit logical line (0-based)</summary>
+			public int Line { get; }
+			/// <summary>Hit column (0-based)</summary>
+			public int Column { get; }
+			/// <summary>Inlay type.</summary>
+			public InlayType Type { get; }
+			/// <summary>Type-specific integer payload. Icon uses icon id, color uses ARGB, text uses 0.</summary>
+			public int IntValue { get; }
+			/// <summary>Pointer location in editor coordinates.</summary>
+			public PointF LocationInEditor { get; }
+			public InlayHintClickEventArgs(int line, int column, InlayType type, int intValue, PointF point) {
+				Line = line;
+				Column = column;
+				Type = type;
+				IntValue = intValue;
+				LocationInEditor = point;
+			}
 		}
-	}
 
-	/// <summary>
-	/// CodeLens click event args.
-	/// </summary>
-	public class CodeLensClickEventArgs : EventArgs {
-		/// <summary>Hit logical line (0-based)</summary>
-		public int Line { get; }
-		/// <summary>Column anchor of the clicked CodeLens (0-based, UTF-16 offset)</summary>
-		public int Column { get; }
-		/// <summary>Command ID (from CodeLensItem)</summary>
-		public int CommandId { get; }
-		/// <summary>Tap screen position</summary>
-		public PointF ScreenPoint { get; }
-		public CodeLensClickEventArgs(int line, int column, int commandId, PointF point) {
-			Line = line; Column = column; CommandId = commandId; ScreenPoint = point;
+		/// <summary>
+		/// GutterIcon click event args.
+		/// </summary>
+		public class GutterIconClickEventArgs : EventArgs {
+			/// <summary>Hit logical line (0-based)</summary>
+			public int Line { get; }
+			/// <summary>Icon ID</summary>
+			public int IconId { get; }
+			/// <summary>Pointer location in editor coordinates.</summary>
+			public PointF LocationInEditor { get; }
+			public GutterIconClickEventArgs(int line, int iconId, PointF point) {
+				Line = line;
+				IconId = iconId;
+				LocationInEditor = point;
+			}
 		}
-	}
 
-	/// <summary>
-	/// Link click event args.
-	/// </summary>
-	public class LinkClickEventArgs : EventArgs {
-		/// <summary>Hit logical line (0-based)</summary>
-		public int Line { get; }
-		/// <summary>Column anchor of the clicked link (0-based, UTF-16 offset)</summary>
-		public int Column { get; }
-		/// <summary>Link target string resolved by the native core.</summary>
-		public string Target { get; }
-		/// <summary>Tap screen position</summary>
-		public PointF ScreenPoint { get; }
-		public LinkClickEventArgs(int line, int column, string target, PointF point) {
-			Line = line;
-			Column = column;
-			Target = target ?? string.Empty;
-			ScreenPoint = point;
+		/// <summary>
+		/// Fold region click event args (toggleFold is already executed by the C++ layer).
+		/// </summary>
+		public class FoldToggleEventArgs : EventArgs {
+			/// <summary>Line index of the fold region (0-based).</summary>
+			public int Line { get; }
+			/// <summary>Whether the click hit the gutter fold arrow (false means the fold placeholder was clicked).</summary>
+			public bool IsGutter { get; }
+			/// <summary>Pointer location in editor coordinates.</summary>
+			public PointF LocationInEditor { get; }
+			public FoldToggleEventArgs(int line, bool isGutter, PointF point) {
+				Line = line;
+				IsGutter = isGutter;
+				LocationInEditor = point;
+			}
 		}
-	}
+
+		/// <summary>
+		/// CodeLens click event args.
+		/// </summary>
+		public class CodeLensClickEventArgs : EventArgs {
+			/// <summary>Hit logical line (0-based)</summary>
+			public int Line { get; }
+			/// <summary>Column anchor of the clicked CodeLens (0-based, UTF-16 offset)</summary>
+			public int Column { get; }
+			/// <summary>Command ID (from CodeLensItem)</summary>
+			public int CommandId { get; }
+			/// <summary>Pointer location in editor coordinates.</summary>
+			public PointF LocationInEditor { get; }
+			public CodeLensClickEventArgs(int line, int column, int commandId, PointF point) {
+				Line = line;
+				Column = column;
+				CommandId = commandId;
+				LocationInEditor = point;
+			}
+		}
+
+		/// <summary>
+		/// Link click event args.
+		/// </summary>
+		public class LinkClickEventArgs : EventArgs {
+			/// <summary>Hit logical line (0-based)</summary>
+			public int Line { get; }
+			/// <summary>Column anchor of the clicked link (0-based, UTF-16 offset)</summary>
+			public int Column { get; }
+			/// <summary>Link target string resolved by the native core.</summary>
+			public string Target { get; }
+			/// <summary>Pointer location in editor coordinates.</summary>
+			public PointF LocationInEditor { get; }
+			public LinkClickEventArgs(int line, int column, string target, PointF point) {
+				Line = line;
+				Column = column;
+				Target = target ?? string.Empty;
+				LocationInEditor = point;
+			}
+		}
 
 	#endregion
 
@@ -1876,11 +1908,14 @@ namespace SweetEditor {
 		[DllImport(LibraryName, EntryPoint = "editor_register_text_style", CallingConvention = CallingConvention.Cdecl)]
 		internal static extern void registerTextStyle(IntPtr handle, uint styleId, int color, int backgroundColor, int fontStyle);
 
-		[DllImport(LibraryName, EntryPoint = "editor_register_batch_text_styles", CallingConvention = CallingConvention.Cdecl)]
-		internal static extern void registerBatchTextStyles(IntPtr handle, byte[] data, nuint size);
+			[DllImport(LibraryName, EntryPoint = "editor_register_batch_text_styles", CallingConvention = CallingConvention.Cdecl)]
+			internal static extern void registerBatchTextStyles(IntPtr handle, byte[] data, nuint size);
 
-		[DllImport(LibraryName, EntryPoint = "editor_set_line_spans", CallingConvention = CallingConvention.Cdecl)]
-		internal static extern void SetLineSpans(IntPtr handle, byte[] data, nuint size);
+			[DllImport(LibraryName, EntryPoint = "editor_set_line_spans", CallingConvention = CallingConvention.Cdecl)]
+			internal static extern void SetLineSpans(IntPtr handle, byte[] data, nuint size);
+
+			[DllImport(LibraryName, EntryPoint = "editor_clear_line_spans", CallingConvention = CallingConvention.Cdecl)]
+			internal static extern void ClearLineSpans(IntPtr handle, nuint line, byte layer);
 
 		[DllImport(LibraryName, EntryPoint = "editor_set_line_inlay_hints", CallingConvention = CallingConvention.Cdecl)]
 		internal static extern void SetLineInlayHints(IntPtr handle, byte[] data, nuint size);
@@ -1976,6 +2011,9 @@ namespace SweetEditor {
 
 		[DllImport(LibraryName, EntryPoint = "editor_is_line_visible", CallingConvention = CallingConvention.Cdecl)]
 		internal static extern int IsLineVisible(IntPtr handle, nuint line);
+
+		[DllImport(LibraryName, EntryPoint = "editor_get_visible_line_range", CallingConvention = CallingConvention.Cdecl)]
+		internal static extern void GetVisibleLineRange(IntPtr handle, out int outStartLine, out int outEndLine);
 
 		[DllImport(LibraryName, EntryPoint = "editor_clear_highlights", CallingConvention = CallingConvention.Cdecl)]
 		internal static extern void ClearHighlights(IntPtr handle);
@@ -2781,6 +2819,13 @@ namespace SweetEditor {
 			IntPtr payloadPtr = NativeMethods.GetScrollMetrics(nativeHandle, out UIntPtr payloadSize);
 			return ProtocolDecoder.ParseScrollMetrics(payloadPtr, payloadSize);
 		}
+
+		/// <summary>Gets the visible logical line range from the last completed layout pass.</summary>
+		public IntRange GetVisibleLineRange() {
+			if (IsReleased) return new IntRange(0, -1);
+			NativeMethods.GetVisibleLineRange(nativeHandle, out int startLine, out int endLine);
+			return new IntRange(startLine, endLine);
+		}
 		#endregion
 
 		#region Decorations And Folding
@@ -2790,23 +2835,23 @@ namespace SweetEditor {
 		/// <param name="color">Text color (ARGB)</param>
 		/// <param name="backgroundColor">Background color (ARGB)</param>
 		/// <param name="fontStyle">Font style (bit flags: BOLD | ITALIC | STRIKETHROUGH).</param>
-		public void registerTextStyle(uint styleId, int color, int backgroundColor, int fontStyle) {
+		public void registerTextStyle(int styleId, int color, int backgroundColor, int fontStyle) {
 			if (IsReleased) return;
-			NativeMethods.registerTextStyle(nativeHandle, styleId, color, backgroundColor, fontStyle);
+			NativeMethods.registerTextStyle(nativeHandle, unchecked((uint)styleId), color, backgroundColor, fontStyle);
 		}
 
 		/// <summary>Registers a highlight style (without background color).</summary>
 		/// <param name="styleId">Style ID</param>
 		/// <param name="color">Text color (ARGB)</param>
 		/// <param name="fontStyle">Font style (bit flags: BOLD | ITALIC | STRIKETHROUGH).</param>
-		public void registerTextStyle(uint styleId, int color, int fontStyle) {
+		public void registerTextStyle(int styleId, int color, int fontStyle) {
 			if (IsReleased) return;
-			NativeMethods.registerTextStyle(nativeHandle, styleId, color, 0, fontStyle);
+			NativeMethods.registerTextStyle(nativeHandle, unchecked((uint)styleId), color, 0, fontStyle);
 		}
 
 		/// <summary>Registers multiple highlight styles in one native call.</summary>
 		/// <param name="stylesById">Style definitions keyed by style ID.</param>
-		public void registerBatchTextStyles(IReadOnlyDictionary<uint, TextStyle> stylesById) {
+		public void registerBatchTextStyles(IReadOnlyDictionary<int, TextStyle> stylesById) {
 			if (IsReleased || stylesById == null || stylesById.Count == 0) {
 				return;
 			}
@@ -2843,6 +2888,12 @@ namespace SweetEditor {
 		public void SetBatchLineSpans(byte[] payload) {
 			if (IsReleased || payload == null) return;
 			NativeMethods.SetBatchLineSpans(nativeHandle, payload, (nuint)payload.Length);
+		}
+
+		/// <summary>Clears highlight spans for the specified line and layer.</summary>
+		public void ClearLineSpans(int line, int layer) {
+			if (IsReleased) return;
+			NativeMethods.ClearLineSpans(nativeHandle, (nuint)line, (byte)layer);
 		}
 
 		/// <summary>Sets Inlay Hints for the specified line (model overload, replaces whole line).</summary>

@@ -19,7 +19,6 @@ namespace SweetEditor {
 		private const float BaseInlayHintFontSize = 9.5f;
 		private const string DefaultTextFontFamily = "Consolas";
 		private const string BaseInlayHintFontFamily = "Segoe UI";
-		private const int TemporaryLinkColor = unchecked((int)0xFF4C9DFF);
 
 		internal float baseTextFontSize = DefaultTextFontSize;
 		internal string baseTextFontFamily = DefaultTextFontFamily;
@@ -229,6 +228,34 @@ namespace SweetEditor {
 
 		private SolidBrush GetOrCreateBrush(Color color) {
 			return GetOrCreateBrush(color.ToArgb());
+		}
+
+		private Color ResolveCodeLensColor(bool active) {
+			if (active) {
+				if (!currentTheme.CodeLensActiveColor.IsEmpty) return currentTheme.CodeLensActiveColor;
+				Color activeAccent = GetCurrentLineAccentColor();
+				if (!activeAccent.IsEmpty) return activeAccent;
+				if (!currentTheme.CodeLensColor.IsEmpty) return currentTheme.CodeLensColor;
+			} else if (!currentTheme.CodeLensColor.IsEmpty) {
+				return currentTheme.CodeLensColor;
+			}
+
+			if (!currentTheme.InlayHintTextColor.IsEmpty) return currentTheme.InlayHintTextColor;
+			return currentTheme.TextColor;
+		}
+
+		private Color ResolveLinkColor(bool active) {
+			if (active) {
+				if (!currentTheme.LinkActiveColor.IsEmpty) return currentTheme.LinkActiveColor;
+				if (!currentTheme.LinkColor.IsEmpty) return currentTheme.LinkColor;
+				if (!currentTheme.CodeLensActiveColor.IsEmpty) return currentTheme.CodeLensActiveColor;
+			} else if (!currentTheme.LinkColor.IsEmpty) {
+				return currentTheme.LinkColor;
+			}
+
+			if (!currentTheme.CodeLensColor.IsEmpty) return currentTheme.CodeLensColor;
+			if (!currentTheme.InlayHintTextColor.IsEmpty) return currentTheme.InlayHintTextColor;
+			return currentTheme.TextColor;
 		}
 
 		#region TextMeasurer Callbacks
@@ -543,9 +570,9 @@ namespace SweetEditor {
 				: GetTextFontMetrics(visualRun.Style.FontStyle, g);
 			Color color;
 			if (visualRun.Type == VisualRunType.CODELENS) {
-				color = visualRun.Active ? GetCurrentLineAccentColor() : currentTheme.InlayHintTextColor;
+				color = ResolveCodeLensColor(visualRun.Active);
 			} else if (visualRun.Type == VisualRunType.LINK) {
-				color = Color.FromArgb(TemporaryLinkColor);
+				color = ResolveLinkColor(visualRun.Active);
 			} else {
 				color = (visualRun.Style.Color != 0)
 					? Color.FromArgb(visualRun.Style.Color)
@@ -690,7 +717,7 @@ namespace SweetEditor {
 
 		private void DrawCompositionDecoration(Graphics g, CompositionDecoration comp) {
 			float y = comp.Origin.Y + comp.Height;
-			using var pen = new Pen(currentTheme.CompositionColor, 2f);
+			using var pen = new Pen(currentTheme.CompositionUnderlineColor, 2f);
 			g.DrawLine(pen, comp.Origin.X, y, comp.Origin.X + comp.Width, y);
 		}
 
@@ -771,7 +798,7 @@ namespace SweetEditor {
 			if (model.GuideSegments == null || model.GuideSegments.Count == 0) return;
 			foreach (var seg in model.GuideSegments) {
 				var color = seg.Type switch {
-					GuideType.SEPARATOR => currentTheme.SeparatorColor,
+					GuideType.SEPARATOR => currentTheme.SeparatorLineColor,
 					_ => currentTheme.GuideColor
 				};
 				float lineWidth = seg.Type == GuideType.INDENT ? 1f : 1.2f;

@@ -20,5 +20,7 @@ public enum HitTargetType {
     /** Hit an InlayHint (color block type) */
     INLAY_HINT_COLOR,
     /** Hit a CodeLens item */
-    CODELENS
+    CODELENS,
+    /** Hit an embedded clickable link */
+    LINK
 }

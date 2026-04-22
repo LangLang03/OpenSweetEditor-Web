@@ -6,6 +6,7 @@ import com.qiplat.sweeteditor.core.Document;
 import com.qiplat.sweeteditor.core.foundation.CurrentLineRenderMode;
 import com.qiplat.sweeteditor.core.foundation.WrapMode;
 import com.qiplat.sweeteditor.event.CodeLensClickEvent;
+import com.qiplat.sweeteditor.event.LinkClickEvent;
 
 import javax.swing.BorderFactory;
 import javax.swing.DefaultComboBoxModel;
@@ -25,10 +26,12 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 
 public class Main extends JFrame {
-    private static final int STYLE_COLOR = EditorTheme.STYLE_PREPROCESSOR + 1;
     private static final String FALLBACK_FILE_NAME = "example.cpp";
+    private static final float LINUX_EDITOR_TEXT_SIZE = 26f;
+    private static final float DESKTOP_EDITOR_TEXT_SIZE = 18f;
     private static final String FALLBACK_SAMPLE_CODE =
             "// SweetEditor Demo\n" +
             "int main() {\n" +
@@ -54,14 +57,18 @@ public class Main extends JFrame {
         setLocationRelativeTo(null);
 
         editor = new SweetEditor(EditorTheme.dark());
-        editor.getSettings().setEditorTextSize(26);
+        editor.getSettings().setEditorTextSize(resolveDemoEditorTextSize());
+        String demoFontFamily = resolveDemoFontFamily();
+        if (demoFontFamily != null) {
+            editor.getSettings().setFontFamily(demoFontFamily);
+        }
         editor.getSettings().setCursorAnimationEnabled(true);
         editor.getSettings().setGutterAnimationEnabled(true);
 
         statusLabel = new JLabel("Ready");
         statusLabel.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 4));
 
-        registerColorStyleForCurrentTheme();
+        registerDemoStylesForCurrentTheme();
 
         try {
             DemoDecorationProvider.ensureSweetLineReady(resolveSyntaxFiles());
@@ -69,7 +76,6 @@ public class Main extends JFrame {
             throw new RuntimeException(e);
         }
 
-        editor.setPerfOverlayEnabled(true);
         editor.getSettings().setCurrentLineRenderMode(CurrentLineRenderMode.BORDER);
 
         demoProvider = new DemoDecorationProvider();
@@ -79,6 +85,7 @@ public class Main extends JFrame {
         editor.addCompletionProvider(demoCompletionProvider);
         editor.subscribe(CodeLensClickEvent.class, e ->
                 updateStatus("CodeLens " + describeCodeLensCommand(e.commandId) + " at line: " + (e.line + 1)));
+        editor.subscribe(LinkClickEvent.class, e -> updateStatus("Link: " + e.target));
 
         JPanel toolbar = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 4));
         fileComboBox = new JComboBox<>();
@@ -114,7 +121,7 @@ public class Main extends JFrame {
         toolbar.add(makeButton("Theme", e -> {
             isDarkTheme = !isDarkTheme;
             editor.applyTheme(isDarkTheme ? EditorTheme.dark() : EditorTheme.light());
-            registerColorStyleForCurrentTheme();
+            registerDemoStylesForCurrentTheme();
             updateStatus(isDarkTheme ? "Switched to dark theme" : "Switched to light theme");
         }));
         toolbar.add(makeButton("WrapMode", e -> cycleWrapMode()));
@@ -195,9 +202,27 @@ public class Main extends JFrame {
         return "Command#" + commandId;
     }
 
-    private void registerColorStyleForCurrentTheme() {
+    private void registerDemoStylesForCurrentTheme() {
         int color = isDarkTheme ? 0xFFB5CEA8 : 0xFF098658;
-        editor.registerTextStyle(STYLE_COLOR, color, 0);
+        int linkColor = isDarkTheme ? 0xFF7DCFFF : 0xFF005FB8;
+        editor.registerTextStyle(DemoDecorationProvider.STYLE_COLOR, color, 0);
+        editor.registerTextStyle(DemoDecorationProvider.STYLE_LINK, linkColor, 0);
+    }
+
+    private static float resolveDemoEditorTextSize() {
+        String osName = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+        return osName.contains("linux") ? LINUX_EDITOR_TEXT_SIZE : DESKTOP_EDITOR_TEXT_SIZE;
+    }
+
+    private static String resolveDemoFontFamily() {
+        String osName = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+        if (osName.contains("win")) {
+            return "Consolas";
+        }
+        if (osName.contains("mac")) {
+            return "Menlo";
+        }
+        return null;
     }
 
     private static String normalizeNewlines(String text) {
@@ -277,4 +302,3 @@ public class Main extends JFrame {
         });
     }
 }
-

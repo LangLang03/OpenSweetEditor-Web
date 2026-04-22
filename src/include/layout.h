@@ -48,7 +48,7 @@ namespace NS_SWEETEDITOR {
   /// This context does not affect geometry/layout caches. It only affects
   /// the final visual model emitted to platform renderers.
   struct PresentationContext {
-    /// Active interactive hit target (for example hovered CodeLens item)
+    /// Active interactive hit target for clickable runs such as CodeLens or Link.
     HitTarget active_hit_target;
     /// Whether selection_range is valid
     bool has_selection {false};
@@ -145,7 +145,7 @@ namespace NS_SWEETEDITOR {
 
     void layoutLine(size_t index, LogicalLine& logical_line);
 
-    void layoutVisibleLines(EditorRenderModel& model, const PresentationContext& presentation_context);
+    VisibleLineInfo layoutVisibleLines(EditorRenderModel& model, const PresentationContext& presentation_context);
 
     /// Pointer hit test: convert screen point to text position (for cursor placement / tap)
     /// @param screen_point Screen point (relative to editor view top-left)
@@ -154,6 +154,7 @@ namespace NS_SWEETEDITOR {
     /// Text-boundary hit test: convert screen point to a stable text boundary
     /// used by selection dragging and handle dragging.
     /// Virtual lines (for example CodeLens) are mapped to adjacent document text boundaries.
+    /// Clickable inline runs such as Link still map to their own logical text range.
     /// @param screen_point Screen point (relative to editor view top-left)
     TextPosition hitTestTextBoundary(const PointF& screen_point);
 

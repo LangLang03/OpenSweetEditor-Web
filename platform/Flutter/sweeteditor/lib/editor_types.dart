@@ -78,6 +78,10 @@ class EditorTheme {
   int diagnosticWarningColor = 0xFFE0AF68;
   int diagnosticInfoColor = 0xFF7DCFFF;
   int diagnosticHintColor = 0xFF8FA3BF;
+  int codeLensColor = 0;
+  int codeLensActiveColor = 0;
+  int linkColor = 0;
+  int linkActiveColor = 0;
   int linkedEditingActiveColor = 0xCC7AA2F7;
   int linkedEditingInactiveColor = 0x667AA2F7;
   int bracketHighlightBorderColor = 0xCC9ECE6A;
@@ -116,6 +120,10 @@ class EditorTheme {
       styleAnnotation: const core.TextStyle(color: 0xFF2AC3DE),
       stylePreprocessor: const core.TextStyle(color: 0xFFF7768E),
     };
+    theme.codeLensColor = theme.inlayHintTextColor;
+    theme.codeLensActiveColor = theme.currentLineNumberColor;
+    theme.linkColor = 0xFF4C9DFF;
+    theme.linkActiveColor = 0xFF4C9DFF;
     return theme;
   }
 
@@ -145,6 +153,10 @@ class EditorTheme {
       ..diagnosticWarningColor = 0xFFD97706
       ..diagnosticInfoColor = 0xFF0EA5E9
       ..diagnosticHintColor = 0xFF64748B
+      ..codeLensColor = 0xB0344A73
+      ..codeLensActiveColor = 0xFF3A5FA0
+      ..linkColor = 0xFF4C9DFF
+      ..linkActiveColor = 0xFF4C9DFF
       ..linkedEditingActiveColor = 0xCC2563EB
       ..linkedEditingInactiveColor = 0x662563EB
       ..bracketHighlightBorderColor = 0xCC0F766E

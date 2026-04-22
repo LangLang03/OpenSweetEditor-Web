@@ -217,6 +217,7 @@ class EditorCanvasPainter extends ChangeNotifier implements CustomPainter {
           case core.VisualRunType.whitespace:
           case core.VisualRunType.tab:
           case core.VisualRunType.codelens:
+          case core.VisualRunType.link:
             _drawTextRun(canvas, run);
           case core.VisualRunType.phantomText:
             _drawPhantomTextRun(canvas, run);
@@ -235,19 +236,23 @@ class EditorCanvasPainter extends ChangeNotifier implements CustomPainter {
     if (run.text.isEmpty) return;
     final screenX = run.x;
     final baselineY = run.y;
-    final effectiveColor = run.type == core.VisualRunType.codelens
-        ? (run.active
-              ? (_theme.currentLineNumberColor != 0
-                    ? _theme.currentLineNumberColor
-                    : _theme.lineNumberColor)
-              : _theme.inlayHintTextColor)
-        : _theme.textColor;
-    final style = _measurer.buildRunStyle(run.style, effectiveColor).copyWith(
-      color: Color(effectiveColor),
-      decoration: run.type == core.VisualRunType.codelens && run.active
-          ? TextDecoration.underline
-          : TextDecoration.none,
-    );
+    int? overrideColor;
+    if (run.type == core.VisualRunType.codelens) {
+      overrideColor = _resolveCodeLensColor(run.active);
+    } else if (run.type == core.VisualRunType.link) {
+      overrideColor = _resolveLinkColor(run.active);
+    }
+    final style = _measurer
+        .buildRunStyle(run.style, overrideColor ?? _theme.textColor)
+        .copyWith(
+          color: overrideColor != null ? Color(overrideColor) : null,
+          decoration:
+              ((run.type == core.VisualRunType.codelens ||
+                      run.type == core.VisualRunType.link) &&
+                  run.active)
+              ? TextDecoration.underline
+              : TextDecoration.none,
+        );
     final fontMetrics = _measurer.getFontMetrics(run.style.fontStyle);
     final painter = TextPainter(
       text: TextSpan(text: run.text, style: style),
@@ -273,6 +278,24 @@ class EditorCanvasPainter extends ChangeNotifier implements CustomPainter {
       baselineY,
       fontMetrics.ascent,
     );
+  }
+
+  int _resolveCodeLensColor(bool active) {
+    if (active) {
+      if (_theme.codeLensActiveColor != 0) return _theme.codeLensActiveColor;
+      if (_theme.currentLineNumberColor != 0) {
+        return _theme.currentLineNumberColor;
+      }
+      return _theme.lineNumberColor;
+    }
+    if (_theme.codeLensColor != 0) return _theme.codeLensColor;
+    return _theme.inlayHintTextColor;
+  }
+
+  int _resolveLinkColor(bool active) {
+    if (active && _theme.linkActiveColor != 0) return _theme.linkActiveColor;
+    if (_theme.linkColor != 0) return _theme.linkColor;
+    return _resolveCodeLensColor(active);
   }
 
   void _drawPhantomTextRun(Canvas canvas, core.VisualRun run) {

@@ -8,7 +8,7 @@ import {
   DecorationResult,
   DecorationResultBuilder,
   DecorationType,
-  DiagnosticItem,
+  Diagnostic,
   Document as EditorDocument,
   EditorTheme,
   FoldRegion,
@@ -17,6 +17,7 @@ import {
   InlayHint,
   InlayType,
   CodeLensItem,
+  SeparatorStyle,
   SeparatorGuide,
   StyleSpan,
   TextRange
@@ -94,7 +95,7 @@ export class DemoDecorationProvider implements DecorationProvider {
   }
 
   provideDecorations(context: DecorationContext, receiver: DecorationReceiver): void {
-    const diagnostics = new Map<number, DiagnosticItem[]>();
+    const diagnostics = new Map<number, Diagnostic[]>();
     receiver.accept(this.buildSweetLineDecorationResult(context, diagnostics));
 
     setTimeout(() => {
@@ -108,7 +109,7 @@ export class DemoDecorationProvider implements DecorationProvider {
   }
 
   private buildSweetLineDecorationResult(context: DecorationContext,
-    dynamicDiagnostics: Map<number, DiagnosticItem[]>): DecorationResult {
+    dynamicDiagnostics: Map<number, Diagnostic[]>): DecorationResult {
     if (DemoDecorationProvider.highlightEngine === null) {
       return this.buildEmptyResult();
     }
@@ -158,8 +159,8 @@ export class DemoDecorationProvider implements DecorationProvider {
       return this.buildEmptyResult();
     }
 
-    const renderStartLine = Math.max(0, context.visibleStartLine);
-    const maxLine = Math.min(context.visibleEndLine, this.cacheHighlight.lines.length - 1);
+    const renderStartLine = Math.max(0, context.visibleLineRange.start);
+    const maxLine = Math.min(context.visibleLineRange.end, this.cacheHighlight.lines.length - 1);
     for (let line = renderStartLine; line <= maxLine; line++) {
       const lineHighlight = this.cacheHighlight.lines[line];
       for (let spanIndex = 0; spanIndex < lineHighlight.spans.length; spanIndex++) {
@@ -239,7 +240,7 @@ export class DemoDecorationProvider implements DecorationProvider {
       .build();
   }
 
-  private appendDynamicDemoDecorations(diagnostics: Map<number, DiagnosticItem[]>,
+  private appendDynamicDemoDecorations(diagnostics: Map<number, Diagnostic[]>,
     seenDiagnostics: Set<string>,
     diagnosticCount: number[],
     firstKeywordRange: TokenRangeInfo | null,
@@ -434,7 +435,7 @@ export class DemoDecorationProvider implements DecorationProvider {
     if (count > 0) {
       separatorGuides.push({
         line: range.line,
-        style: isDouble ? 1 : 0,
+        style: isDouble ? SeparatorStyle.DOUBLE : SeparatorStyle.SINGLE,
         count,
         textEndColumn: lineText.length
       });
@@ -493,7 +494,7 @@ export class DemoDecorationProvider implements DecorationProvider {
     }
   }
 
-  private static appendDiagnostic(diagnostics: Map<number, DiagnosticItem[]>,
+  private static appendDiagnostic(diagnostics: Map<number, Diagnostic[]>,
     seenDiagnostics: Set<string>,
     diagnosticCount: number[],
     line: number,
@@ -521,7 +522,7 @@ export class DemoDecorationProvider implements DecorationProvider {
     diagnosticCount[0]++;
   }
 
-  private static appendDiagnosticFallbackIfNeeded(diagnostics: Map<number, DiagnosticItem[]>,
+  private static appendDiagnosticFallbackIfNeeded(diagnostics: Map<number, Diagnostic[]>,
     seenDiagnostics: Set<string>,
     diagnosticCount: number[],
     firstKeywordRange: TokenRangeInfo | null): void {

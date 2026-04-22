@@ -11,8 +11,10 @@ import com.qiplat.sweeteditor.core.adornment.SeparatorGuide;
 import com.qiplat.sweeteditor.core.adornment.InlayHint;
 import com.qiplat.sweeteditor.core.adornment.SpanLayer;
 import com.qiplat.sweeteditor.core.adornment.CodeLensItem;
+import com.qiplat.sweeteditor.core.adornment.LinkSpan;
 import com.qiplat.sweeteditor.core.adornment.PhantomText;
 import com.qiplat.sweeteditor.core.adornment.StyleSpan;
+import com.qiplat.sweeteditor.core.foundation.IntRange;
 import com.qiplat.sweeteditor.core.foundation.TextChange;
 
 import javax.swing.SwingUtilities;
@@ -41,8 +43,9 @@ public final class DecorationProviderManager {
     private final List<TextChange> pendingTextChanges = new ArrayList<>();
     private volatile boolean applyScheduled;
     private volatile int generation;
-    private volatile int lastVisibleStartLine;
-    private volatile int lastVisibleEndLine = -1;
+    private volatile boolean disposed;
+    private volatile IntRange lastVisibleLineRange = new IntRange(0, -1);
+    private volatile IntRange lastContextLineRange = new IntRange(0, -1);
     private volatile boolean scrollRefreshScheduled;
     private volatile boolean pendingScrollRefresh;
     private volatile long lastScrollRefreshUptimeMs;
@@ -66,7 +69,9 @@ public final class DecorationProviderManager {
     }
 
     public void addProvider(DecorationProvider provider) {
+        if (disposed) return;
         runOnEdt(() -> {
+            if (disposed) return;
             if (!providers.contains(provider)) {
                 providers.add(provider);
                 providerStates.put(provider, new ProviderState());
@@ -76,7 +81,9 @@ public final class DecorationProviderManager {
     }
 
     public void removeProvider(DecorationProvider provider) {
+        if (disposed) return;
         runOnEdt(() -> {
+            if (disposed) return;
             providers.remove(provider);
             ProviderState state = providerStates.remove(provider);
             if (state != null) {
@@ -90,23 +97,52 @@ public final class DecorationProviderManager {
     }
 
     public void requestRefresh() {
+        if (disposed) return;
         scheduleRefresh(0, null);
     }
 
     public void onDocumentLoaded() {
+        if (disposed) return;
         scheduleRefresh(0, null);
     }
 
     public void onTextChanged(List<TextChange> changes) {
+        if (disposed) return;
         scheduleRefresh(50, changes);
     }
 
     public void onScrollChanged() {
+        if (disposed) return;
         runOnEdt(this::scheduleScrollRefresh);
+    }
+
+    public void close() {
+        runOnEdt(() -> {
+            if (disposed) return;
+            disposed = true;
+            generation++;
+            debounceTimer.stop();
+            scrollRefreshTimer.stop();
+            scrollRefreshScheduled = false;
+            pendingScrollRefresh = false;
+            applyScheduled = false;
+            pendingTextChanges.clear();
+            lastVisibleLineRange = new IntRange(0, -1);
+            lastContextLineRange = new IntRange(0, -1);
+            for (ProviderState state : providerStates.values()) {
+                if (state.activeReceiver != null) {
+                    state.activeReceiver.cancel();
+                }
+                state.executor.shutdownNow();
+            }
+            providers.clear();
+            providerStates.clear();
+        });
     }
 
     private void scheduleRefresh(int delayMs, List<TextChange> changes) {
         runOnEdt(() -> {
+            if (disposed) return;
             if (changes != null) {
                 pendingTextChanges.addAll(changes);
             }
@@ -122,6 +158,7 @@ public final class DecorationProviderManager {
     }
 
     private void scheduleScrollRefresh() {
+        if (disposed) return;
         long now = System.currentTimeMillis();
         long elapsed = now - lastScrollRefreshUptimeMs;
         int minInterval = getScrollRefreshMinIntervalMs();
@@ -139,29 +176,29 @@ public final class DecorationProviderManager {
     }
 
     private void doRefresh() {
+        if (disposed) return;
         generation++;
         int currentGeneration = generation;
 
-        int[] visible = editor.getVisibleLineRange();
-        lastVisibleStartLine = visible[0];
-        lastVisibleEndLine = visible[1];
+        IntRange visible = editor.getVisibleLineRange();
+        lastVisibleLineRange = visible;
         int total = editor.getTotalLineCount();
         List<TextChange> changes = new ArrayList<>(pendingTextChanges);
         pendingTextChanges.clear();
-        int contextStart = visible[0];
-        int contextEnd = visible[1];
-        if (total > 0 && visible[1] >= visible[0]) {
-            int overscanLines = calculateOverscanLines(visible[0], visible[1]);
-            contextStart = Math.max(0, visible[0] - overscanLines);
-            contextEnd = Math.min(total - 1, visible[1] + overscanLines);
+        int contextStart = visible.start();
+        int contextEnd = visible.end();
+        if (total > 0 && visible.end() >= visible.start()) {
+            int overscanLines = calculateOverscanLines(visible.start(), visible.end());
+            contextStart = Math.max(0, visible.start() - overscanLines);
+            contextEnd = Math.min(total - 1, visible.end() + overscanLines);
         }
         DecorationContext context = new DecorationContext(
-                contextStart,
-                contextEnd,
+                new IntRange(contextStart, contextEnd),
                 total,
                 changes,
                 editor.getLanguageConfiguration(),
                 editor.getMetadata());
+        lastContextLineRange = context.visibleLineRange;
 
         for (DecorationProvider provider : providers) {
             ProviderState state = providerStates.computeIfAbsent(provider, p -> new ProviderState());
@@ -186,12 +223,14 @@ public final class DecorationProviderManager {
     }
 
     private void scheduleApply() {
+        if (disposed) return;
         if (applyScheduled) return;
         applyScheduled = true;
         runOnEdt(this::applyMerged);
     }
 
     private void applyMerged() {
+        if (disposed) return;
         applyScheduled = false;
 
         Map<Integer, List<StyleSpan>> syntaxSpans = new HashMap<>();
@@ -206,6 +245,7 @@ public final class DecorationProviderManager {
         Map<Integer, List<GutterIcon>> gutterIcons = new HashMap<>();
         Map<Integer, List<PhantomText>> phantomTexts = new HashMap<>();
         Map<Integer, List<CodeLensItem>> codeLensItems = new HashMap<>();
+        Map<Integer, List<LinkSpan>> links = new HashMap<>();
         DecorationResult.ApplyMode syntaxMode = DecorationResult.ApplyMode.MERGE;
         DecorationResult.ApplyMode semanticMode = DecorationResult.ApplyMode.MERGE;
         DecorationResult.ApplyMode inlayMode = DecorationResult.ApplyMode.MERGE;
@@ -218,6 +258,7 @@ public final class DecorationProviderManager {
         DecorationResult.ApplyMode gutterMode = DecorationResult.ApplyMode.MERGE;
         DecorationResult.ApplyMode phantomMode = DecorationResult.ApplyMode.MERGE;
         DecorationResult.ApplyMode codeLensMode = DecorationResult.ApplyMode.MERGE;
+        DecorationResult.ApplyMode linksMode = DecorationResult.ApplyMode.MERGE;
 
         for (DecorationProvider provider : providers) {
             ProviderState state = providerStates.get(provider);
@@ -252,22 +293,26 @@ public final class DecorationProviderManager {
             if (r.getCodeLensItems() != null) {
                 appendMapOfList(codeLensItems, r.getCodeLensItems());
             }
+            linksMode = mergeMode(linksMode, r.getLinksMode());
+            if (r.getLinks() != null) {
+                appendMapOfList(links, r.getLinks());
+            }
 
             indentMode = mergeMode(indentMode, r.getIndentGuidesMode());
             if (r.getIndentGuides() != null) {
-                indentGuides = new ArrayList<>(r.getIndentGuides());
+                indentGuides = appendList(indentGuides, r.getIndentGuides());
             }
             bracketMode = mergeMode(bracketMode, r.getBracketGuidesMode());
             if (r.getBracketGuides() != null) {
-                bracketGuides = new ArrayList<>(r.getBracketGuides());
+                bracketGuides = appendList(bracketGuides, r.getBracketGuides());
             }
             flowMode = mergeMode(flowMode, r.getFlowGuidesMode());
             if (r.getFlowGuides() != null) {
-                flowGuides = new ArrayList<>(r.getFlowGuides());
+                flowGuides = appendList(flowGuides, r.getFlowGuides());
             }
             separatorMode = mergeMode(separatorMode, r.getSeparatorGuidesMode());
             if (r.getSeparatorGuides() != null) {
-                separatorGuides = new ArrayList<>(r.getSeparatorGuides());
+                separatorGuides = appendList(separatorGuides, r.getSeparatorGuides());
             }
             foldMode = mergeMode(foldMode, r.getFoldRegionsMode());
             if (r.getFoldRegions() != null) {
@@ -306,6 +351,9 @@ public final class DecorationProviderManager {
         applyCodeLensMode(codeLensMode);
         editor.setBatchLineCodeLens(codeLensItems);
 
+        applyLinksMode(linksMode);
+        editor.setBatchLineLinks(links);
+
         editor.flush();
     }
 
@@ -318,11 +366,20 @@ public final class DecorationProviderManager {
         }
     }
 
+    private static <T> List<T> appendList(List<T> out, List<T> patch) {
+        if (patch == null || patch.isEmpty()) {
+            return out;
+        }
+        List<T> target = out != null ? out : new ArrayList<>();
+        target.addAll(patch);
+        return target;
+    }
+
     private void applySpanMode(SpanLayer layer, DecorationResult.ApplyMode mode) {
         if (mode == DecorationResult.ApplyMode.REPLACE_ALL) {
             editor.clearHighlights(layer);
         } else if (mode == DecorationResult.ApplyMode.REPLACE_RANGE) {
-            clearSpanRange(layer, lastVisibleStartLine, lastVisibleEndLine);
+            clearSpanRange(layer, lastContextLineRange.start(), lastContextLineRange.end());
         }
     }
 
@@ -330,7 +387,7 @@ public final class DecorationProviderManager {
         if (mode == DecorationResult.ApplyMode.REPLACE_ALL) {
             editor.clearInlayHints();
         } else if (mode == DecorationResult.ApplyMode.REPLACE_RANGE) {
-            clearInlayRange(lastVisibleStartLine, lastVisibleEndLine);
+            clearInlayRange(lastContextLineRange.start(), lastContextLineRange.end());
         }
     }
 
@@ -338,7 +395,7 @@ public final class DecorationProviderManager {
         if (mode == DecorationResult.ApplyMode.REPLACE_ALL) {
             editor.clearDiagnostics();
         } else if (mode == DecorationResult.ApplyMode.REPLACE_RANGE) {
-            clearDiagnosticRange(lastVisibleStartLine, lastVisibleEndLine);
+            clearDiagnosticRange(lastContextLineRange.start(), lastContextLineRange.end());
         }
     }
 
@@ -346,7 +403,7 @@ public final class DecorationProviderManager {
         if (mode == DecorationResult.ApplyMode.REPLACE_ALL) {
             editor.clearGutterIcons();
         } else if (mode == DecorationResult.ApplyMode.REPLACE_RANGE) {
-            clearGutterRange(lastVisibleStartLine, lastVisibleEndLine);
+            clearGutterRange(lastContextLineRange.start(), lastContextLineRange.end());
         }
     }
 
@@ -354,7 +411,7 @@ public final class DecorationProviderManager {
         if (mode == DecorationResult.ApplyMode.REPLACE_ALL) {
             editor.clearPhantomTexts();
         } else if (mode == DecorationResult.ApplyMode.REPLACE_RANGE) {
-            clearPhantomRange(lastVisibleStartLine, lastVisibleEndLine);
+            clearPhantomRange(lastContextLineRange.start(), lastContextLineRange.end());
         }
     }
 
@@ -362,7 +419,15 @@ public final class DecorationProviderManager {
         if (mode == DecorationResult.ApplyMode.REPLACE_ALL) {
             editor.clearCodeLens();
         } else if (mode == DecorationResult.ApplyMode.REPLACE_RANGE) {
-            clearCodeLensRange(lastVisibleStartLine, lastVisibleEndLine);
+            clearCodeLensRange(lastContextLineRange.start(), lastContextLineRange.end());
+        }
+    }
+
+    private void applyLinksMode(DecorationResult.ApplyMode mode) {
+        if (mode == DecorationResult.ApplyMode.REPLACE_ALL) {
+            editor.clearLinks();
+        } else if (mode == DecorationResult.ApplyMode.REPLACE_RANGE) {
+            clearLinksRange(lastContextLineRange.start(), lastContextLineRange.end());
         }
     }
 
@@ -434,6 +499,12 @@ public final class DecorationProviderManager {
         editor.setBatchLineCodeLens(empty);
     }
 
+    private void clearLinksRange(int startLine, int endLine) {
+        Map<Integer, List<LinkSpan>> empty = buildEmptyRangeMap(startLine, endLine);
+        if (empty.isEmpty()) return;
+        editor.setBatchLineLinks(empty);
+    }
+
     private static <T> Map<Integer, List<T>> buildEmptyRangeMap(int startLine, int endLine) {
         Map<Integer, List<T>> out = new HashMap<>();
         if (endLine < startLine) return out;
@@ -479,10 +550,10 @@ public final class DecorationProviderManager {
 
         @Override
         public boolean accept(DecorationResult result) {
-            if (cancelled || receiverGeneration != generation) return false;
+            if (disposed || cancelled || receiverGeneration != generation) return false;
             DecorationResult snapshot = result.copy();
             runOnEdt(() -> {
-                if (cancelled || receiverGeneration != generation) return;
+                if (disposed || cancelled || receiverGeneration != generation) return;
                 ProviderState state = providerStates.computeIfAbsent(provider, p -> new ProviderState());
                 mergePatch(state, snapshot);
                 scheduleApply();
@@ -492,7 +563,7 @@ public final class DecorationProviderManager {
 
         @Override
         public boolean isCancelled() {
-            return cancelled || receiverGeneration != generation;
+            return disposed || cancelled || receiverGeneration != generation;
         }
 
         void cancel() {
@@ -589,6 +660,13 @@ public final class DecorationProviderManager {
         } else if (patch.getCodeLensItemsMode() != DecorationResult.ApplyMode.MERGE) {
             target.setCodeLensItems(null);
             target.setCodeLensItemsMode(patch.getCodeLensItemsMode());
+        }
+        if (patch.getLinks() != null) {
+            target.setLinks(patch.getLinks());
+            target.setLinksMode(patch.getLinksMode());
+        } else if (patch.getLinksMode() != DecorationResult.ApplyMode.MERGE) {
+            target.setLinks(null);
+            target.setLinksMode(patch.getLinksMode());
         }
     }
 

@@ -70,11 +70,28 @@ class PhantomText {
 
 /// CodeLens item (clickable label above a code line).
 class CodeLensItem {
-  const CodeLensItem({required this.column, required this.text, required this.commandId});
+  const CodeLensItem({
+    required this.column,
+    required this.text,
+    required this.commandId,
+  });
 
   final int column;
   final String text;
   final int commandId;
+}
+
+/// Clickable document link range.
+class LinkSpan {
+  const LinkSpan({
+    required this.column,
+    required this.length,
+    required this.target,
+  });
+
+  final int column;
+  final int length;
+  final String target;
 }
 
 /// Gutter icon.

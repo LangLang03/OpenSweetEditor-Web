@@ -265,6 +265,7 @@ namespace NS_SWEETEDITOR {
     m_diagnostics_.clear();
     m_gutter_icons_.clear();
     m_codelens_items_.clear();
+    m_links_.clear();
     m_indent_guides_.clear();
     m_bracket_guides_.clear();
     m_flow_guides_.clear();
@@ -943,4 +944,3 @@ namespace NS_SWEETEDITOR {
   }
 #pragma endregion
 }
-

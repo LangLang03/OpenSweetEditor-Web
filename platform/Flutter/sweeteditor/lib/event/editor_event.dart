@@ -50,48 +50,72 @@ class ScaleChangedEvent implements EditorEvent {
 
 class LongPressEvent implements EditorEvent {
   final core.TextPosition cursorPosition;
-  final core.PointF screenPoint;
+  final core.PointF locationInEditor;
 
   const LongPressEvent({
     required this.cursorPosition,
-    required this.screenPoint,
-  });
+    core.PointF? locationInEditor,
+    @Deprecated('Use locationInEditor instead.') core.PointF? screenPoint,
+  }) : assert(locationInEditor != null || screenPoint != null),
+       locationInEditor =
+           locationInEditor ?? screenPoint ?? const core.PointF();
+
+  @Deprecated('Use locationInEditor instead.')
+  core.PointF get screenPoint => locationInEditor;
 }
 
 class DoubleTapEvent implements EditorEvent {
   final core.TextPosition cursorPosition;
   final bool hasSelection;
   final core.TextRange? selection;
-  final core.PointF screenPoint;
+  final core.PointF locationInEditor;
 
   const DoubleTapEvent({
     required this.cursorPosition,
     required this.hasSelection,
     this.selection,
-    required this.screenPoint,
-  });
+    core.PointF? locationInEditor,
+    @Deprecated('Use locationInEditor instead.') core.PointF? screenPoint,
+  }) : assert(locationInEditor != null || screenPoint != null),
+       locationInEditor =
+           locationInEditor ?? screenPoint ?? const core.PointF();
+
+  @Deprecated('Use locationInEditor instead.')
+  core.PointF get screenPoint => locationInEditor;
 }
 
 class ContextMenuEvent implements EditorEvent {
   final core.TextPosition cursorPosition;
-  final core.PointF screenPoint;
+  final core.PointF locationInEditor;
 
   const ContextMenuEvent({
     required this.cursorPosition,
-    required this.screenPoint,
-  });
+    core.PointF? locationInEditor,
+    @Deprecated('Use locationInEditor instead.') core.PointF? screenPoint,
+  }) : assert(locationInEditor != null || screenPoint != null),
+       locationInEditor =
+           locationInEditor ?? screenPoint ?? const core.PointF();
+
+  @Deprecated('Use locationInEditor instead.')
+  core.PointF get screenPoint => locationInEditor;
 }
 
 class GutterIconClickEvent implements EditorEvent {
   final int line;
   final int iconId;
-  final core.PointF screenPoint;
+  final core.PointF locationInEditor;
 
   const GutterIconClickEvent({
     required this.line,
     required this.iconId,
-    required this.screenPoint,
-  });
+    core.PointF? locationInEditor,
+    @Deprecated('Use locationInEditor instead.') core.PointF? screenPoint,
+  }) : assert(locationInEditor != null || screenPoint != null),
+       locationInEditor =
+           locationInEditor ?? screenPoint ?? const core.PointF();
+
+  @Deprecated('Use locationInEditor instead.')
+  core.PointF get screenPoint => locationInEditor;
 }
 
 class InlayHintClickEvent implements EditorEvent {
@@ -99,41 +123,79 @@ class InlayHintClickEvent implements EditorEvent {
   final int column;
   final core.InlayType type;
   final int intValue;
-  final core.PointF screenPoint;
+  final core.PointF locationInEditor;
 
   const InlayHintClickEvent({
     required this.line,
     required this.column,
     required this.type,
     this.intValue = 0,
-    required this.screenPoint,
-  });
+    core.PointF? locationInEditor,
+    @Deprecated('Use locationInEditor instead.') core.PointF? screenPoint,
+  }) : assert(locationInEditor != null || screenPoint != null),
+       locationInEditor =
+           locationInEditor ?? screenPoint ?? const core.PointF();
+
+  @Deprecated('Use locationInEditor instead.')
+  core.PointF get screenPoint => locationInEditor;
 }
 
 class FoldToggleEvent implements EditorEvent {
   final int line;
   final bool isGutter;
-  final core.PointF screenPoint;
+  final core.PointF locationInEditor;
 
   const FoldToggleEvent({
     required this.line,
     required this.isGutter,
-    required this.screenPoint,
-  });
+    core.PointF? locationInEditor,
+    @Deprecated('Use locationInEditor instead.') core.PointF? screenPoint,
+  }) : assert(locationInEditor != null || screenPoint != null),
+       locationInEditor =
+           locationInEditor ?? screenPoint ?? const core.PointF();
+
+  @Deprecated('Use locationInEditor instead.')
+  core.PointF get screenPoint => locationInEditor;
 }
 
 class CodeLensClickEvent implements EditorEvent {
   final int line;
   final int column;
   final int commandId;
-  final core.PointF screenPoint;
+  final core.PointF locationInEditor;
 
   const CodeLensClickEvent({
     required this.line,
     required this.column,
     required this.commandId,
-    required this.screenPoint,
-  });
+    core.PointF? locationInEditor,
+    @Deprecated('Use locationInEditor instead.') core.PointF? screenPoint,
+  }) : assert(locationInEditor != null || screenPoint != null),
+       locationInEditor =
+           locationInEditor ?? screenPoint ?? const core.PointF();
+
+  @Deprecated('Use locationInEditor instead.')
+  core.PointF get screenPoint => locationInEditor;
+}
+
+class LinkClickEvent implements EditorEvent {
+  final int line;
+  final int column;
+  final String target;
+  final core.PointF locationInEditor;
+
+  const LinkClickEvent({
+    required this.line,
+    required this.column,
+    required this.target,
+    core.PointF? locationInEditor,
+    @Deprecated('Use locationInEditor instead.') core.PointF? screenPoint,
+  }) : assert(locationInEditor != null || screenPoint != null),
+       locationInEditor =
+           locationInEditor ?? screenPoint ?? const core.PointF();
+
+  @Deprecated('Use locationInEditor instead.')
+  core.PointF get screenPoint => locationInEditor;
 }
 
 class DocumentLoadedEvent implements EditorEvent {}

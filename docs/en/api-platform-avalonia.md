@@ -16,9 +16,7 @@ This document maps to the current Avalonia implementation:
   - `platform/Avalonia/SweetEditor/EditorPerf.cs`
 - Shared demo: `platform/Avalonia/Demo.Shared/*`
 - Android host: `platform/Avalonia/Demo.Android/*`
-- Desktop host: `platform/Avalonia/Demo.Desktop/*`
-- macOS host: `platform/Avalonia/Demo.Mac/*`
-- iOS host: `platform/Avalonia/Demo.iOS/*`
+- Desktop host: `platform/Avalonia/Demo/*`
 
 ## Architecture Notes
 
@@ -27,16 +25,14 @@ This document maps to the current Avalonia implementation:
 - `EditorProtocol` decodes binary payloads; `EditorRenderer` consumes `EditorRenderModel` and draws through Avalonia `DrawingContext`.
 - `SweetEditorControl` is the concrete widget entry. `SweetEditorController` is the external command surface for declarative / MVVM-style host code.
 - Decorations, completion, newline action, inline suggestion, and selection menu are split into dedicated Avalonia-side manager/provider modules.
-- Demo.Shared references the `SweetLine` NuGet package directly. Linux/macOS dynamic libraries are provided by NuGet RID assets; the Android host stages `libsweetline.asset` into the app-private directory and sets `SWEETLINE_LIB_PATH`.
+- Android demo uses `libsweetline.so` directly. Desktop demo falls back to managed highlighting when SweetLine native is not available.
 
 ## Layout
 
 - `SweetEditor/`: Avalonia widget, bridge, rendering, events, provider management
 - `Demo.Shared/`: shared UI, sample loading, SweetLine runtime, icon/menu logic
 - `Demo.Android/`: Avalonia Android host, IME / InputPane / safe-area integration
-- `Demo.Desktop/`: Avalonia desktop host
-- `Demo.Mac/`: Avalonia macOS host
-- `Demo.iOS/`: Avalonia iOS host
+- `Demo/`: Avalonia desktop host
 
 ## Requirements
 
@@ -54,10 +50,9 @@ This document maps to the current Avalonia implementation:
 - .NET Android workload
 - Android SDK (API 34)
 - `adb`
-- Android demo uses the `SweetLine` NuGet managed API and provides Android-loadable native libraries in the platform layer:
-  - `platform/Avalonia/Demo.Android/native/sweetline/arm64-v8a/libsweetline.asset`
-  - `platform/Avalonia/Demo.Android/native/sweetline/x86_64/libsweetline.asset`
-  - runtime staging sets `SWEETLINE_LIB_PATH`
+- For SweetLine native highlighting in Android demo:
+  - `platform/Avalonia/Demo.Android/native/sweetline/arm64-v8a/libsweetline.so`
+  - `platform/Avalonia/Demo.Android/native/sweetline/x86_64/libsweetline.so`
 
 See `platform/Avalonia/Demo.Android/termux-dotnet-android-build.md` for a fuller Termux / Android toolchain walkthrough.
 
@@ -68,7 +63,7 @@ See `platform/Avalonia/Demo.Android/termux-dotnet-android-build.md` for a fuller
 ```bash
 cd platform/Avalonia
 dotnet build Avalonia.sln -c Debug
-dotnet run --project Demo.Desktop/Demo.Desktop.csproj -c Debug
+dotnet run --project Demo/Demo.csproj -c Debug
 ```
 
 ### Build the Android demo inside this repository
@@ -122,21 +117,20 @@ Shared demo sample loader:
 
 - `platform/Avalonia/Demo.Shared/UI/Samples/EmbeddedSampleRepository.cs`
 
-### SweetLine integration
+### SweetLine native path
 
-Demo.Shared references the `SweetLine` NuGet package directly through:
+Android uses `libsweetline.so` directly through:
 
 - `platform/Avalonia/Demo.Shared/Decoration/DemoSweetLineRuntime.cs`
-- `platform/Avalonia/Demo.Shared/Decoration/DemoDecorationProvider.cs`
+- `platform/Avalonia/Demo.Shared/SweetLine/SweetLineNative.cs`
+- `platform/Avalonia/Demo.Shared/SweetLine/SweetLine.cs`
 
 Current strategy:
 
-- Shared layer: create NuGet-provided `HighlightEngine`, `DocumentAnalyzer`, and `TextAnalyzer`
+- Android: create `HighlightEngine`, `DocumentAnalyzer`, and `TextAnalyzer`
 - Syntax rules: compile embedded `platform/_res/syntaxes/*.json`
 - Large documents: prefer visible-range slice / line-level analysis instead of returning the full highlight result to managed code
-- Android: `Demo.Android/MainActivity.cs` stages `libsweetline.asset` and sets `SWEETLINE_LIB_PATH`
-- Fallback resolution: if no matching library is found in NuGet bundles, set `SWEETLINE_LIB_PATH` or copy the library to the current working directory
-- Stability: Android avoids the native line-range incremental analysis path that can crash and re-primes slice/session state instead
+- Desktop: fall back to managed highlighting if SweetLine native is unavailable
 
 ## Public Entry Types
 
@@ -177,7 +171,6 @@ public event EventHandler<DoubleTapEventArgs>? DoubleTap
 public new event EventHandler<ContextMenuEventArgs>? ContextMenu
 public event EventHandler<InlayHintClickEventArgs>? InlayHintClick
 public event EventHandler<GutterIconClickEventArgs>? GutterIconClick
-public event EventHandler<CodeLensClickEventArgs>? CodeLensClick
 public event EventHandler<FoldToggleEventArgs>? FoldToggle
 public event EventHandler<SelectionMenuItemClickEventArgs>? SelectionMenuItemClick
 public event Action<IReadOnlyList<CompletionItem>>? CompletionItemsUpdated
@@ -313,12 +306,8 @@ public void SetLinePhantomTexts(int line, IList<PhantomText> phantoms)
 public void SetBatchLinePhantomTexts(Dictionary<int, IList<PhantomText>> phantomsByLine)
 public void SetLineGutterIcons(int line, IList<GutterIcon> icons)
 public void SetBatchLineGutterIcons(Dictionary<int, IList<GutterIcon>> iconsByLine)
-public void SetMaxGutterIcons(int count)
-public int GetMaxGutterIcons()
-public void SetLineCodeLens(int line, IList<CodeLensItem> items)
-public void SetBatchLineCodeLens(Dictionary<int, IList<CodeLensItem>> itemsByLine)
-public void SetLineDiagnostics<TDiagnostic>(int line, IList<TDiagnostic> items) where TDiagnostic : Diagnostic
-public void SetBatchLineDiagnostics<TDiagnostic>(Dictionary<int, IList<TDiagnostic>> diagsByLine) where TDiagnostic : Diagnostic
+public void SetLineDiagnostics(int line, IList<DiagnosticItem> items)
+public void SetBatchLineDiagnostics(Dictionary<int, IList<DiagnosticItem>> diagsByLine)
 public void SetIndentGuides(IList<IndentGuide> guides)
 public void SetBracketGuides(IList<BracketGuide> guides)
 public void SetFlowGuides(IList<FlowGuide> guides)
@@ -330,11 +319,9 @@ public void ClearHighlights(SpanLayer layer)
 public void ClearInlayHints()
 public void ClearPhantomTexts()
 public void ClearGutterIcons()
-public void ClearCodeLens()
 public void ClearGuides()
 public void ClearDiagnostics()
 public void ClearAllDecorations()
-public void SetMatchedBrackets(int openLine, int openColumn, int closeLine, int closeColumn)
 public void ClearMatchedBrackets()
 
 public TextEditResult InsertSnippet(string snippetTemplate)
@@ -364,13 +351,6 @@ public void Dispose()
 ### Public events
 
 The controller exposes the same event set as `SweetEditorControl`.
-
-```csharp
-TextChanged / CursorChanged / SelectionChanged / ScrollChanged / ScaleChanged / DocumentLoaded
-LongPress / DoubleTap / ContextMenu / InlayHintClick / GutterIconClick / CodeLensClick / FoldToggle
-SelectionMenuItemClick / CompletionItemsUpdated / CompletionDismissed
-InlineSuggestionAccepted / InlineSuggestionDismissed
-```
 
 ### Public methods
 
@@ -429,10 +409,6 @@ public void SetDecorationOverscanViewportMultiplier(float multiplier)
 public float GetDecorationOverscanViewportMultiplier()
 ```
 
-Notes:
-
-- `SetMaxGutterIcons(...)` is exposed both through `EditorSettings` and as a direct control/controller API to stay aligned with the Core API surface.
-
 ## Provider and data model notes
 
 ### Completion
@@ -451,11 +427,8 @@ Notes:
 - `DecorationApplyMode`
 - `DecorationContext`
 - `DecorationResult`
-- `Diagnostic` (canonical diagnostic model)
-- `DiagnosticItem` (legacy Avalonia name kept as a compatibility alias)
 - `IDecorationProvider`
 - `IDecorationReceiver`
-- `CodeLensItem`
 
 ### New line
 
@@ -480,26 +453,10 @@ Notes:
 - Touch, long-press, double-tap, drag-select, IME avoidance, and selection-menu behavior get extra Avalonia-host adaptation on Android.
 - Android demo packages:
   - `libsweeteditor.so` from `prebuilt/android/*`
-  - `libsweetline.asset` from `Demo.Android/native/sweetline/*`, staged as `libsweetline.so` at runtime
-- `MainActivity` sets `SWEETLINE_LIB_PATH` before Avalonia initialization. The shared layer only uses the `SweetLine` NuGet API and contains no Android-specific loading logic.
+  - `libsweetline.so` from `Demo.Android/native/sweetline/*`
 
 ### Desktop
 
-- `Demo.Desktop`, `Demo.Mac`, `Demo.iOS`, and `Demo.Android` share `Demo.Shared/MainView.cs`.
-- Linux/macOS SweetLine dynamic libraries are resolved from NuGet RID assets first; if a matching bundle is unavailable, use `SWEETLINE_LIB_PATH` or place the library in the current working directory.
-- All hosts share the same `SweetEditorControl` / `SweetEditorController` / provider API contract. Platform differences are isolated behind `IDemoPlatformServices`.
-
-## Demo and Documentation Entry Points
-
-- `platform/Avalonia/README.demo.md`
-- `platform/Avalonia/AVALONIA_INTEGRATION_STATUS.md`
-- `platform/Avalonia/Demo.Android/README.md`
-- `platform/Avalonia/Demo.Android/termux-dotnet-android-build.md`
-
-## Current Implementation Notes
-
-- Avalonia currently implements the project-standard host API surface for `SweetEditorControl`, `SweetEditorController`, `EditorSettings`, provider management, events, selection menu, inline suggestion, perf overlay, CodeLens, diagnostics, guides, matched brackets, and linked editing.
-- `EditorCore.Dispose()` releases the C++ `free_editor` handle exactly once. Direct access after explicit disposal raises `ObjectDisposedException`.
-- Android demo uses the `SweetLine` NuGet managed API plus platform-layer native library staging, with no local SweetLine P/Invoke wrapper.
-- Remaining work is SHOULD/MAY level: platform-layer tests, provider timeout policy, and systematic accessibility support. The Android APK has been build/install/cold-start smoke tested.
-- Host-side IME, touch, selection menu, completion popup, and large-document highlighting have platform compatibility handling. If documentation and code conflict, code is authoritative.
+- `Demo` and `Demo.Android` share `Demo.Shared/MainView.cs`.
+- If SweetLine native is not available on desktop, syntax highlighting falls back to managed implementation.
+- Desktop and Android share the same `SweetEditorControl` / `SweetEditorController` / provider API contract.

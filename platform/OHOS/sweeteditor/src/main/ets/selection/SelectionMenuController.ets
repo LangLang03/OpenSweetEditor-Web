@@ -1,8 +1,13 @@
-import { SelectionMenuItem, SelectionMenuItemProvider, SelectionMenuState } from './SelectionMenuTypes';
+import {
+  SelectionMenuItem,
+  SelectionMenuItemProvider,
+  SelectionMenuState
+} from './SelectionMenuTypes';
 import { EditorEventBus } from '../event/EditorEventBus';
 import { SelectionMenuItemClickEvent } from '../event/EditorEvent';
 import { GestureResult, GestureType } from '../core/EditorCore';
 import { PointF } from '../core/CoreVisual';
+import { SweetEditorController } from '../SweetEditorController';
 import { SweetEditor } from '../SweetEditor';
 
 const SHOW_DELAY_MS = 100;
@@ -23,6 +28,7 @@ export interface SelectionHandleInfo {
  */
 export class SelectionMenuController {
   private editor: SweetEditor;
+  private controller: SweetEditorController;
   private eventBus: EditorEventBus;
   private itemProvider: SelectionMenuItemProvider | null = null;
   private startHandle: SelectionHandleInfo | null = null;
@@ -36,8 +42,9 @@ export class SelectionMenuController {
   private stateListener: ((state: SelectionMenuState) => void) | null = null;
   private state: SelectionMenuState = { visible: false, items: [], x: 0, y: 0 };
 
-  constructor(editor: SweetEditor, eventBus: EditorEventBus) {
+  constructor(editor: SweetEditor, controller: SweetEditorController, eventBus: EditorEventBus) {
     this.editor = editor;
+    this.controller = controller;
     this.eventBus = eventBus;
   }
 
@@ -242,7 +249,7 @@ export class SelectionMenuController {
 
   private buildItems(): SelectionMenuItem[] {
     if (this.itemProvider) {
-      return this.itemProvider.provideMenuItems() || [];
+      return this.itemProvider.provideMenuItems(this.controller) || [];
     }
     return this.buildDefaultMenuItems();
   }
@@ -333,4 +340,3 @@ export class SelectionMenuController {
     });
   }
 }
-

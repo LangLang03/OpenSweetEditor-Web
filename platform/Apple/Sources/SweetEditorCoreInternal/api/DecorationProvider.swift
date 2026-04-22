@@ -1,8 +1,7 @@
 import Foundation
 
 public struct DecorationContext {
-    public let visibleStartLine: Int
-    public let visibleEndLine: Int
+    public let visibleLineRange: IntRange
     public let totalLineCount: Int
     /// All text changes accumulated during the current refresh debounce window.
     public let textChanges: [TextChange]
@@ -10,14 +9,12 @@ public struct DecorationContext {
     public let languageConfiguration: LanguageConfiguration?
 
     public init(
-        visibleStartLine: Int,
-        visibleEndLine: Int,
+        visibleLineRange: IntRange,
         totalLineCount: Int,
         textChanges: [TextChange],
         languageConfiguration: LanguageConfiguration?
     ) {
-        self.visibleStartLine = visibleStartLine
-        self.visibleEndLine = visibleEndLine
+        self.visibleLineRange = visibleLineRange
         self.totalLineCount = totalLineCount
         self.textChanges = textChanges
         self.languageConfiguration = languageConfiguration
@@ -278,7 +275,7 @@ final class DecorationProviderManager {
     }
 
     private let core: SweetEditorCore
-    private let visibleLineRangeProvider: () -> (Int, Int)
+    private let visibleLineRangeProvider: () -> IntRange
     private let totalLineCountProvider: () -> Int
     private let languageConfigurationProvider: () -> LanguageConfiguration?
     private let onApplied: () -> Void
@@ -287,13 +284,13 @@ final class DecorationProviderManager {
     private var states: [ObjectIdentifier: ProviderState] = [:]
     private var pendingTextChanges: [TextChange] = []
     private var pendingRefreshReason: RefreshReason?
-    private var lastRefreshedVisibleRange: (start: Int, end: Int)?
+    private var lastRefreshedVisibleRange: IntRange?
     private var debounceItem: DispatchWorkItem?
     private var applyScheduled = false
     private var generation = 0
 
     init(core: SweetEditorCore,
-         visibleLineRangeProvider: @escaping () -> (Int, Int),
+         visibleLineRangeProvider: @escaping () -> IntRange,
          totalLineCountProvider: @escaping () -> Int,
          languageConfigurationProvider: @escaping () -> LanguageConfiguration?,
          onApplied: @escaping () -> Void) {
@@ -348,17 +345,15 @@ final class DecorationProviderManager {
         if reason == .scrollChanged,
            textChanges.isEmpty,
            let lastVisible = lastRefreshedVisibleRange,
-           lastVisible.start == visible.0,
-           lastVisible.end == visible.1 {
+           lastVisible == visible {
             return
         }
 
         generation += 1
         let currentGeneration = generation
-        lastRefreshedVisibleRange = (start: visible.0, end: visible.1)
+        lastRefreshedVisibleRange = visible
         let context = DecorationContext(
-            visibleStartLine: visible.0,
-            visibleEndLine: visible.1,
+            visibleLineRange: visible,
             totalLineCount: totalLineCountProvider(),
             textChanges: textChanges,
             languageConfiguration: languageConfigurationProvider()

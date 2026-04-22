@@ -29,7 +29,6 @@ import androidx.annotation.Nullable;
 
 import java.util.Map;
 
-import com.qiplat.sweeteditor.animation.AnimationHolder;
 import com.qiplat.sweeteditor.core.Document;
 import com.qiplat.sweeteditor.core.EditorOptions;
 import com.qiplat.sweeteditor.core.EditorCore;
@@ -49,12 +48,14 @@ import com.qiplat.sweeteditor.core.adornment.CodeLensItem;
 import com.qiplat.sweeteditor.core.adornment.GutterIcon;
 import com.qiplat.sweeteditor.core.adornment.InlayHint;
 import com.qiplat.sweeteditor.core.adornment.InlayType;
+import com.qiplat.sweeteditor.core.adornment.LinkSpan;
 import com.qiplat.sweeteditor.core.adornment.PhantomText;
 import com.qiplat.sweeteditor.core.adornment.StyleSpan;
 import com.qiplat.sweeteditor.core.adornment.TextStyle;
 
 import com.qiplat.sweeteditor.core.TextMeasurer;
 import com.qiplat.sweeteditor.core.foundation.ScrollBehavior;
+import com.qiplat.sweeteditor.core.foundation.IntRange;
 import com.qiplat.sweeteditor.core.adornment.SpanLayer;
 import com.qiplat.sweeteditor.core.foundation.TextChange;
 import com.qiplat.sweeteditor.core.foundation.TextPosition;
@@ -72,6 +73,8 @@ import com.qiplat.sweeteditor.completion.CompletionContext;
 import com.qiplat.sweeteditor.copilot.InlineSuggestion;
 import com.qiplat.sweeteditor.copilot.InlineSuggestionController;
 import com.qiplat.sweeteditor.copilot.InlineSuggestionListener;
+import com.qiplat.sweeteditor.contextmenu.ContextMenuController;
+import com.qiplat.sweeteditor.contextmenu.ContextMenuItemProvider;
 import com.qiplat.sweeteditor.decoration.DecorationProvider;
 import com.qiplat.sweeteditor.decoration.DecorationProviderManager;
 import com.qiplat.sweeteditor.newline.NewLineAction;
@@ -88,8 +91,10 @@ import com.qiplat.sweeteditor.event.CodeLensClickEvent;
 import com.qiplat.sweeteditor.event.FoldToggleEvent;
 import com.qiplat.sweeteditor.event.GutterIconClickEvent;
 import com.qiplat.sweeteditor.event.InlayHintClickEvent;
+import com.qiplat.sweeteditor.event.LinkClickEvent;
 import com.qiplat.sweeteditor.event.LongPressEvent;
 import com.qiplat.sweeteditor.selection.SelectionMenuController;
+import com.qiplat.sweeteditor.ui.AnimationHolder;
 import com.qiplat.sweeteditor.selection.SelectionMenuItemProvider;
 import com.qiplat.sweeteditor.event.ScaleChangedEvent;
 import com.qiplat.sweeteditor.event.ScrollChangedEvent;
@@ -111,6 +116,7 @@ public class SweetEditor extends View {
     private static final String TAG = SweetEditor.class.getSimpleName();
     private static final boolean ENABLE_PERF_LOG = true;
     private static final int PERF_LOG_INTERVAL = 60;
+    private static final int MAX_CLIPBOARD_SELECTION_CHARS = 100_000;
     private static final float DEFAULT_CONTENT_START_PADDING_DP = 3.0f;
 
     private EditorRenderer mRenderer;
@@ -125,6 +131,8 @@ public class SweetEditor extends View {
     private int mBottomOcclusionInset = 0;
     private int mAppliedViewportWidth = -1;
     private int mAppliedViewportHeight = -1;
+    @Nullable
+    private PointF mLastHoverPoint;
 
     // ==================== Construction/Init/Lifecycle ====================
 
@@ -140,6 +148,7 @@ public class SweetEditor extends View {
     private InlineSuggestionController mInlineSuggestionController;
     private NewLineActionProviderManager mNewLineActionProviderManager;
     private SelectionMenuController mSelectionMenuController;
+    private ContextMenuController mContextMenuController;
     @Nullable
     private LanguageConfiguration mLanguageConfiguration;
     @Nullable
@@ -276,8 +285,8 @@ public class SweetEditor extends View {
         long t0 = ENABLE_PERF_LOG ? System.nanoTime() : 0;
         EditorCore.GestureResult result = mEditorCore.handleGestureEvent(event);
         Log.d(TAG, "result: " + result);
-        PointF screenPoint = new PointF(event.getX(), event.getY());
-        fireGestureEvents(result, screenPoint, event.getActionMasked());
+        PointF locationInView = new PointF(event.getX(), event.getY());
+        fireGestureEvents(result, locationInView, event.getActionMasked());
         if (result.type == EditorCore.GestureType.TAP) {
             requestFocus();
             if (result.hitTarget == null || result.hitTarget.type == EditorCore.HitTargetType.NONE) {
@@ -289,13 +298,7 @@ public class SweetEditor extends View {
             syncPlatformScale(result.viewScale);
         }
         flush();
-        if (result.needsAnimation && !mScrollAnimationActive) {
-            mScrollAnimationActive = true;
-            Choreographer.getInstance().postFrameCallback(mScrollAnimationCallback);
-        } else if (!result.needsAnimation && mScrollAnimationActive) {
-            mScrollAnimationActive = false;
-            Choreographer.getInstance().removeFrameCallback(mScrollAnimationCallback);
-        }
+        updateGestureAnimationState(result);
         if (ENABLE_PERF_LOG) {
             float ms = (System.nanoTime() - t0) / 1_000_000f;
             if (ms >= PerfOverlay.WARN_INPUT_MS) {
@@ -307,6 +310,35 @@ public class SweetEditor extends View {
     }
 
     @Override
+    public boolean onGenericMotionEvent(MotionEvent event) {
+        if (event.getActionMasked() == MotionEvent.ACTION_BUTTON_PRESS
+                && (event.getButtonState() & MotionEvent.BUTTON_SECONDARY) != 0) {
+            long t0 = ENABLE_PERF_LOG ? System.nanoTime() : 0;
+            PointF locationInView = new PointF(event.getX(), event.getY());
+            EditorCore.GestureResult result = mEditorCore.handleGestureEventEx(
+                    EditorCore.EVENT_TYPE_MOUSE_RIGHT_DOWN,
+                    new PointF[]{locationInView},
+                    getMotionEventModifiers(event),
+                    0,
+                    0,
+                    1
+            );
+            fireGestureEvents(result, locationInView, event.getActionMasked());
+            flush();
+            updateGestureAnimationState(result);
+            if (ENABLE_PERF_LOG) {
+                float ms = (System.nanoTime() - t0) / 1_000_000f;
+                if (ms >= PerfOverlay.WARN_INPUT_MS) {
+                    Log.w(TAG, String.format("[PERF][SLOW] onGenericMotionEvent: %.2f ms", ms));
+                }
+                mRenderer.getPerfOverlay().recordInput("mouse", ms);
+            }
+            return true;
+        }
+        return super.onGenericMotionEvent(event);
+    }
+
+    @Override
     public boolean onHoverEvent(MotionEvent event) {
         int action = event.getActionMasked();
         if (action != MotionEvent.ACTION_HOVER_ENTER
@@ -315,25 +347,8 @@ public class SweetEditor extends View {
             return super.onHoverEvent(event);
         }
 
-        PointF point = action == MotionEvent.ACTION_HOVER_EXIT
-                ? new PointF(-1f, -1f)
-                : new PointF(event.getX(), event.getY());
-        EditorCore.GestureResult result = mEditorCore.handleGestureEventEx(
-                EditorCore.EVENT_TYPE_MOUSE_MOVE,
-                new PointF[] {point},
-                0,
-                0,
-                0,
-                1
-        );
-        flush();
-        if (result.needsAnimation && !mScrollAnimationActive) {
-            mScrollAnimationActive = true;
-            Choreographer.getInstance().postFrameCallback(mScrollAnimationCallback);
-        } else if (!result.needsAnimation && mScrollAnimationActive) {
-            mScrollAnimationActive = false;
-            Choreographer.getInstance().removeFrameCallback(mScrollAnimationCallback);
-        }
+        PointF point = action == MotionEvent.ACTION_HOVER_EXIT ? null : new PointF(event.getX(), event.getY());
+        updateHoverGesture(point, getMotionEventModifiers(event));
         return true;
     }
 
@@ -341,6 +356,9 @@ public class SweetEditor extends View {
     public InputConnection onCreateInputConnection(EditorInfo outAttrs) {
         outAttrs.inputType = EditorInfo.TYPE_CLASS_TEXT | EditorInfo.TYPE_TEXT_FLAG_MULTI_LINE;
         outAttrs.imeOptions = EditorInfo.IME_FLAG_NO_EXTRACT_UI | EditorInfo.IME_ACTION_NONE;
+        IntRange selectionOffsets = getImeSelectionOffsets();
+        outAttrs.initialSelStart = selectionOffsets.start;
+        outAttrs.initialSelEnd = selectionOffsets.end;
         return new SweetEditorInputConnection(this, true);
     }
 
@@ -352,7 +370,17 @@ public class SweetEditor extends View {
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         handleKeyEventFromIME(event);
+        refreshHoverActivation(event);
         return true;
+    }
+
+    @Override
+    public boolean onKeyUp(int keyCode, KeyEvent event) {
+        if (isLinkActivationModifierKey(keyCode)) {
+            refreshHoverActivation(event);
+            return true;
+        }
+        return super.onKeyUp(keyCode, event);
     }
 
     @Override
@@ -435,6 +463,9 @@ public class SweetEditor extends View {
         if (mSelectionMenuController != null) {
             mSelectionMenuController.dismiss();
         }
+        if (mContextMenuController != null) {
+            mContextMenuController.dismiss();
+        }
     }
 
     @Override
@@ -469,6 +500,7 @@ public class SweetEditor extends View {
             mDecorationProviderManager.onDocumentLoaded();
         }
         mEventBus.publish(new DocumentLoadedEvent());
+        restartImeInput();
         flush();
     }
 
@@ -547,6 +579,10 @@ public class SweetEditor extends View {
             mSelectionMenuController.applyTheme(theme);
         }
 
+        if (mContextMenuController != null) {
+            mContextMenuController.applyTheme(theme);
+        }
+
         flush();
     }
 
@@ -555,24 +591,12 @@ public class SweetEditor extends View {
         return mEditorCore;
     }
 
-    public int[] getVisibleLineRange() {
+    public IntRange getVisibleLineRange() {
         // Reuse cached model, build once if not exists
-        EditorRenderModel model = mCachedModel;
-        if (model == null) {
-            model = mEditorCore.buildRenderModel();
+        if (mCachedModel == null) {
+            mEditorCore.buildRenderModel();
         }
-        if (model == null || model.lines == null || model.lines.isEmpty()) {
-            return new int[]{0, -1};
-        }
-        int start = Integer.MAX_VALUE;
-        int end = -1;
-        for (VisualLine line : model.lines) {
-            if (line == null) continue;
-            if (line.logicalLine < start) start = line.logicalLine;
-            if (line.logicalLine > end) end = line.logicalLine;
-        }
-        if (start == Integer.MAX_VALUE) start = 0;
-        return new int[]{start, end};
+        return mEditorCore.getVisibleLineRange();
     }
 
     public int getTotalLineCount() {
@@ -626,7 +650,9 @@ public class SweetEditor extends View {
 
     // ==================== Line Operations ====================
 
-    /** Move current line (or lines covered by selection) up by one. */
+    /**
+     * Move current line (or lines covered by selection) up by one.
+     */
     public EditorCore.TextEditResult moveLineUp() {
         EditorCore.TextEditResult result = mEditorCore.moveLineUp();
         dispatchTextChanged(TextChangeAction.INSERT, result);
@@ -635,7 +661,9 @@ public class SweetEditor extends View {
         return result;
     }
 
-    /** Move current line (or lines covered by selection) down by one. */
+    /**
+     * Move current line (or lines covered by selection) down by one.
+     */
     public EditorCore.TextEditResult moveLineDown() {
         EditorCore.TextEditResult result = mEditorCore.moveLineDown();
         dispatchTextChanged(TextChangeAction.INSERT, result);
@@ -644,7 +672,9 @@ public class SweetEditor extends View {
         return result;
     }
 
-    /** Duplicate current line (or lines covered by selection) above. */
+    /**
+     * Duplicate current line (or lines covered by selection) above.
+     */
     public EditorCore.TextEditResult copyLineUp() {
         EditorCore.TextEditResult result = mEditorCore.copyLineUp();
         dispatchTextChanged(TextChangeAction.INSERT, result);
@@ -653,7 +683,9 @@ public class SweetEditor extends View {
         return result;
     }
 
-    /** Duplicate current line (or lines covered by selection) below. */
+    /**
+     * Duplicate current line (or lines covered by selection) below.
+     */
     public EditorCore.TextEditResult copyLineDown() {
         EditorCore.TextEditResult result = mEditorCore.copyLineDown();
         dispatchTextChanged(TextChangeAction.INSERT, result);
@@ -662,7 +694,9 @@ public class SweetEditor extends View {
         return result;
     }
 
-    /** Delete current line (or all lines covered by selection). */
+    /**
+     * Delete current line (or all lines covered by selection).
+     */
     public EditorCore.TextEditResult deleteLine() {
         EditorCore.TextEditResult result = mEditorCore.deleteLine();
         dispatchTextChanged(TextChangeAction.INSERT, result);
@@ -671,7 +705,9 @@ public class SweetEditor extends View {
         return result;
     }
 
-    /** Insert empty line above current line. */
+    /**
+     * Insert empty line above current line.
+     */
     public EditorCore.TextEditResult insertLineAbove() {
         EditorCore.TextEditResult result = mEditorCore.insertLineAbove();
         dispatchTextChanged(TextChangeAction.INSERT, result);
@@ -680,7 +716,9 @@ public class SweetEditor extends View {
         return result;
     }
 
-    /** Insert empty line below current line. */
+    /**
+     * Insert empty line below current line.
+     */
     public EditorCore.TextEditResult insertLineBelow() {
         EditorCore.TextEditResult result = mEditorCore.insertLineBelow();
         dispatchTextChanged(TextChangeAction.INSERT, result);
@@ -742,7 +780,8 @@ public class SweetEditor extends View {
      */
     public void selectAll() {
         mEditorCore.selectAll();
-        if (mSelectionMenuController != null) {
+        if (mSelectionMenuController != null
+                && (mContextMenuController == null || !mContextMenuController.isShowing())) {
             mSelectionMenuController.onSelectAll();
         }
         flush();
@@ -814,6 +853,36 @@ public class SweetEditor extends View {
     }
 
     /**
+     * Set a custom provider for context menu sections.
+     * <p>
+     * The provider is called each time the context menu is about to show.
+     * Pass {@code null} to restore the default menu sections.
+     *
+     * @param provider custom provider, or null for the default menu
+     */
+    public void setContextMenuItemProvider(@Nullable ContextMenuItemProvider provider) {
+        if (mContextMenuController != null) {
+            mContextMenuController.setItemProvider(provider);
+        }
+    }
+
+    /**
+     * Dismiss the context menu if it is currently visible.
+     */
+    public void dismissContextMenu() {
+        if (mContextMenuController != null) {
+            mContextMenuController.dismiss();
+        }
+    }
+
+    /**
+     * Check whether the context menu is currently visible.
+     */
+    public boolean isContextMenuShowing() {
+        return mContextMenuController != null && mContextMenuController.isShowing();
+    }
+
+    /**
      * Get current cursor position.
      *
      * @return cursor row/column position (0-based)
@@ -845,7 +914,7 @@ public class SweetEditor extends View {
 
     /**
      * Set cursor position (does not scroll viewport, only moves cursor).
-     * To scroll viewport simultaneously, use {@link #gotoPosition(int,int)}.
+     * To scroll viewport simultaneously, use {@link #gotoPosition(int, int)}.
      *
      * @param position target position
      */
@@ -858,16 +927,24 @@ public class SweetEditor extends View {
 
     /**
      * Copy current selection text to system clipboard.
+     *
+     * @return true if text was copied, false otherwise
      */
-    public void copyToClipboard() {
+    public boolean copyToClipboard() {
+        if (isSelectionTooLargeForClipboard()) {
+            Log.w(TAG, "Skip copy: selection exceeds clipboard safety threshold");
+            return false;
+        }
         String selected = getSelectedText();
         if (selected != null && !selected.isEmpty()) {
             ClipboardManager clipboard = (ClipboardManager) getContext()
                     .getSystemService(Context.CLIPBOARD_SERVICE);
             if (clipboard != null) {
                 clipboard.setPrimaryClip(ClipData.newPlainText("SweetEditor", selected));
+                return true;
             }
         }
+        return false;
     }
 
     /**
@@ -889,19 +966,44 @@ public class SweetEditor extends View {
 
     /**
      * Cut current selection text to system clipboard.
+     *
+     * @return true if text was cut, false otherwise
      */
-    public void cutToClipboard() {
+    public boolean cutToClipboard() {
+        if (isSelectionTooLargeForClipboard()) {
+            Log.w(TAG, "Skip cut: selection exceeds clipboard safety threshold");
+            return false;
+        }
         String selected = getSelectedText();
         if (selected != null && !selected.isEmpty()) {
             ClipboardManager clipboard = (ClipboardManager) getContext()
                     .getSystemService(Context.CLIPBOARD_SERVICE);
             if (clipboard != null) {
                 clipboard.setPrimaryClip(ClipData.newPlainText("SweetEditor", selected));
+                insertText("");
+                return true;
             }
-            insertText("");
         }
+        return false;
     }
 
+    private boolean isSelectionTooLargeForClipboard() {
+        if (mDocument == null) {
+            return false;
+        }
+        TextRange selection = getSelection();
+        if (selection == null) {
+            return false;
+        }
+        int start = mDocument.getCharIndexFromPosition(selection.start);
+        int end = mDocument.getCharIndexFromPosition(selection.end);
+        if (end < start) {
+            int tmp = start;
+            start = end;
+            end = tmp;
+        }
+        return end - start > MAX_CLIPBOARD_SELECTION_CHARS;
+    }
 
 
     // ==================== Position/Coordinate Query API ====================
@@ -1021,7 +1123,6 @@ public class SweetEditor extends View {
     }
 
 
-
     /**
      * Batch set highlight spans for multiple lines (reduces JNI calls, single dirty mark).
      *
@@ -1076,7 +1177,6 @@ public class SweetEditor extends View {
     // -------------------- Gutter Icons --------------------
 
 
-
     /**
      * Set gutter icons for a specified line (replaces entire line).
      * <p>Icon Drawables are provided by {@link EditorIconProvider}.
@@ -1116,6 +1216,35 @@ public class SweetEditor extends View {
      */
     public void setBatchLineCodeLens(@Nullable SparseArray<? extends List<? extends CodeLensItem>> itemsByLine) {
         mEditorCore.setBatchLineCodeLens(itemsByLine);
+    }
+
+    // -------------------- Links --------------------
+
+    /**
+     * Set link ranges for a specified line.
+     *
+     * @param line  Line number (0-based)
+     * @param links Link range list
+     */
+    public void setLineLinks(int line, @NonNull List<? extends LinkSpan> links) {
+        mEditorCore.setLineLinks(line, links);
+    }
+
+    /**
+     * Batch set link ranges for multiple lines (reduces JNI calls).
+     *
+     * @param linksByLine Sparse array of line number to link list
+     */
+    public void setBatchLineLinks(@Nullable SparseArray<? extends List<? extends LinkSpan>> linksByLine) {
+        mEditorCore.setBatchLineLinks(linksByLine);
+    }
+
+    /**
+     * Resolve link target by line and column inside that link.
+     */
+    @NonNull
+    public String getLinkTargetAt(int line, int column) {
+        return mEditorCore.getLinkTargetAt(line, column);
     }
 
     // -------------------- Diagnostic Decorations --------------------
@@ -1187,7 +1316,6 @@ public class SweetEditor extends View {
     public void setFoldRegions(@NonNull List<? extends FoldRegion> regions) {
         mEditorCore.setFoldRegions(regions);
     }
-
 
 
     /**
@@ -1363,6 +1491,13 @@ public class SweetEditor extends View {
      */
     public void clearCodeLens() {
         mEditorCore.clearCodeLens();
+    }
+
+    /**
+     * Clear all link ranges.
+     */
+    public void clearLinks() {
+        mEditorCore.clearLinks();
     }
 
     /**
@@ -1610,7 +1745,7 @@ public class SweetEditor extends View {
      * <pre>
      * editor.subscribe(TextChangedEvent.class, e -> Log.d(TAG, "changes=" + e.changes.size()));
      * editor.subscribe(CursorChangedEvent.class, e -> updateStatusBar(e.cursorPosition));
-     * editor.subscribe(LongPressEvent.class, e -> showPopup(e.screenPoint));
+     * editor.subscribe(LongPressEvent.class, e -> showPopup(e.locationInEditor));
      * </pre>
      */
     public <T extends EditorEvent> void subscribe(@NonNull Class<T> eventType, @NonNull EditorEventListener<T> listener) {
@@ -1666,7 +1801,41 @@ public class SweetEditor extends View {
         long t0 = ENABLE_PERF_LOG ? System.nanoTime() : 0;
         mEditorCore.compositionUpdate(text);
         flush();
+        updateImeSelectionState();
         logInputPerf(t0, "ime-update");
+    }
+
+    @NonNull
+    IntRange getImeSelectionOffsets() {
+        if (mDocument == null) {
+            return new IntRange(0, 0);
+        }
+
+        TextRange selection = getSelection();
+        if (selection != null) {
+            int start = mDocument.getCharIndexFromPosition(selection.start);
+            int end = mDocument.getCharIndexFromPosition(selection.end);
+            return start <= end ? new IntRange(start, end) : new IntRange(end, start);
+        }
+
+        int cursor = mDocument.getCharIndexFromPosition(mEditorCore.getCursorPosition());
+        return new IntRange(cursor, cursor);
+    }
+
+    void updateImeSelectionState() {
+        InputMethodManager imm = getInputMethodManager();
+        if (imm == null) {
+            return;
+        }
+        IntRange selectionOffsets = getImeSelectionOffsets();
+        imm.updateSelection(this, selectionOffsets.start, selectionOffsets.end, -1, -1);
+    }
+
+    void restartImeInput() {
+        InputMethodManager imm = getInputMethodManager();
+        if (imm != null) {
+            imm.restartInput(this);
+        }
     }
 
     // ==================== Event Dispatch (Internal) ====================
@@ -1680,6 +1849,9 @@ public class SweetEditor extends View {
             // Hide selection menu on text change
             if (mSelectionMenuController != null) {
                 mSelectionMenuController.onTextChanged();
+            }
+            if (mContextMenuController != null) {
+                mContextMenuController.onTextChanged();
             }
             // Suppress completion trigger during linked editing to avoid conflict with Enter/Tab keys
             if (!mEditorCore.isInLinkedEditing()) {
@@ -1730,17 +1902,17 @@ public class SweetEditor extends View {
     /**
      * Dispatch corresponding editor events based on gesture result.
      *
-     * @param result      Gesture processing result
-     * @param screenPoint Screen coordinates of touch point
+     * @param result           Gesture processing result
+     * @param locationInEditor Pointer location relative to the editor
      */
-    private void fireGestureEvents(EditorCore.GestureResult result, PointF screenPoint, int actionMasked) {
+    private void fireGestureEvents(EditorCore.GestureResult result, PointF locationInEditor, int actionMasked) {
         switch (result.type) {
             case LONG_PRESS:
-                mEventBus.publish(new LongPressEvent(result.cursorPosition, screenPoint));
+                mEventBus.publish(new LongPressEvent(result.cursorPosition, locationInEditor));
                 mEventBus.publish(new CursorChangedEvent(result.cursorPosition));
                 break;
             case DOUBLE_TAP:
-                mEventBus.publish(new DoubleTapEvent(result.cursorPosition, result.hasSelection, result.selection, screenPoint));
+                mEventBus.publish(new DoubleTapEvent(result.cursorPosition, result.hasSelection, result.selection, locationInEditor));
                 mEventBus.publish(new CursorChangedEvent(result.cursorPosition));
                 if (result.hasSelection) {
                     mEventBus.publish(new SelectionChangedEvent(true, result.selection, result.cursorPosition));
@@ -1761,7 +1933,7 @@ public class SweetEditor extends View {
                                     result.hitTarget.column,
                                     InlayType.TEXT,
                                     0,
-                                    screenPoint));
+                                    locationInEditor));
                             break;
                         case INLAY_HINT_ICON:
                             mEventBus.publish(new InlayHintClickEvent(
@@ -1769,7 +1941,7 @@ public class SweetEditor extends View {
                                     result.hitTarget.column,
                                     InlayType.ICON,
                                     result.hitTarget.iconId,
-                                    screenPoint));
+                                    locationInEditor));
                             break;
                         case INLAY_HINT_COLOR:
                             mEventBus.publish(new InlayHintClickEvent(
@@ -1777,67 +1949,101 @@ public class SweetEditor extends View {
                                     result.hitTarget.column,
                                     InlayType.COLOR,
                                     result.hitTarget.colorValue,
-                                    screenPoint));
+                                    locationInEditor));
                             break;
                         case GUTTER_ICON:
                             mEventBus.publish(new GutterIconClickEvent(
                                     result.hitTarget.line,
                                     result.hitTarget.iconId,
-                                    screenPoint));
+                                    locationInEditor));
                             break;
                         case FOLD_PLACEHOLDER:
                         case FOLD_GUTTER:
                             mEventBus.publish(new FoldToggleEvent(
                                     result.hitTarget.line,
                                     result.hitTarget.type == EditorCore.HitTargetType.FOLD_GUTTER,
-                                    screenPoint));
+                                    locationInEditor));
                             break;
                         case CODELENS:
                             mEventBus.publish(new CodeLensClickEvent(
                                     result.hitTarget.line,
                                     result.hitTarget.column,
                                     result.hitTarget.iconId,
-                                    screenPoint));
+                                    locationInEditor));
+                            break;
+                        case LINK:
+                            mEventBus.publish(new LinkClickEvent(
+                                    result.hitTarget.line,
+                                    result.hitTarget.column,
+                                    getLinkTargetAt(result.hitTarget.line, result.hitTarget.column),
+                                    locationInEditor));
                             break;
                     }
                 }
                 break;
             case SCROLL:
             case FAST_SCROLL:
-                mEventBus.publish(new ScrollChangedEvent(result.viewScrollX, result.viewScrollY));
-                if (mDecorationProviderManager != null) {
-                    mDecorationProviderManager.onScrollChanged();
-                }
-                // Dismiss completion panel on scroll
-                if (mCompletionPopupController != null && mCompletionPopupController.isShowing()) {
-                    mCompletionProviderManager.dismiss();
-                }
-                if (mSettings.isCursorAnimationEnabled()) {
-                    animationHolder.cursorAnimatedX = -1f;
-                    animationHolder.cursorAnimatedY = -1f;
-                }
+                handleScrollChanged(result);
                 break;
             case SCALE:
                 mEventBus.publish(new ScaleChangedEvent(result.viewScale));
                 break;
             case DRAG_SELECT:
+                if (didScrollSinceLastFrame(result)) {
+                    handleScrollChanged(result);
+                }
                 mEventBus.publish(new SelectionChangedEvent(result.hasSelection, result.selection, result.cursorPosition));
                 break;
             case CONTEXT_MENU:
-                mEventBus.publish(new ContextMenuEvent(result.cursorPosition, screenPoint));
+                mEventBus.publish(new ContextMenuEvent(result.cursorPosition, locationInEditor));
                 break;
+        }
+
+        if ((result.type == EditorCore.GestureType.LONG_PRESS
+                || result.type == EditorCore.GestureType.CONTEXT_MENU)
+                && mSelectionMenuController != null) {
+            mSelectionMenuController.dismiss();
         }
 
         // Drive selection menu state machine
         if (mSelectionMenuController != null) {
             mSelectionMenuController.onGestureResult(result, actionMasked);
         }
+
+        if (mContextMenuController != null) {
+            mContextMenuController.onGestureResult(result, locationInEditor);
+        }
+    }
+
+    private void handleScrollChanged(@NonNull EditorCore.GestureResult result) {
+        mEventBus.publish(new ScrollChangedEvent(result.viewScrollX, result.viewScrollY));
+        if (mDecorationProviderManager != null) {
+            mDecorationProviderManager.onScrollChanged();
+        }
+        if (mCompletionPopupController != null && mCompletionPopupController.isShowing()) {
+            mCompletionProviderManager.dismiss();
+        }
+        if (mSettings.isCursorAnimationEnabled()) {
+            animationHolder.cursorAnimatedX = -1f;
+            animationHolder.cursorAnimatedY = -1f;
+        }
+    }
+
+    private boolean didScrollSinceLastFrame(@NonNull EditorCore.GestureResult result) {
+        if (mCachedModel == null) {
+            return result.viewScrollX != 0f || result.viewScrollY != 0f;
+        }
+        return Float.compare(mCachedModel.scrollX, result.viewScrollX) != 0
+                || Float.compare(mCachedModel.scrollY, result.viewScrollY) != 0;
     }
 
     private void dispatchKeyEventResult(@NonNull EditorCore.KeyEventResult result) {
         if (result.contentChanged) {
             if (mSelectionMenuController != null) {
                 mSelectionMenuController.onTextChanged();
+            }
+            if (mContextMenuController != null) {
+                mContextMenuController.onTextChanged();
             }
             if (result.editResult != null && result.editResult.changed && !result.editResult.changes.isEmpty()) {
                 mEventBus.publish(new TextChangedEvent(TextChangeAction.KEY, result.editResult.changes));
@@ -1861,6 +2067,7 @@ public class SweetEditor extends View {
         EditorCore.TextEditResult result = mEditorCore.compositionEnd(text);
         dispatchTextChanged(TextChangeAction.COMPOSITION, result);
         flush();
+        updateImeSelectionState();
         logInputPerf(t0, "ime-commit");
     }
 
@@ -1892,7 +2099,7 @@ public class SweetEditor extends View {
                 NewLineAction action = mNewLineActionProviderManager.provideNewLineAction();
                 if (action != null) {
                     EditorCore.TextEditResult editResult = mEditorCore.insertText(action.text);
-        dispatchTextChanged(TextChangeAction.KEY, editResult);
+                    dispatchTextChanged(TextChangeAction.KEY, editResult);
                     resetCursorBlink();
                     flush();
                     logInputPerf(t0, "key-enter");
@@ -1943,6 +2150,70 @@ public class SweetEditor extends View {
         return EditorKeyMap.defaultKeyMap();
     }
 
+    private void updateHoverGesture(@Nullable PointF point, int modifiers) {
+        mLastHoverPoint = point != null ? new PointF(point.x, point.y) : null;
+        PointF probePoint = point != null ? point : new PointF(-1f, -1f);
+        EditorCore.GestureResult result = mEditorCore.handleGestureEventEx(
+                EditorCore.EVENT_TYPE_MOUSE_MOVE,
+                new PointF[]{probePoint},
+                modifiers,
+                0,
+                0,
+                1
+        );
+        flush();
+        if (result.needsAnimation && !mScrollAnimationActive) {
+            mScrollAnimationActive = true;
+            Choreographer.getInstance().postFrameCallback(mScrollAnimationCallback);
+        } else if (!result.needsAnimation && mScrollAnimationActive) {
+            mScrollAnimationActive = false;
+            Choreographer.getInstance().removeFrameCallback(mScrollAnimationCallback);
+        }
+    }
+
+    private void updateGestureAnimationState(@NonNull EditorCore.GestureResult result) {
+        if (result.needsAnimation && !mScrollAnimationActive) {
+            mScrollAnimationActive = true;
+            Choreographer.getInstance().postFrameCallback(mScrollAnimationCallback);
+        } else if (!result.needsAnimation && mScrollAnimationActive) {
+            mScrollAnimationActive = false;
+            Choreographer.getInstance().removeFrameCallback(mScrollAnimationCallback);
+        }
+    }
+
+    private void refreshHoverActivation(@NonNull KeyEvent event) {
+        if (!isLinkActivationModifierKey(event.getKeyCode()) || mLastHoverPoint == null) {
+            return;
+        }
+        updateHoverGesture(mLastHoverPoint, getKeyEventModifiers(event));
+    }
+
+    private static boolean isLinkActivationModifierKey(int keyCode) {
+        return keyCode == KeyEvent.KEYCODE_CTRL_LEFT
+                || keyCode == KeyEvent.KEYCODE_CTRL_RIGHT
+                || keyCode == KeyEvent.KEYCODE_META_LEFT
+                || keyCode == KeyEvent.KEYCODE_META_RIGHT;
+    }
+
+    private static int getMotionEventModifiers(@NonNull MotionEvent event) {
+        int metaState = event.getMetaState();
+        int modifiers = KeyModifier.NONE;
+        if ((metaState & KeyEvent.META_SHIFT_ON) != 0) modifiers |= KeyModifier.SHIFT;
+        if ((metaState & KeyEvent.META_CTRL_ON) != 0) modifiers |= KeyModifier.CTRL;
+        if ((metaState & KeyEvent.META_ALT_ON) != 0) modifiers |= KeyModifier.ALT;
+        if ((metaState & KeyEvent.META_META_ON) != 0) modifiers |= KeyModifier.META;
+        return modifiers;
+    }
+
+    private static int getKeyEventModifiers(@NonNull KeyEvent event) {
+        int modifiers = KeyModifier.NONE;
+        if (event.isShiftPressed()) modifiers |= KeyModifier.SHIFT;
+        if (event.isCtrlPressed()) modifiers |= KeyModifier.CTRL;
+        if (event.isAltPressed()) modifiers |= KeyModifier.ALT;
+        if (event.isMetaPressed()) modifiers |= KeyModifier.META;
+        return modifiers;
+    }
+
     // ==================== Private Helper / Internal Implementation ====================
 
     private void initView(Context context) {
@@ -1968,7 +2239,7 @@ public class SweetEditor extends View {
         mTextMeasurer = mRenderer.getTextMeasurer();
 
         int scaledTouchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
-        EditorOptions editorOptions = new EditorOptions(scaledTouchSlop, 300);
+        EditorOptions editorOptions = new EditorOptions(scaledTouchSlop, 300, true);
         mEditorCore = new EditorCore(mTextMeasurer, editorOptions);
         mEditorCore.setHandleConfig(mRenderer.getHandleConfig());
         mEditorCore.setScrollbarConfig(mRenderer.getScrollbarConfig());
@@ -1983,6 +2254,7 @@ public class SweetEditor extends View {
         mInlineSuggestionController = new InlineSuggestionController(context, this);
 
         mSelectionMenuController = new SelectionMenuController(this, mEventBus, mTheme);
+        mContextMenuController = new ContextMenuController(this, mEventBus, mTheme);
 
         mEditorCore.registerBatchTextStyles(mTheme.textStyles);
 
@@ -2080,31 +2352,50 @@ public class SweetEditor extends View {
     }
 
     private void showSoftKeyboard() {
-        InputMethodManager imm = (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+        InputMethodManager imm = getInputMethodManager();
         if (imm != null) {
             imm.showSoftInput(this, InputMethodManager.SHOW_IMPLICIT);
         }
         requestApplyInsets();
     }
 
+    @Nullable
+    private InputMethodManager getInputMethodManager() {
+        return (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+    }
+
     private static int mapAndroidKeyCode(int androidKeyCode) {
         switch (androidKeyCode) {
-            case KeyEvent.KEYCODE_DEL:         return KeyCode.BACKSPACE;
-            case KeyEvent.KEYCODE_TAB:         return KeyCode.TAB;
-            case KeyEvent.KEYCODE_ENTER:       return KeyCode.ENTER;
-            case KeyEvent.KEYCODE_ESCAPE:      return KeyCode.ESCAPE;
-            case KeyEvent.KEYCODE_FORWARD_DEL: return KeyCode.DELETE_KEY;
-            case KeyEvent.KEYCODE_DPAD_LEFT:   return KeyCode.LEFT;
-            case KeyEvent.KEYCODE_DPAD_UP:     return KeyCode.UP;
-            case KeyEvent.KEYCODE_DPAD_RIGHT:  return KeyCode.RIGHT;
-            case KeyEvent.KEYCODE_DPAD_DOWN:   return KeyCode.DOWN;
-            case KeyEvent.KEYCODE_MOVE_HOME:   return KeyCode.HOME;
-            case KeyEvent.KEYCODE_MOVE_END:    return KeyCode.END;
-            case KeyEvent.KEYCODE_PAGE_UP:     return KeyCode.PAGE_UP;
-            case KeyEvent.KEYCODE_PAGE_DOWN:   return KeyCode.PAGE_DOWN;
-            case KeyEvent.KEYCODE_SPACE:        return KeyCode.SPACE;
-            default:                           return KeyCode.NONE;
+            case KeyEvent.KEYCODE_DEL:
+                return KeyCode.BACKSPACE;
+            case KeyEvent.KEYCODE_TAB:
+                return KeyCode.TAB;
+            case KeyEvent.KEYCODE_ENTER:
+                return KeyCode.ENTER;
+            case KeyEvent.KEYCODE_ESCAPE:
+                return KeyCode.ESCAPE;
+            case KeyEvent.KEYCODE_FORWARD_DEL:
+                return KeyCode.DELETE_KEY;
+            case KeyEvent.KEYCODE_DPAD_LEFT:
+                return KeyCode.LEFT;
+            case KeyEvent.KEYCODE_DPAD_UP:
+                return KeyCode.UP;
+            case KeyEvent.KEYCODE_DPAD_RIGHT:
+                return KeyCode.RIGHT;
+            case KeyEvent.KEYCODE_DPAD_DOWN:
+                return KeyCode.DOWN;
+            case KeyEvent.KEYCODE_MOVE_HOME:
+                return KeyCode.HOME;
+            case KeyEvent.KEYCODE_MOVE_END:
+                return KeyCode.END;
+            case KeyEvent.KEYCODE_PAGE_UP:
+                return KeyCode.PAGE_UP;
+            case KeyEvent.KEYCODE_PAGE_DOWN:
+                return KeyCode.PAGE_DOWN;
+            case KeyEvent.KEYCODE_SPACE:
+                return KeyCode.SPACE;
+            default:
+                return KeyCode.NONE;
         }
     }
 }
-

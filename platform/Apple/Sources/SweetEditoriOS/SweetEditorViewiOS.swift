@@ -86,15 +86,8 @@ class IOSEditorView: UIView, UIKeyInput, UITextInput, UITextInputTraits, UIPoint
         decorationProviderManager = DecorationProviderManager(
             core: editorCore,
             visibleLineRangeProvider: { [weak self] in
-                guard let self, let model = self.renderModel, !model.lines.isEmpty else { return (0, -1) }
-                let lines = model.lines
-                var start = Int.max
-                var end = -1
-                for line in lines {
-                    start = min(start, line.logical_line)
-                    end = max(end, line.logical_line)
-                }
-                return start == Int.max ? (0, -1) : (start, end)
+                guard let self else { return IntRange(start: 0, end: -1) }
+                return self.editorCore.getVisibleLineRange()
             },
             totalLineCountProvider: { [weak self] in
                 guard let self, let doc = self.document else { return -1 }

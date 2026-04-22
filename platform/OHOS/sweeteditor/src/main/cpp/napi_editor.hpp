@@ -220,8 +220,15 @@ public:
         std::memcpy(&options.fling_min_velocity, ptr + offset, sizeof(float)); offset += sizeof(float);
         std::memcpy(&options.fling_max_velocity, ptr + offset, sizeof(float)); offset += sizeof(float);
         uint64_t max_undo = 0;
-        std::memcpy(&max_undo, ptr + offset, sizeof(uint64_t));
+        std::memcpy(&max_undo, ptr + offset, sizeof(uint64_t)); offset += sizeof(uint64_t);
         options.max_undo_stack_size = static_cast<size_t>(max_undo);
+        if (offset + sizeof(int64_t) <= byte_length) {
+          std::memcpy(&options.key_chord_timeout_ms, ptr + offset, sizeof(int64_t));
+          offset += sizeof(int64_t);
+        }
+        if (offset + sizeof(uint8_t) <= byte_length) {
+          options.reveal_selection_end_on_select_all = ptr[offset] != 0;
+        }
       }
     }
 
@@ -1150,6 +1157,23 @@ public:
     int result = editor_is_line_visible(static_cast<intptr_t>(napi_get_handle(env, args[0])),
                                         static_cast<size_t>(napi_get_int32(env, args[1])));
     return napi_create_bool_value(env, result != 0);
+  }
+
+  static napi_value getVisibleLineRange(napi_env env, napi_callback_info info) {
+    size_t argc = 1;
+    napi_value args[1];
+    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+    int32_t start_line = 0;
+    int32_t end_line = -1;
+    editor_get_visible_line_range(static_cast<intptr_t>(napi_get_handle(env, args[0])), &start_line, &end_line);
+    napi_value result;
+    napi_create_array_with_length(env, 2, &result);
+    napi_value value;
+    napi_create_int32(env, start_line, &value);
+    napi_set_element(env, result, 0, value);
+    napi_create_int32(env, end_line, &value);
+    napi_set_element(env, result, 1, value);
+    return result;
   }
 
   static napi_value setMaxGutterIcons(napi_env env, napi_callback_info info) {

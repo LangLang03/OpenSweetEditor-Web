@@ -33,7 +33,6 @@ const HANDLE_LINE_WIDTH = 1.5;
 const HANDLE_DROP_RADIUS = 10.0;
 const HANDLE_CENTER_DIST = 24.0;
 const DEFAULT_TEXT_SIZE = 28;
-const TEMP_LINK_COLOR = 0xFF4C9DFF;
 
 interface FontMetricsSnapshot {
   ascent: number;
@@ -234,14 +233,15 @@ export class EditorRenderer {
   private drawTextRun(ctx: CanvasRenderingContext2D, run: VisualRun, textSize: number): void {
     const fontStyle = run.style ? run.style.fontStyle : 0;
     let color = (run.style && run.style.color !== 0) ? run.style.color : this.theme.textColor;
+    let metrics: FontMetricsSnapshot | null = null;
     if (run.type === VisualRunType.CODELENS) {
-      color = run.active ? this.getActiveLineNumberColor() : this.theme.inlayHintTextColor;
+      color = this.getCodeLensColor(run.active);
     } else if (run.type === VisualRunType.LINK) {
-      color = TEMP_LINK_COLOR;
+      color = this.getLinkColor(run.active);
     }
 
     if (run.style && run.style.backgroundColor !== 0) {
-      const metrics = this.getFontMetrics(ctx, fontStyle, textSize, this.fontFamily);
+      metrics = this.getFontMetrics(ctx, fontStyle, textSize, this.fontFamily);
       ctx.fillStyle = colorToString(run.style.backgroundColor);
       ctx.fillRect(run.x, run.y - metrics.ascent, run.width, metrics.ascent + metrics.descent);
     } else {
@@ -254,6 +254,18 @@ export class EditorRenderer {
       ctx.fillStyle = colorToString(color);
     }
     ctx.fillText(run.text, run.x, run.y);
+    if ((fontStyle & 4) !== 0) {
+      if (!metrics) {
+        metrics = this.getFontMetrics(ctx, fontStyle, textSize, this.fontFamily);
+      }
+      const strikeY = run.y - metrics.ascent * 0.35;
+      ctx.beginPath();
+      ctx.strokeStyle = colorToString(color);
+      ctx.lineWidth = 1;
+      ctx.moveTo(run.x, strikeY);
+      ctx.lineTo(run.x + run.width, strikeY);
+      ctx.stroke();
+    }
     if ((run.type === VisualRunType.CODELENS || run.type === VisualRunType.LINK) && run.active) {
       const underlineY = run.y + 1;
       ctx.beginPath();
@@ -567,7 +579,7 @@ export class EditorRenderer {
         continue;
       }
       const isSeparator = seg.type === GuideType.SEPARATOR;
-      ctx.strokeStyle = colorToString(isSeparator ? this.theme.separatorColor : this.theme.guideColor);
+      ctx.strokeStyle = colorToString(isSeparator ? this.theme.separatorLineColor : this.theme.guideColor);
       ctx.lineWidth = 1;
 
       if (seg.style === GuideStyle.DOUBLE) {
@@ -644,7 +656,7 @@ export class EditorRenderer {
       return;
     }
     const y = decoration.origin.y + decoration.height;
-    ctx.strokeStyle = colorToString(this.theme.compositionColor);
+    ctx.strokeStyle = colorToString(this.theme.compositionUnderlineColor);
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(decoration.origin.x, y);
@@ -822,6 +834,52 @@ export class EditorRenderer {
       return -1;
     }
     return model.cursor.textPosition.line;
+  }
+
+  private getCodeLensColor(active: boolean): number {
+    if (active) {
+      if (this.theme.codeLensActiveColor !== 0) {
+        return this.theme.codeLensActiveColor;
+      }
+      if (this.theme.currentLineNumberColor !== 0) {
+        return this.theme.currentLineNumberColor;
+      }
+      if (this.theme.lineNumberColor !== 0) {
+        return this.theme.lineNumberColor;
+      }
+      return this.theme.textColor;
+    }
+
+    if (this.theme.codeLensColor !== 0) {
+      return this.theme.codeLensColor;
+    }
+    if (this.theme.inlayHintTextColor !== 0) {
+      return this.theme.inlayHintTextColor;
+    }
+    return this.theme.textColor;
+  }
+
+  private getLinkColor(active: boolean): number {
+    if (active) {
+      if (this.theme.linkActiveColor !== 0) {
+        return this.theme.linkActiveColor;
+      }
+      if (this.theme.linkColor !== 0) {
+        return this.theme.linkColor;
+      }
+      return this.getCodeLensColor(true);
+    }
+
+    if (this.theme.linkColor !== 0) {
+      return this.theme.linkColor;
+    }
+    if (this.theme.codeLensColor !== 0) {
+      return this.theme.codeLensColor;
+    }
+    if (this.theme.inlayHintTextColor !== 0) {
+      return this.theme.inlayHintTextColor;
+    }
+    return this.theme.textColor;
   }
 
   private getActiveLineNumberColor(): number {

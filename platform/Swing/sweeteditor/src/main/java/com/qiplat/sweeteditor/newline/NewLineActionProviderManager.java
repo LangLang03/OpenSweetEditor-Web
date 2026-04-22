@@ -27,6 +27,10 @@ public class NewLineActionProviderManager {
         providers.remove(provider);
     }
 
+    public void clearProviders() {
+        providers.clear();
+    }
+
     /**
      * Iterate all providers, return first non-null NewLineAction; return null if all return null.
      */

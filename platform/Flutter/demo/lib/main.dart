@@ -46,12 +46,15 @@ class _EditorDemoPageState extends State<EditorDemoPage> {
   ];
 
   late final SweetEditorController _controller;
+  late final EditorSettings _editorSettings;
   StreamSubscription<TextChangedEvent>? _textChangedSub;
   StreamSubscription<CursorChangedEvent>? _cursorChangedSub;
   StreamSubscription<CodeLensClickEvent>? _codeLensClickSub;
   bool _isDarkTheme = true;
   core.WrapMode _wrapMode = core.WrapMode.none;
   String _statusText = 'Ready';
+  String _editorText = '';
+  EditorMetadata? _editorMetadata;
   int _activeSampleIndex = 0;
   bool _isLoadingSample = false;
   int _loadRequestId = 0;
@@ -61,7 +64,11 @@ class _EditorDemoPageState extends State<EditorDemoPage> {
   void initState() {
     super.initState();
     _controller = SweetEditorController();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    _editorSettings = EditorSettings()
+      ..setFoldArrowMode(core.FoldArrowMode.auto_)
+      ..setCurrentLineRenderMode(core.CurrentLineRenderMode.border)
+      ..setMaxGutterIcons(1);
+    _controller.whenReady(() {
       unawaited(_setupEditor());
     });
   }
@@ -76,11 +83,6 @@ class _EditorDemoPageState extends State<EditorDemoPage> {
   }
 
   Future<void> _setupEditor() async {
-    final settings = _controller.settings;
-    settings.setFoldArrowMode(core.FoldArrowMode.auto_);
-    settings.setCurrentLineRenderMode(core.CurrentLineRenderMode.border);
-    settings.setMaxGutterIcons(1);
-
     _controller.addCompletionProvider(DemoCompletionProvider());
     try {
       await DemoDecorationProvider.ensureSweetLineReady();
@@ -119,7 +121,9 @@ class _EditorDemoPageState extends State<EditorDemoPage> {
   }
 
   void _onCodeLensClick(CodeLensClickEvent e) {
-    _updateStatus('CodeLens ${_describeCodeLensCommand(e.commandId)} at line ${e.line + 1}');
+    _updateStatus(
+      'CodeLens ${_describeCodeLensCommand(e.commandId)} at line ${e.line + 1}',
+    );
   }
 
   void _scheduleSuggestionIfAtLineEnd(CursorChangedEvent event) {
@@ -151,19 +155,15 @@ class _EditorDemoPageState extends State<EditorDemoPage> {
     setState(() {
       _isDarkTheme = !_isDarkTheme;
     });
-    final theme = _isDarkTheme ? EditorTheme.dark() : EditorTheme.light();
-    theme.defineTextStyle(
-      _styleColor,
-      core.TextStyle(color: _isDarkTheme ? 0xFFB5CEA8 : 0xFF098658),
-    );
-    _controller.setTheme(theme);
     _updateStatus(_isDarkTheme ? 'Dark theme' : 'Light theme');
   }
 
   void _cycleWrapMode() {
     final modes = core.WrapMode.values;
-    _wrapMode = modes[(_wrapMode.value + 1) % modes.length];
-    _controller.settings.setWrapMode(_wrapMode);
+    setState(() {
+      _wrapMode = modes[(_wrapMode.value + 1) % modes.length];
+      _editorSettings.setWrapMode(_wrapMode);
+    });
     _updateStatus('WrapMode: ${_wrapMode.name}');
   }
 
@@ -203,8 +203,10 @@ class _EditorDemoPageState extends State<EditorDemoPage> {
       if (!mounted || requestId != _loadRequestId) {
         return;
       }
-      _controller.metadata = DemoFileMetadata(sample.key);
-      _controller.loadText(text);
+      setState(() {
+        _editorMetadata = DemoFileMetadata(sample.key);
+        _editorText = text;
+      });
       _updateStatus('Loaded: ${sample.key}');
     } catch (e) {
       if (!mounted || requestId != _loadRequestId) {
@@ -242,7 +244,10 @@ class _EditorDemoPageState extends State<EditorDemoPage> {
             Expanded(
               child: SweetEditorWidget(
                 controller: _controller,
+                text: _editorText,
                 theme: theme,
+                settings: _editorSettings,
+                metadata: _editorMetadata,
                 fontFamily:
                     defaultTargetPlatform == TargetPlatform.iOS ||
                         defaultTargetPlatform == TargetPlatform.macOS

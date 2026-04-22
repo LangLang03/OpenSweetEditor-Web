@@ -204,7 +204,7 @@ namespace NS_SWEETEDITOR {
     float view_scroll_y {0};
     /// View scale (filled by EditorCore)
     float view_scale {1};
-    /// Tap hit target (filled by EditorCore on TAP)
+    /// Decoration hit target at the gesture location (filled by EditorCore when applicable)
     HitTarget hit_target;
     /// Whether the platform should start/continue an edge-scroll timer.
     /// When true, the platform must call tickEdgeScroll() at ~16ms intervals.

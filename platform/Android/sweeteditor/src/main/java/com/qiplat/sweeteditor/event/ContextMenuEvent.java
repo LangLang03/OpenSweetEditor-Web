@@ -13,10 +13,10 @@ public final class ContextMenuEvent extends EditorEvent {
     @NonNull
     public final TextPosition cursorPosition;
     @NonNull
-    public final PointF screenPoint;
+    public final PointF locationInEditor;
 
-    public ContextMenuEvent(@NonNull TextPosition cursorPosition, @NonNull PointF screenPoint) {
+    public ContextMenuEvent(@NonNull TextPosition cursorPosition, @NonNull PointF locationInEditor) {
         this.cursorPosition = cursorPosition;
-        this.screenPoint = screenPoint;
+        this.locationInEditor = locationInEditor;
     }
 }

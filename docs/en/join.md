@@ -10,6 +10,7 @@ This document gives practical development entry points based on the current repo
 4. `src/include/*.h`
 5. `src/core/*.cpp`
 6. Read `platform/*` last
+7. `docs/en/guide-adding-decoration-type.md` — step-by-step guide for adding a new decoration type
 
 ## Repository Map
 

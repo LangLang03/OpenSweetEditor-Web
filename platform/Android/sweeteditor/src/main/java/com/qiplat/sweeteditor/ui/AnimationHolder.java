@@ -1,4 +1,4 @@
-package com.qiplat.sweeteditor.animation;
+package com.qiplat.sweeteditor.ui;
 
 public class AnimationHolder {
 

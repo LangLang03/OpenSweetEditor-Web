@@ -172,6 +172,13 @@ public void SetLineInlayHints(int line, IList<InlayHint> hints)
 public void SetBatchLineInlayHints(Dictionary<int, IList<InlayHint>> hintsByLine)
 public void SetLinePhantomTexts(int line, IList<PhantomText> phantoms)
 public void SetBatchLinePhantomTexts(Dictionary<int, IList<PhantomText>> phantomsByLine)
+public void SetLineCodeLens(int line, IList<CodeLensItem> items)
+public void SetBatchLineCodeLens(Dictionary<int, IList<CodeLensItem>> itemsByLine)
+public void ClearCodeLens()
+public void SetLineLinks(int line, IList<LinkSpan> links)
+public void SetBatchLineLinks(Dictionary<int, IList<LinkSpan>> linksByLine)
+public string GetLinkTargetAt(int line, int column)
+public void ClearLinks()
 
 public void SetLineDiagnostics(int line, IList<DiagnosticItem> items)
 public void SetBatchLineDiagnostics(Dictionary<int, IList<DiagnosticItem>> diagsByLine)
@@ -231,6 +238,15 @@ public int GetTotalLineCount()
 ```
 
 `GetTotalLineCount()` 返回当前文档总行数；若尚未加载文档，则返回 `-1`。
+
+### 交互事件
+
+```csharp
+public event EventHandler<CodeLensClickEventArgs> CodeLensClick
+public event EventHandler<LinkClickEventArgs> LinkClick
+```
+
+`GetLinkTargetAt()` 在请求位置未命中 link 时返回空字符串。
 
 ## 桥接层补充
 

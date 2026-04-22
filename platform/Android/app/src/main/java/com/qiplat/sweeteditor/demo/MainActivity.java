@@ -1,8 +1,11 @@
 package com.qiplat.sweeteditor.demo;
 
+import android.content.ActivityNotFoundException;
+import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.PorterDuff;
 import android.graphics.Typeface;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -42,6 +45,7 @@ import com.qiplat.sweeteditor.event.CursorChangedEvent;
 import com.qiplat.sweeteditor.event.CodeLensClickEvent;
 import com.qiplat.sweeteditor.event.GutterIconClickEvent;
 import com.qiplat.sweeteditor.event.InlayHintClickEvent;
+import com.qiplat.sweeteditor.event.LinkClickEvent;
 import com.qiplat.sweeteditor.event.TextChangedEvent;
 
 import java.io.BufferedReader;
@@ -53,7 +57,8 @@ import java.util.Collections;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
-    private static final int STYLE_COLOR = EditorTheme.STYLE_PREPROCESSOR + 1;
+    private static final int STYLE_COLOR = DemoDecorationProvider.STYLE_COLOR;
+    private static final int STYLE_LINK = DemoDecorationProvider.STYLE_LINK;
     private static final String DEMO_FILES_ASSET_DIR = "files";
     private static final String FALLBACK_FILE_NAME = "sample.cpp";
 
@@ -114,7 +119,7 @@ public class MainActivity extends AppCompatActivity {
                 .setInsertSpaces(true)
                 .build();
         mEditor.setLanguageConfiguration(configuration);
-        registerColorStyleForCurrentTheme();
+        registerDemoStylesForCurrentTheme();
 
         try {
             DemoDecorationProvider.ensureSweetLineReady(this);
@@ -264,7 +269,7 @@ public class MainActivity extends AppCompatActivity {
             updateStatus(message);
             Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
         });
-
+        mEditor.subscribe(LinkClickEvent.class, e -> openLinkInBrowser(e.target));
         mEditor.subscribe(CursorChangedEvent.class, e -> scheduleSuggestionIfAtLineEnd(e));
 
         mEditor.setInlineSuggestionListener(new com.qiplat.sweeteditor.copilot.InlineSuggestionListener() {
@@ -310,6 +315,24 @@ public class MainActivity extends AppCompatActivity {
         if (mPendingSuggestion != null) {
             mSuggestionHandler.removeCallbacks(mPendingSuggestion);
             mPendingSuggestion = null;
+        }
+    }
+
+    private void openLinkInBrowser(@Nullable String target) {
+        if (target == null || target.isEmpty()) {
+            updateStatus("Link target is empty");
+            Toast.makeText(this, "Link target is empty", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        try {
+            Intent viewIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(target));
+            viewIntent.addCategory(Intent.CATEGORY_BROWSABLE);
+            Intent chooserIntent = Intent.createChooser(viewIntent, "Open link with");
+            startActivity(chooserIntent);
+            updateStatus("Open link " + target);
+        } catch (ActivityNotFoundException ex) {
+            updateStatus("No browser found for " + target);
+            Toast.makeText(this, "No browser found", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -418,7 +441,7 @@ public class MainActivity extends AppCompatActivity {
         mBtnTheme.setOnClickListener(v -> {
             mIsDarkTheme = !mIsDarkTheme;
             mEditor.applyTheme(mIsDarkTheme ? EditorTheme.dark() : EditorTheme.light());
-            registerColorStyleForCurrentTheme();
+            registerDemoStylesForCurrentTheme();
             applyAppTheme();
             updateStatus(mIsDarkTheme ? "Dark theme" : "Light theme");
         });
@@ -437,9 +460,10 @@ public class MainActivity extends AppCompatActivity {
         mStatusBar.setText(message);
     }
 
-    private void registerColorStyleForCurrentTheme() {
+    private void registerDemoStylesForCurrentTheme() {
         int color = mIsDarkTheme ? 0xFFB5CEA8 : 0xFF098658;
+        int linkColor = mIsDarkTheme ? 0xFF7DCFFF : 0xFF005FB8;
         mEditor.registerTextStyle(STYLE_COLOR, color, 0);
+        mEditor.registerTextStyle(STYLE_LINK, linkColor, 0);
     }
 }
-

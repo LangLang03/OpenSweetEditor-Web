@@ -70,7 +70,8 @@ enum HitTargetType {
   foldPlaceholder(4),
   foldGutter(5),
   inlayHintColor(6),
-  codelens(7);
+  codelens(7),
+  link(8);
 
   const HitTargetType(this.value);
   final int value;
@@ -184,6 +185,7 @@ class GestureResult {
     this.needsFling = false,
     this.needsAnimation = false,
     this.isHandleDrag = false,
+    this.pointerCursorType = PointerCursorType.text,
   });
 
   static const GestureResult empty = GestureResult();
@@ -201,6 +203,7 @@ class GestureResult {
   final bool needsFling;
   final bool needsAnimation;
   final bool isHandleDrag;
+  final PointerCursorType pointerCursorType;
 }
 
 /// Result of a keyboard event.
@@ -232,6 +235,8 @@ class EditorOptions {
     this.flingMinVelocity = 50,
     this.flingMaxVelocity = 8000,
     this.maxUndoStackSize = 512,
+    this.keyChordTimeoutMs = 2000,
+    this.revealSelectionEndOnSelectAll = false,
   });
 
   final double touchSlop;
@@ -241,10 +246,12 @@ class EditorOptions {
   final double flingMinVelocity;
   final double flingMaxVelocity;
   final int maxUndoStackSize;
+  final int keyChordTimeoutMs;
+  final bool revealSelectionEndOnSelectAll;
 
   /// Serialize to LE binary payload matching C API EditorOptions layout.
   Uint8List toBytes() {
-    final data = ByteData(4 + 8 + 8 + 4 + 4 + 4 + 8);
+    final data = ByteData(4 + 8 + 8 + 4 + 4 + 4 + 8 + 8 + 1);
     var offset = 0;
     data.setFloat32(offset, touchSlop, Endian.little);
     offset += 4;
@@ -259,6 +266,10 @@ class EditorOptions {
     data.setFloat32(offset, flingMaxVelocity, Endian.little);
     offset += 4;
     data.setUint64(offset, maxUndoStackSize, Endian.little);
+    offset += 8;
+    data.setInt64(offset, keyChordTimeoutMs, Endian.little);
+    offset += 8;
+    data.setUint8(offset, revealSelectionEndOnSelectAll ? 1 : 0);
     return data.buffer.asUint8List();
   }
 }
@@ -816,6 +827,12 @@ class EditorCore {
     return _readNativeUtf8(bindings.editor_get_word_at_cursor(_handle));
   }
 
+  String getLinkTargetAt(int line, int column) {
+    _ensureOpen();
+    final ptr = bindings.editor_get_link_target_at(_handle, line, column);
+    return _readNativeUtf8(ptr);
+  }
+
   void moveCursorLeft({bool extendSelection = false}) {
     _ensureOpen();
     bindings.editor_move_cursor_left(_handle, extendSelection ? 1 : 0);
@@ -924,6 +941,16 @@ class EditorCore {
     );
   }
 
+  IntRange getVisibleLineRange() {
+    _ensureOpen();
+    return using((arena) {
+      final outStartLine = arena.allocate<ffi.Int32>(ffi.sizeOf<ffi.Int32>());
+      final outEndLine = arena.allocate<ffi.Int32>(ffi.sizeOf<ffi.Int32>());
+      bindings.editor_get_visible_line_range(_handle, outStartLine, outEndLine);
+      return IntRange(outStartLine.value, outEndLine.value);
+    });
+  }
+
   CursorRect getPositionRect(int line, int column) {
     _ensureOpen();
     return using((arena) {
@@ -1026,7 +1053,9 @@ class EditorCore {
   }
 
   void setLinePhantomTexts(int line, List<PhantomText> phantoms) {
-    setLinePhantomTextsRaw(ProtocolEncoder.packLinePhantomTexts(line, phantoms));
+    setLinePhantomTextsRaw(
+      ProtocolEncoder.packLinePhantomTexts(line, phantoms),
+    );
   }
 
   void setLinePhantomTextsRaw(Uint8List data) {
@@ -1092,17 +1121,38 @@ class EditorCore {
   }
 
   void setBatchLineCodeLens(Map<int, List<CodeLensItem>> itemsByLine) {
-    setBatchLineCodeLensRaw(
-      ProtocolEncoder.packBatchLineCodeLens(itemsByLine),
-    );
+    setBatchLineCodeLensRaw(ProtocolEncoder.packBatchLineCodeLens(itemsByLine));
   }
 
   void setBatchLineCodeLensRaw(Uint8List data) {
     _ensureOpen();
     _callWithBinaryData(
       data,
-      (ptr, len) =>
-          bindings.editor_set_batch_line_codelens(_handle, ptr, len),
+      (ptr, len) => bindings.editor_set_batch_line_codelens(_handle, ptr, len),
+    );
+  }
+
+  void setLineLinks(int line, List<LinkSpan> links) {
+    setLineLinksRaw(ProtocolEncoder.packLineLinks(line, links));
+  }
+
+  void setLineLinksRaw(Uint8List data) {
+    _ensureOpen();
+    _callWithBinaryData(
+      data,
+      (ptr, len) => bindings.editor_set_line_links(_handle, ptr, len),
+    );
+  }
+
+  void setBatchLineLinks(Map<int, List<LinkSpan>> linksByLine) {
+    setBatchLineLinksRaw(ProtocolEncoder.packBatchLineLinks(linksByLine));
+  }
+
+  void setBatchLineLinksRaw(Uint8List data) {
+    _ensureOpen();
+    _callWithBinaryData(
+      data,
+      (ptr, len) => bindings.editor_set_batch_line_links(_handle, ptr, len),
     );
   }
 
@@ -1241,6 +1291,11 @@ class EditorCore {
   void clearCodeLens() {
     _ensureOpen();
     bindings.editor_clear_codelens(_handle);
+  }
+
+  void clearLinks() {
+    _ensureOpen();
+    bindings.editor_clear_links(_handle);
   }
 
   void clearGuides() {

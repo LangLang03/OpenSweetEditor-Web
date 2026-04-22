@@ -13,12 +13,12 @@ public final class GutterIconClickEvent extends EditorEvent {
     public final int line;
     /** Icon ID (consistent with what was passed to setLineGutterIcons) */
     public final int iconId;
-    /** Screen coordinates at the time of click */
-    @NonNull public final PointF screenPoint;
+    /** Pointer location relative to the editor at the time of click. */
+    @NonNull public final PointF locationInEditor;
 
-    public GutterIconClickEvent(int line, int iconId, @NonNull PointF screenPoint) {
+    public GutterIconClickEvent(int line, int iconId, @NonNull PointF locationInEditor) {
         this.line = line;
         this.iconId = iconId;
-        this.screenPoint = screenPoint;
+        this.locationInEditor = locationInEditor;
     }
 }

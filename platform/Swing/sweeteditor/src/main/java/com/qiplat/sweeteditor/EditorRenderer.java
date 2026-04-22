@@ -20,10 +20,10 @@ import java.util.List;
 
 /**
  * Platform-independent rendering engine for the Swing editor.
- * Owns all Font objects, implements TextMeasureCallback, and contains all draw methods.
+ * Owns all Font objects, implements TextMeasurer, and contains all draw methods.
  * SweetEditor delegates all rendering to this class.
  */
-final class EditorRenderer implements EditorCore.TextMeasureCallback {
+final class EditorRenderer implements EditorCore.TextMeasurer {
 
     private static final FontRenderContext FALLBACK_FRC = new FontRenderContext(null, true, true);
 
@@ -57,7 +57,7 @@ final class EditorRenderer implements EditorCore.TextMeasureCallback {
         syncPlatformScale(1.0f);
     }
 
-    public EditorCore.TextMeasureCallback getTextMeasureCallback() {
+    public EditorCore.TextMeasurer getTextMeasurer() {
         return this;
     }
 
@@ -307,7 +307,9 @@ final class EditorRenderer implements EditorCore.TextMeasureCallback {
 
         Color color;
         if (run.type == VisualRunType.CODELENS) {
-            color = run.active ? theme.currentLineNumberColor : theme.inlayHintTextColor;
+            color = getCodeLensColor(run.active);
+        } else if (run.type == VisualRunType.LINK) {
+            color = getLinkColor(run.active);
         } else {
             color = (run.style != null && run.style.color != 0)
                     ? argbToColor(run.style.color)
@@ -363,7 +365,7 @@ final class EditorRenderer implements EditorCore.TextMeasureCallback {
                 g.setColor(drawColor);
                 g.setFont(font);
                 g.drawString(text, run.x, run.y);
-                if (run.type == VisualRunType.CODELENS && run.active) {
+                if ((run.type == VisualRunType.CODELENS || run.type == VisualRunType.LINK) && run.active) {
                     float underlineY = run.y + 1.0f;
                     g.drawLine((int) run.x, (int) underlineY, (int) (run.x + run.width), (int) underlineY);
                 }
@@ -376,6 +378,48 @@ final class EditorRenderer implements EditorCore.TextMeasureCallback {
             g.setStroke(new BasicStroke(1f));
             g.drawLine((int) run.x, (int) strikeY, (int) (run.x + run.width), (int) strikeY);
         }
+    }
+
+    private Color getCodeLensColor(boolean active) {
+        Color color = active ? theme.codeLensActiveColor : theme.codeLensColor;
+        if (color != null) {
+            return color;
+        }
+        if (active) {
+            color = theme.currentLineNumberColor;
+            if (color != null) {
+                return color;
+            }
+        } else {
+            color = theme.inlayHintTextColor;
+            if (color != null) {
+                return color;
+            }
+        }
+        return theme.textColor;
+    }
+
+    private Color getLinkColor(boolean active) {
+        Color color = active ? theme.linkActiveColor : theme.linkColor;
+        if (color != null) {
+            return color;
+        }
+        color = active ? theme.codeLensActiveColor : theme.codeLensColor;
+        if (color != null) {
+            return color;
+        }
+        if (active) {
+            color = theme.currentLineNumberColor;
+            if (color != null) {
+                return color;
+            }
+        } else {
+            color = theme.inlayHintTextColor;
+            if (color != null) {
+                return color;
+            }
+        }
+        return theme.textColor;
     }
 
     private void drawGutterOverlay(Graphics2D g, EditorRenderModel model, int viewWidth, int viewHeight, AnimationHolder animationHolder) {

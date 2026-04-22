@@ -21,17 +21,17 @@ namespace SweetEditor {
 		/// <summary>Current line text.</summary>
 		public string LineText { get; }
 		/// <summary>Language configuration (nullable).</summary>
-		public LanguageConfiguration? LanguageConfig { get; }
+		public LanguageConfiguration? LanguageConfiguration { get; }
 		/// <summary>Editor metadata (nullable).</summary>
 		public IEditorMetadata? EditorMetadata { get; }
 
 		public NewLineContext(int lineNumber, int column, string lineText,
-							  LanguageConfiguration? languageConfig,
+							  LanguageConfiguration? languageConfiguration,
 							  IEditorMetadata? editorMetadata = null) {
 			LineNumber = lineNumber;
 			Column = column;
 			LineText = lineText;
-			LanguageConfig = languageConfig;
+			LanguageConfiguration = languageConfiguration;
 			EditorMetadata = editorMetadata;
 		}
 	}

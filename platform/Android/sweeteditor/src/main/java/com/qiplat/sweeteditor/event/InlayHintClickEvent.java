@@ -19,14 +19,14 @@ public final class InlayHintClickEvent extends EditorEvent {
     @NonNull public final InlayType type;
     /** Type-specific integer value: iconId for ICON, ARGB for COLOR, 0 for TEXT. */
     public final int intValue;
-    /** Screen coordinates at the time of click. */
-    @NonNull public final PointF screenPoint;
+    /** Pointer location relative to the editor at the time of click. */
+    @NonNull public final PointF locationInEditor;
 
-    public InlayHintClickEvent(int line, int column, @NonNull InlayType type, int intValue, @NonNull PointF screenPoint) {
+    public InlayHintClickEvent(int line, int column, @NonNull InlayType type, int intValue, @NonNull PointF locationInEditor) {
         this.line = line;
         this.column = column;
         this.type = type;
         this.intValue = intValue;
-        this.screenPoint = screenPoint;
+        this.locationInEditor = locationInEditor;
     }
 }

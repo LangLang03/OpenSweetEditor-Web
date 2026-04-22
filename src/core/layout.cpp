@@ -115,14 +115,14 @@ namespace NS_SWEETEDITOR {
     logical_line.is_layout_dirty = false;
   }
 
-  void TextLayout::layoutVisibleLines(EditorRenderModel& model, const PresentationContext& presentation_context) {
+  VisibleLineInfo TextLayout::layoutVisibleLines(EditorRenderModel& model, const PresentationContext& presentation_context) {
     PERF_TIMER("layoutVisibleLines");
     if (!m_viewport_.valid() || m_document_ == nullptr) {
-      return;
+      return {};
     }
     Vector<LogicalLine>& logical_lines = m_document_->getLogicalLines();
     if (logical_lines.empty()) {
-      return;
+      return {};
     }
     // Compute line number width
     m_layout_metrics_.line_number_width = computeLineNumberWidth();
@@ -169,6 +169,11 @@ namespace NS_SWEETEDITOR {
                 && run.column == presentation_context.active_hit_target.column
                 && run.icon_id == presentation_context.active_hit_target.icon_id) {
               run.active = true;
+            } else if (run.type == VisualRunType::LINK) {
+              const LinkSpan* link = m_decoration_manager_->findLinkAt(visual_line.logical_line, run.column);
+              if (link != nullptr && link->column == presentation_context.active_hit_target.column) {
+                run.active = true;
+              }
             }
           }
         }
@@ -194,6 +199,7 @@ namespace NS_SWEETEDITOR {
     model.scroll_y = scroll_y;
     model.viewport_width = m_viewport_.width;
     model.viewport_height = m_viewport_.height;
+    return visible_line_info;
   }
 
   TextPosition TextLayout::hitTestPointer(const PointF& screen_point) {
@@ -417,7 +423,7 @@ namespace NS_SWEETEDITOR {
       click_x = screen_point.x - text_area_x + scroll_x;
     }
 
-    // Iterate runs to check hit on InlayHint, FoldPlaceholder, or CodeLens
+    // Iterate runs to check hit on InlayHint, FoldPlaceholder, CodeLens, or Link.
     float run_x = 0;
     for (const VisualRun& run : vl.runs) {
       float run_right = run_x + run.width;
@@ -1174,6 +1180,7 @@ namespace NS_SWEETEDITOR {
     const auto merged_spans = m_decoration_manager_->getMergedLineSpans(line_index);
     const auto& inlay_hints = m_decoration_manager_->getLineInlayHints(line_index);
     const auto& phantom_texts = m_decoration_manager_->getLinePhantomTexts(line_index);
+    const auto& links = m_decoration_manager_->getLineLinks(line_index);
 
     const size_t text_len = line_text.length();
 
@@ -1186,7 +1193,7 @@ namespace NS_SWEETEDITOR {
         if (tab_pos == U16String::npos) tab_pos = t.length();
         if (tab_pos > pos) {
           VisualRun text_part;
-          text_part.type = VisualRunType::TEXT;
+          text_part.type = src_run.type;
           text_part.column = src_run.column + static_cast<uint32_t>(pos);
           text_part.length = tab_pos - pos;
           text_part.style = src_run.style;
@@ -1213,7 +1220,7 @@ namespace NS_SWEETEDITOR {
     };
 
     // If there is no decoration, generate runs directly (split tabs)
-    if (merged_spans.empty() && inlay_hints.empty() && phantom_texts.empty()) {
+    if (merged_spans.empty() && inlay_hints.empty() && phantom_texts.empty() && links.empty()) {
       VisualRun run = {VisualRunType::TEXT, 0, text_len};
       run.style.font_style = FONT_STYLE_NORMAL;
       run.text = line_text;
@@ -1247,6 +1254,13 @@ namespace NS_SWEETEDITOR {
         split_set.insert(phantom.column);
       }
     }
+    for (const auto& link : links) {
+      if (link.column <= text_len) {
+        split_set.insert(link.column);
+        uint32_t end_col = std::min(link.column + link.length, static_cast<uint32_t>(text_len));
+        split_set.insert(end_col);
+      }
+    }
 
     // Sort split points
     Vector<uint32_t> splits(split_set.begin(), split_set.end());
@@ -1261,6 +1275,15 @@ namespace NS_SWEETEDITOR {
         }
       }
       return {};
+    };
+
+    auto findLink = [&](uint32_t col) -> const LinkSpan* {
+      for (const auto& link : links) {
+        if (col >= link.column && col < link.column + link.length) {
+          return &link;
+        }
+      }
+      return nullptr;
     };
 
     // Helper to build InlayHint VisualRun
@@ -1328,7 +1351,7 @@ namespace NS_SWEETEDITOR {
       if (seg_start < seg_end && seg_start < text_len) {
         uint32_t actual_end = std::min(seg_end, static_cast<uint32_t>(text_len));
         VisualRun text_run;
-        text_run.type = VisualRunType::TEXT;
+        text_run.type = findLink(seg_start) != nullptr ? VisualRunType::LINK : VisualRunType::TEXT;
         text_run.column = seg_start;
         text_run.length = actual_end - seg_start;
         text_run.style = findSpanStyle(seg_start);

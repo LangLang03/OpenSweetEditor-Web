@@ -123,13 +123,20 @@ public setEditorIconProvider(provider: EditorIconProvider | null): void
 
 ```ts
 public addDecorationProvider(provider: DecorationProvider): void
+public setLineCodeLens(line: number, items: CodeLensItem[]): void
+public setBatchLineCodeLens(itemsByLine: Map<number, CodeLensItem[]>): void
+public clearCodeLens(): void
+public setLineLinks(line: number, links: LinkSpan[]): void
+public setBatchLineLinks(linksByLine: Map<number, LinkSpan[]>): void
+public getLinkTargetAt(line: number, column: number): string
+public clearLinks(): void
+public requestDecorationRefresh(): void
 public addCompletionProvider(provider: CompletionProvider): void
 public triggerCompletion(): void
 public showInlineSuggestion(suggestion: InlineSuggestion): void
 public dismissInlineSuggestion(): void
 public isInlineSuggestionShowing(): boolean
 public setInlineSuggestionListener(listener: InlineSuggestionListener | null): void
-public requestDecorationRefresh(): void
 ```
 
 ### Events and Undo/Redo
@@ -153,6 +160,10 @@ public onGutterIconClick(listener: EditorEventListener<GutterIconClickEvent>): v
 public offGutterIconClick(listener: EditorEventListener<GutterIconClickEvent>): void
 public onInlayHintClick(listener: EditorEventListener<InlayHintClickEvent>): void
 public offInlayHintClick(listener: EditorEventListener<InlayHintClickEvent>): void
+public onCodeLensClick(listener: EditorEventListener<CodeLensClickEvent>): void
+public offCodeLensClick(listener: EditorEventListener<CodeLensClickEvent>): void
+public onLinkClick(listener: EditorEventListener<LinkClickEvent>): void
+public offLinkClick(listener: EditorEventListener<LinkClickEvent>): void
 public undo(): TextEditResult | null
 public redo(): TextEditResult | null
 public canUndo(): boolean
@@ -160,6 +171,8 @@ public canRedo(): boolean
 ```
 
 Mobile-specific events such as `LongPressEvent`, `DoubleTapEvent`, and OHOS-specific `SelectionMenuItemClickEvent` are also exposed through matching `onXxx` / `offXxx` methods.
+
+`getLinkTargetAt(...)` returns an empty string when no link matches the requested position.
 
 ## Runtime Settings: `EditorSettings`
 
@@ -275,6 +288,13 @@ public setLineInlayHints(...): void
 public setBatchLineInlayHints(...): void
 public setLinePhantomTexts(...): void
 public setBatchLinePhantomTexts(...): void
+public setLineCodeLens(lineOrData: number | ArrayBuffer, itemsOrSize?: CodeLensItem[] | number): void
+public setBatchLineCodeLens(itemsByLineOrData: Map<number, CodeLensItem[]> | ArrayBuffer, _size?: number): void
+public clearCodeLens(): void
+public setLineLinks(lineOrData: number | ArrayBuffer, linksOrSize?: LinkSpan[] | number): void
+public setBatchLineLinks(linksByLineOrData: Map<number, LinkSpan[]> | ArrayBuffer, _size?: number): void
+public getLinkTargetAt(line: number, column: number): string
+public clearLinks(): void
 public setLineGutterIcons(...): void
 public setBatchLineGutterIcons(...): void
 public setLineDiagnostics(...): void
@@ -296,6 +316,8 @@ public clearAllDecorations(): void
 ```
 
 Most batch decoration APIs accept either strongly typed ArkTS data or pre-packed `ArrayBuffer`. The `ArrayBuffer` path is intended for advanced provider pipelines and large batch updates.
+
+For Link lookup, `getLinkTargetAt(...)` returns an empty string when no link matches the requested position.
 
 ## `Document`
 

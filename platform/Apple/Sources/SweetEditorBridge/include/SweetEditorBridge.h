@@ -235,6 +235,7 @@ int  editor_unfold_at(intptr_t editor_handle, size_t line);
 void editor_fold_all(intptr_t editor_handle);
 void editor_unfold_all(intptr_t editor_handle);
 int  editor_is_line_visible(intptr_t editor_handle, size_t line);
+void editor_get_visible_line_range(intptr_t editor_handle, int32_t* out_start_line, int32_t* out_end_line);
 
 // ===================== Decorations Clear API =====================
 

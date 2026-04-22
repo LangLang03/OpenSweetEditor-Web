@@ -29,8 +29,7 @@ namespace SweetEditor {
 	}
 
 	public sealed class DecorationContext {
-		public int VisibleStartLine { get; }
-		public int VisibleEndLine { get; }
+		public IntRange VisibleLineRange { get; }
 		public int TotalLineCount { get; }
 		/// <summary>All text changes accumulated in this refresh cycle (read-only). An empty list means the refresh was triggered by a non-text change.</summary>
 		public IReadOnlyList<TextChange> TextChanges { get; }
@@ -39,11 +38,10 @@ namespace SweetEditor {
 		/// <summary>Current editor metadata (from SweetEditorControl).</summary>
 		public IEditorMetadata? EditorMetadata { get; }
 
-		public DecorationContext(int visibleStartLine, int visibleEndLine, int totalLineCount,
+		public DecorationContext(IntRange visibleLineRange, int totalLineCount,
 								 IReadOnlyList<TextChange> textChanges, LanguageConfiguration? languageConfiguration = null,
 								 IEditorMetadata? editorMetadata = null) {
-			VisibleStartLine = visibleStartLine;
-			VisibleEndLine = visibleEndLine;
+			VisibleLineRange = visibleLineRange;
 			TotalLineCount = totalLineCount;
 			TextChanges = textChanges;
 			LanguageConfiguration = languageConfiguration;
@@ -146,8 +144,7 @@ namespace SweetEditor {
 		private readonly List<TextChange> pendingTextChanges = new();
 		private bool applyScheduled;
 		private int generation;
-		private int lastVisibleStartLine;
-		private int lastVisibleEndLine = -1;
+		private IntRange lastVisibleLineRange = new(0, -1);
 		private bool scrollRefreshScheduled;
 		private bool pendingScrollRefresh;
 		private long lastScrollRefreshTickMs;
@@ -231,21 +228,19 @@ namespace SweetEditor {
 			int currentGeneration = generation;
 
 			var visible = editor.GetVisibleLineRange();
-			lastVisibleStartLine = visible.start;
-			lastVisibleEndLine = visible.end;
+			lastVisibleLineRange = visible;
 			var changes = new List<TextChange>(pendingTextChanges).AsReadOnly();
 			pendingTextChanges.Clear();
 			int total = editor.GetTotalLineCount();
-			int contextStart = visible.start;
-			int contextEnd = visible.end;
-			if (total > 0 && visible.end >= visible.start) {
-				int overscanLines = CalculateOverscanLines(visible.start, visible.end);
-				contextStart = Math.Max(0, visible.start - overscanLines);
-				contextEnd = Math.Min(total - 1, visible.end + overscanLines);
+			int contextStart = visible.Start;
+			int contextEnd = visible.End;
+			if (total > 0 && visible.End >= visible.Start) {
+				int overscanLines = CalculateOverscanLines(visible.Start, visible.End);
+				contextStart = Math.Max(0, visible.Start - overscanLines);
+				contextEnd = Math.Min(total - 1, visible.End + overscanLines);
 			}
 			var context = new DecorationContext(
-				contextStart,
-				contextEnd,
+				new IntRange(contextStart, contextEnd),
 				total,
 				changes,
 				editor.GetLanguageConfiguration(),
@@ -464,7 +459,7 @@ namespace SweetEditor {
 			if (mode == DecorationApplyMode.REPLACE_ALL) {
 				editor.ClearHighlights(layer);
 			} else if (mode == DecorationApplyMode.REPLACE_RANGE) {
-				ClearSpanRange(layer, lastVisibleStartLine, lastVisibleEndLine);
+				ClearSpanRange(layer, lastVisibleLineRange.Start, lastVisibleLineRange.End);
 			}
 		}
 
@@ -472,7 +467,7 @@ namespace SweetEditor {
 			if (mode == DecorationApplyMode.REPLACE_ALL) {
 				editor.ClearInlayHints();
 			} else if (mode == DecorationApplyMode.REPLACE_RANGE) {
-				ClearInlayRange(lastVisibleStartLine, lastVisibleEndLine);
+				ClearInlayRange(lastVisibleLineRange.Start, lastVisibleLineRange.End);
 			}
 		}
 
@@ -480,7 +475,7 @@ namespace SweetEditor {
 			if (mode == DecorationApplyMode.REPLACE_ALL) {
 				editor.ClearDiagnostics();
 			} else if (mode == DecorationApplyMode.REPLACE_RANGE) {
-				ClearDiagnosticRange(lastVisibleStartLine, lastVisibleEndLine);
+				ClearDiagnosticRange(lastVisibleLineRange.Start, lastVisibleLineRange.End);
 			}
 		}
 
@@ -488,7 +483,7 @@ namespace SweetEditor {
 			if (mode == DecorationApplyMode.REPLACE_ALL) {
 				editor.ClearGutterIcons();
 			} else if (mode == DecorationApplyMode.REPLACE_RANGE) {
-				ClearGutterRange(lastVisibleStartLine, lastVisibleEndLine);
+				ClearGutterRange(lastVisibleLineRange.Start, lastVisibleLineRange.End);
 			}
 		}
 
@@ -496,7 +491,7 @@ namespace SweetEditor {
 			if (mode == DecorationApplyMode.REPLACE_ALL) {
 				editor.ClearPhantomTexts();
 			} else if (mode == DecorationApplyMode.REPLACE_RANGE) {
-				ClearPhantomRange(lastVisibleStartLine, lastVisibleEndLine);
+				ClearPhantomRange(lastVisibleLineRange.Start, lastVisibleLineRange.End);
 			}
 		}
 
@@ -504,7 +499,7 @@ namespace SweetEditor {
 			if (mode == DecorationApplyMode.REPLACE_ALL) {
 				editor.ClearCodeLens();
 			} else if (mode == DecorationApplyMode.REPLACE_RANGE) {
-				ClearCodeLensRange(lastVisibleStartLine, lastVisibleEndLine);
+				ClearCodeLensRange(lastVisibleLineRange.Start, lastVisibleLineRange.End);
 			}
 		}
 
@@ -512,7 +507,7 @@ namespace SweetEditor {
 			if (mode == DecorationApplyMode.REPLACE_ALL) {
 				editor.ClearLinks();
 			} else if (mode == DecorationApplyMode.REPLACE_RANGE) {
-				ClearLinksRange(lastVisibleStartLine, lastVisibleEndLine);
+				ClearLinksRange(lastVisibleLineRange.Start, lastVisibleLineRange.End);
 			}
 		}
 

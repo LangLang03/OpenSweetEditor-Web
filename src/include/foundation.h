@@ -32,6 +32,17 @@ namespace NS_SWEETEDITOR {
     U8String dump() const;
   };
 
+  /// Inclusive integer range
+  struct IntRange {
+    int32_t start {0};
+    int32_t end {-1};
+
+    bool isEmpty() const;
+    bool contains(int32_t value) const;
+    int32_t length() const;
+    U8String dump() const;
+  };
+
   /// 2D coordinate wrapper
   struct PointF {
     float x {0};

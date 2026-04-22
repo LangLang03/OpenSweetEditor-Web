@@ -25,6 +25,12 @@ class EditorInteractionController {
     });
   }
 
+  void stopCursorBlink({bool keepCursorVisible = true}) {
+    _stopCursorBlink();
+    _cursorVisible = keepCursorVisible;
+    _session.setCursorVisible(keepCursorVisible);
+  }
+
   void dispose() {
     _stopCursorBlink();
     _animationTicker?.stop();
@@ -269,7 +275,7 @@ class EditorInteractionController {
             cursorPosition: pos,
             hasSelection: result.hasSelection,
             selection: result.hasSelection ? result.selection : null,
-            screenPoint: result.tapPoint,
+            locationInEditor: result.tapPoint,
           ),
         );
         _session.eventBus.publish(CursorChangedEvent(cursorPosition: pos));
@@ -284,27 +290,29 @@ class EditorInteractionController {
         }
       case core.GestureType.longPress:
         _session.eventBus.publish(
-          LongPressEvent(cursorPosition: pos, screenPoint: result.tapPoint),
+          LongPressEvent(
+            cursorPosition: pos,
+            locationInEditor: result.tapPoint,
+          ),
         );
         _session.eventBus.publish(CursorChangedEvent(cursorPosition: pos));
       case core.GestureType.contextMenu:
         _session.eventBus.publish(
-          ContextMenuEvent(cursorPosition: pos, screenPoint: result.tapPoint),
+          ContextMenuEvent(
+            cursorPosition: pos,
+            locationInEditor: result.tapPoint,
+          ),
         );
         _session.eventBus.publish(CursorChangedEvent(cursorPosition: pos));
       case core.GestureType.scroll:
       case core.GestureType.fastScroll:
-        _session.eventBus.publish(
-          ScrollChangedEvent(
-            scrollX: result.viewScrollX,
-            scrollY: result.viewScrollY,
-          ),
-        );
-        _session.decorationProviderManager.onScrollChanged();
-        _session.completionProviderManager.dismiss();
+        _handleScrollChanged(result);
       case core.GestureType.scale:
         _session.eventBus.publish(ScaleChangedEvent(scale: result.viewScale));
       case core.GestureType.dragSelect:
+        if (_didScrollSinceLastFrame(result)) {
+          _handleScrollChanged(result);
+        }
         if (result.hasSelection) {
           _session.eventBus.publish(
             SelectionChangedEvent(
@@ -319,9 +327,26 @@ class EditorInteractionController {
     }
   }
 
+  void _handleScrollChanged(core.GestureResult result) {
+    _session.eventBus.publish(
+      ScrollChangedEvent(
+        scrollX: result.viewScrollX,
+        scrollY: result.viewScrollY,
+      ),
+    );
+    _session.decorationProviderManager.onScrollChanged();
+    _session.completionProviderManager.dismiss();
+  }
+
+  bool _didScrollSinceLastFrame(core.GestureResult result) {
+    final model = _session.renderModel;
+    return model.scrollX != result.viewScrollX ||
+        model.scrollY != result.viewScrollY;
+  }
+
   void _publishHitTargetEvent(
     core.HitTarget hitTarget,
-    core.PointF screenPoint,
+    core.PointF locationInEditor,
   ) {
     switch (hitTarget.type) {
       case core.HitTargetType.gutterIcon:
@@ -329,7 +354,7 @@ class EditorInteractionController {
           GutterIconClickEvent(
             line: hitTarget.line,
             iconId: hitTarget.iconId,
-            screenPoint: screenPoint,
+            locationInEditor: locationInEditor,
           ),
         );
       case core.HitTargetType.inlayHintText:
@@ -338,7 +363,7 @@ class EditorInteractionController {
             line: hitTarget.line,
             column: hitTarget.column,
             type: core.InlayType.text,
-            screenPoint: screenPoint,
+            locationInEditor: locationInEditor,
           ),
         );
       case core.HitTargetType.inlayHintIcon:
@@ -348,7 +373,7 @@ class EditorInteractionController {
             column: hitTarget.column,
             type: core.InlayType.icon,
             intValue: hitTarget.iconId,
-            screenPoint: screenPoint,
+            locationInEditor: locationInEditor,
           ),
         );
       case core.HitTargetType.inlayHintColor:
@@ -358,20 +383,41 @@ class EditorInteractionController {
             column: hitTarget.column,
             type: core.InlayType.color,
             intValue: hitTarget.colorValue,
-            screenPoint: screenPoint,
+            locationInEditor: locationInEditor,
           ),
         );
       case core.HitTargetType.none:
+        break;
       case core.HitTargetType.foldPlaceholder:
       case core.HitTargetType.foldGutter:
-        break;
+        _session.eventBus.publish(
+          FoldToggleEvent(
+            line: hitTarget.line,
+            isGutter: hitTarget.type == core.HitTargetType.foldGutter,
+            locationInEditor: locationInEditor,
+          ),
+        );
       case core.HitTargetType.codelens:
         _session.eventBus.publish(
           CodeLensClickEvent(
             line: hitTarget.line,
             column: hitTarget.column,
             commandId: hitTarget.iconId,
-            screenPoint: screenPoint,
+            locationInEditor: locationInEditor,
+          ),
+        );
+      case core.HitTargetType.link:
+        _session.eventBus.publish(
+          LinkClickEvent(
+            line: hitTarget.line,
+            column: hitTarget.column,
+            target:
+                _session.editorCore?.getLinkTargetAt(
+                  hitTarget.line,
+                  hitTarget.column,
+                ) ??
+                '',
+            locationInEditor: locationInEditor,
           ),
         );
     }

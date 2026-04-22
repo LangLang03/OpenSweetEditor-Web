@@ -13,7 +13,6 @@ import androidx.annotation.Nullable;
 
 import java.util.List;
 
-import com.qiplat.sweeteditor.animation.AnimationHolder;
 import com.qiplat.sweeteditor.core.HandleConfig;
 import com.qiplat.sweeteditor.core.ScrollbarConfig;
 import com.qiplat.sweeteditor.core.TextMeasurer;
@@ -23,6 +22,7 @@ import com.qiplat.sweeteditor.core.visual.*;
 import com.qiplat.sweeteditor.perf.MeasurePerfStats;
 import com.qiplat.sweeteditor.perf.PerfOverlay;
 import com.qiplat.sweeteditor.perf.PerfStepRecorder;
+import com.qiplat.sweeteditor.ui.AnimationHolder;
 
 /**
  * Platform-independent rendering engine for the editor.
@@ -416,7 +416,8 @@ final class EditorRenderer {
             int lastColor = 0;
             for (VisualRun run : line.runs) {
                 if (run.type == VisualRunType.TEXT || run.type == VisualRunType.WHITESPACE
-                        || run.type == VisualRunType.CODELENS || run.type == VisualRunType.INLAY_HINT || run.type == VisualRunType.PHANTOM_TEXT
+                        || run.type == VisualRunType.CODELENS || run.type == VisualRunType.LINK
+                        || run.type == VisualRunType.INLAY_HINT || run.type == VisualRunType.PHANTOM_TEXT
                         || run.type == VisualRunType.FOLD_PLACEHOLDER) {
 
                     if (run.type == VisualRunType.FOLD_PLACEHOLDER) {
@@ -505,7 +506,9 @@ final class EditorRenderer {
                     int fontStyle = run.style != null ? run.style.fontStyle : 0;
                     int color = (run.style != null && run.style.color != 0) ? run.style.color : mTheme.textColor;
                     if (run.type == VisualRunType.CODELENS) {
-                        color = run.active ? getActiveLineNumberColor() : mTheme.inlayHintTextColor;
+                        color = resolveCodeLensColor(run.active);
+                    } else if (run.type == VisualRunType.LINK) {
+                        color = resolveLinkColor(run.active);
                     }
 
                     if (fontStyle != lastFontStyle) {
@@ -533,7 +536,7 @@ final class EditorRenderer {
                         continue;
                     }
 
-                    if (run.type == VisualRunType.CODELENS) {
+                    if (run.type == VisualRunType.CODELENS || run.type == VisualRunType.LINK) {
                         mTextPaint.setUnderlineText(run.active);
                         canvas.drawText(run.text, run.x, run.y, mTextPaint);
                         mTextPaint.setUnderlineText(false);
@@ -681,6 +684,33 @@ final class EditorRenderer {
         int color = mTheme.currentLineNumberColor;
         if (color == 0) color = mTheme.lineNumberColor;
         return (color & 0x00FFFFFF) | 0xFF000000;
+    }
+
+    private int resolveCodeLensColor(boolean active) {
+        if (active) {
+            int color = mTheme.codeLensActiveColor;
+            if (color == 0) color = getActiveLineNumberColor();
+            if (color == 0) color = mTheme.codeLensColor;
+            if (color == 0) color = mTheme.inlayHintTextColor;
+            if (color == 0) color = mTheme.textColor;
+            return color;
+        }
+        int color = mTheme.codeLensColor;
+        if (color == 0) color = mTheme.inlayHintTextColor;
+        if (color == 0) color = mTheme.textColor;
+        return color;
+    }
+
+    private int resolveLinkColor(boolean active) {
+        if (active) {
+            int color = mTheme.linkActiveColor;
+            if (color == 0) color = mTheme.linkColor;
+            if (color == 0) color = resolveCodeLensColor(true);
+            return color;
+        }
+        int color = mTheme.linkColor;
+        if (color == 0) color = resolveCodeLensColor(false);
+        return color;
     }
 
     private int getCurrentLineBorderColor() {

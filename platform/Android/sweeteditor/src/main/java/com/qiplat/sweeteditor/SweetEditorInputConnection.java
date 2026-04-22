@@ -1,13 +1,15 @@
 package com.qiplat.sweeteditor;
 
 import android.text.Editable;
+import android.text.Selection;
 import android.text.SpannableStringBuilder;
-import android.util.Log;
 import android.view.KeyEvent;
 import android.view.inputmethod.BaseInputConnection;
 
 import com.qiplat.sweeteditor.core.Document;
+import com.qiplat.sweeteditor.core.foundation.IntRange;
 import com.qiplat.sweeteditor.core.foundation.TextPosition;
+import com.qiplat.sweeteditor.core.foundation.TextRange;
 
 /**
  * Custom InputConnection for handling IME input method composing and commit.
@@ -16,14 +18,17 @@ import com.qiplat.sweeteditor.core.foundation.TextPosition;
  * read real document text directly from editor core to ensure IME gets correct context.
  */
 public class SweetEditorInputConnection extends BaseInputConnection {
-    private static final String TAG = "SweetEditorIC";
+    private static final int MAX_IME_TEXT_LENGTH = 512;
+
     private final SweetEditor mEditor;
     private final SpannableStringBuilder mEditable;
+    private int mPendingFallbackDeleteBeforeLength = 0;
 
     public SweetEditorInputConnection(SweetEditor editor, boolean fullEditor) {
         super(editor, fullEditor);
         mEditor = editor;
         mEditable = new SpannableStringBuilder();
+        Selection.setSelection(mEditable, 0);
     }
 
     @Override
@@ -31,90 +36,45 @@ public class SweetEditorInputConnection extends BaseInputConnection {
         return mEditable;
     }
 
-    private static final int MAX_IME_TEXT_LENGTH = 2048;
-
     @Override
     public CharSequence getTextBeforeCursor(int n, int flags) {
         n = Math.min(n, MAX_IME_TEXT_LENGTH);
-        Document doc = mEditor.getDocument();
-        if (doc == null) return "";
-
-        TextPosition cursorPos = mEditor.getCursorPosition();
-
-        String lineText = doc.getLineText(cursorPos.line);
-        if (lineText == null) lineText = "";
-
-        int col = Math.min(cursorPos.column, lineText.length());
-
-        if (col == 0 && cursorPos.line == 0) return "";
-
-        String beforeInLine = lineText.substring(0, col);
-
-        if (beforeInLine.length() >= n) {
-            return beforeInLine.substring(beforeInLine.length() - n);
+        if (shouldExposeShadowText()) {
+            return super.getTextBeforeCursor(n, flags);
         }
 
-        StringBuilder sb = new StringBuilder(beforeInLine);
-        for (int line = cursorPos.line - 1; line >= 0 && sb.length() < n; line--) {
-            String prevLineText = doc.getLineText(line);
-            if (prevLineText == null) prevLineText = "";
-            sb.insert(0, "\n");
-            sb.insert(0, prevLineText);
-        }
-
-        String result = sb.toString();
-        if (result.length() > n) {
-            return result.substring(result.length() - n);
-        }
-        return result;
+        return getDocumentTextBeforeCursor(n);
     }
 
     @Override
     public CharSequence getTextAfterCursor(int n, int flags) {
         n = Math.min(n, MAX_IME_TEXT_LENGTH);
-        Document doc = mEditor.getDocument();
-        if (doc == null) return "";
-
-        TextPosition cursorPos = mEditor.getCursorPosition();
-
-        String lineText = doc.getLineText(cursorPos.line);
-        if (lineText == null) lineText = "";
-
-        int col = Math.min(cursorPos.column, lineText.length());
-        String afterInLine = lineText.substring(col);
-
-        if (afterInLine.length() >= n) {
-            return afterInLine.substring(0, n);
+        if (shouldExposeShadowText()) {
+            return super.getTextAfterCursor(n, flags);
         }
 
-        StringBuilder sb = new StringBuilder(afterInLine);
-        int lineCount = doc.getLineCount();
-        for (int line = cursorPos.line + 1; line < lineCount && sb.length() < n; line++) {
-            sb.append("\n");
-            String nextLineText = doc.getLineText(line);
-            if (nextLineText != null) {
-                sb.append(nextLineText);
-            }
-        }
-
-        String result = sb.toString();
-        if (result.length() > n) {
-            return result.substring(0, n);
-        }
-        return result;
+        return getDocumentTextAfterCursor(n);
     }
 
     @Override
     public CharSequence getSelectedText(int flags) {
+        if (shouldExposeShadowText()) {
+            CharSequence selected = super.getSelectedText(flags);
+            return selected != null ? selected : "";
+        }
+        if (mEditor.getSelection() == null) {
+            return "";
+        }
+
         String selected = mEditor.getSelectedText();
         return selected != null ? selected : "";
     }
 
     @Override
     public boolean setComposingText(CharSequence text, int newCursorPosition) {
-        Log.d(TAG, "setComposingText: text=" + text + ", newCursorPosition=" + newCursorPosition);
+        mPendingFallbackDeleteBeforeLength = 0;
         if (!mEditor.isCompositionEnabled()) {
-            return true;
+            return super.setComposingText(text, newCursorPosition);
         }
         mEditor.compositionUpdate(text != null ? text.toString() : "");
         return true;
@@ -122,13 +82,17 @@ public class SweetEditorInputConnection extends BaseInputConnection {
 
     @Override
     public boolean commitText(CharSequence text, int newCursorPosition) {
-        Log.d(TAG, "commitText: text=" + text + ", isComposing=" + mEditor.isComposing());
         String textStr = text != null ? text.toString() : "";
         if (!mEditor.isCompositionEnabled() || !mEditor.isComposing()) {
+            mPendingFallbackDeleteBeforeLength = mEditable.length();
+            clearShadowEditable();
             if (textStr.equals("\n")) {
                 mEditor.handleKeyEventFromIME(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER));
             } else if (!textStr.isEmpty()) {
                 mEditor.insertText(textStr);
+            }
+            if (!mEditor.isCompositionEnabled()) {
+                mEditor.updateImeSelectionState();
             }
         } else {
             mEditor.commitComposition(textStr);
@@ -138,15 +102,43 @@ public class SweetEditorInputConnection extends BaseInputConnection {
 
     @Override
     public boolean finishComposingText() {
-        Log.d(TAG, "finishComposingText: isComposing=" + mEditor.isComposing());
         if (mEditor.isCompositionEnabled() && mEditor.isComposing()) {
             mEditor.commitComposition("");
+            return true;
+        }
+
+        if (!mEditor.isCompositionEnabled() && mEditable.length() > 0) {
+            mPendingFallbackDeleteBeforeLength = mEditable.length();
+            clearShadowEditable();
+            mEditor.updateImeSelectionState();
         }
         return true;
     }
 
     @Override
     public boolean deleteSurroundingText(int beforeLength, int afterLength) {
+        if (!mEditor.isCompositionEnabled()) {
+            int remainingBefore = consumePendingFallbackDelete(beforeLength);
+            if (mEditable.length() > 0) {
+                return super.deleteSurroundingText(remainingBefore, afterLength);
+            }
+            if (remainingBefore == 0 && afterLength == 0) {
+                return true;
+            }
+            mPendingFallbackDeleteBeforeLength = 0;
+            if (remainingBefore == 1 && afterLength == 0 && hasCollapsedImeSelection()) {
+                sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL));
+                sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DEL));
+                return true;
+            }
+            if (remainingBefore == 0 && afterLength == 1 && hasCollapsedImeSelection()) {
+                sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_FORWARD_DEL));
+                sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_FORWARD_DEL));
+                return true;
+            }
+            return deleteDocumentSurroundingText(remainingBefore, afterLength);
+        }
+
         for (int i = 0; i < beforeLength; i++) {
             sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL));
             sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DEL));
@@ -164,14 +156,12 @@ public class SweetEditorInputConnection extends BaseInputConnection {
             mEditor.selectAll();
             return true;
         } else if (id == android.R.id.copy) {
-            mEditor.copyToClipboard();
-            return true;
+            return mEditor.copyToClipboard();
         } else if (id == android.R.id.paste) {
             mEditor.pasteFromClipboard();
             return true;
         } else if (id == android.R.id.cut) {
-            mEditor.cutToClipboard();
-            return true;
+            return mEditor.cutToClipboard();
         }
         return super.performContextMenuAction(id);
     }
@@ -181,6 +171,87 @@ public class SweetEditorInputConnection extends BaseInputConnection {
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
             mEditor.handleKeyEventFromIME(event);
         }
+        return true;
+    }
+
+    private CharSequence getDocumentTextBeforeCursor(int n) {
+        Document doc = mEditor.getDocument();
+        if (doc == null) return "";
+
+        TextPosition cursorPos = mEditor.getCursorPosition();
+
+        String lineText = doc.getLineText(cursorPos.line);
+        if (lineText == null) lineText = "";
+
+        int col = Math.min(cursorPos.column, lineText.length());
+
+        String beforeInLine = lineText.substring(0, col);
+        return beforeInLine.length() > n
+                ? beforeInLine.substring(beforeInLine.length() - n)
+                : beforeInLine;
+    }
+
+    private CharSequence getDocumentTextAfterCursor(int n) {
+        Document doc = mEditor.getDocument();
+        if (doc == null) return "";
+
+        TextPosition cursorPos = mEditor.getCursorPosition();
+
+        String lineText = doc.getLineText(cursorPos.line);
+        if (lineText == null) lineText = "";
+
+        int col = Math.min(cursorPos.column, lineText.length());
+        String afterInLine = lineText.substring(col);
+        return afterInLine.length() > n
+                ? afterInLine.substring(0, n)
+                : afterInLine;
+    }
+
+    private boolean shouldExposeShadowText() {
+        return !mEditor.isCompositionEnabled() && mEditable.length() > 0;
+    }
+
+    private void clearShadowEditable() {
+        BaseInputConnection.removeComposingSpans(mEditable);
+        mEditable.clear();
+        Selection.setSelection(mEditable, 0);
+    }
+
+    private int consumePendingFallbackDelete(int beforeLength) {
+        if (beforeLength <= 0 || mPendingFallbackDeleteBeforeLength <= 0) {
+            return beforeLength;
+        }
+
+        int consumed = Math.min(beforeLength, mPendingFallbackDeleteBeforeLength);
+        mPendingFallbackDeleteBeforeLength -= consumed;
+        return beforeLength - consumed;
+    }
+
+    private boolean hasCollapsedImeSelection() {
+        IntRange selectionOffsets = mEditor.getImeSelectionOffsets();
+        return selectionOffsets.start == selectionOffsets.end;
+    }
+
+    private boolean deleteDocumentSurroundingText(int beforeLength, int afterLength) {
+        Document doc = mEditor.getDocument();
+        if (doc == null) {
+            return true;
+        }
+
+        IntRange selectionOffsets = mEditor.getImeSelectionOffsets();
+        long rawDeleteStart = (long) selectionOffsets.start - Math.max(0, beforeLength);
+        long rawDeleteEnd = (long) selectionOffsets.end + Math.max(0, afterLength);
+        int deleteStart = (int) Math.max(0L, Math.min(rawDeleteStart, Integer.MAX_VALUE));
+        int deleteEnd = (int) Math.max(0L, Math.min(rawDeleteEnd, Integer.MAX_VALUE));
+        if (deleteStart >= deleteEnd) {
+            return true;
+        }
+
+        TextRange deleteRange = new TextRange(
+                doc.getPositionFromCharIndex(deleteStart),
+                doc.getPositionFromCharIndex(deleteEnd));
+        mEditor.deleteText(deleteRange);
+        mEditor.updateImeSelectionState();
         return true;
     }
 }

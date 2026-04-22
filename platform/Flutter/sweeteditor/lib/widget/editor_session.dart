@@ -4,38 +4,53 @@ class EditorSession implements EditorSettingsHost {
   EditorSession({
     required this.controller,
     required EditorTheme theme,
+    EditorSettings? initialSettings,
     required String fontFamily,
     required double fontSize,
     required bool gutterSticky,
+    required EditorKeyMap initialKeyMap,
+    EditorIconProvider? initialIconProvider,
+    LanguageConfiguration? initialLanguageConfiguration,
+    EditorMetadata? initialMetadata,
     required this.completionPopupController,
     required this.selectionMenuController,
   }) : _theme = theme {
-    controller.settings.seedDefaults(
-      textSize: fontSize,
-      fontFamily: fontFamily,
-      gutterSticky: gutterSticky,
-    );
+    _settings = (initialSettings ?? EditorSettings()).copy()
+      ..seedDefaults(
+        textSize: fontSize,
+        fontFamily: fontFamily,
+        gutterSticky: gutterSticky,
+      );
     _measurer = EditorTextMeasurer(
-      fontFamily: controller.settings.getFontFamily(),
-      fontSize:
-          controller.settings.getEditorTextSize() *
-          controller.settings.getScale(),
+      fontFamily: _settings.getFontFamily(),
+      fontSize: _settings.getEditorTextSize() * _settings.getScale(),
     );
-    _iconProvider = controller._iconProvider;
+    _iconProvider = initialIconProvider;
     _painter = EditorCanvasPainter(
       theme: _theme,
       measurer: _measurer,
       iconProvider: _iconProvider,
     );
     final nativeMeasurer = _measurer.buildNativeMeasurer();
-    _editorCore = core.EditorCore(measurer: nativeMeasurer);
-    _keyMap = controller.getKeyMap();
+    _editorCore = core.EditorCore(
+      measurer: nativeMeasurer,
+      options: core.EditorOptions(
+        revealSelectionEndOnSelectAll:
+            !kIsWeb &&
+            (defaultTargetPlatform == TargetPlatform.android ||
+                defaultTargetPlatform == TargetPlatform.iOS),
+      ),
+    );
+    _keyMap = initialKeyMap;
     _editorCore!.setKeyMap(_keyMap);
+    _languageConfiguration = initialLanguageConfiguration;
+    _metadata = initialMetadata;
     completionProviderManager = CompletionProviderManager(session: this);
     decorationProviderManager = DecorationProviderManager(session: this);
     inlineSuggestionController = InlineSuggestionController(session: this);
     newLineActionProviderManager = NewLineActionProviderManager();
     _registerTextStyles();
+    applyLanguageConfiguration(_languageConfiguration);
   }
 
   final SweetEditorController controller;
@@ -48,6 +63,7 @@ class EditorSession implements EditorSettingsHost {
 
   late final EditorTextMeasurer _measurer;
   late final EditorCanvasPainter _painter;
+  late final EditorSettings _settings;
   core.EditorCore? _editorCore;
   core.Document? _document;
   bool _ownsDocument = false;
@@ -55,6 +71,8 @@ class EditorSession implements EditorSettingsHost {
   EditorTheme _theme;
   late EditorKeyMap _keyMap;
   EditorIconProvider? _iconProvider;
+  LanguageConfiguration? _languageConfiguration;
+  EditorMetadata? _metadata;
   Size _viewportSize = Size.zero;
   bool _viewportReady = false;
   bool _cursorVisible = true;
@@ -66,7 +84,7 @@ class EditorSession implements EditorSettingsHost {
   VoidCallback? onRequestDecorationRefresh;
 
   EditorEventBus get eventBus => controller._eventBus;
-  EditorSettings get settings => controller.settings;
+  EditorSettings get settings => _settings;
   core.EditorCore? get editorCore => _editorCore;
   core.Document? get document => _document;
   core.EditorRenderModel get renderModel => _renderModel;
@@ -77,17 +95,16 @@ class EditorSession implements EditorSettingsHost {
   EditorCanvasPainter get painter => _painter;
   Size get viewportSize => _viewportSize;
   bool get viewportReady => _viewportReady;
-  LanguageConfiguration? get languageConfiguration =>
-      controller.languageConfiguration;
-  EditorMetadata? get metadata => controller.metadata;
+  LanguageConfiguration? get languageConfiguration => _languageConfiguration;
+  EditorMetadata? get metadata => _metadata;
 
   void bindSettings() {
-    controller.settings.bind(this);
+    _settings.bind(this);
   }
 
   void dispose() {
     _disposed = true;
-    controller.settings.unbind(this);
+    _settings.unbind(this);
     inlineSuggestionController.dispose();
     _editorCore?.close();
     _releaseDocument();
@@ -104,6 +121,7 @@ class EditorSession implements EditorSettingsHost {
   }
 
   void applyLanguageConfiguration(LanguageConfiguration? config) {
+    _languageConfiguration = config;
     final ec = _editorCore;
     if (ec == null) return;
 
@@ -137,6 +155,10 @@ class EditorSession implements EditorSettingsHost {
     }
   }
 
+  void applyMetadata(EditorMetadata? metadata) {
+    _metadata = metadata;
+  }
+
   void applyKeyMap(EditorKeyMap keyMap) {
     _keyMap = keyMap;
     _editorCore?.setKeyMap(keyMap);
@@ -145,6 +167,21 @@ class EditorSession implements EditorSettingsHost {
   void applyIconProvider(EditorIconProvider? provider) {
     _iconProvider = provider;
     _painter.updateIconProvider(provider);
+  }
+
+  void applyDeclarativeSettings(
+    EditorSettings? snapshot, {
+    required double fontSize,
+    required String fontFamily,
+    required bool gutterSticky,
+  }) {
+    final nextSettings = (snapshot ?? EditorSettings()).copy()
+      ..seedDefaults(
+        textSize: fontSize,
+        fontFamily: fontFamily,
+        gutterSticky: gutterSticky,
+      );
+    _settings.replaceFrom(nextSettings);
   }
 
   void setViewport(Size size) {

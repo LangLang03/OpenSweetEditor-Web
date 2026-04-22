@@ -16,6 +16,10 @@ sealed class Result<out T> {
     data class Error(val message: String) : Result<Nothing>()
 }
 
+// links
+val sweetEditorUrl = "https://github.com/FinalScave/OpenSweetEditor"
+val sweetLineUrl = "https://github.com/FinalScave/SweetLine"
+
 // generic type
 data class DataA<T>(val a: Int) : Result<T>()
 open class Container<K, V>(val key: K, val value: V) : Map<K, V>

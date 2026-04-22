@@ -8,11 +8,11 @@ import com.qiplat.sweeteditor.core.visual.PointF;
 public final class FoldToggleEvent extends EditorEvent {
     public final int line;
     public final boolean isGutter;
-    public final PointF screenPoint;
+    public final PointF locationInEditor;
 
-    public FoldToggleEvent(int line, boolean isGutter, PointF screenPoint) {
+    public FoldToggleEvent(int line, boolean isGutter, PointF locationInEditor) {
         this.line = line;
         this.isGutter = isGutter;
-        this.screenPoint = screenPoint;
+        this.locationInEditor = locationInEditor;
     }
 }

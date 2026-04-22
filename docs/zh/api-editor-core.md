@@ -27,7 +27,7 @@
 - 渲染模型、手势结果、键盘结果、文本编辑结果、滚动度量等复杂返回值通常为 `const uint8_t* + out_size` 二进制 payload，调用方用 `free_binary_data` 释放。
 - `get_layout_metrics` 返回 `LayoutMetrics` 二进制 payload（`const uint8_t* + out_size`），同样用 `free_binary_data` 释放。
 - `get_document_line_text` 返回 UTF-16 文本，调用方用 `free_u16_string` 释放。
-- 少量文本查询返回 UTF-8 `const char*`（如 `get_document_text`、`editor_get_selected_text`、`editor_get_word_at_cursor`）；平台封装层通常会立即复制，当前 C API 未单独导出 UTF-8 free 函数。
+- 少量文本查询返回 UTF-8 `const char*`（如 `get_document_text`、`editor_get_selected_text`、`editor_get_word_at_cursor`、`editor_get_link_target_at`）；调用方使用 `free_u8_string` 释放，平台封装层通常会立即复制。
 
 ## 回调结构
 
@@ -268,13 +268,22 @@ void editor_clear_highlights_layer(intptr_t editor_handle, uint8_t layer);
   - `u32 layer, u32 entry_count`
   - 重复 `entry_count` 组：`[u32 line, u32 span_count, [u32 column, u32 length, u32 style_id] × span_count]`
 
-### 15) Inlay / Phantom / Gutter / Diagnostics
+### 15) Inlay / Phantom / CodeLens / Links / Gutter / Diagnostics
 
 ```c
 void editor_set_line_inlay_hints(intptr_t editor_handle, const uint8_t* data, size_t size);
 void editor_set_batch_line_inlay_hints(intptr_t editor_handle, const uint8_t* data, size_t size);
 void editor_set_line_phantom_texts(intptr_t editor_handle, const uint8_t* data, size_t size);
 void editor_set_batch_line_phantom_texts(intptr_t editor_handle, const uint8_t* data, size_t size);
+
+void editor_set_line_codelens(intptr_t editor_handle, const uint8_t* data, size_t size);
+void editor_set_batch_line_codelens(intptr_t editor_handle, const uint8_t* data, size_t size);
+void editor_clear_codelens(intptr_t editor_handle);
+
+void editor_set_line_links(intptr_t editor_handle, const uint8_t* data, size_t size);
+void editor_set_batch_line_links(intptr_t editor_handle, const uint8_t* data, size_t size);
+void editor_clear_links(intptr_t editor_handle);
+const char* editor_get_link_target_at(intptr_t editor_handle, size_t line, size_t column);
 
 void editor_set_line_gutter_icons(intptr_t editor_handle, const uint8_t* data, size_t size);
 void editor_set_batch_line_gutter_icons(intptr_t editor_handle, const uint8_t* data, size_t size);
@@ -298,6 +307,19 @@ void editor_clear_diagnostics(intptr_t editor_handle);
 - `editor_set_batch_line_phantom_texts` payload（LE）：
   - `u32 entry_count`
   - 重复 `entry_count` 组：`[u32 line, u32 phantom_count, phantom_items...]`
+- `editor_set_line_codelens` payload（LE）：
+  - `u32 line, u32 item_count`
+  - 重复 `item_count` 组：`[i32 column, i32 command_id, u32 text_len, u8[text_len] text_utf8]`
+- `editor_set_batch_line_codelens` payload（LE）：
+  - `u32 entry_count`
+  - 重复 `entry_count` 组：`[u32 line, u32 item_count, codelens_items...]`
+- `editor_set_line_links` payload（LE）：
+  - `u32 line, u32 link_count`
+  - 重复 `link_count` 组：`[u32 column, u32 length, u32 target_len, u8[target_len] target_utf8]`
+- `editor_set_batch_line_links` payload（LE）：
+  - `u32 entry_count`
+  - 重复 `entry_count` 组：`[u32 line, u32 link_count, link_items...]`
+- `editor_get_link_target_at` 返回 UTF-8 字符串，使用 `free_u8_string` 释放；当请求位置未命中 link 时返回空字符串。
 - `editor_set_line_gutter_icons` payload（LE）：
   - `u32 line, u32 icon_count`
   - 重复 `icon_count` 组：`[i32 icon_id]`
@@ -386,6 +408,7 @@ void           editor_cancel_linked_editing(intptr_t editor_handle);
 ### 19) 工具 / 内存管理
 
 ```c
+void free_u8_string(intptr_t string_ptr);
 void free_u16_string(intptr_t string_ptr);
 void free_binary_data(intptr_t data_ptr);
 ```

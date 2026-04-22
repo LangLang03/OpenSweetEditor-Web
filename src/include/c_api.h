@@ -108,6 +108,7 @@ EDITOR_API U16Char* get_document_line_utf16(intptr_t document_handle, size_t lin
 ///        f32 fling_max_velocity — Maximum fling velocity in px/s (default 8000)
 ///        u64 max_undo_stack_size — Max undo stack depth, 0=unlimited (default 512)
 ///        i64 key_chord_timeout_ms — Key chord pending timeout in ms (default 2000)
+///        u8 reveal_selection_end_on_select_all — When true, selectAll() reveals the selection end (default false)
 /// @param options_size Byte length of options_data
 /// @return EditorCore handle
 EDITOR_API intptr_t create_editor(text_measurer_t measurer, const uint8_t* options_data, size_t options_size);
@@ -805,7 +806,7 @@ EDITOR_API void editor_clear_gutter_icons(intptr_t editor_handle);
 /// Set CodeLens items for specified line (compact binary)
 /// @param data payload(LE):
 ///             u32 line, u32 item_count, then repeat for item_count groups:
-///             [i32 command_id, u32 text_len, u8[text_len] text_utf8]
+///             [i32 column, i32 command_id, u32 text_len, u8[text_len] text_utf8]
 /// @param size payload byte length
 EDITOR_API void editor_set_line_codelens(intptr_t editor_handle, const uint8_t* data, size_t size);
 
@@ -813,7 +814,7 @@ EDITOR_API void editor_set_line_codelens(intptr_t editor_handle, const uint8_t* 
 /// @param data payload(LE):
 ///             u32 entry_count,
 ///             [u32 line, u32 item_count,
-///              [i32 command_id, u32 text_len, u8[text_len] text_utf8] x item_count] x entry_count
+///              [i32 column, i32 command_id, u32 text_len, u8[text_len] text_utf8] x item_count] x entry_count
 /// @param size payload byte length
 EDITOR_API void editor_set_batch_line_codelens(intptr_t editor_handle, const uint8_t* data, size_t size);
 
@@ -839,7 +840,8 @@ EDITOR_API void editor_set_batch_line_links(intptr_t editor_handle, const uint8_
 EDITOR_API void editor_clear_links(intptr_t editor_handle);
 
 /// Resolve link target by line and column inside that link
-/// @return UTF8 target string; caller owns returned buffer and must free it with free_u8_string
+/// @return UTF8 target string; caller owns returned buffer and must free it with free_u8_string.
+///         Returns an empty string when no link matches the requested position.
 EDITOR_API const char* editor_get_link_target_at(intptr_t editor_handle, size_t line, size_t column);
 
 /// Set diagnostic decoration ranges for specified line (compact binary)
@@ -945,6 +947,11 @@ EDITOR_API void editor_unfold_all(intptr_t editor_handle);
 /// @param line Line number(0-based)
 /// @return 1=visible, 0=hidden
 EDITOR_API int editor_is_line_visible(intptr_t editor_handle, size_t line);
+
+/// Get visible logical line range from the most recent completed layout pass
+/// @param out_start_line Output first visible logical line (inclusive)
+/// @param out_end_line Output last visible logical line (inclusive), or -1 when empty
+EDITOR_API void editor_get_visible_line_range(intptr_t editor_handle, int32_t* out_start_line, int32_t* out_end_line);
 
 /// Clear all highlight spans
 EDITOR_API void editor_clear_highlights(intptr_t editor_handle);

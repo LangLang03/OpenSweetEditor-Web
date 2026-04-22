@@ -8,10 +8,10 @@ import com.qiplat.sweeteditor.core.visual.PointF;
  */
 public final class ContextMenuEvent extends EditorEvent {
     public final TextPosition cursorPosition;
-    public final PointF screenPoint;
+    public final PointF locationInEditor;
 
-    public ContextMenuEvent(TextPosition cursorPosition, PointF screenPoint) {
+    public ContextMenuEvent(TextPosition cursorPosition, PointF locationInEditor) {
         this.cursorPosition = cursorPosition;
-        this.screenPoint = screenPoint;
+        this.locationInEditor = locationInEditor;
     }
 }

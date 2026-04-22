@@ -3,6 +3,7 @@ package com.qiplat.sweeteditor.demo;
 import android.os.SystemClock;
 import android.view.MotionEvent;
 
+import com.qiplat.sweeteditor.core.foundation.IntRange;
 import com.qiplat.sweeteditor.core.foundation.TextPosition;
 import com.qiplat.sweeteditor.core.visual.CursorRect;
 
@@ -55,8 +56,8 @@ public class CursorInteractionTest {
         editorRule.runOnEditor(editor -> editor.gotoPosition(150, 0));
         TextPosition pos = editorRule.runOnEditorSync(editor -> editor.getCursorPosition());
         assertEquals(150, pos.line);
-        int[] visible = editorRule.runOnEditorSync(editor -> editor.getVisibleLineRange());
-        assertTrue("Line 150 should be visible", visible[0] <= 150 && visible[1] >= 150);
+        IntRange visible = editorRule.runOnEditorSync(editor -> editor.getVisibleLineRange());
+        assertTrue("Line 150 should be visible", visible.start <= 150 && visible.end >= 150);
     }
 
     @Test

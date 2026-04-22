@@ -12,7 +12,7 @@ import { TextPosition, TextRange } from './CoreFoundation';
 import {
   BracketGuide,
   CodeLensItem,
-  DiagnosticItem,
+  Diagnostic,
   FlowGuide,
   FoldRegion,
   GutterIcon,
@@ -145,6 +145,11 @@ class BinaryWriter {
     this.writeInt64(value);
   }
 
+  writeUint8(value: number): void {
+    this.view.setUint8(this.offset, value);
+    this.offset += 1;
+  }
+
   writeBytes(bytes: Uint8Array): void {
     const target = new Uint8Array(this.buffer, this.offset, bytes.length);
     target.set(bytes);
@@ -162,7 +167,7 @@ class BinaryWriter {
 
 export class ProtocolEncoder {
   static packEditorOptions(options: EditorOptions): ArrayBuffer {
-    const writer = new BinaryWriter(40);
+    const writer = new BinaryWriter(49);
     writer.writeFloat32(options.touchSlop);
     writer.writeInt64(options.doubleTapTimeout);
     writer.writeInt64(options.longPressMs);
@@ -170,6 +175,8 @@ export class ProtocolEncoder {
     writer.writeFloat32(options.flingMinVelocity);
     writer.writeFloat32(options.flingMaxVelocity);
     writer.writeUint64(options.maxUndoStackSize);
+    writer.writeInt64(options.keyChordTimeoutMs);
+    writer.writeUint8(options.revealSelectionEndOnSelectAll ? 1 : 0);
     return writer.getBuffer();
   }
 
@@ -420,7 +427,7 @@ export class ProtocolEncoder {
     return writer.getBuffer();
   }
 
-  static packBatchLineDiagnostics(diagsByLine: Map<number, DiagnosticItem[]>): ArrayBuffer {
+  static packBatchLineDiagnostics(diagsByLine: Map<number, Diagnostic[]>): ArrayBuffer {
     let totalDiags = 0;
     diagsByLine.forEach(items => totalDiags += items.length);
     const writer = new BinaryWriter(4 + diagsByLine.size * 8 + totalDiags * 12);
@@ -500,7 +507,7 @@ export class ProtocolEncoder {
     return writer.getBuffer();
   }
 
-  static packLineDiagnostics(line: number, items: DiagnosticItem[]): ArrayBuffer {
+  static packLineDiagnostics(line: number, items: Diagnostic[]): ArrayBuffer {
     const writer = new BinaryWriter(8 + items.length * 12);
     writer.writeInt32(line);
     writer.writeInt32(items.length);
@@ -1075,4 +1082,3 @@ export class ProtocolDecoder {
     };
   }
 }
-

@@ -21,7 +21,7 @@ namespace SweetEditor {
 		private bool gutterSticky = true;
 		private bool gutterVisible = true;
 		private CurrentLineRenderMode currentLineRenderMode = CurrentLineRenderMode.BACKGROUND;
-		private AutoIndentMode autoIndentMode = AutoIndentMode.NONE;
+			private AutoIndentMode autoIndentMode = AutoIndentMode.KEEP_INDENT;
 		private bool backspaceUnindent = true;
 		private bool readOnly = false;
 		private bool compositionEnabled = true;
@@ -70,6 +70,7 @@ namespace SweetEditor {
 		public void SetFoldArrowMode(FoldArrowMode mode) {
 			foldArrowMode = mode;
 			editor.EditorCoreInternal.SetFoldArrowMode((int)mode);
+			editor.Flush();
 		}
 
 		/// <summary>Gets fold arrow mode.</summary>
@@ -190,6 +191,7 @@ namespace SweetEditor {
 		public void SetMaxGutterIcons(int count) {
 			maxGutterIcons = count;
 			editor.EditorCoreInternal.SetMaxGutterIcons(count);
+			editor.Flush();
 		}
 
 		/// <summary>Gets max gutter icons.</summary>

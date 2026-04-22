@@ -18,8 +18,12 @@ class DecorationProviderManager {
   final List<core.TextChange> _pendingTextChanges = [];
   int _generation = 0;
   bool _applyScheduled = false;
-  int _lastVisibleStartLine = 0;
-  int _lastVisibleEndLine = -1;
+  core.IntRange _lastContextLineRange = const core.IntRange(0, -1);
+  List<core.IndentGuide> _appliedIndentGuides = const [];
+  List<core.BracketGuide> _appliedBracketGuides = const [];
+  List<core.FlowGuide> _appliedFlowGuides = const [];
+  List<core.SeparatorGuide> _appliedSeparatorGuides = const [];
+  List<core.FoldRegion> _appliedFoldRegions = const [];
   bool _pendingScrollRefresh = false;
   int _lastScrollRefreshTimeMs = 0;
   bool _disposed = false;
@@ -90,8 +94,8 @@ class DecorationProviderManager {
     if (_disposed) return;
     final now = DateTime.now().millisecondsSinceEpoch;
     final elapsed = now - _lastScrollRefreshTimeMs;
-    final minInterval =
-        session.settings.getDecorationScrollRefreshMinIntervalMs();
+    final minInterval = session.settings
+        .getDecorationScrollRefreshMinIntervalMs();
     final delay = elapsed >= minInterval ? 0 : (minInterval - elapsed);
     _pendingScrollRefresh = true;
     _scrollRefreshTimer?.cancel();
@@ -113,27 +117,23 @@ class DecorationProviderManager {
     _generation++;
     final currentGeneration = _generation;
 
-    final visualLines = session.renderModel.visualLines;
-    final visible = visualLines.isEmpty
-        ? [0, -1]
-        : [visualLines.first.logicalLine, visualLines.last.logicalLine];
-    _lastVisibleStartLine = visible[0];
-    _lastVisibleEndLine = visible[1];
+    final visible =
+        session.editorCore?.getVisibleLineRange() ?? const core.IntRange(0, -1);
     final total = session.document?.lineCount ?? 0;
     final changes = List<core.TextChange>.of(_pendingTextChanges);
     _pendingTextChanges.clear();
 
-    var contextStart = visible[0];
-    var contextEnd = visible[1];
-    if (total > 0 && visible[1] >= visible[0]) {
-      final overscanLines = _calculateOverscanLines(visible[0], visible[1]);
-      contextStart = (visible[0] - overscanLines).clamp(0, total - 1);
-      contextEnd = (visible[1] + overscanLines).clamp(0, total - 1);
+    var contextStart = visible.start;
+    var contextEnd = visible.end;
+    if (total > 0 && visible.end >= visible.start) {
+      final overscanLines = _calculateOverscanLines(visible.start, visible.end);
+      contextStart = (visible.start - overscanLines).clamp(0, total - 1);
+      contextEnd = (visible.end + overscanLines).clamp(0, total - 1);
     }
+    _lastContextLineRange = core.IntRange(contextStart, contextEnd);
 
     final context = DecorationContext(
-      visibleStartLine: contextStart,
-      visibleEndLine: contextEnd,
+      visibleLineRange: _lastContextLineRange,
       totalLineCount: total,
       textChanges: changes,
       languageConfiguration: session.languageConfiguration,
@@ -185,10 +185,11 @@ class DecorationProviderManager {
     List<core.BracketGuide>? bracketGuides;
     List<core.FlowGuide>? flowGuides;
     List<core.SeparatorGuide>? separatorGuides;
-    final foldRegions = <core.FoldRegion>[];
+    List<core.FoldRegion>? foldRegions;
     final gutterIcons = <int, List<core.GutterIcon>>{};
     final phantomTexts = <int, List<core.PhantomText>>{};
     final codeLensItems = <int, List<core.CodeLensItem>>{};
+    final links = <int, List<core.LinkSpan>>{};
 
     var syntaxMode = ApplyMode.merge;
     var semanticMode = ApplyMode.merge;
@@ -202,6 +203,7 @@ class DecorationProviderManager {
     var gutterMode = ApplyMode.merge;
     var phantomMode = ApplyMode.merge;
     var codeLensMode = ApplyMode.merge;
+    var linksMode = ApplyMode.merge;
 
     for (final provider in _providers) {
       final state = _providerStates[provider];
@@ -236,19 +238,33 @@ class DecorationProviderManager {
       if (r.codeLensItems != null) {
         _appendMapOfArrays(codeLensItems, r.codeLensItems!);
       }
+      linksMode = _mergeMode(linksMode, r.linksMode);
+      if (r.links != null) {
+        _appendMapOfArrays(links, r.links!);
+      }
 
       indentMode = _mergeMode(indentMode, r.indentGuidesMode);
-      if (r.indentGuides != null) indentGuides = List.of(r.indentGuides!);
+      if (r.indentGuides != null) {
+        (indentGuides ??= <core.IndentGuide>[]).addAll(r.indentGuides!);
+      }
       bracketMode = _mergeMode(bracketMode, r.bracketGuidesMode);
-      if (r.bracketGuides != null) bracketGuides = List.of(r.bracketGuides!);
+      if (r.bracketGuides != null) {
+        (bracketGuides ??= <core.BracketGuide>[]).addAll(r.bracketGuides!);
+      }
       flowMode = _mergeMode(flowMode, r.flowGuidesMode);
-      if (r.flowGuides != null) flowGuides = List.of(r.flowGuides!);
+      if (r.flowGuides != null) {
+        (flowGuides ??= <core.FlowGuide>[]).addAll(r.flowGuides!);
+      }
       separatorMode = _mergeMode(separatorMode, r.separatorGuidesMode);
       if (r.separatorGuides != null) {
-        separatorGuides = List.of(r.separatorGuides!);
+        (separatorGuides ??= <core.SeparatorGuide>[]).addAll(
+          r.separatorGuides!,
+        );
       }
       foldMode = _mergeMode(foldMode, r.foldRegionsMode);
-      if (r.foldRegions != null) foldRegions.addAll(r.foldRegions!);
+      if (r.foldRegions != null) {
+        (foldRegions ??= <core.FoldRegion>[]).addAll(r.foldRegions!);
+      }
     }
 
     _applySpanMode(0, syntaxMode);
@@ -267,11 +283,15 @@ class DecorationProviderManager {
     _applyGuidesMode(flowMode, flowGuides, 2);
     _applyGuidesMode(separatorMode, separatorGuides, 3);
 
-    if (foldMode == ApplyMode.replaceAll ||
-        foldMode == ApplyMode.replaceRange) {
-      _setFoldRegions(foldRegions);
-    } else if (foldRegions.isNotEmpty) {
-      _setFoldRegions(foldRegions);
+    final nextFoldRegions = _resolveRangeAppliedList(
+      previous: _appliedFoldRegions,
+      incoming: foldRegions,
+      mode: foldMode,
+      overlapsRange: _foldRegionOverlapsRange,
+    );
+    if (nextFoldRegions != null) {
+      _appliedFoldRegions = nextFoldRegions;
+      _setFoldRegions(nextFoldRegions);
     }
 
     _applyGutterMode(gutterMode);
@@ -283,6 +303,9 @@ class DecorationProviderManager {
     _applyCodeLensMode(codeLensMode);
     _setBatchLineCodeLens(codeLensItems);
 
+    _applyLinksMode(linksMode);
+    _setBatchLineLinks(links);
+
     session.requestFlush();
   }
 
@@ -290,7 +313,11 @@ class DecorationProviderManager {
     if (mode == ApplyMode.replaceAll) {
       _clearHighlights(layer);
     } else if (mode == ApplyMode.replaceRange) {
-      _clearSpanRange(layer, _lastVisibleStartLine, _lastVisibleEndLine);
+      _clearSpanRange(
+        layer,
+        _lastContextLineRange.start,
+        _lastContextLineRange.end,
+      );
     }
   }
 
@@ -298,7 +325,7 @@ class DecorationProviderManager {
     if (mode == ApplyMode.replaceAll) {
       _clearInlayHints();
     } else if (mode == ApplyMode.replaceRange) {
-      _clearInlayRange(_lastVisibleStartLine, _lastVisibleEndLine);
+      _clearInlayRange(_lastContextLineRange.start, _lastContextLineRange.end);
     }
   }
 
@@ -306,7 +333,10 @@ class DecorationProviderManager {
     if (mode == ApplyMode.replaceAll) {
       _clearDiagnostics();
     } else if (mode == ApplyMode.replaceRange) {
-      _clearDiagnosticRange(_lastVisibleStartLine, _lastVisibleEndLine);
+      _clearDiagnosticRange(
+        _lastContextLineRange.start,
+        _lastContextLineRange.end,
+      );
     }
   }
 
@@ -314,7 +344,7 @@ class DecorationProviderManager {
     if (mode == ApplyMode.replaceAll) {
       _clearGutterIcons();
     } else if (mode == ApplyMode.replaceRange) {
-      _clearGutterRange(_lastVisibleStartLine, _lastVisibleEndLine);
+      _clearGutterRange(_lastContextLineRange.start, _lastContextLineRange.end);
     }
   }
 
@@ -322,7 +352,10 @@ class DecorationProviderManager {
     if (mode == ApplyMode.replaceAll) {
       _clearPhantomTexts();
     } else if (mode == ApplyMode.replaceRange) {
-      _clearPhantomRange(_lastVisibleStartLine, _lastVisibleEndLine);
+      _clearPhantomRange(
+        _lastContextLineRange.start,
+        _lastContextLineRange.end,
+      );
     }
   }
 
@@ -330,31 +363,71 @@ class DecorationProviderManager {
     if (mode == ApplyMode.replaceAll) {
       _clearCodeLens();
     } else if (mode == ApplyMode.replaceRange) {
-      _clearCodeLensRange(_lastVisibleStartLine, _lastVisibleEndLine);
+      _clearCodeLensRange(
+        _lastContextLineRange.start,
+        _lastContextLineRange.end,
+      );
+    }
+  }
+
+  void _applyLinksMode(ApplyMode mode) {
+    if (mode == ApplyMode.replaceAll) {
+      _clearLinks();
+    } else if (mode == ApplyMode.replaceRange) {
+      _clearLinksRange(_lastContextLineRange.start, _lastContextLineRange.end);
     }
   }
 
   void _applyGuidesMode(ApplyMode mode, List<Object>? data, int guideType) {
-    final shouldReplace =
-        mode == ApplyMode.replaceAll || mode == ApplyMode.replaceRange;
-    final items = data ?? [];
     switch (guideType) {
       case 0:
-        if (shouldReplace || items.isNotEmpty) {
-          _setIndentGuides(items.cast<core.IndentGuide>());
+        final nextIndentGuides = _resolveRangeAppliedList(
+          previous: _appliedIndentGuides,
+          incoming: data?.cast<core.IndentGuide>(),
+          mode: mode,
+          overlapsRange: _indentGuideOverlapsRange,
+        );
+        if (nextIndentGuides != null) {
+          _appliedIndentGuides = nextIndentGuides;
+          _setIndentGuides(nextIndentGuides);
         }
+        break;
       case 1:
-        if (shouldReplace || items.isNotEmpty) {
-          _setBracketGuides(items.cast<core.BracketGuide>());
+        final nextBracketGuides = _resolveRangeAppliedList(
+          previous: _appliedBracketGuides,
+          incoming: data?.cast<core.BracketGuide>(),
+          mode: mode,
+          overlapsRange: _bracketGuideOverlapsRange,
+        );
+        if (nextBracketGuides != null) {
+          _appliedBracketGuides = nextBracketGuides;
+          _setBracketGuides(nextBracketGuides);
         }
+        break;
       case 2:
-        if (shouldReplace || items.isNotEmpty) {
-          _setFlowGuides(items.cast<core.FlowGuide>());
+        final nextFlowGuides = _resolveRangeAppliedList(
+          previous: _appliedFlowGuides,
+          incoming: data?.cast<core.FlowGuide>(),
+          mode: mode,
+          overlapsRange: _flowGuideOverlapsRange,
+        );
+        if (nextFlowGuides != null) {
+          _appliedFlowGuides = nextFlowGuides;
+          _setFlowGuides(nextFlowGuides);
         }
+        break;
       case 3:
-        if (shouldReplace || items.isNotEmpty) {
-          _setSeparatorGuides(items.cast<core.SeparatorGuide>());
+        final nextSeparatorGuides = _resolveRangeAppliedList(
+          previous: _appliedSeparatorGuides,
+          incoming: data?.cast<core.SeparatorGuide>(),
+          mode: mode,
+          overlapsRange: _separatorGuideOverlapsRange,
+        );
+        if (nextSeparatorGuides != null) {
+          _appliedSeparatorGuides = nextSeparatorGuides;
+          _setSeparatorGuides(nextSeparatorGuides);
         }
+        break;
     }
   }
 
@@ -363,9 +436,11 @@ class DecorationProviderManager {
         ? (visibleEnd - visibleStart + 1)
         : 0;
     if (viewportLineCount <= 0) return 0;
-    final multiplier = (session.settings
-            .getDecorationOverscanViewportMultiplier())
-        .clamp(0.0, double.infinity);
+    final multiplier =
+        (session.settings.getDecorationOverscanViewportMultiplier()).clamp(
+          0.0,
+          double.infinity,
+        );
     return (viewportLineCount * multiplier).ceil().clamp(0, 1 << 30);
   }
 
@@ -382,7 +457,7 @@ class DecorationProviderManager {
   }
 
   void _clearDiagnosticRange(int startLine, int endLine) {
-      final empty = _buildEmptyMapRange<core.Diagnostic>(startLine, endLine);
+    final empty = _buildEmptyMapRange<core.Diagnostic>(startLine, endLine);
     if (empty.isEmpty) return;
     _setBatchLineDiagnostics(empty);
   }
@@ -403,6 +478,12 @@ class DecorationProviderManager {
     final empty = _buildEmptyMapRange<core.CodeLensItem>(startLine, endLine);
     if (empty.isEmpty) return;
     _setBatchLineCodeLens(empty);
+  }
+
+  void _clearLinksRange(int startLine, int endLine) {
+    final empty = _buildEmptyMapRange<core.LinkSpan>(startLine, endLine);
+    if (empty.isEmpty) return;
+    _setBatchLineLinks(empty);
   }
 
   void onProviderResult(
@@ -509,6 +590,13 @@ class DecorationProviderManager {
       target.codeLensItems = null;
       target.codeLensItemsMode = patch.codeLensItemsMode;
     }
+    if (patch.links != null) {
+      target.links = patch.links;
+      target.linksMode = patch.linksMode;
+    } else if (patch.linksMode != ApplyMode.merge) {
+      target.links = null;
+      target.linksMode = patch.linksMode;
+    }
   }
 
   static ApplyMode _mergeMode(ApplyMode current, ApplyMode next) {
@@ -524,6 +612,76 @@ class DecorationProviderManager {
       case ApplyMode.replaceAll:
         return 2;
     }
+  }
+
+  List<T>? _resolveRangeAppliedList<T>({
+    required List<T> previous,
+    required List<T>? incoming,
+    required ApplyMode mode,
+    required bool Function(T item, core.IntRange range) overlapsRange,
+  }) {
+    switch (mode) {
+      case ApplyMode.merge:
+        return List<T>.of(incoming ?? <T>[]);
+      case ApplyMode.replaceAll:
+        return List<T>.of(incoming ?? <T>[]);
+      case ApplyMode.replaceRange:
+        final next = <T>[
+          for (final item in previous)
+            if (!overlapsRange(item, _lastContextLineRange)) item,
+        ];
+        if (incoming != null) {
+          next.addAll(incoming);
+        }
+        return next;
+    }
+  }
+
+  static bool _indentGuideOverlapsRange(
+    core.IndentGuide guide,
+    core.IntRange range,
+  ) => _positionRangeOverlapsRange(guide.start.line, guide.end.line, range);
+
+  static bool _bracketGuideOverlapsRange(
+    core.BracketGuide guide,
+    core.IntRange range,
+  ) {
+    var maxLine = guide.end.line;
+    for (final child in guide.children) {
+      if (child.line > maxLine) {
+        maxLine = child.line;
+      }
+    }
+    return _positionRangeOverlapsRange(guide.parent.line, maxLine, range);
+  }
+
+  static bool _flowGuideOverlapsRange(
+    core.FlowGuide guide,
+    core.IntRange range,
+  ) => _positionRangeOverlapsRange(guide.start.line, guide.end.line, range);
+
+  static bool _separatorGuideOverlapsRange(
+    core.SeparatorGuide guide,
+    core.IntRange range,
+  ) => _lineOverlapsRange(guide.line, range);
+
+  static bool _foldRegionOverlapsRange(
+    core.FoldRegion region,
+    core.IntRange range,
+  ) => _positionRangeOverlapsRange(region.startLine, region.endLine, range);
+
+  static bool _positionRangeOverlapsRange(
+    int startLine,
+    int endLine,
+    core.IntRange range,
+  ) {
+    if (range.end < range.start) return false;
+    return endLine >= range.start && startLine <= range.end;
+  }
+
+  static bool _lineOverlapsRange(int line, core.IntRange range) {
+    if (range.end < range.start) return false;
+    return line >= range.start && line <= range.end;
   }
 
   void _clearHighlights(int layer) {
@@ -584,6 +742,16 @@ class DecorationProviderManager {
     final ec = session.editorCore;
     if (ec == null) return;
     ec.setBatchLineCodeLens(items);
+  }
+
+  void _clearLinks() {
+    session.editorCore?.clearLinks();
+  }
+
+  void _setBatchLineLinks(Map<int, List<core.LinkSpan>> links) {
+    final ec = session.editorCore;
+    if (ec == null) return;
+    ec.setBatchLineLinks(links);
   }
 
   void _setIndentGuides(List<core.IndentGuide> guides) {

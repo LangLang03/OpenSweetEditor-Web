@@ -3,19 +3,25 @@ package com.qiplat.sweeteditor.copilot;
 import android.content.Context;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
+import android.graphics.RectF;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.animation.AlphaAnimation;
 import android.widget.LinearLayout;
 import android.widget.PopupWindow;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+
+import com.qiplat.sweeteditor.ui.PopupAnimator;
+import com.qiplat.sweeteditor.ui.PopupPositioner;
+
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * Lightweight floating action bar for inline suggestion Accept / Dismiss interaction.
@@ -34,13 +40,17 @@ public class InlineSuggestionActionBar {
     private static final int BUTTON_HORIZONTAL_PADDING_DP = 10;
     private static final int DIVIDER_WIDTH_DP = 1;
     private static final int DIVIDER_VERTICAL_MARGIN_DP = 6;
-    private static final int FADE_DURATION_MS = 150;
     private static final int GAP_DP = 2;
     private static final int ELEVATION_DP = 4;
+    private static final int POPUP_FALLBACK_WIDTH_DP = 200;
+    private static final List<PopupPositioner.Placement> BAR_PLACEMENTS = Arrays.asList(
+            PopupPositioner.Placement.of(PopupPositioner.PopupSide.ABOVE, PopupPositioner.PopupAlign.START),
+            PopupPositioner.Placement.of(PopupPositioner.PopupSide.BELOW, PopupPositioner.PopupAlign.START)
+    );
 
     private final Context context;
     private final PopupWindow popupWindow;
-    private final View contentView;
+    private View contentView;
     @Nullable private ActionCallback callback;
 
     private int bgColor;
@@ -48,6 +58,8 @@ public class InlineSuggestionActionBar {
     private int dismissTextColor;
     private int dividerColor;
     private int rippleColor;
+    @NonNull private PopupPositioner.Placement lastPlacement =
+            PopupPositioner.Placement.of(PopupPositioner.PopupSide.ABOVE, PopupPositioner.PopupAlign.START);
 
     public InlineSuggestionActionBar(@NonNull Context context,
                                      int bgColor, int acceptTextColor, int dismissTextColor) {
@@ -89,6 +101,7 @@ public class InlineSuggestionActionBar {
 
         View newContent = buildContentView();
         popupWindow.setContentView(newContent);
+        contentView = newContent;
     }
 
     public boolean isShowing() {
@@ -96,49 +109,27 @@ public class InlineSuggestionActionBar {
     }
 
     public void showAt(@NonNull View anchor, float cursorX, float cursorY, float cursorHeight) {
-        int barHeight = dpToPx(BAR_HEIGHT_DP);
-        popupWindow.setHeight(barHeight);
+        PopupLayout layout = computeLayout(anchor, cursorX, cursorY, cursorHeight);
         if (!popupWindow.isShowing()) {
-            popupWindow.showAtLocation(anchor, Gravity.NO_GRAVITY, 0, 0);
-            fadeIn();
+            lastPlacement = layout.position.placement;
+            PopupAnimator.prepareForShow(contentView, lastPlacement);
+            popupWindow.showAtLocation(anchor, Gravity.NO_GRAVITY,
+                    layout.position.screenX, layout.position.screenY);
+            applyPopupLayout(layout);
+            PopupAnimator.animateShow(contentView, lastPlacement);
+            return;
         }
-        updatePosition(anchor, cursorX, cursorY, cursorHeight);
+        applyPopupLayout(layout);
     }
 
     public void updatePosition(@NonNull View anchor, float cursorX, float cursorY, float cursorHeight) {
         if (!popupWindow.isShowing()) return;
-
-        int gap = dpToPx(GAP_DP);
-        int barHeight = dpToPx(BAR_HEIGHT_DP);
-
-        int[] loc = new int[2];
-        anchor.getLocationOnScreen(loc);
-
-        int screenX = loc[0] + (int) cursorX;
-        int screenY = loc[1] + (int) cursorY - barHeight - gap;
-
-        int screenW = context.getResources().getDisplayMetrics().widthPixels;
-
-        if (screenY < 0) {
-            screenY = loc[1] + (int) (cursorY + cursorHeight + gap);
-        }
-
-        int popupW = popupWindow.getWidth();
-        if (popupW <= 0) popupW = contentView.getMeasuredWidth();
-        if (popupW <= 0) popupW = dpToPx(200);
-
-        if (screenX + popupW > screenW) {
-            screenX = screenW - popupW;
-        }
-        screenX = Math.max(0, screenX);
-        screenY = Math.max(0, screenY);
-
-        popupWindow.update(screenX, screenY, -1, barHeight);
+        applyPopupLayout(computeLayout(anchor, cursorX, cursorY, cursorHeight));
     }
 
     public void dismiss() {
         if (!popupWindow.isShowing()) return;
-        fadeOut(() -> {
+        PopupAnimator.animateDismiss(contentView, lastPlacement, () -> {
             if (popupWindow.isShowing()) popupWindow.dismiss();
         });
     }
@@ -151,11 +142,13 @@ public class InlineSuggestionActionBar {
         LinearLayout bar = new LinearLayout(context);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setPadding(dpToPx(HORIZONTAL_PADDING_DP), 0, dpToPx(HORIZONTAL_PADDING_DP), 0);
+        bar.setPadding(
+                PopupPositioner.dpToPx(context, HORIZONTAL_PADDING_DP), 0,
+                PopupPositioner.dpToPx(context, HORIZONTAL_PADDING_DP), 0);
 
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(bgColor);
-        bg.setCornerRadius(dpToPx(CORNER_RADIUS_DP));
+        bg.setCornerRadius(PopupPositioner.dpToPx(context, CORNER_RADIUS_DP));
         bar.setBackground(bg);
 
         TextView acceptBtn = createButton("Accept", acceptTextColor, true);
@@ -186,11 +179,13 @@ public class InlineSuggestionActionBar {
         btn.setTextColor(textColor);
         if (bold) btn.setTypeface(btn.getTypeface(), android.graphics.Typeface.BOLD);
         btn.setGravity(Gravity.CENTER);
-        btn.setPadding(dpToPx(BUTTON_HORIZONTAL_PADDING_DP), 0, dpToPx(BUTTON_HORIZONTAL_PADDING_DP), 0);
+        btn.setPadding(
+                PopupPositioner.dpToPx(context, BUTTON_HORIZONTAL_PADDING_DP), 0,
+                PopupPositioner.dpToPx(context, BUTTON_HORIZONTAL_PADDING_DP), 0);
 
         GradientDrawable mask = new GradientDrawable();
         mask.setColor(Color.WHITE);
-        mask.setCornerRadius(dpToPx(CORNER_RADIUS_DP));
+        mask.setCornerRadius(PopupPositioner.dpToPx(context, CORNER_RADIUS_DP));
         btn.setBackground(new RippleDrawable(
                 ColorStateList.valueOf(rippleColor),
                 null,
@@ -203,44 +198,66 @@ public class InlineSuggestionActionBar {
         View divider = new View(context);
         divider.setBackgroundColor(dividerColor);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                dpToPx(DIVIDER_WIDTH_DP), ViewGroup.LayoutParams.MATCH_PARENT);
-        lp.topMargin = dpToPx(DIVIDER_VERTICAL_MARGIN_DP);
-        lp.bottomMargin = dpToPx(DIVIDER_VERTICAL_MARGIN_DP);
+                PopupPositioner.dpToPx(context, DIVIDER_WIDTH_DP), ViewGroup.LayoutParams.MATCH_PARENT);
+        lp.topMargin = PopupPositioner.dpToPx(context, DIVIDER_VERTICAL_MARGIN_DP);
+        lp.bottomMargin = PopupPositioner.dpToPx(context, DIVIDER_VERTICAL_MARGIN_DP);
         divider.setLayoutParams(lp);
         return divider;
     }
 
     private PopupWindow createPopupWindow(View content) {
         PopupWindow pw = new PopupWindow(content,
-                ViewGroup.LayoutParams.WRAP_CONTENT, dpToPx(BAR_HEIGHT_DP));
+                ViewGroup.LayoutParams.WRAP_CONTENT, PopupPositioner.dpToPx(context, BAR_HEIGHT_DP));
         pw.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
         pw.setOutsideTouchable(true);
         pw.setFocusable(false);
-        pw.setElevation(dpToPx(ELEVATION_DP));
+        pw.setElevation(PopupPositioner.dpToPx(context, ELEVATION_DP));
         return pw;
     }
 
-    private void fadeIn() {
-        AlphaAnimation anim = new AlphaAnimation(0f, 1f);
-        anim.setDuration(FADE_DURATION_MS);
-        contentView.startAnimation(anim);
+    @NonNull
+    private PopupLayout computeLayout(@NonNull View anchor,
+                                      float cursorX,
+                                      float cursorY,
+                                      float cursorHeight) {
+        int barHeight = PopupPositioner.dpToPx(context, BAR_HEIGHT_DP);
+        int gap = PopupPositioner.dpToPx(context, GAP_DP);
+        int popupWidth = popupWindow.getWidth();
+        if (popupWidth <= 0) {
+            contentView.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
+            popupWidth = contentView.getMeasuredWidth();
+        }
+        if (popupWidth <= 0) {
+            popupWidth = PopupPositioner.dpToPx(context, POPUP_FALLBACK_WIDTH_DP);
+        }
+        PopupPositioner.Result position = PopupPositioner.compute(new PopupPositioner.Request(
+                anchor,
+                new RectF(cursorX, cursorY, cursorX, cursorY + cursorHeight),
+                popupWidth,
+                barHeight,
+                gap,
+                0,
+                BAR_PLACEMENTS
+        ));
+        return new PopupLayout(position, popupWidth, barHeight);
     }
 
-    private void fadeOut(Runnable onEnd) {
-        AlphaAnimation anim = new AlphaAnimation(1f, 0f);
-        anim.setDuration(FADE_DURATION_MS);
-        anim.setFillAfter(true);
-        anim.setAnimationListener(new android.view.animation.Animation.AnimationListener() {
-            @Override public void onAnimationStart(android.view.animation.Animation a) {}
-            @Override public void onAnimationRepeat(android.view.animation.Animation a) {}
-            @Override public void onAnimationEnd(android.view.animation.Animation a) {
-                contentView.post(onEnd);
-            }
-        });
-        contentView.startAnimation(anim);
+    private void applyPopupLayout(@NonNull PopupLayout layout) {
+        lastPlacement = layout.position.placement;
+        popupWindow.update(layout.position.screenX, layout.position.screenY,
+                layout.popupWidth, layout.popupHeight);
     }
 
-    private int dpToPx(int dp) {
-        return (int) (dp * context.getResources().getDisplayMetrics().density + 0.5f);
+    private static final class PopupLayout {
+        @NonNull final PopupPositioner.Result position;
+        final int popupWidth;
+        final int popupHeight;
+
+        PopupLayout(@NonNull PopupPositioner.Result position, int popupWidth, int popupHeight) {
+            this.position = position;
+            this.popupWidth = popupWidth;
+            this.popupHeight = popupHeight;
+        }
     }
+
 }

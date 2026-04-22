@@ -109,8 +109,8 @@ public final class DemoDecorationProvider: DecorationProvider {
     }
 
     private func makeVisibleRange(context: DecorationContext) -> ClosedRange<Int> {
-        let safeStart = max(0, context.visibleStartLine - 24)
-        let safeEnd = max(safeStart, min(context.totalLineCount - 1, context.visibleEndLine + 24))
+        let safeStart = max(0, context.visibleLineRange.start - 24)
+        let safeEnd = max(safeStart, min(context.totalLineCount - 1, context.visibleLineRange.end + 24))
         return safeStart...safeEnd
     }
 

@@ -1,6 +1,6 @@
 package com.qiplat.sweeteditor.selection;
 
-import android.graphics.PointF;
+import android.graphics.RectF;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.MotionEvent;
@@ -14,8 +14,10 @@ import com.qiplat.sweeteditor.core.EditorCore;
 import com.qiplat.sweeteditor.core.visual.SelectionHandle;
 import com.qiplat.sweeteditor.event.EditorEventBus;
 import com.qiplat.sweeteditor.event.SelectionMenuItemClickEvent;
+import com.qiplat.sweeteditor.ui.PopupPositioner;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -36,6 +38,10 @@ public class SelectionMenuController {
     // Match Android handle visual geometry (teardrop rotated around tip).
     // Ensures popup placed below selection does not cover handles near top lines.
     private static final int MENU_HANDLE_CLEARANCE_DP = 32;
+    private static final List<PopupPositioner.Placement> MENU_PLACEMENTS = Arrays.asList(
+            PopupPositioner.Placement.of(PopupPositioner.PopupSide.ABOVE, PopupPositioner.PopupAlign.CENTER),
+            PopupPositioner.Placement.of(PopupPositioner.PopupSide.BELOW, PopupPositioner.PopupAlign.CENTER)
+    );
 
     private final SweetEditor editor;
     private final EditorEventBus eventBus;
@@ -196,11 +202,11 @@ public class SelectionMenuController {
         List<SelectionMenuItem> items = buildItems();
         if (items.isEmpty()) return;
 
-        PointF pos = computeMenuPosition();
+        PopupPositioner.Result position = computeMenuPosition();
         if (menuBar.isShowing()) {
             menuBar.dismissImmediate();
         }
-        menuBar.showAt(editor, (int) pos.x, (int) pos.y, items);
+        menuBar.showAt(editor, position.screenX, position.screenY, items, position.placement);
     }
 
     private List<SelectionMenuItem> buildItems() {
@@ -224,12 +230,14 @@ public class SelectionMenuController {
     private void onItemClicked(@NonNull SelectionMenuItem item) {
         switch (item.id) {
             case SelectionMenuItem.ACTION_CUT:
-                editor.cutToClipboard();
-                hide();
+                if (editor.cutToClipboard()) {
+                    hide();
+                }
                 break;
             case SelectionMenuItem.ACTION_COPY:
-                editor.copyToClipboard();
-                hide();
+                if (editor.copyToClipboard()) {
+                    hide();
+                }
                 break;
             case SelectionMenuItem.ACTION_PASTE:
                 editor.pasteFromClipboard();
@@ -245,13 +253,12 @@ public class SelectionMenuController {
         }
     }
 
-    private PointF computeMenuPosition() {
-        int offsetY = dpToPx(MENU_OFFSET_Y_DP);
-        int handleClearance = dpToPx(MENU_HANDLE_CLEARANCE_DP);
+    @NonNull
+    private PopupPositioner.Result computeMenuPosition() {
+        int offsetY = PopupPositioner.dpToPx(editor.getContext(), MENU_OFFSET_Y_DP);
+        int handleClearance = PopupPositioner.dpToPx(editor.getContext(), MENU_HANDLE_CLEARANCE_DP);
 
-        float anchorX;
-        float topY;
-        float bottomY;
+        RectF anchorRect;
         SelectionHandle start = startHandle;
         SelectionHandle end = endHandle;
         if (start != null && start.visible && start.position != null) {
@@ -268,42 +275,25 @@ public class SelectionMenuController {
                 endBottom = endY + end.height;
             }
 
-            anchorX = (startX + endX) * 0.5f;
-            topY = Math.min(startY, endY);
-            bottomY = Math.max(startBottom, endBottom);
+            anchorRect = new RectF(
+                    Math.min(startX, endX),
+                    Math.min(startY, endY),
+                    Math.max(startX, endX),
+                    Math.max(startBottom, endBottom)
+            );
         } else {
-            anchorX = editor.getWidth() * 0.5f;
-            topY = 0f;
-            bottomY = 0f;
+            float centerX = editor.getWidth() * 0.5f;
+            anchorRect = new RectF(centerX, 0f, centerX, 0f);
         }
 
-        int[] loc = new int[2];
-        editor.getLocationOnScreen(loc);
-
-        int menuWidth = Math.max(1, menuBar.getPopupWidth());
-        int menuHeight = Math.max(1, menuBar.getPopupHeight());
-
-        int minX = loc[0];
-        int maxX = minX + Math.max(0, editor.getWidth() - menuWidth);
-        int minY = loc[1];
-        int maxY = minY + Math.max(0, editor.getHeight() - menuHeight);
-
-        int screenX = loc[0] + Math.round(anchorX) - menuWidth / 2;
-        screenX = clamp(screenX, minX, maxX);
-
-        int aboveY = loc[1] + Math.round(topY) - menuHeight - offsetY;
-        int belowY = loc[1] + Math.round(bottomY) + offsetY + handleClearance;
-        int screenY = aboveY >= minY ? aboveY : belowY;
-        screenY = clamp(screenY, minY, maxY);
-
-        return new PointF(screenX, screenY);
-    }
-
-    private static int clamp(int value, int min, int max) {
-        return Math.max(min, Math.min(max, value));
-    }
-
-    private int dpToPx(int dp) {
-        return (int) (dp * editor.getContext().getResources().getDisplayMetrics().density + 0.5f);
+        return PopupPositioner.compute(new PopupPositioner.Request(
+                editor,
+                anchorRect,
+                Math.max(1, menuBar.getPopupWidth()),
+                Math.max(1, menuBar.getPopupHeight()),
+                offsetY,
+                handleClearance,
+                MENU_PLACEMENTS
+        ));
     }
 }

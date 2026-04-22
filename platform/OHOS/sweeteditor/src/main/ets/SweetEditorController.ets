@@ -1,9 +1,9 @@
 import { Document, TextEditResult } from './core/EditorCore';
-import { ScrollBehavior, TextPosition, TextRange } from './core/CoreFoundation';
+import { IntRange, ScrollBehavior, TextPosition, TextRange } from './core/CoreFoundation';
 import { CursorRect, ScrollMetrics } from './core/CoreVisual';
 import {
   BracketGuide,
-  DiagnosticItem,
+  Diagnostic,
   FlowGuide,
   FoldRegion,
   CodeLensItem,
@@ -53,35 +53,28 @@ import { SweetEditor } from './SweetEditor';
 
 export class SweetEditorController {
   private api: SweetEditor | null = null;
-  private pendingActions: Array<(api: SweetEditor) => void> = [];
+  private associatedEditor: SweetEditor | null = null;
+  private inactive: boolean = false;
   private eventListeners: Map<string, EditorEventListener<EditorEvent>[]> = new Map();
   private readyListeners: Array<() => void> = [];
-  private document: Document | null = null;
-  private theme: EditorTheme | null = null;
-  private languageConfiguration: LanguageConfiguration | null = null;
-  private metadata: EditorMetadata | null = null;
-  private iconProvider: EditorIconProvider | null = null;
-  private keyMap: EditorKeyMap = EditorKeyMap.defaultKeyMap();
-  private settings: EditorSettings = new EditorSettings();
 
   bind(api: SweetEditor): void {
+    if (this.inactive) {
+      return;
+    }
+    if (this.associatedEditor === null) {
+      this.associatedEditor = api;
+    } else if (this.associatedEditor !== api) {
+      throw new Error('SweetEditorController cannot be rebound to another editor instance.');
+    }
+    if (this.api === api) {
+      return;
+    }
+    if (this.api !== null) {
+      throw new Error('SweetEditorController cannot be bound to multiple widgets at the same time.');
+    }
     this.api = api;
     this.attachStoredEventListeners(api);
-    if (this.document) {
-      api.loadDocument(this.document);
-    }
-    if (this.theme) {
-      api.applyTheme(this.theme);
-    }
-    api.setKeyMap(this.keyMap);
-    api.setLanguageConfiguration(this.languageConfiguration);
-    api.setMetadata(this.metadata);
-    api.setEditorIconProvider(this.iconProvider);
-    const actions = [...this.pendingActions];
-    this.pendingActions = [];
-    for (const action of actions) {
-      action(api);
-    }
     const listeners = [...this.readyListeners];
     this.readyListeners = [];
     for (const listener of listeners) {
@@ -96,12 +89,17 @@ export class SweetEditorController {
           this.detachEventListener(api, type, listener);
         }
       });
-      this.settings.unbind(api);
       this.api = null;
+      this.inactive = true;
+      this.readyListeners = [];
+      this.eventListeners.clear();
     }
   }
 
   whenReady(listener: () => void): void {
+    if (this.inactive) {
+      return;
+    }
     if (this.api) {
       listener();
       return;
@@ -110,70 +108,81 @@ export class SweetEditorController {
   }
 
   loadDocument(document: Document): void {
-    this.document = document;
-    if (this.api) {
-      this.api.loadDocument(document);
+    const api = this.getActiveApi();
+    if (!api) {
       return;
     }
+    api.loadDocument(document);
   }
 
   getDocument(): Document | null {
-    return this.api ? this.api.getDocument() : this.document;
+    const api = this.getActiveApi();
+    return api ? api.getDocument() : null;
   }
 
-  getSettings(): EditorSettings {
-    return this.settings;
+  getSettings(): EditorSettings | null {
+    const api = this.getActiveApi();
+    return api ? api.getSettings() : null;
   }
 
   applyTheme(theme: EditorTheme): void {
-    this.theme = theme;
-    if (this.api) {
-      this.api.applyTheme(theme);
+    const api = this.getActiveApi();
+    if (!api) {
+      return;
     }
+    api.applyTheme(theme);
   }
 
   getTheme(): EditorTheme | null {
-    return this.api ? this.api.getTheme() : this.theme;
+    const api = this.getActiveApi();
+    return api ? api.getTheme() : null;
   }
 
   setLanguageConfiguration(config: LanguageConfiguration | null): void {
-    this.languageConfiguration = config;
-    if (this.api) {
-      this.api.setLanguageConfiguration(config);
+    const api = this.getActiveApi();
+    if (!api) {
+      return;
     }
+    api.setLanguageConfiguration(config);
   }
 
   getLanguageConfiguration(): LanguageConfiguration | null {
-    return this.api ? this.api.getLanguageConfiguration() : this.languageConfiguration;
+    const api = this.getActiveApi();
+    return api ? api.getLanguageConfiguration() : null;
   }
 
   setMetadata(metadata: EditorMetadata | null): void {
-    this.metadata = metadata;
-    if (this.api) {
-      this.api.setMetadata(metadata);
+    const api = this.getActiveApi();
+    if (!api) {
+      return;
     }
+    api.setMetadata(metadata);
   }
 
   getMetadata(): EditorMetadata | null {
-    return this.api ? this.api.getMetadata() : this.metadata;
+    const api = this.getActiveApi();
+    return api ? api.getMetadata() : null;
   }
 
   setEditorIconProvider(provider: EditorIconProvider | null): void {
-    this.iconProvider = provider;
-    if (this.api) {
-      this.api.setEditorIconProvider(provider);
+    const api = this.getActiveApi();
+    if (!api) {
+      return;
     }
+    api.setEditorIconProvider(provider);
   }
 
   getKeyMap(): EditorKeyMap {
-    return this.keyMap;
+    const api = this.getActiveApi();
+    return api ? api.getKeyMap() : EditorKeyMap.defaultKeyMap();
   }
 
   setKeyMap(keyMap: EditorKeyMap): void {
-    this.keyMap = keyMap;
-    if (this.api) {
-      this.api.setKeyMap(keyMap);
+    const api = this.getActiveApi();
+    if (!api) {
+      return;
     }
+    api.setKeyMap(keyMap);
   }
 
   addDecorationProvider(provider: DecorationProvider): void {
@@ -346,12 +355,13 @@ export class SweetEditorController {
     return this.api ? this.api.getCursorRect() : { x: 0, y: 0, height: 0 };
   }
 
-  getVisibleLineRange(): number[] {
-    return this.api ? this.api.getVisibleLineRange() : [0, -1];
+  getVisibleLineRange(): IntRange {
+    return this.api ? this.api.getVisibleLineRange() : { start: 0, end: -1 };
   }
 
   getTotalLineCount(): number {
-    return this.api ? this.api.getTotalLineCount() : (this.document ? this.document.getLineCount() : 0);
+    const api = this.getActiveApi();
+    return api ? api.getTotalLineCount() : 0;
   }
 
   registerTextStyle(styleId: number, color: number, backgroundColorOrFontStyle: number, fontStyle?: number): void {
@@ -414,11 +424,11 @@ export class SweetEditorController {
     return this.api ? this.api.getLinkTargetAt(line, column) : '';
   }
 
-  setLineDiagnostics(line: number, items: DiagnosticItem[]): void {
+  setLineDiagnostics(line: number, items: Diagnostic[]): void {
     this.run((api) => api.setLineDiagnostics(line, items));
   }
 
-  setBatchLineDiagnostics(diagsByLine: Map<number, DiagnosticItem[]>): void {
+  setBatchLineDiagnostics(diagsByLine: Map<number, Diagnostic[]>): void {
     this.run((api) => api.setBatchLineDiagnostics(diagsByLine));
   }
 
@@ -508,6 +518,10 @@ export class SweetEditorController {
 
   clearCodeLens(): void {
     this.run((api) => api.clearCodeLens());
+  }
+
+  clearLinks(): void {
+    this.run((api) => api.clearLinks());
   }
 
   clearGuides(): void {
@@ -626,6 +640,14 @@ export class SweetEditorController {
     this.removeEventListener('codeLensClick', listener as EditorEventListener<EditorEvent>);
   }
 
+  onLinkClick(listener: EditorEventListener<LinkClickEvent>): void {
+    this.addEventListener('linkClick', listener as EditorEventListener<EditorEvent>);
+  }
+
+  offLinkClick(listener: EditorEventListener<LinkClickEvent>): void {
+    this.removeEventListener('linkClick', listener as EditorEventListener<EditorEvent>);
+  }
+
   onFoldToggle(listener: EditorEventListener<FoldToggleEvent>): void {
     this.addEventListener('foldToggle', listener as EditorEventListener<EditorEvent>);
   }
@@ -679,6 +701,9 @@ export class SweetEditorController {
   }
 
   private addEventListener(type: string, listener: EditorEventListener<EditorEvent>): void {
+    if (this.inactive) {
+      return;
+    }
     let listeners = this.eventListeners.get(type);
     if (!listeners) {
       listeners = [];
@@ -818,10 +843,17 @@ export class SweetEditorController {
   }
 
   private run(action: (api: SweetEditor) => void): void {
-    if (this.api) {
-      action(this.api);
+    const api = this.getActiveApi();
+    if (!api) {
       return;
     }
-    this.pendingActions.push(action);
+    action(api);
+  }
+
+  private getActiveApi(): SweetEditor | null {
+    if (this.inactive) {
+      return null;
+    }
+    return this.api;
   }
 }

@@ -471,6 +471,92 @@ final class ProtocolEncoder {
         return payload.array();
     }
 
+    static byte[] packLineLinks(int line, List<? extends LinkSpan> links) {
+        int count = links.size();
+        int totalSize = 8; // line(4) + count(4)
+        byte[][] targetBytes = new byte[count][];
+        for (int i = 0; i < count; i++) {
+            LinkSpan link = links.get(i);
+            totalSize += 12; // column(4) + length(4) + target_len(4)
+            if (link.target != null) {
+                byte[] bytes = link.target.getBytes(StandardCharsets.UTF_8);
+                targetBytes[i] = bytes;
+                totalSize += bytes.length;
+            }
+        }
+        ByteBuffer payload = ByteBuffer.allocate(totalSize).order(ByteOrder.LITTLE_ENDIAN);
+        payload.putInt(line);
+        payload.putInt(count);
+        for (int i = 0; i < count; i++) {
+            LinkSpan link = links.get(i);
+            payload.putInt(link.column);
+            payload.putInt(link.length);
+            byte[] tb = targetBytes[i];
+            if (tb != null) {
+                payload.putInt(tb.length);
+                payload.put(tb);
+            } else {
+                payload.putInt(0);
+            }
+        }
+        return payload.array();
+    }
+
+    static byte[] packBatchLineLinks(Map<Integer, ? extends List<? extends LinkSpan>> linksByLine) {
+        if (linksByLine == null || linksByLine.isEmpty()) return null;
+        int entryCount = linksByLine.size();
+        var sortedEntries = linksByLine.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey()).toList();
+        int totalSize = 4; // entry_count(4)
+        int totalLinkCount = 0;
+        for (var entry : sortedEntries) {
+            List<? extends LinkSpan> links = entry.getValue();
+            int linkCount = (links != null) ? links.size() : 0;
+            totalLinkCount += linkCount;
+            totalSize += 8; // line(4) + link_count(4)
+        }
+        byte[][] targetBytesCache = new byte[totalLinkCount][];
+        int linkIdx = 0;
+        for (var entry : sortedEntries) {
+            List<? extends LinkSpan> links = entry.getValue();
+            if (links == null) continue;
+            for (int j = 0; j < links.size(); j++) {
+                LinkSpan link = links.get(j);
+                totalSize += 12; // column(4) + length(4) + target_len(4)
+                if (link.target != null) {
+                    byte[] bytes = link.target.getBytes(StandardCharsets.UTF_8);
+                    targetBytesCache[linkIdx] = bytes;
+                    totalSize += bytes.length;
+                }
+                linkIdx++;
+            }
+        }
+        ByteBuffer payload = ByteBuffer.allocate(totalSize).order(ByteOrder.LITTLE_ENDIAN);
+        payload.putInt(entryCount);
+        linkIdx = 0;
+        for (var entry : sortedEntries) {
+            int line = entry.getKey();
+            List<? extends LinkSpan> links = entry.getValue();
+            int linkCount = (links != null) ? links.size() : 0;
+            payload.putInt(line);
+            payload.putInt(linkCount);
+            for (int j = 0; j < linkCount; j++) {
+                LinkSpan link = links.get(j);
+                payload.putInt(link.column);
+                payload.putInt(link.length);
+                byte[] tb = targetBytesCache[linkIdx];
+                if (tb != null) {
+                    payload.putInt(tb.length);
+                    payload.put(tb);
+                } else {
+                    payload.putInt(0);
+                }
+                linkIdx++;
+            }
+        }
+        return payload.array();
+    }
+
     // ==================== Guide ====================
 
     static byte[] packIndentGuides(List<? extends IndentGuide> guides) {
@@ -549,16 +635,18 @@ final class ProtocolEncoder {
     // ==================== EditorOptions ====================
 
     /** Size of the EditorOptions binary payload in bytes */
-    static final int EDITOR_OPTIONS_SIZE = 40; // 4 + 8 + 8 + 4 + 4 + 4 + 8
+    static final int EDITOR_OPTIONS_SIZE = 49;
 
     /**
      * Pack EditorOptions directly into a MemorySegment (zero-copy path for Panama FFI).
      * <p>
-     * Format (LE): f32 touch_slop, i64 double_tap_timeout, i64 long_press_ms, f32 fling_friction, f32 fling_min_velocity, f32 fling_max_velocity, u64 max_undo_stack_size
+     * Format (LE): f32 touch_slop, i64 double_tap_timeout, i64 long_press_ms, f32 fling_friction,
+     * f32 fling_min_velocity, f32 fling_max_velocity, u64 max_undo_stack_size,
+     * i64 key_chord_timeout_ms, u8 reveal_selection_end_on_select_all
      *
      * @param options editor construction options
      * @param arena   arena to allocate the MemorySegment from
-     * @return packed MemorySegment (40 bytes)
+     * @return packed MemorySegment (49 bytes)
      */
     static MemorySegment packEditorOptions(EditorOptions options, Arena arena) {
         MemorySegment seg = arena.allocate(EDITOR_OPTIONS_SIZE);
@@ -569,6 +657,8 @@ final class ProtocolEncoder {
         seg.set(ValueLayout.JAVA_FLOAT_UNALIGNED, 24, options.flingMinVelocity);
         seg.set(ValueLayout.JAVA_FLOAT_UNALIGNED, 28, options.flingMaxVelocity);
         seg.set(ValueLayout.JAVA_LONG_UNALIGNED, 32, options.maxUndoStackSize);
+        seg.set(ValueLayout.JAVA_LONG_UNALIGNED, 40, options.keyChordTimeoutMs);
+        seg.set(ValueLayout.JAVA_BYTE, 48, (byte) (options.revealSelectionEndOnSelectAll ? 1 : 0));
         return seg;
     }
 

@@ -8,6 +8,7 @@ import com.qiplat.sweeteditor.core.adornment.FoldRegion;
 import com.qiplat.sweeteditor.core.adornment.GutterIcon;
 import com.qiplat.sweeteditor.core.adornment.IndentGuide;
 import com.qiplat.sweeteditor.core.adornment.InlayHint;
+import com.qiplat.sweeteditor.core.adornment.LinkSpan;
 import com.qiplat.sweeteditor.core.adornment.PhantomText;
 import com.qiplat.sweeteditor.core.adornment.SeparatorGuide;
 import com.qiplat.sweeteditor.core.adornment.StyleSpan;
@@ -46,7 +47,8 @@ import java.util.concurrent.Executors;
 
 public class DemoDecorationProvider implements DecorationProvider {
     private static final String DEFAULT_ANALYSIS_FILE_NAME = "example.cpp";
-    private static final int STYLE_COLOR = EditorTheme.STYLE_USER_BASE + 1;
+    public static final int STYLE_COLOR = EditorTheme.STYLE_USER_BASE + 1;
+    public static final int STYLE_LINK = EditorTheme.STYLE_USER_BASE + 2;
     private static final int MAX_DYNAMIC_DIAGNOSTICS = 8;
     private static final String PHANTOM_MEMBER_STUB =
             "\n    void debugTrace(const std::string& tag) {\n        log(DEBUG, tag);\n    }";
@@ -78,7 +80,8 @@ public class DemoDecorationProvider implements DecorationProvider {
                 DecorationType.INLAY_HINT,
                 DecorationType.PHANTOM_TEXT,
                 DecorationType.DIAGNOSTIC,
-                DecorationType.CODELENS
+                DecorationType.CODELENS,
+                DecorationType.LINK
         );
     }
 
@@ -122,6 +125,7 @@ public class DemoDecorationProvider implements DecorationProvider {
         Map<Integer, List<InlayHint>> colorInlayHints = new HashMap<>();
         Map<Integer, List<GutterIcon>> gutterIcons = new HashMap<>();
         Map<Integer, List<CodeLensItem>> codeLensItems = new HashMap<>();
+        Map<Integer, List<LinkSpan>> links = new HashMap<>();
         List<IndentGuide> indentGuides = new ArrayList<>();
         List<FoldRegion> foldRegions = new ArrayList<>();
         List<SeparatorGuide> separatorGuides = new ArrayList<>();
@@ -138,6 +142,7 @@ public class DemoDecorationProvider implements DecorationProvider {
             if (highlightEngine == null) {
                 return new DecorationResult.Builder()
                         .phantomTexts(dynamicPhantoms, DecorationResult.ApplyMode.REPLACE_ALL)
+                        .links(links, DecorationResult.ApplyMode.REPLACE_RANGE)
                         .build();
             }
 
@@ -178,12 +183,13 @@ public class DemoDecorationProvider implements DecorationProvider {
                     .foldRegions(foldRegions, DecorationResult.ApplyMode.REPLACE_ALL)
                     .separatorGuides(separatorGuides, DecorationResult.ApplyMode.REPLACE_ALL)
                     .gutterIcons(gutterIcons, DecorationResult.ApplyMode.REPLACE_ALL)
+                    .links(links, DecorationResult.ApplyMode.REPLACE_RANGE)
                     .build();
         }
 
         List<String> textLines = splitLines(textSnapshot);
-        int renderStartLine = Math.max(0, context.visibleStartLine);
-        int maxLine = Math.min(context.visibleEndLine, highlightSnapshot.lines().size() - 1);
+        int renderStartLine = Math.max(0, context.visibleLineRange.start());
+        int maxLine = Math.min(context.visibleLineRange.end(), highlightSnapshot.lines().size() - 1);
         for (int i = renderStartLine; i <= maxLine; i++) {
             LineHighlight lineHighlight = highlightSnapshot.lines().get(i);
             if (lineHighlight == null || lineHighlight.spans() == null) {
@@ -196,6 +202,7 @@ public class DemoDecorationProvider implements DecorationProvider {
                 appendSeparator(separatorGuides, textLines, token);
                 appendGutterIcons(gutterIcons, textLines, token);
                 appendCodeLens(codeLensItems, textLines, token);
+                appendLink(links, textLines, token);
                 firstKeywordRange = appendDynamicDemoDecorations(
                         dynamicPhantoms,
                         phantomLines,
@@ -248,6 +255,7 @@ public class DemoDecorationProvider implements DecorationProvider {
                 .separatorGuides(separatorGuides, DecorationResult.ApplyMode.REPLACE_ALL)
                 .gutterIcons(gutterIcons, DecorationResult.ApplyMode.REPLACE_ALL)
                 .codeLensItems(codeLensItems, DecorationResult.ApplyMode.REPLACE_ALL)
+                .links(links, DecorationResult.ApplyMode.REPLACE_RANGE)
                 .build();
     }
 
@@ -475,6 +483,22 @@ public class DemoDecorationProvider implements DecorationProvider {
         }
     }
 
+    private void appendLink(Map<Integer, List<LinkSpan>> linksByLine, List<String> textLines, TokenSpan token) {
+        if (token.styleId() != STYLE_LINK) {
+            return;
+        }
+        TokenRangeInfo range = extractSingleLineTokenRange(token);
+        if (range == null) {
+            return;
+        }
+        String target = getTokenLiteral(textLines, range);
+        if (target.isEmpty()) {
+            return;
+        }
+        linksByLine.computeIfAbsent(range.line, ignored -> new ArrayList<>())
+                .add(new LinkSpan(range.startColumn, range.length(), target));
+    }
+
     private static Integer parseColorLiteral(String literal) {
         if (literal.length() > 2
                 && literal.charAt(0) == '0'
@@ -627,6 +651,7 @@ public class DemoDecorationProvider implements DecorationProvider {
         engine.registerStyleName("builtin", EditorTheme.STYLE_BUILTIN);
         engine.registerStyleName("annotation", EditorTheme.STYLE_ANNOTATION);
         engine.registerStyleName("color", STYLE_COLOR);
+        engine.registerStyleName("link", STYLE_LINK);
     }
 
     private static String resolveCurrentFileName(DecorationContext context) {

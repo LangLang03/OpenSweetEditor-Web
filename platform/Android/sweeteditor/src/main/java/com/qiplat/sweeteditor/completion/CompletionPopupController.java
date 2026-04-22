@@ -3,13 +3,12 @@ package com.qiplat.sweeteditor.completion;
 import android.content.Context;
 import android.graphics.Color;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.text.TextUtils;
-import android.os.Build;
 import android.view.KeyEvent;
-import android.view.WindowInsets;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -23,8 +22,11 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.qiplat.sweeteditor.EditorTheme;
+import com.qiplat.sweeteditor.ui.PopupAnimator;
+import com.qiplat.sweeteditor.ui.PopupPositioner;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -37,10 +39,18 @@ public class CompletionPopupController implements CompletionProviderManager.Comp
         void onCompletionConfirmed(@NonNull CompletionItem item);
     }
 
-    private static final int MAX_VISIBLE_ITEMS = 6;
+    private static final int MAX_VISIBLE_ITEMS = 4;
     private static final int ITEM_HEIGHT_DP = 32;
     private static final int POPUP_WIDTH_DP = 300;
+    private static final int PANEL_HORIZONTAL_PADDING_DP = 4;
+    private static final int PANEL_VERTICAL_PADDING_DP = 6;
+    private static final int POPUP_MIN_WIDTH_DP = 120;
+    private static final int POPUP_FRAME_PADDING_DP = 8;
     private static final int GAP_DP = 4;
+    private static final List<PopupPositioner.Placement> POPUP_PLACEMENTS = Arrays.asList(
+            PopupPositioner.Placement.of(PopupPositioner.PopupSide.BELOW, PopupPositioner.PopupAlign.START),
+            PopupPositioner.Placement.of(PopupPositioner.PopupSide.ABOVE, PopupPositioner.PopupAlign.START)
+    );
 
     private final Context context;
     private final View anchorView;
@@ -62,6 +72,8 @@ public class CompletionPopupController implements CompletionProviderManager.Comp
     private float cachedCursorX = 0;
     private float cachedCursorY = 0;
     private float cachedCursorHeight = 0;
+    @NonNull private PopupPositioner.Placement lastPlacement =
+            PopupPositioner.Placement.of(PopupPositioner.PopupSide.BELOW, PopupPositioner.PopupAlign.START);
 
     public CompletionPopupController(@NonNull Context context, @NonNull View anchorView, @NonNull EditorTheme theme) {
         this.context = context;
@@ -81,11 +93,7 @@ public class CompletionPopupController implements CompletionProviderManager.Comp
         labelColor = theme.completionLabelColor;
         detailColor = theme.completionDetailColor;
         if (recyclerView != null) {
-            GradientDrawable panelBg = new GradientDrawable();
-            panelBg.setColor(panelBgColor);
-            panelBg.setCornerRadius(dpToPx(context, 12));
-            panelBg.setStroke(dpToPx(context, 1), panelBorderColor);
-            recyclerView.setBackground(panelBg);
+            recyclerView.setBackground(createPanelBackground());
             recyclerView.setClipToOutline(true);
         }
         if (adapter != null) adapter.notifyDataSetChanged();
@@ -163,127 +171,20 @@ public class CompletionPopupController implements CompletionProviderManager.Comp
      * cachedCursorX/Y are coordinates within anchorView, need to be converted to screen coordinates for PopupWindow positioning.
      */
     private void applyPosition() {
-        int gap = dpToPx(context, GAP_DP);
-        int popupHeight = popupWindow.getHeight();
-        if (popupHeight <= 0) {
-            popupHeight = dpToPx(context, ITEM_HEIGHT_DP * Math.min(items.size(), MAX_VISIBLE_ITEMS));
-        }
-
-        int[] anchorLocation = new int[2];
-        anchorView.getLocationOnScreen(anchorLocation);
-
-        int cursorLeft = anchorLocation[0] + (int) cachedCursorX;
-        int cursorTop = anchorLocation[1] + (int) cachedCursorY;
-        int cursorBottom = anchorLocation[1] + (int) (cachedCursorY + cachedCursorHeight);
-
-        Rect visibleFrame = new Rect();
-        anchorView.getWindowVisibleDisplayFrame(visibleFrame);
-        if (visibleFrame.width() <= 0 || visibleFrame.height() <= 0) {
-            int screenHeight = anchorView.getResources().getDisplayMetrics().heightPixels;
-            int screenWidth = anchorView.getResources().getDisplayMetrics().widthPixels;
-            visibleFrame.set(0, 0, screenWidth, screenHeight);
-        }
-
-        int imeBottom = 0;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            WindowInsets rootInsets = anchorView.getRootWindowInsets();
-            if (rootInsets != null) {
-                imeBottom = rootInsets.getInsets(WindowInsets.Type.ime()).bottom;
-            }
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            WindowInsets rootInsets = anchorView.getRootWindowInsets();
-            if (rootInsets != null) {
-                int systemBottom = rootInsets.getSystemWindowInsetBottom();
-                int stableBottom = rootInsets.getStableInsetBottom();
-                imeBottom = Math.max(0, systemBottom - stableBottom);
-            }
-        }
-
-        if (imeBottom > 0) {
-            View rootView = anchorView.getRootView();
-            int rootHeight = rootView != null ? rootView.getHeight() : 0;
-            if (rootView != null && rootHeight > 0) {
-                int[] rootLocation = new int[2];
-                rootView.getLocationOnScreen(rootLocation);
-                int imeTop = rootLocation[1] + rootHeight - imeBottom;
-                if (imeTop > visibleFrame.top && imeTop < visibleFrame.bottom) {
-                    visibleFrame.bottom = imeTop;
-                }
-            } else if (imeBottom < visibleFrame.height()) {
-                visibleFrame.bottom = visibleFrame.bottom - imeBottom;
-            }
-        }
-
-        if (imeBottom <= 0) {
-            // Fallback for edge-to-edge windows where IME insets may temporarily report 0.
-            View rootView = anchorView.getRootView();
-            if (rootView != null) {
-                Rect rootVisible = new Rect();
-                rootView.getWindowVisibleDisplayFrame(rootVisible);
-                int keyboardHeight = rootView.getHeight() - rootVisible.height();
-                int keyboardThreshold = dpToPx(context, 80);
-                if (keyboardHeight > keyboardThreshold) {
-                    int[] rootLocation = new int[2];
-                    rootView.getLocationOnScreen(rootLocation);
-                    int imeTop = rootLocation[1] + rootVisible.bottom;
-                    if (imeTop > visibleFrame.top && imeTop < visibleFrame.bottom) {
-                        visibleFrame.bottom = imeTop;
-                    }
-                }
-            }
-        }
-
-        if (visibleFrame.height() < dpToPx(context, ITEM_HEIGHT_DP)) {
+        PopupLayout layout = computePopupLayout();
+        if (layout == null) {
             return;
         }
-
-        int desiredPopupWidth = dpToPx(context, POPUP_WIDTH_DP);
-        int minPopupWidth = dpToPx(context, 120);
-        int availableWidth = Math.max(1, visibleFrame.width() - dpToPx(context, 8));
-        int popupWidth = Math.min(desiredPopupWidth, Math.max(minPopupWidth, availableWidth));
-        if (popupWidth > visibleFrame.width()) {
-            popupWidth = visibleFrame.width();
-        }
-
-        int maxPopupHeight = Math.max(dpToPx(context, ITEM_HEIGHT_DP), visibleFrame.height() - dpToPx(context, 8));
-        if (popupHeight > maxPopupHeight) {
-            popupHeight = maxPopupHeight;
-        }
-
-        int maxX = visibleFrame.right - popupWidth;
-        int screenX = Math.max(visibleFrame.left, Math.min(cursorLeft, maxX));
-
-        int belowY = cursorBottom + gap;
-        int aboveY = cursorTop - popupHeight - gap;
-
-        boolean canShowBelow = belowY + popupHeight <= visibleFrame.bottom;
-        boolean canShowAbove = aboveY >= visibleFrame.top;
-
-        int screenY;
-        if (canShowBelow) {
-            screenY = belowY;
-        } else if (canShowAbove) {
-            screenY = aboveY;
-        } else {
-            int clampedBelow = Math.max(visibleFrame.top,
-                    Math.min(belowY, visibleFrame.bottom - popupHeight));
-            int clampedAbove = Math.max(visibleFrame.top,
-                    Math.min(aboveY, visibleFrame.bottom - popupHeight));
-            int spaceBelow = visibleFrame.bottom - cursorBottom - gap;
-            int spaceAbove = cursorTop - gap - visibleFrame.top;
-            screenY = spaceAbove > spaceBelow ? clampedAbove : clampedBelow;
-        }
-
-        screenY = Math.max(visibleFrame.top, screenY);
-        if (screenY + popupHeight > visibleFrame.bottom) {
-            screenY = Math.max(visibleFrame.top, visibleFrame.bottom - popupHeight);
-        }
-
-        popupWindow.update(screenX, screenY, popupWidth, popupHeight);
+        applyPopupLayout(layout);
     }
+
     public void dismiss() {
         if (popupWindow != null && popupWindow.isShowing()) {
-            popupWindow.dismiss();
+            PopupAnimator.animateDismiss(recyclerView, lastPlacement, () -> {
+                if (popupWindow.isShowing()) {
+                    popupWindow.dismiss();
+                }
+            });
         }
     }
 
@@ -291,33 +192,110 @@ public class CompletionPopupController implements CompletionProviderManager.Comp
         recyclerView = new RecyclerView(context);
         recyclerView.setLayoutManager(new LinearLayoutManager(context));
 
-        GradientDrawable panelBg = new GradientDrawable();
-        panelBg.setColor(panelBgColor);
-        panelBg.setCornerRadius(dpToPx(context, 12));
-        panelBg.setStroke(dpToPx(context, 1), panelBorderColor);
-        recyclerView.setBackground(panelBg);
+        recyclerView.setBackground(createPanelBackground());
         recyclerView.setClipToOutline(true);
-        recyclerView.setPadding(dpToPx(context, 4), dpToPx(context, 6), dpToPx(context, 4), dpToPx(context, 6));
+        recyclerView.setPadding(
+                PopupPositioner.dpToPx(context, PANEL_HORIZONTAL_PADDING_DP),
+                PopupPositioner.dpToPx(context, PANEL_VERTICAL_PADDING_DP),
+                PopupPositioner.dpToPx(context, PANEL_HORIZONTAL_PADDING_DP),
+                PopupPositioner.dpToPx(context, PANEL_VERTICAL_PADDING_DP));
         recyclerView.setClipToPadding(false);
 
         adapter = new CompletionAdapter();
         recyclerView.setAdapter(adapter);
 
-        int width = dpToPx(context, POPUP_WIDTH_DP);
+        int width = PopupPositioner.dpToPx(context, POPUP_WIDTH_DP);
         popupWindow = new PopupWindow(recyclerView, width, ViewGroup.LayoutParams.WRAP_CONTENT);
         popupWindow.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
         popupWindow.setFocusable(false);
-        popupWindow.setElevation(dpToPx(context, 8));
+        popupWindow.setElevation(PopupPositioner.dpToPx(context, 8));
     }
 
     private void show() {
-        int maxHeight = dpToPx(context, ITEM_HEIGHT_DP * Math.min(items.size(), MAX_VISIBLE_ITEMS));
-        popupWindow.setHeight(maxHeight);
-        if (!popupWindow.isShowing()) {
-            popupWindow.showAtLocation(anchorView, Gravity.NO_GRAVITY, 0, 0);
+        PopupLayout layout = computePopupLayout();
+        if (layout == null) {
+            dismiss();
+            return;
         }
-        // Position near cursor immediately using cached cursor coordinates
-        applyPosition();
+        applyPopupSize(layout.popupWidth, layout.popupHeight);
+        if (!popupWindow.isShowing()) {
+            lastPlacement = layout.position.placement;
+            PopupAnimator.prepareForShow(recyclerView, lastPlacement);
+            popupWindow.showAtLocation(anchorView, Gravity.NO_GRAVITY,
+                    layout.position.screenX, layout.position.screenY);
+            applyPopupLayout(layout);
+            PopupAnimator.animateShow(recyclerView, lastPlacement);
+            return;
+        }
+        applyPopupLayout(layout);
+    }
+
+    @Nullable
+    private PopupLayout computePopupLayout() {
+        int gap = PopupPositioner.dpToPx(context, GAP_DP);
+        int visibleRows = Math.max(1, Math.min(items.size(), MAX_VISIBLE_ITEMS));
+        int popupHeight = PopupPositioner.dpToPx(context,
+                ITEM_HEIGHT_DP * visibleRows + PANEL_VERTICAL_PADDING_DP * 2);
+
+        Rect availableFrame = PopupPositioner.resolveAvailableFrame(anchorView);
+        if (availableFrame.height() < PopupPositioner.dpToPx(context, ITEM_HEIGHT_DP)) {
+            return null;
+        }
+
+        int desiredPopupWidth = PopupPositioner.dpToPx(context, POPUP_WIDTH_DP);
+        int minPopupWidth = PopupPositioner.dpToPx(context, POPUP_MIN_WIDTH_DP);
+        int availableWidth = Math.max(1, availableFrame.width() - PopupPositioner.dpToPx(context, POPUP_FRAME_PADDING_DP));
+        int popupWidth = Math.min(desiredPopupWidth, Math.max(minPopupWidth, availableWidth));
+        if (popupWidth > availableFrame.width()) {
+            popupWidth = availableFrame.width();
+        }
+
+        int maxPopupHeight = Math.max(
+                PopupPositioner.dpToPx(context, ITEM_HEIGHT_DP + PANEL_VERTICAL_PADDING_DP * 2),
+                availableFrame.height() - PopupPositioner.dpToPx(context, POPUP_FRAME_PADDING_DP));
+        if (popupHeight > maxPopupHeight) {
+            popupHeight = maxPopupHeight;
+        }
+
+        PopupPositioner.Result position = PopupPositioner.compute(new PopupPositioner.Request(
+                anchorView,
+                new RectF(cachedCursorX, cachedCursorY, cachedCursorX, cachedCursorY + cachedCursorHeight),
+                popupWidth,
+                popupHeight,
+                gap,
+                0,
+                POPUP_PLACEMENTS
+        ));
+        return new PopupLayout(position, popupWidth, popupHeight);
+    }
+
+    private void applyPopupSize(int popupWidth, int popupHeight) {
+        ViewGroup.LayoutParams layoutParams = recyclerView.getLayoutParams();
+        if (layoutParams == null) {
+            layoutParams = new ViewGroup.LayoutParams(popupWidth, popupHeight);
+        } else {
+            layoutParams.width = popupWidth;
+            layoutParams.height = popupHeight;
+        }
+        recyclerView.setLayoutParams(layoutParams);
+        popupWindow.setWidth(popupWidth);
+        popupWindow.setHeight(popupHeight);
+    }
+
+    private void applyPopupLayout(@NonNull PopupLayout layout) {
+        lastPlacement = layout.position.placement;
+        applyPopupSize(layout.popupWidth, layout.popupHeight);
+        popupWindow.update(layout.position.screenX, layout.position.screenY,
+                layout.popupWidth, layout.popupHeight);
+    }
+
+    @NonNull
+    private GradientDrawable createPanelBackground() {
+        GradientDrawable panelBg = new GradientDrawable();
+        panelBg.setColor(panelBgColor);
+        panelBg.setCornerRadius(PopupPositioner.dpToPx(context, 12));
+        panelBg.setStroke(PopupPositioner.dpToPx(context, 1), panelBorderColor);
+        return panelBg;
     }
 
     private void moveSelection(int delta) {
@@ -339,10 +317,6 @@ public class CompletionPopupController implements CompletionProviderManager.Comp
                 confirmListener.onCompletionConfirmed(item);
             }
         }
-    }
-
-    private static int dpToPx(@NonNull Context ctx, int dp) {
-        return (int) (dp * ctx.getResources().getDisplayMetrics().density + 0.5f);
     }
 
     private class CompletionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
@@ -399,11 +373,11 @@ public class CompletionPopupController implements CompletionProviderManager.Comp
             detailView = itemView.findViewWithTag("detail");
 
             rowBg = new GradientDrawable();
-            rowBg.setCornerRadius(dpToPx(parent.getContext(), 6));
+            rowBg.setCornerRadius(PopupPositioner.dpToPx(parent.getContext(), 6));
             itemView.setBackground(rowBg);
 
             badgeBg = new GradientDrawable();
-            badgeBg.setCornerRadius(dpToPx(parent.getContext(), 4));
+            badgeBg.setCornerRadius(PopupPositioner.dpToPx(parent.getContext(), 4));
             kindBadge.setBackground(badgeBg);
         }
 
@@ -513,6 +487,18 @@ public class CompletionPopupController implements CompletionProviderManager.Comp
             layout.addView(detail);
 
             return layout;
+        }
+    }
+
+    private static final class PopupLayout {
+        @NonNull final PopupPositioner.Result position;
+        final int popupWidth;
+        final int popupHeight;
+
+        PopupLayout(@NonNull PopupPositioner.Result position, int popupWidth, int popupHeight) {
+            this.position = position;
+            this.popupWidth = popupWidth;
+            this.popupHeight = popupHeight;
         }
     }
 }

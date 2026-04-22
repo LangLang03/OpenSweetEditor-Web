@@ -4,6 +4,7 @@ import {
   AutoIndentMode,
   CurrentLineRenderMode,
   FoldArrowMode,
+  IntRange,
   ScrollBehavior,
   TextPosition,
   TextRange,
@@ -14,7 +15,7 @@ import {
   BracketGuide,
   CodeLensItem,
   LinkSpan,
-  DiagnosticItem,
+  Diagnostic,
   FlowGuide,
   FoldRegion,
   GutterIcon,
@@ -162,6 +163,8 @@ export class EditorOptions {
   flingMinVelocity: number = 30;
   flingMaxVelocity: number = 12000;
   maxUndoStackSize: number = 512;
+  keyChordTimeoutMs: number = 2000;
+  revealSelectionEndOnSelectAll: boolean = false;
 }
 
 export class HandleConfig {
@@ -659,6 +662,14 @@ export class EditorCore {
     return ProtocolDecoder.decodeScrollMetrics(native.editorGetScrollMetrics(this.handle));
   }
 
+  getVisibleLineRange(): IntRange {
+    const visible = native.editorGetVisibleLineRange(this.handle);
+    return {
+      start: visible && visible.length > 0 ? visible[0] : 0,
+      end: visible && visible.length > 1 ? visible[1] : -1
+    };
+  }
+
   // ==================== Style Registration + Highlight Spans ====================
 
   registerTextStyle(styleId: number, color: number, backgroundColorOrFontStyle: number, fontStyle?: number): void {
@@ -850,7 +861,7 @@ export class EditorCore {
 
   // ==================== Diagnostic Decorations ====================
 
-  setLineDiagnostics(lineOrData: number | ArrayBuffer, itemsOrSize: DiagnosticItem[] | number): void {
+  setLineDiagnostics(lineOrData: number | ArrayBuffer, itemsOrSize: Diagnostic[] | number): void {
     if (lineOrData instanceof ArrayBuffer) {
       native.editorSetLineDiagnostics(this.handle, lineOrData, lineOrData.byteLength);
       return;
@@ -862,7 +873,7 @@ export class EditorCore {
     native.editorSetLineDiagnostics(this.handle, data, data.byteLength);
   }
 
-  setBatchLineDiagnostics(diagsByLineOrData: Map<number, DiagnosticItem[]> | ArrayBuffer, _size?: number): void {
+  setBatchLineDiagnostics(diagsByLineOrData: Map<number, Diagnostic[]> | ArrayBuffer, _size?: number): void {
     if (diagsByLineOrData instanceof ArrayBuffer) {
       native.editorSetBatchLineDiagnostics(this.handle, diagsByLineOrData, diagsByLineOrData.byteLength);
       return;
@@ -1034,4 +1045,3 @@ export class EditorCore {
     native.editorClearAllDecorations(this.handle);
   }
 }
-

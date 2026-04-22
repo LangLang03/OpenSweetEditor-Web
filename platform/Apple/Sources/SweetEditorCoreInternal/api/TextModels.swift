@@ -20,6 +20,28 @@ public struct TextRange {
     }
 }
 
+public struct IntRange: Equatable {
+    public var start: Int
+    public var end: Int
+
+    public init(start: Int, end: Int) {
+        self.start = start
+        self.end = end
+    }
+
+    public var isEmpty: Bool {
+        end < start
+    }
+
+    public func contains(_ value: Int) -> Bool {
+        !isEmpty && value >= start && value <= end
+    }
+
+    public var length: Int {
+        isEmpty ? 0 : (end - start + 1)
+    }
+}
+
 public struct TextChange {
     public let range: TextRange
     public let newText: String

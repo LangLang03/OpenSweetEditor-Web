@@ -60,8 +60,6 @@ public class SweetEditor extends JPanel {
     private EditorRenderModel renderModel;
     private boolean renderModelDirty = true;
     private boolean fontMetricsDirty = true;
-    private int cachedVisibleStartLine;
-    private int cachedVisibleEndLine = -1;
     private EditorRenderer renderer;
     private AnimationHolder animationHolder;
 
@@ -100,7 +98,7 @@ public class SweetEditor extends JPanel {
         renderer = new EditorRenderer(theme);
         animationHolder = new AnimationHolder();
 
-        editorCore = new EditorCore(renderer.getTextMeasureCallback(), new EditorOptions(20.0f, 300));
+        editorCore = new EditorCore(renderer.getTextMeasurer(), new EditorOptions(20.0f, 300, false));
         keyMap = createDefaultKeyMap();
         editorCore.setKeyMap(keyMap);
 
@@ -147,8 +145,6 @@ public class SweetEditor extends JPanel {
         if (document == null) return;
         editorCore.loadDocument(document);
         renderModel = null;
-        cachedVisibleStartLine = 0;
-        cachedVisibleEndLine = -1;
         decorationProviderManager.onDocumentLoaded();
         eventBus.publish(new DocumentLoadedEvent());
         flush();
@@ -199,11 +195,11 @@ public class SweetEditor extends JPanel {
         flush();
     }
 
-    public int[] getVisibleLineRange() {
-        if ((renderModel == null || cachedVisibleEndLine < 0) && renderModelDirty) {
+    public IntRange getVisibleLineRange() {
+        if (renderModelDirty) {
             ensureRenderModelUpToDate();
         }
-        return new int[]{cachedVisibleStartLine, cachedVisibleEndLine};
+        return editorCore.getVisibleLineRange();
     }
 
     public int getTotalLineCount() {
@@ -461,6 +457,18 @@ public class SweetEditor extends JPanel {
         editorCore.setBatchLineCodeLens(itemsByLine);
     }
 
+    public void setLineLinks(int line, List<? extends LinkSpan> links) {
+        editorCore.setLineLinks(line, links);
+    }
+
+    public void setBatchLineLinks(Map<Integer, ? extends List<? extends LinkSpan>> linksByLine) {
+        editorCore.setBatchLineLinks(linksByLine);
+    }
+
+    public String getLinkTargetAt(int line, int column) {
+        return editorCore.getLinkTargetAt(line, column);
+    }
+
     public void setLineDiagnostics(int line, List<? extends Diagnostic> items) {
         editorCore.setLineDiagnostics(line, items);
     }
@@ -582,6 +590,10 @@ public class SweetEditor extends JPanel {
 
     public void clearCodeLens() {
         editorCore.clearCodeLens();
+    }
+
+    public void clearLinks() {
+        editorCore.clearLinks();
     }
 
     public void clearGuides() {
@@ -1100,15 +1112,15 @@ public class SweetEditor extends JPanel {
 
     // ===================== Event Dispatching =====================
 
-    private void fireGestureEvents(GestureResult result, PointF screenPoint) {
+    private void fireGestureEvents(GestureResult result, PointF locationInEditor) {
         if (result.type == null) return;
         switch (result.type) {
             case LONG_PRESS:
-                eventBus.publish(new LongPressEvent(result.cursorPosition, screenPoint));
+                eventBus.publish(new LongPressEvent(result.cursorPosition, locationInEditor));
                 eventBus.publish(new CursorChangedEvent(result.cursorPosition));
                 break;
             case DOUBLE_TAP:
-                eventBus.publish(new DoubleTapEvent(result.cursorPosition, result.hasSelection, result.selection, screenPoint));
+                eventBus.publish(new DoubleTapEvent(result.cursorPosition, result.hasSelection, result.selection, locationInEditor));
                 eventBus.publish(new CursorChangedEvent(result.cursorPosition));
                 if (result.hasSelection) {
                     eventBus.publish(new SelectionChangedEvent(true, result.selection, result.cursorPosition));
@@ -1129,32 +1141,39 @@ public class SweetEditor extends JPanel {
                                     result.hitTarget.line, result.hitTarget.column,
                                     hitType == HitTargetType.INLAY_HINT_ICON ? InlayType.ICON : InlayType.TEXT,
                                     result.hitTarget.iconId,
-                                    screenPoint));
+                                    locationInEditor));
                             break;
                         case INLAY_HINT_COLOR:
                             eventBus.publish(new InlayHintClickEvent(
                                     result.hitTarget.line, result.hitTarget.column,
                                     InlayType.COLOR,
                                     result.hitTarget.colorValue,
-                                    screenPoint));
+                                    locationInEditor));
                             break;
                         case GUTTER_ICON:
                             eventBus.publish(new GutterIconClickEvent(
-                                    result.hitTarget.line, result.hitTarget.iconId, screenPoint));
+                                    result.hitTarget.line, result.hitTarget.iconId, locationInEditor));
                             break;
                         case FOLD_PLACEHOLDER:
                         case FOLD_GUTTER:
                             eventBus.publish(new FoldToggleEvent(
                                     result.hitTarget.line,
                                     hitType == HitTargetType.FOLD_GUTTER,
-                                    screenPoint));
+                                    locationInEditor));
                             break;
                         case CODELENS:
                             eventBus.publish(new CodeLensClickEvent(
                                     result.hitTarget.line,
                                     result.hitTarget.column,
                                     result.hitTarget.iconId,
-                                    screenPoint));
+                                    locationInEditor));
+                            break;
+                        case LINK:
+                            eventBus.publish(new LinkClickEvent(
+                                    result.hitTarget.line,
+                                    result.hitTarget.column,
+                                    getLinkTargetAt(result.hitTarget.line, result.hitTarget.column),
+                                    locationInEditor));
                             break;
                         default:
                             break;
@@ -1163,28 +1182,43 @@ public class SweetEditor extends JPanel {
                 break;
             case SCROLL:
             case FAST_SCROLL:
-                eventBus.publish(new ScrollChangedEvent(result.viewScrollX, result.viewScrollY));
-                decorationProviderManager.onScrollChanged();
-                // Close completion panel on scroll
-                if (completionPopupController != null && completionPopupController.isShowing()) {
-                    completionProviderManager.dismiss();
-                }
-                if (settings.isCursorAnimationEnabled()) {
-                    ensureRenderModelUpToDate();
-                    animationHolder.cursorAnimatedX = renderModel.cursor.position.x;
-                    animationHolder.cursorAnimatedY = renderModel.cursor.position.y;
-                }
+                handleScrollChanged(result);
                 break;
             case SCALE:
                 eventBus.publish(new ScaleChangedEvent(result.viewScale));
                 break;
             case DRAG_SELECT:
+                if (didScrollSinceLastFrame(result)) {
+                    handleScrollChanged(result);
+                }
                 eventBus.publish(new SelectionChangedEvent(result.hasSelection, result.selection, result.cursorPosition));
                 break;
             case CONTEXT_MENU:
-                eventBus.publish(new ContextMenuEvent(result.cursorPosition, screenPoint));
+                eventBus.publish(new ContextMenuEvent(result.cursorPosition, locationInEditor));
                 break;
         }
+    }
+
+    private void handleScrollChanged(GestureResult result) {
+        eventBus.publish(new ScrollChangedEvent(result.viewScrollX, result.viewScrollY));
+        decorationProviderManager.onScrollChanged();
+        if (completionPopupController != null && completionPopupController.isShowing()) {
+            completionProviderManager.dismiss();
+        }
+        if (settings.isCursorAnimationEnabled()) {
+            ensureRenderModelUpToDate();
+            animationHolder.cursorAnimatedX = renderModel.cursor.position.x;
+            animationHolder.cursorAnimatedY = renderModel.cursor.position.y;
+        }
+    }
+
+    private boolean didScrollSinceLastFrame(GestureResult result) {
+        if (renderModel == null) {
+            return Float.compare(result.viewScrollX, 0f) != 0
+                    || Float.compare(result.viewScrollY, 0f) != 0;
+        }
+        return Float.compare(renderModel.scrollX, result.viewScrollX) != 0
+                || Float.compare(renderModel.scrollY, result.viewScrollY) != 0;
     }
 
     private void applyCompletionItem(CompletionItem item) {
@@ -1319,6 +1353,9 @@ public class SweetEditor extends JPanel {
 
     private void setupCursorAnimation() {
         cursorAnimationTimer = new Timer(ANIMATION_INTERVAL_MS, e -> {
+            if (renderModel == null || renderModel.cursor == null || renderModel.cursor.position == null) {
+                return;
+            }
             Cursor cursor = renderModel.cursor;
             PointF position = cursor.position;
             float targetX = position.x;
@@ -1358,6 +1395,9 @@ public class SweetEditor extends JPanel {
 
     private void setupGutterAnimation() {
         gutterAnimationTimer = new Timer(ANIMATION_INTERVAL_MS, e -> {
+            if (renderModel == null) {
+                return;
+            }
             float targetX = renderModel.splitX;
 
             if (animationHolder.splitAnimatedX == -1f) {
@@ -1446,7 +1486,6 @@ public class SweetEditor extends JPanel {
         if (renderModel != null) {
             updateMouseCursor(renderModel.pointerCursorType);
         }
-        updateVisibleLineRangeCache(renderModel);
         if (buildPerf != null) {
             buildPerf.mark(PerfStepRecorder.STEP_BUILD);
             buildPerf.finish();
@@ -1485,22 +1524,6 @@ public class SweetEditor extends JPanel {
             inlineSuggestionController.updatePosition(
                     renderModel.cursor.position.x, renderModel.cursor.position.y, renderModel.cursor.height);
         }
-    }
-
-    private void updateVisibleLineRangeCache(EditorRenderModel model) {
-        if (model == null || model.lines == null || model.lines.isEmpty()) {
-            cachedVisibleStartLine = 0;
-            cachedVisibleEndLine = -1;
-            return;
-        }
-        int start = Integer.MAX_VALUE;
-        int end = -1;
-        for (VisualLine line : model.lines) {
-            if (line.logicalLine < start) start = line.logicalLine;
-            if (line.logicalLine > end) end = line.logicalLine;
-        }
-        cachedVisibleStartLine = start == Integer.MAX_VALUE ? 0 : start;
-        cachedVisibleEndLine = end;
     }
 
     private long startInputPerf() {

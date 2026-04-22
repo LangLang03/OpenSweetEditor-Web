@@ -8,21 +8,37 @@ part of '../sweeteditor.dart';
 /// Usage:
 /// ```
 /// final controller = SweetEditorController();
-/// SweetEditorWidget(controller: controller);
-/// controller.loadDocument(core.Document.fromString('hello world'));
+/// SweetEditorWidget(
+///   controller: controller,
+///   text: 'hello world',
+/// );
 /// ```
 class SweetEditorWidget extends StatefulWidget {
   const SweetEditorWidget({
     super.key,
     required this.controller,
+    this.document,
+    this.text,
     this.theme,
+    this.settings,
+    this.keyMap,
+    this.iconProvider,
+    this.languageConfiguration,
+    this.metadata,
     this.fontFamily = 'monospace',
     this.fontSize = 14,
     this.autofocus = true,
   });
 
   final SweetEditorController controller;
+  final core.Document? document;
+  final String? text;
   final EditorTheme? theme;
+  final EditorSettings? settings;
+  final EditorKeyMap? keyMap;
+  final EditorIconProvider? iconProvider;
+  final LanguageConfiguration? languageConfiguration;
+  final EditorMetadata? metadata;
   final String fontFamily;
   final double fontSize;
   final bool autofocus;
@@ -44,7 +60,8 @@ class _SweetEditorWidgetState extends State<SweetEditorWidget>
   bool _pendingShowTextInput = false;
   Size? _pendingViewportSize;
   bool _viewportUpdateScheduled = false;
-  bool _released = false;
+  bool _editorResourcesReleased = false;
+  core.PointerCursorType _pointerCursorType = core.PointerCursorType.text;
 
   EditorEventBus get _eventBus => widget.controller._eventBus;
   core.EditorCore? get _editorCore => _session.editorCore;
@@ -63,6 +80,7 @@ class _SweetEditorWidgetState extends State<SweetEditorWidget>
       _session.newLineActionProviderManager;
   SelectionMenuController get _selectionMenuController =>
       _session.selectionMenuController;
+  EditorSettings get _settings => _session.settings;
 
   @override
   void initState() {
@@ -70,6 +88,39 @@ class _SweetEditorWidgetState extends State<SweetEditorWidget>
     _focusNode = FocusNode(debugLabel: 'SweetEditor');
     _focusNode.addListener(_handleFocusChanged);
     _initEditor();
+  }
+
+  @override
+  void didUpdateWidget(covariant SweetEditorWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(widget.controller, oldWidget.controller)) {
+      throw StateError(
+        'SweetEditorWidget cannot change controller after the editor is mounted',
+      );
+    }
+
+    final defaultTheme = EditorTheme.dark();
+    _applyTheme(widget.theme ?? defaultTheme);
+    _session.applyDeclarativeSettings(
+      widget.settings,
+      fontSize: widget.fontSize,
+      fontFamily: widget.fontFamily,
+      gutterSticky: _isDesktopStylePlatform,
+    );
+    _applyKeyMap(widget.keyMap ?? EditorKeyMap.defaultKeyMap());
+    _applyIconProvider(widget.iconProvider);
+    _applyLanguageConfiguration(widget.languageConfiguration);
+    _applyMetadata(widget.metadata);
+
+    final documentChanged = !identical(widget.document, oldWidget.document);
+    final textChanged = widget.text != oldWidget.text;
+    if (widget.document != null) {
+      if (documentChanged) {
+        _loadDocument(widget.document!);
+      }
+    } else if (documentChanged || textChanged) {
+      _loadText(widget.text ?? '');
+    }
   }
 
   @override
@@ -86,12 +137,19 @@ class _SweetEditorWidgetState extends State<SweetEditorWidget>
     _session.onRequestDecorationRefresh =
         _decorationProviderManager.requestRefresh;
     _session.onRenderModelUpdated = (model) {
+      final pointerCursorChanged =
+          model.pointerCursorType != _pointerCursorType;
+      _pointerCursorType = model.pointerCursorType;
       _overlayCoordinator.onRenderModelUpdated(model);
       _updateTextInputGeometry();
+      if (pointerCursorChanged && mounted) {
+        setState(() {});
+      }
     };
     _session.bindSettings();
     _session.setHandleConfig(_computeHandleHitConfig());
     _session.setScrollbarConfig(_buildScrollbarConfig());
+    _applyDeclarativeInputs();
     widget.controller._attach(this);
     _interactionController.startCursorBlink();
   }
@@ -100,9 +158,14 @@ class _SweetEditorWidgetState extends State<SweetEditorWidget>
     _session = EditorSession(
       controller: widget.controller,
       theme: widget.theme ?? EditorTheme.dark(),
+      initialSettings: widget.settings,
       fontFamily: widget.fontFamily,
       fontSize: widget.fontSize,
       gutterSticky: _isDesktopStylePlatform,
+      initialKeyMap: widget.keyMap ?? EditorKeyMap.defaultKeyMap(),
+      initialIconProvider: widget.iconProvider,
+      initialLanguageConfiguration: widget.languageConfiguration,
+      initialMetadata: widget.metadata,
       completionPopupController: CompletionPopupController(
         panelBgColor:
             widget.theme?.completionBgColor ??
@@ -134,6 +197,18 @@ class _SweetEditorWidgetState extends State<SweetEditorWidget>
       _interactionController.onCompletionItemConfirmed,
     );
     completionProviderManager.setListener(_session.completionPopupController);
+  }
+
+  void _applyDeclarativeInputs() {
+    final document = widget.document;
+    if (document != null) {
+      _loadDocument(document);
+      return;
+    }
+    final text = widget.text;
+    if (text != null) {
+      _loadText(text);
+    }
   }
 
   static core.HandleConfig _computeHandleHitConfig() {
@@ -258,18 +333,15 @@ class _SweetEditorWidgetState extends State<SweetEditorWidget>
     _flush();
   }
 
-  void _releaseFromController() {
-    if (_released) return;
-    _closeTextInputConnection();
-    _releaseEditorResources();
-    if (mounted) {
-      setState(() {});
-    }
+  void _applyMetadata(EditorMetadata? metadata) {
+    _session.applyMetadata(metadata);
+    _decorationProviderManager.requestRefresh();
+    _flush();
   }
 
   void _releaseEditorResources() {
-    if (_released) return;
-    _released = true;
+    if (_editorResourcesReleased) return;
+    _editorResourcesReleased = true;
     _interactionController.dispose();
     _overlayCoordinator.dispose();
     _completionProviderManager.dispose();
@@ -368,6 +440,11 @@ class _SweetEditorWidgetState extends State<SweetEditorWidget>
   void performSelector(String selectorName) {}
 
   void _handleFocusChanged() {
+    if (_editorResourcesReleased) {
+      _pendingShowTextInput = false;
+      _closeTextInputConnection();
+      return;
+    }
     if (_focusNode.hasFocus) {
       final show = _pendingShowTextInput;
       _pendingShowTextInput = false;
@@ -379,14 +456,17 @@ class _SweetEditorWidgetState extends State<SweetEditorWidget>
   }
 
   void _openTextInputConnection({required bool show}) {
-    if (!_usesPlatformTextInput || !_focusNode.hasFocus || !mounted) {
+    if (_editorResourcesReleased ||
+        !_usesPlatformTextInput ||
+        !_focusNode.hasFocus ||
+        !mounted) {
       return;
     }
     final configuration = TextInputConfiguration(
       viewId: View.of(context).viewId,
       inputType: TextInputType.multiline,
       inputAction: TextInputAction.newline,
-      readOnly: widget.controller.settings.isReadOnly(),
+      readOnly: _settings.isReadOnly(),
       autocorrect: false,
       enableSuggestions: false,
     );
@@ -425,10 +505,8 @@ class _SweetEditorWidgetState extends State<SweetEditorWidget>
       return;
     }
     _textInputConnection!.setStyle(
-      fontFamily: widget.controller.settings.getFontFamily(),
-      fontSize:
-          widget.controller.settings.getEditorTextSize() *
-          widget.controller.settings.getScale(),
+      fontFamily: _settings.getFontFamily(),
+      fontSize: _settings.getEditorTextSize() * _settings.getScale(),
       fontWeight: FontWeight.w400,
       textDirection: TextDirection.ltr,
       textAlign: TextAlign.left,
@@ -578,6 +656,7 @@ class _SweetEditorWidgetState extends State<SweetEditorWidget>
   }
 
   void _handleGestureInputResult(core.GestureResult? result) {
+    if (_editorResourcesReleased) return;
     if (result == null) return;
     if (result.type != core.GestureType.tap) {
       _pendingShowTextInput = false;
@@ -597,94 +676,118 @@ class _SweetEditorWidgetState extends State<SweetEditorWidget>
     }
   }
 
+  MouseCursor _resolveMouseCursor() {
+    if (_editorResourcesReleased) {
+      return SystemMouseCursors.basic;
+    }
+    switch (_pointerCursorType) {
+      case core.PointerCursorType.default_:
+        return SystemMouseCursors.basic;
+      case core.PointerCursorType.text:
+        return SystemMouseCursors.text;
+      case core.PointerCursorType.hand:
+        return SystemMouseCursors.click;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (_released) {
-      return const SizedBox.shrink();
-    }
     return Focus(
       focusNode: _focusNode,
       autofocus: widget.autofocus,
-      onKeyEvent: _interactionController.handleKeyEvent,
-      child: MouseRegion(
-        onExit: (event) => _interactionController.onPointerExit(event),
-        child: Listener(
-          onPointerDown: _interactionController.onPointerDown,
-          onPointerMove: _interactionController.onPointerMove,
-          onPointerHover: _interactionController.onPointerHover,
-          onPointerUp: (event) {
-            final result = _interactionController.onPointerUp(event);
-            _handleGestureInputResult(result);
-          },
-          onPointerSignal: _interactionController.onPointerSignal,
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final newSize = constraints.biggest;
-              if (newSize != _session.viewportSize &&
-                  newSize.width > 0 &&
-                  newSize.height > 0) {
-                _scheduleViewportUpdate(newSize);
-              }
-
-              return ClipRect(
-                child: AnimatedBuilder(
-                  animation: _overlayCoordinator.overlayListenable,
-                  builder: (context, child) {
-                    final completionOverlay =
-                        _overlayCoordinator.completionOverlay.value.data;
-                    final inlineSuggestionOverlay =
-                        _overlayCoordinator.inlineSuggestionOverlay.value.data;
-                    final selectionMenuOverlay =
-                        _overlayCoordinator.selectionMenuOverlay.value.data;
-
-                    return Stack(
-                      clipBehavior: Clip.hardEdge,
-                      children: [
-                        Positioned.fill(child: child!),
-                        if (completionOverlay != null)
-                          CompletionPopupWidget(
-                            items: completionOverlay.items,
-                            selectedIndex: completionOverlay.selectedIndex,
-                            position: completionOverlay.position,
-                            themeColors: _completionPopupController.themeColors,
-                            viewportSize: newSize,
-                            onItemTap: (index) =>
-                                _completionPopupController.confirmItem(index),
-                          ),
-                        if (inlineSuggestionOverlay != null)
-                          InlineSuggestionBarWidget(
-                            x: inlineSuggestionOverlay.x,
-                            y: inlineSuggestionOverlay.y,
-                            cursorHeight: inlineSuggestionOverlay.cursorHeight,
-                            theme: _theme,
-                            onAccept: () => _inlineSuggestionController.accept(),
-                            onDismiss: () =>
-                                _inlineSuggestionController.dismiss(),
-                          ),
-                        if (selectionMenuOverlay != null &&
-                            selectionMenuOverlay.items.isNotEmpty)
-                          SelectionMenuWidget(
-                            position: _overlayCoordinator
-                                .computeSelectionMenuPosition(
-                                  newSize,
-                                  selectionMenuOverlay.items,
-                                ),
-                            items: selectionMenuOverlay.items,
-                            bgColor: _theme.completionBgColor,
-                            textColor: _theme.completionLabelColor,
-                            onItemTap:
-                                _interactionController.onSelectionMenuItemTap,
-                          ),
-                      ],
-                    );
-                  },
-                  child: SizedBox.expand(
-                    key: _editorKey,
-                    child: CustomPaint(size: newSize, painter: _painter),
-                  ),
-                ),
-              );
+      canRequestFocus: !_editorResourcesReleased,
+      skipTraversal: _editorResourcesReleased,
+      onKeyEvent: _editorResourcesReleased
+          ? (_, _) => KeyEventResult.ignored
+          : _interactionController.handleKeyEvent,
+      child: IgnorePointer(
+        ignoring: _editorResourcesReleased,
+        child: MouseRegion(
+          cursor: _resolveMouseCursor(),
+          onExit: (event) => _interactionController.onPointerExit(event),
+          child: Listener(
+            onPointerDown: _interactionController.onPointerDown,
+            onPointerMove: _interactionController.onPointerMove,
+            onPointerHover: _interactionController.onPointerHover,
+            onPointerUp: (event) {
+              final result = _interactionController.onPointerUp(event);
+              _handleGestureInputResult(result);
             },
+            onPointerSignal: _interactionController.onPointerSignal,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final newSize = constraints.biggest;
+                if (newSize != _session.viewportSize &&
+                    newSize.width > 0 &&
+                    newSize.height > 0) {
+                  _scheduleViewportUpdate(newSize);
+                }
+
+                return ClipRect(
+                  child: AnimatedBuilder(
+                    animation: _overlayCoordinator.overlayListenable,
+                    builder: (context, child) {
+                      final completionOverlay =
+                          _overlayCoordinator.completionOverlay.value.data;
+                      final inlineSuggestionOverlay = _overlayCoordinator
+                          .inlineSuggestionOverlay
+                          .value
+                          .data;
+                      final selectionMenuOverlay =
+                          _overlayCoordinator.selectionMenuOverlay.value.data;
+
+                      return Stack(
+                        clipBehavior: Clip.hardEdge,
+                        children: [
+                          Positioned.fill(child: child!),
+                          if (completionOverlay != null)
+                            CompletionPopupWidget(
+                              items: completionOverlay.items,
+                              selectedIndex: completionOverlay.selectedIndex,
+                              position: completionOverlay.position,
+                              themeColors:
+                                  _completionPopupController.themeColors,
+                              viewportSize: newSize,
+                              onItemTap: (index) =>
+                                  _completionPopupController.confirmItem(index),
+                            ),
+                          if (inlineSuggestionOverlay != null)
+                            InlineSuggestionBarWidget(
+                              x: inlineSuggestionOverlay.x,
+                              y: inlineSuggestionOverlay.y,
+                              cursorHeight:
+                                  inlineSuggestionOverlay.cursorHeight,
+                              theme: _theme,
+                              onAccept: () =>
+                                  _inlineSuggestionController.accept(),
+                              onDismiss: () =>
+                                  _inlineSuggestionController.dismiss(),
+                            ),
+                          if (selectionMenuOverlay != null &&
+                              selectionMenuOverlay.items.isNotEmpty)
+                            SelectionMenuWidget(
+                              position: _overlayCoordinator
+                                  .computeSelectionMenuPosition(
+                                    newSize,
+                                    selectionMenuOverlay.items,
+                                  ),
+                              items: selectionMenuOverlay.items,
+                              bgColor: _theme.completionBgColor,
+                              textColor: _theme.completionLabelColor,
+                              onItemTap:
+                                  _interactionController.onSelectionMenuItemTap,
+                            ),
+                        ],
+                      );
+                    },
+                    child: SizedBox.expand(
+                      key: _editorKey,
+                      child: CustomPaint(size: newSize, painter: _painter),
+                    ),
+                  ),
+                );
+              },
+            ),
           ),
         ),
       ),

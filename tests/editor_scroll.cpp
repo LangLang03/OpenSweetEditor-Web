@@ -76,3 +76,44 @@ TEST_CASE("EditorCore viewport change re-clamps existing scroll offset") {
   CHECK(after.max_scroll_y < before.max_scroll_y);
   CHECK(after.scroll_y == after.max_scroll_y);
 }
+
+TEST_CASE("EditorCore selectAll keeps scroll stable when reveal_selection_end_on_select_all is disabled") {
+  EditorOptions options;
+  EditorCore editor(makeShared<FixedWidthTextMeasurer>(10.0f), options);
+
+  SharedPtr<Document> document = makeShared<LineArrayDocument>(makeLines(80, "abcdefghij"));
+  editor.loadDocument(document);
+  editor.setViewport({120, 80});
+
+  EditorRenderModel model;
+  editor.buildRenderModel(model);
+  ScrollMetrics before = editor.getScrollMetrics();
+
+  editor.selectAll();
+  ScrollMetrics after = editor.getScrollMetrics();
+
+  CHECK(after.scroll_y == before.scroll_y);
+  CHECK(after.scroll_y == 0.0f);
+}
+
+TEST_CASE("EditorCore selectAll reveals selection end when reveal_selection_end_on_select_all is enabled") {
+  EditorOptions options;
+  options.reveal_selection_end_on_select_all = true;
+  EditorCore editor(makeShared<FixedWidthTextMeasurer>(10.0f), options);
+
+  SharedPtr<Document> document = makeShared<LineArrayDocument>(makeLines(80, "abcdefghij"));
+  editor.loadDocument(document);
+  editor.setViewport({120, 80});
+
+  EditorRenderModel model;
+  editor.buildRenderModel(model);
+
+  editor.selectAll();
+  ScrollMetrics after = editor.getScrollMetrics();
+  CursorRect cursor_rect = editor.getCursorScreenRect();
+
+  REQUIRE(after.max_scroll_y > 0.0f);
+  CHECK(after.scroll_y > 0.0f);
+  CHECK(cursor_rect.y >= 0.0f);
+  CHECK(cursor_rect.y + cursor_rect.height <= 80.0f);
+}

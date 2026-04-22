@@ -1,6 +1,6 @@
 import {
   BracketGuide,
-  DiagnosticItem,
+  Diagnostic,
   FlowGuide,
   FoldRegion,
   GutterIcon,
@@ -13,6 +13,7 @@ import {
   StyleSpan
 } from '../core/CoreAdornments';
 import { TextChange } from '../core/EditorCore';
+import { IntRange } from '../core/CoreFoundation';
 import { EditorMetadata, LanguageConfiguration } from '../EditorTypes';
 
 export enum DecorationType {
@@ -34,19 +35,17 @@ export enum DecorationType {
 export { TextChange } from '../core/EditorCore';
 
 export class DecorationContext {
-  readonly visibleStartLine: number;
-  readonly visibleEndLine: number;
+  readonly visibleLineRange: IntRange;
   readonly totalLineCount: number;
   readonly textChanges: TextChange[];
   readonly languageConfiguration: LanguageConfiguration | null;
   readonly editorMetadata: EditorMetadata | null;
 
-  constructor(visibleStartLine: number, visibleEndLine: number, totalLineCount: number,
+  constructor(visibleLineRange: IntRange, totalLineCount: number,
     textChanges: TextChange[],
     languageConfiguration: LanguageConfiguration | null,
     editorMetadata: EditorMetadata | null) {
-    this.visibleStartLine = visibleStartLine;
-    this.visibleEndLine = visibleEndLine;
+    this.visibleLineRange = visibleLineRange;
     this.totalLineCount = totalLineCount;
     this.textChanges = [...textChanges];
     this.languageConfiguration = languageConfiguration;
@@ -91,7 +90,7 @@ export class DecorationResult {
   syntaxSpans: Map<number, StyleSpan[]> | null = null;
   semanticSpans: Map<number, StyleSpan[]> | null = null;
   inlayHints: Map<number, InlayHint[]> | null = null;
-  diagnostics: Map<number, DiagnosticItem[]> | null = null;
+  diagnostics: Map<number, Diagnostic[]> | null = null;
   indentGuides: IndentGuide[] | null = null;
   bracketGuides: BracketGuide[] | null = null;
   flowGuides: FlowGuide[] | null = null;
@@ -168,7 +167,7 @@ export class DecorationResultBuilder {
     return this;
   }
 
-  diagnostics(value: Map<number, DiagnosticItem[]> | null, mode: ApplyMode): DecorationResultBuilder {
+  diagnostics(value: Map<number, Diagnostic[]> | null, mode: ApplyMode): DecorationResultBuilder {
     this.result.diagnostics = value;
     this.result.diagnosticsMode = mode;
     return this;
@@ -243,4 +242,3 @@ function copyMapOfArrays<T>(source: Map<number, T[]> | null): Map<number, T[]> |
   });
   return out;
 }
-

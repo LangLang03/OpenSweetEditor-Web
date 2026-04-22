@@ -47,34 +47,34 @@ public class EditorCore {
         }
     }
 
-    public interface TextMeasureCallback {
+    public interface TextMeasurer {
         float measureTextWidth(MemorySegment textPtr, int fontStyle);
         float measureInlayHintWidth(MemorySegment textPtr);
         float measureIconWidth(int iconId);
         void getFontMetrics(MemorySegment arrPtr, long length);
     }
 
-    public EditorCore(TextMeasureCallback callback, EditorOptions options) {
+    public EditorCore(TextMeasurer callback, EditorOptions options) {
         this.arena = Arena.ofShared();
 
         MemorySegment measurer = arena.allocate(EditorNative.MEASURER_LAYOUT);
 
-        MemorySegment measureTextStub = EditorNative.createUpcallStub(arena, callback, TextMeasureCallback.class,
+        MemorySegment measureTextStub = EditorNative.createUpcallStub(arena, callback, TextMeasurer.class,
                 "measureTextWidth",
                 MethodType.methodType(float.class, MemorySegment.class, int.class),
                 EditorNative.MEASURE_TEXT_WIDTH_DESC);
 
-        MemorySegment measureInlayStub = EditorNative.createUpcallStub(arena, callback, TextMeasureCallback.class,
+        MemorySegment measureInlayStub = EditorNative.createUpcallStub(arena, callback, TextMeasurer.class,
                 "measureInlayHintWidth",
                 MethodType.methodType(float.class, MemorySegment.class),
                 EditorNative.MEASURE_INLAY_HINT_WIDTH_DESC);
 
-        MemorySegment measureIconStub = EditorNative.createUpcallStub(arena, callback, TextMeasureCallback.class,
+        MemorySegment measureIconStub = EditorNative.createUpcallStub(arena, callback, TextMeasurer.class,
                 "measureIconWidth",
                 MethodType.methodType(float.class, int.class),
                 EditorNative.MEASURE_ICON_WIDTH_DESC);
 
-        MemorySegment fontMetricsStub = EditorNative.createUpcallStub(arena, callback, TextMeasureCallback.class,
+        MemorySegment fontMetricsStub = EditorNative.createUpcallStub(arena, callback, TextMeasurer.class,
                 "getFontMetrics",
                 MethodType.methodType(void.class, MemorySegment.class, long.class),
                 EditorNative.GET_FONT_METRICS_DESC);
@@ -176,6 +176,12 @@ public class EditorCore {
             return ProtocolDecoder.decodeLayoutMetrics(result.asByteBuffer());
         } finally {
             result.free();
+        }
+    }
+
+    public IntRange getVisibleLineRange() {
+        try (Arena tempArena = Arena.ofConfined()) {
+            return EditorNative.getVisibleLineRange(nativeHandle, tempArena);
         }
     }
 
@@ -836,6 +842,47 @@ public class EditorCore {
     /** Clears all CodeLens items */
     public void clearCodeLens() {
         EditorNative.clearCodeLens(nativeHandle);
+    }
+
+    // ===================== Links =====================
+
+    /** Set link spans for a specific line */
+    public void setLineLinks(int line, List<? extends LinkSpan> links) {
+        if (links == null) return;
+        try (Arena tempArena = Arena.ofConfined()) {
+            byte[] payload = ProtocolEncoder.packLineLinks(line, links);
+            EditorNative.setLineLinks(nativeHandle, payload, tempArena);
+        }
+    }
+
+    /** Set link spans for a specific line (zero-copy overload) */
+    public void setLineLinks(MemorySegment payload, long size) {
+        EditorNative.setLineLinks(nativeHandle, payload, size);
+    }
+
+    /** Batch set link spans for multiple lines */
+    public void setBatchLineLinks(Map<Integer, ? extends List<? extends LinkSpan>> linksByLine) {
+        if (linksByLine == null || linksByLine.isEmpty()) return;
+        byte[] payload = ProtocolEncoder.packBatchLineLinks(linksByLine);
+        if (payload == null) return;
+        try (Arena tempArena = Arena.ofConfined()) {
+            EditorNative.setBatchLineLinks(nativeHandle, payload, tempArena);
+        }
+    }
+
+    /** Batch set link spans for multiple lines (zero-copy overload) */
+    public void setBatchLineLinks(MemorySegment payload, long size) {
+        EditorNative.setBatchLineLinks(nativeHandle, payload, size);
+    }
+
+    /** Clears all link spans */
+    public void clearLinks() {
+        EditorNative.clearLinks(nativeHandle);
+    }
+
+    /** Returns the link target at the given position, or null if no link exists there */
+    public String getLinkTargetAt(int line, int column) {
+        return EditorNative.getLinkTargetAt(nativeHandle, line, column);
     }
 
     // ===================== Diagnostics =====================

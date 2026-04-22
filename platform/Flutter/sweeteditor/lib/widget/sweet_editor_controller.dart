@@ -3,47 +3,21 @@ part of '../sweeteditor.dart';
 class SweetEditorController {
   _SweetEditorWidgetState? _state;
   final EditorEventBus _eventBus = EditorEventBus();
-  final EditorSettings settings = EditorSettings();
-  EditorKeyMap _keyMap = EditorKeyMap.defaultKeyMap();
-  EditorIconProvider? _iconProvider;
-  String? _pendingText;
-  core.Document? _pendingDocument;
-  EditorTheme? _pendingTheme;
-  LanguageConfiguration? _languageConfiguration;
-  bool _closed = false;
   final List<VoidCallback> _readyCallbacks = <VoidCallback>[];
+  bool _associationEstablished = false;
+  bool _terminated = false;
 
   void _attach(_SweetEditorWidgetState state) {
-    if (_closed) {
-      throw StateError('SweetEditorController is already closed');
+    if (_associationEstablished) {
+      if (!identical(_state, state)) {
+        throw StateError(
+          'SweetEditorController cannot be rebound to another editor instance',
+        );
+      }
+      return;
     }
-    final currentState = _state;
-    if (currentState != null && !identical(currentState, state)) {
-      throw StateError(
-        'SweetEditorController cannot be attached to multiple widgets',
-      );
-    }
+    _associationEstablished = true;
     _state = state;
-    final pendingTheme = _pendingTheme;
-    if (pendingTheme != null) {
-      _pendingTheme = null;
-      state._applyTheme(pendingTheme);
-    }
-    state._applyIconProvider(_iconProvider);
-    state._applyKeyMap(_keyMap);
-    final pendingDocument = _pendingDocument;
-    if (pendingDocument != null) {
-      _pendingDocument = null;
-      state._loadDocument(pendingDocument);
-    }
-    final pendingText = _pendingText;
-    if (pendingText != null) {
-      _pendingText = null;
-      state._loadText(pendingText);
-    }
-    if (_languageConfiguration != null) {
-      state._applyLanguageConfiguration(_languageConfiguration);
-    }
     final callbacks = List<VoidCallback>.from(_readyCallbacks);
     _readyCallbacks.clear();
     for (final callback in callbacks) {
@@ -53,6 +27,8 @@ class SweetEditorController {
 
   void _detach() {
     _state = null;
+    _terminated = true;
+    _readyCallbacks.clear();
   }
 
   bool get isAttached => _state != null;
@@ -60,51 +36,40 @@ class SweetEditorController {
   core.EditorCore? get _editorCore => _state?._editorCore;
 
   void _withEditorCore(void Function(core.EditorCore editorCore) action) {
-    if (_closed) return;
+    if (_terminated) return;
     final editorCore = _editorCore;
     if (editorCore == null) return;
     action(editorCore);
   }
 
   void whenReady(VoidCallback callback) {
-    if (_closed) return;
     if (_state != null) {
       callback();
       return;
     }
+    if (_terminated) return;
     _readyCallbacks.add(callback);
   }
 
   void loadDocument(core.Document document) {
-    if (_closed) return;
-    if (_state != null) {
-      _state!._loadDocument(document);
-    } else {
-      _pendingText = null;
-      _pendingDocument = document;
-    }
+    if (_terminated) return;
+    _state?._loadDocument(document);
   }
 
   void loadText(String text) {
-    if (_closed) return;
-    if (_state != null) {
-      _state!._loadText(text);
-    } else {
-      _pendingDocument = null;
-      _pendingText = text;
-    }
+    if (_terminated) return;
+    _state?._loadText(text);
   }
 
-  core.Document? getDocument() => _state?._document ?? _pendingDocument;
+  core.Document? getDocument() => _state?._document;
 
-  String getContent() =>
-      _state?._getContent() ?? _pendingDocument?.text ?? (_pendingText ?? '');
-  int get lineCount =>
-      _state?._document?.lineCount ?? _pendingDocument?.lineCount ?? 0;
-  String getLineText(int line) =>
-      _state?._document?.getLineText(line) ??
-      _pendingDocument?.getLineText(line) ??
-      '';
+  String getContent() => _state?._getContent() ?? '';
+  int get lineCount => _state?._document?.lineCount ?? 0;
+  String getLineText(int line) => _state?._document?.getLineText(line) ?? '';
+
+  EditorSettings? get settings => getSettings();
+
+  EditorSettings? getSettings() => _state?._session.settings;
 
   LanguageConfiguration? get languageConfiguration =>
       getLanguageConfiguration();
@@ -112,32 +77,35 @@ class SweetEditorController {
   set languageConfiguration(LanguageConfiguration? value) =>
       setLanguageConfiguration(value);
 
-  LanguageConfiguration? getLanguageConfiguration() => _languageConfiguration;
+  LanguageConfiguration? getLanguageConfiguration() =>
+      _state?._session.languageConfiguration;
 
   void setLanguageConfiguration(LanguageConfiguration? value) {
-    if (_closed) return;
-    _languageConfiguration = value;
+    if (_terminated) return;
     _state?._applyLanguageConfiguration(value);
   }
-
-  EditorMetadata? _metadata;
 
   EditorMetadata? get metadata => getMetadata();
 
   set metadata(EditorMetadata? value) => setMetadata(value);
 
-  EditorMetadata? getMetadata() => _metadata;
+  EditorMetadata? getMetadata() => _state?._session.metadata;
 
   void setMetadata(EditorMetadata? value) {
-    if (_closed) return;
-    _metadata = value;
+    if (_terminated) return;
+    _state?._applyMetadata(value);
   }
 
   core.TextPosition getCursorPosition() =>
       _state?._editorCore?.getCursorPosition() ?? const core.TextPosition(0, 0);
 
-  void setCursorPosition(int line, int column) {
-    _state?._editorCore?.setCursorPosition(line, column);
+  void setCursorPosition(Object positionOrLine, [int? column]) {
+    final position = _resolveTextPositionArgument(
+      positionOrLine,
+      column,
+      methodName: 'setCursorPosition',
+    );
+    _state?._editorCore?.setCursorPosition(position.line, position.column);
     _state?._flush();
   }
 
@@ -174,28 +142,36 @@ class SweetEditorController {
   }
 
   void replaceText(
-    int startLine,
-    int startColumn,
-    int endLine,
-    int endColumn,
-    String text,
-  ) {
-    _state?._interactionController.replaceText(
-      core.TextRange(
-        core.TextPosition(startLine, startColumn),
-        core.TextPosition(endLine, endColumn),
-      ),
+    Object rangeOrStartLine,
+    Object textOrStartColumn, [
+    int? endLine,
+    int? endColumn,
+    String? text,
+  ]) {
+    final args = _resolveReplaceTextArguments(
+      rangeOrStartLine,
+      textOrStartColumn,
+      endLine,
+      endColumn,
       text,
     );
+    _state?._interactionController.replaceText(args.$1, args.$2);
   }
 
-  void deleteText(int startLine, int startColumn, int endLine, int endColumn) {
-    _state?._interactionController.deleteText(
-      core.TextRange(
-        core.TextPosition(startLine, startColumn),
-        core.TextPosition(endLine, endColumn),
-      ),
+  void deleteText(
+    Object rangeOrStartLine, [
+    int? startColumn,
+    int? endLine,
+    int? endColumn,
+  ]) {
+    final range = _resolveTextRangeArgument(
+      rangeOrStartLine,
+      startColumn,
+      endLine,
+      endColumn,
+      methodName: 'deleteText',
     );
+    _state?._interactionController.deleteText(range);
   }
 
   void insertSnippet(String snippetTemplate) {
@@ -372,6 +348,8 @@ class SweetEditorController {
   Stream<CodeLensClickEvent> get onCodeLensClick =>
       _eventBus.on<CodeLensClickEvent>();
 
+  Stream<LinkClickEvent> get onLinkClick => _eventBus.on<LinkClickEvent>();
+
   Stream<FoldToggleEvent> get onFoldToggle => _eventBus.on<FoldToggleEvent>();
 
   Stream<DocumentLoadedEvent> get onDocumentLoaded =>
@@ -420,19 +398,18 @@ class SweetEditorController {
   core.CursorRect getCursorRect() =>
       _state?._editorCore?.getCursorRect() ?? const core.CursorRect();
 
-  ({int startLine, int endLine}) getVisibleLineRange() {
-    final visualLines = _state?._session.renderModel.visualLines;
-    if (visualLines == null || visualLines.isEmpty) {
-      return (startLine: 0, endLine: -1);
+  core.IntRange getVisibleLineRange() {
+    final editorCore = _state?._editorCore;
+    if (editorCore == null) {
+      return const core.IntRange(0, -1);
     }
-    return (
-      startLine: visualLines.first.logicalLine,
-      endLine: visualLines.last.logicalLine,
-    );
+    if (_state?._session.renderModel.visualLines.isEmpty ?? true) {
+      editorCore.buildRenderModel();
+    }
+    return editorCore.getVisibleLineRange();
   }
 
-  int getTotalLineCount() =>
-      _state?._document?.lineCount ?? _pendingDocument?.lineCount ?? 0;
+  int getTotalLineCount() => _state?._document?.lineCount ?? 0;
 
   void scrollToLine(
     int line, {
@@ -447,32 +424,27 @@ class SweetEditorController {
 
   int get totalLineCount => getTotalLineCount();
 
-  EditorKeyMap getKeyMap() => _keyMap;
+  EditorKeyMap getKeyMap() =>
+      _state?._session.keyMap ?? EditorKeyMap.defaultKeyMap();
 
   void setKeyMap(EditorKeyMap keyMap) {
-    if (_closed) return;
-    _keyMap = keyMap;
+    if (_terminated) return;
     _state?._applyKeyMap(keyMap);
   }
 
   void setEditorIconProvider(EditorIconProvider? provider) {
-    if (_closed) return;
-    _iconProvider = provider;
+    if (_terminated) return;
     _state?._applyIconProvider(provider);
   }
 
   void applyTheme(EditorTheme theme) {
-    if (_closed) return;
-    if (_state != null) {
-      _state!._applyTheme(theme);
-    } else {
-      _pendingTheme = theme;
-    }
+    if (_terminated) return;
+    _state?._applyTheme(theme);
   }
 
   void setTheme(EditorTheme theme) => applyTheme(theme);
 
-  EditorTheme? getTheme() => _state?._theme ?? _pendingTheme;
+  EditorTheme? getTheme() => _state?._theme;
 
   void registerTextStyle(
     int styleId,
@@ -565,15 +537,28 @@ class SweetEditorController {
     });
   }
 
+  void setLineLinks(int line, List<core.LinkSpan> links) {
+    _withEditorCore((editorCore) {
+      editorCore.setLineLinks(line, links);
+    });
+  }
+
+  void setBatchLineLinks(Map<int, List<core.LinkSpan>> linksByLine) {
+    _withEditorCore((editorCore) {
+      editorCore.setBatchLineLinks(linksByLine);
+    });
+  }
+
+  String getLinkTargetAt(int line, int column) =>
+      _state?._editorCore?.getLinkTargetAt(line, column) ?? '';
+
   void setLineDiagnostics(int line, List<core.Diagnostic> items) {
     _withEditorCore((editorCore) {
       editorCore.setLineDiagnostics(line, items);
     });
   }
 
-  void setBatchLineDiagnostics(
-    Map<int, List<core.Diagnostic>> itemsByLine,
-  ) {
+  void setBatchLineDiagnostics(Map<int, List<core.Diagnostic>> itemsByLine) {
     _withEditorCore((editorCore) {
       editorCore.setBatchLineDiagnostics(itemsByLine);
     });
@@ -651,6 +636,10 @@ class SweetEditorController {
     _withEditorCore((editorCore) => editorCore.clearCodeLens());
   }
 
+  void clearLinks() {
+    _withEditorCore((editorCore) => editorCore.clearLinks());
+  }
+
   void clearGuides() {
     _withEditorCore((editorCore) => editorCore.clearGuides());
   }
@@ -665,17 +654,79 @@ class SweetEditorController {
 
   void flush() => _state?._flush();
 
-  Future<void> close() async {
-    if (_closed) return;
-    _closed = true;
-    _pendingText = null;
-    _pendingDocument = null;
-    _pendingTheme = null;
-    _languageConfiguration = null;
-    _readyCallbacks.clear();
-    _state?._releaseFromController();
-    await _eventBus.close();
+  core.TextPosition _resolveTextPositionArgument(
+    Object positionOrLine,
+    int? column, {
+    required String methodName,
+  }) {
+    if (positionOrLine is core.TextPosition && column == null) {
+      return positionOrLine;
+    }
+    if (positionOrLine is int && column != null) {
+      return core.TextPosition(positionOrLine, column);
+    }
+    throw ArgumentError(
+      '$methodName expects either a TextPosition or line and column integers.',
+    );
   }
 
-  Future<void> dispose() => close();
+  core.TextRange _resolveTextRangeArgument(
+    Object rangeOrStartLine,
+    int? startColumn,
+    int? endLine,
+    int? endColumn, {
+    required String methodName,
+  }) {
+    if (rangeOrStartLine is core.TextRange &&
+        startColumn == null &&
+        endLine == null &&
+        endColumn == null) {
+      return rangeOrStartLine;
+    }
+    if (rangeOrStartLine is int &&
+        startColumn != null &&
+        endLine != null &&
+        endColumn != null) {
+      return core.TextRange(
+        core.TextPosition(rangeOrStartLine, startColumn),
+        core.TextPosition(endLine, endColumn),
+      );
+    }
+    throw ArgumentError(
+      '$methodName expects either a TextRange or four integer coordinates.',
+    );
+  }
+
+  (core.TextRange, String) _resolveReplaceTextArguments(
+    Object rangeOrStartLine,
+    Object textOrStartColumn,
+    int? endLine,
+    int? endColumn,
+    String? text,
+  ) {
+    if (rangeOrStartLine is core.TextRange &&
+        textOrStartColumn is String &&
+        endLine == null &&
+        endColumn == null &&
+        text == null) {
+      return (rangeOrStartLine, textOrStartColumn);
+    }
+    if (rangeOrStartLine is int &&
+        textOrStartColumn is int &&
+        endLine != null &&
+        endColumn != null &&
+        text != null) {
+      return (
+        core.TextRange(
+          core.TextPosition(rangeOrStartLine, textOrStartColumn),
+          core.TextPosition(endLine, endColumn),
+        ),
+        text,
+      );
+    }
+    throw ArgumentError(
+      'replaceText expects either (TextRange, String) or '
+      '(int, int, int, int, String).',
+    );
+  }
 }

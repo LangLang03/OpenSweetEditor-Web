@@ -82,10 +82,15 @@ namespace NS_SWEETEDITOR {
            && lhs.color_value == rhs.color_value;
   }
 
-  static HitTarget toHotInteractiveTarget(const HitTarget& target) {
-    return (target.type == HitTargetType::CODELENS || target.type == HitTargetType::LINK)
-             ? target
-             : HitTarget {};
+  static HitTarget toHotInteractiveTarget(const HitTarget& target, KeyModifier modifiers) {
+    if (target.type == HitTargetType::CODELENS) {
+      return target;
+    }
+    if (target.type == HitTargetType::LINK
+        && hasAnyModifier(modifiers, KeyModifier::CTRL | KeyModifier::META)) {
+      return target;
+    }
+    return {};
   }
 
   static bool isMousePointerEvent(EventType type) {
@@ -170,6 +175,7 @@ namespace NS_SWEETEDITOR {
     setCursorPosition({});
     m_view_state_.scroll_x = 0.0f;
     m_view_state_.scroll_y = 0.0f;
+    m_visible_line_range_ = {};
     normalizeScrollState();
     LOGD("EditorCore::loadDocument()");
   }
@@ -420,7 +426,12 @@ namespace NS_SWEETEDITOR {
     if (m_caret_.has_selection) {
       presentation_context.selection_range = m_caret_.selection;
     }
-    m_text_layout_->layoutVisibleLines(model, presentation_context);
+    m_visible_line_range_ = {};
+    VisibleLineInfo visible_line_info = m_text_layout_->layoutVisibleLines(model, presentation_context);
+    if (!model.lines.empty()) {
+      m_visible_line_range_.start = static_cast<int32_t>(visible_line_info.first_line);
+      m_visible_line_range_.end = static_cast<int32_t>(visible_line_info.last_line);
+    }
     model.split_line_visible = m_settings_.show_split_line;
     model.current_line_render_mode = m_settings_.current_line_render_mode;
     model.gutter_sticky = m_settings_.gutter_sticky;
@@ -486,6 +497,10 @@ namespace NS_SWEETEDITOR {
     return metrics;
   }
 
+  IntRange EditorCore::getVisibleLineRange() const {
+    return m_visible_line_range_;
+  }
+
   LayoutMetrics& EditorCore::getLayoutMetrics() const {
     return m_text_layout_->getLayoutMetrics();
   }
@@ -496,7 +511,7 @@ namespace NS_SWEETEDITOR {
     bool primary_probe_ready = false;
     auto get_primary_probe = [&]() -> const PointerProbeResult& {
       if (!primary_probe_ready) {
-        primary_probe = has_primary_point ? probePointer(event.points[0]) : PointerProbeResult {};
+        primary_probe = has_primary_point ? probePointer(event.points[0], event.modifiers) : PointerProbeResult {};
         primary_probe_ready = true;
       }
       return primary_probe;
@@ -1703,6 +1718,9 @@ namespace NS_SWEETEDITOR {
     size_t last_line = m_document_->getLineCount() > 0 ? m_document_->getLineCount() - 1 : 0;
     uint32_t last_col = m_document_->getLineColumns(last_line);
     setSelection({{0, 0}, {last_line, last_col}});
+    if (m_options_.reveal_selection_end_on_select_all) {
+      ensureCursorVisible();
+    }
   }
 
   U8String EditorCore::getSelectedText() const {
@@ -2911,7 +2929,7 @@ namespace NS_SWEETEDITOR {
     return m_press_hit_target_.type != HitTargetType::NONE ? m_press_hit_target_ : m_hover_hit_target_;
   }
 
-  EditorCore::PointerProbeResult EditorCore::probePointer(const PointF& point) const {
+  EditorCore::PointerProbeResult EditorCore::probePointer(const PointF& point, KeyModifier modifiers) const {
     PointerProbeResult result;
     if (point.x < 0.0f || point.y < 0.0f
         || point.x >= m_viewport_.width || point.y >= m_viewport_.height) {
@@ -2928,7 +2946,7 @@ namespace NS_SWEETEDITOR {
       return result;
     }
 
-    result.hot_target = toHotInteractiveTarget(m_text_layout_->hitTestDecoration(point));
+    result.hot_target = toHotInteractiveTarget(m_text_layout_->hitTestDecoration(point), modifiers);
     if (result.hot_target.type != HitTargetType::NONE) {
       result.cursor_type = PointerCursorType::HAND;
       return result;
@@ -2967,4 +2985,3 @@ namespace NS_SWEETEDITOR {
 #pragma endregion
 
 }
-

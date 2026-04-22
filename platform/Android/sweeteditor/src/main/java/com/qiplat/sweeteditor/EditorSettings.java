@@ -195,6 +195,7 @@ public class EditorSettings {
     public void setCompositionEnabled(boolean enabled) {
         mCompositionEnabled = enabled;
         mEditor.getEditorCore().setCompositionEnabled(enabled);
+        mEditor.restartImeInput();
         mEditor.flush();
     }
 

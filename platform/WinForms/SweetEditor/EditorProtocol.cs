@@ -10,8 +10,7 @@ namespace SweetEditor {
 		#region EditorOptions
 
 		internal static byte[] PackEditorOptions(EditorOptions options) {
-			// 4 + 8 + 8 + 4 + 4 + 4 + 8 = 40 bytes
-			byte[] payload = new byte[40];
+			byte[] payload = new byte[49];
 			int offset = 0;
 			BitConverter.TryWriteBytes(payload.AsSpan(offset), options.TouchSlop); offset += 4;
 			BinaryPrimitives.WriteInt64LittleEndian(payload.AsSpan(offset), options.DoubleTapTimeout); offset += 8;
@@ -19,7 +18,9 @@ namespace SweetEditor {
 			BitConverter.TryWriteBytes(payload.AsSpan(offset), options.FlingFriction); offset += 4;
 			BitConverter.TryWriteBytes(payload.AsSpan(offset), options.FlingMinVelocity); offset += 4;
 			BitConverter.TryWriteBytes(payload.AsSpan(offset), options.FlingMaxVelocity); offset += 4;
-			BinaryPrimitives.WriteUInt64LittleEndian(payload.AsSpan(offset), options.MaxUndoStackSize);
+			BinaryPrimitives.WriteUInt64LittleEndian(payload.AsSpan(offset), options.MaxUndoStackSize); offset += 8;
+			BinaryPrimitives.WriteInt64LittleEndian(payload.AsSpan(offset), options.KeyChordTimeoutMs); offset += 8;
+			payload[offset] = options.RevealSelectionEndOnSelectAll ? (byte)1 : (byte)0;
 			return payload;
 		}
 
@@ -27,20 +28,20 @@ namespace SweetEditor {
 
 		#region Spans
 
-		internal static byte[] PackBatchTextStyles(IReadOnlyDictionary<uint, TextStyle> stylesById) {
+		internal static byte[] PackBatchTextStyles(IReadOnlyDictionary<int, TextStyle> stylesById) {
 			if (stylesById == null || stylesById.Count == 0) {
 				return Array.Empty<byte>();
 			}
 
-			var styleIds = new List<uint>(stylesById.Keys);
+			var styleIds = new List<int>(stylesById.Keys);
 			styleIds.Sort();
 			byte[] payload = new byte[4 + styleIds.Count * 16];
 			int offset = 0;
 			WriteInt32LE(payload, ref offset, styleIds.Count);
 			for (int i = 0; i < styleIds.Count; i++) {
-				uint styleId = styleIds[i];
+				int styleId = styleIds[i];
 				TextStyle style = stylesById[styleId];
-				WriteUInt32LE(payload, ref offset, styleId);
+				WriteInt32LE(payload, ref offset, styleId);
 				WriteInt32LE(payload, ref offset, style.Color);
 				WriteInt32LE(payload, ref offset, style.BackgroundColor);
 				WriteInt32LE(payload, ref offset, style.FontStyle);
@@ -419,7 +420,7 @@ namespace SweetEditor {
 			// BracketGuide: parent(8) + end(8) + childCount(4) + children(8*n)
 			int totalChildren = 0;
 			for (int i = 0; i < guides.Count; i++) {
-				totalChildren += guides[i].Children?.Length ?? 0;
+				totalChildren += guides[i].Children.Count;
 			}
 			byte[] payload = new byte[4 + guides.Count * 20 + totalChildren * 8];
 			int offset = 0;
@@ -430,10 +431,10 @@ namespace SweetEditor {
 				WriteInt32LE(payload, ref offset, g.Parent.Column);
 				WriteInt32LE(payload, ref offset, g.End.Line);
 				WriteInt32LE(payload, ref offset, g.End.Column);
-				int childCount = g.Children?.Length ?? 0;
+				int childCount = g.Children.Count;
 				WriteInt32LE(payload, ref offset, childCount);
 				for (int c = 0; c < childCount; c++) {
-					WriteInt32LE(payload, ref offset, g.Children![c].Line);
+					WriteInt32LE(payload, ref offset, g.Children[c].Line);
 					WriteInt32LE(payload, ref offset, g.Children[c].Column);
 				}
 			}
@@ -463,7 +464,7 @@ namespace SweetEditor {
 			for (int i = 0; i < count; i++) {
 				var g = guides[i];
 				WriteInt32LE(payload, ref offset, g.Line);
-				WriteInt32LE(payload, ref offset, g.Style);
+				WriteInt32LE(payload, ref offset, (int)g.Style);
 				WriteInt32LE(payload, ref offset, g.Count);
 				WriteInt32LE(payload, ref offset, g.TextEndColumn);
 			}
@@ -611,7 +612,7 @@ namespace SweetEditor {
 		}
 
 		internal static bool TryReadTextChange(ReadOnlySpan<byte> data, ref int offset, out TextChange change) {
-			change = new TextChange();
+			change = default!;
 			if (!TryReadInt32(data, ref offset, out int startLine) ||
 				!TryReadInt32(data, ref offset, out int startColumn) ||
 				!TryReadInt32(data, ref offset, out int endLine) ||
@@ -619,11 +620,11 @@ namespace SweetEditor {
 				!TryReadUtf8String(data, ref offset, out string newText)) {
 				return false;
 			}
-			change.Range = new TextRange {
+			TextRange range = new TextRange {
 				Start = new TextPosition { Line = startLine, Column = startColumn },
 				End = new TextPosition { Line = endLine, Column = endColumn },
 			};
-			change.NewText = newText;
+			change = new TextChange(range, newText);
 			return true;
 		}
 

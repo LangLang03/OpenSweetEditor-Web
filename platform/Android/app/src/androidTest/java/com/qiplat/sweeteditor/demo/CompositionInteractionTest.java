@@ -34,6 +34,7 @@ public class CompositionInteractionTest {
     @Test
     public void testCompositionFlowCommit() {
         editorRule.loadText("");
+        editorRule.runOnEditor(editor -> editor.getSettings().setCompositionEnabled(true));
         InputConnection ic = getInputConnection();
         assertNotNull("InputConnection should not be null", ic);
         editorRule.runOnEditor(editor -> {
@@ -110,6 +111,7 @@ public class CompositionInteractionTest {
     @Test
     public void testComposingTextUpdate() {
         editorRule.loadText("");
+        editorRule.runOnEditor(editor -> editor.getSettings().setCompositionEnabled(true));
         editorRule.runOnEditor(editor -> {
             android.view.inputmethod.EditorInfo info = new android.view.inputmethod.EditorInfo();
             InputConnection conn = editor.onCreateInputConnection(info);
@@ -121,5 +123,37 @@ public class CompositionInteractionTest {
         editorRule.waitForIdle();
         String text = editorRule.runOnEditorSync(editor -> editor.getDocument().getText());
         assertEquals("pin", text);
+    }
+
+    @Test
+    public void testDisabledCompositionCandidateCommit() {
+        editorRule.loadText("");
+        editorRule.runOnEditor(editor -> editor.getSettings().setCompositionEnabled(false));
+        editorRule.runOnEditor(editor -> {
+            android.view.inputmethod.EditorInfo info = new android.view.inputmethod.EditorInfo();
+            InputConnection conn = editor.onCreateInputConnection(info);
+            conn.setComposingText("ni", 1);
+            conn.commitText("你", 1);
+        });
+        editorRule.waitForIdle();
+        String text = editorRule.runOnEditorSync(editor -> editor.getDocument().getText());
+        assertEquals("你", text);
+    }
+
+    @Test
+    public void testDisabledCompositionCleanupDeleteDoesNotRemoveCommittedText() {
+        editorRule.loadText("a");
+        editorRule.runOnEditor(editor -> {
+            editor.getSettings().setCompositionEnabled(false);
+            editor.setCursorPosition(new TextPosition(0, 1));
+            android.view.inputmethod.EditorInfo info = new android.view.inputmethod.EditorInfo();
+            InputConnection conn = editor.onCreateInputConnection(info);
+            conn.setComposingText("ni", 1);
+            conn.commitText("你", 1);
+            conn.deleteSurroundingText(2, 0);
+        });
+        editorRule.waitForIdle();
+        String text = editorRule.runOnEditorSync(editor -> editor.getDocument().getText());
+        assertEquals("a你", text);
     }
 }

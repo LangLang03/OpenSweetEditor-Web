@@ -14,6 +14,7 @@ import com.qiplat.sweeteditor.core.adornment.IndentGuide;
 import com.qiplat.sweeteditor.core.adornment.SeparatorGuide;
 import com.qiplat.sweeteditor.core.adornment.InlayHint;
 import com.qiplat.sweeteditor.core.adornment.CodeLensItem;
+import com.qiplat.sweeteditor.core.adornment.LinkSpan;
 import com.qiplat.sweeteditor.core.adornment.PhantomText;
 import com.qiplat.sweeteditor.core.adornment.StyleSpan;
 
@@ -39,6 +40,7 @@ public class DecorationResult {
     @Nullable private SparseArray<List<GutterIcon>> gutterIcons;
     @Nullable private SparseArray<List<PhantomText>> phantomTexts;
     @Nullable private SparseArray<List<CodeLensItem>> codeLensItems;
+    @Nullable private SparseArray<List<LinkSpan>> links;
 
     @NonNull private ApplyMode syntaxSpansMode = ApplyMode.MERGE;
     @NonNull private ApplyMode semanticSpansMode = ApplyMode.MERGE;
@@ -52,6 +54,7 @@ public class DecorationResult {
     @NonNull private ApplyMode gutterIconsMode = ApplyMode.MERGE;
     @NonNull private ApplyMode phantomTextsMode = ApplyMode.MERGE;
     @NonNull private ApplyMode codeLensItemsMode = ApplyMode.MERGE;
+    @NonNull private ApplyMode linksMode = ApplyMode.MERGE;
 
     @Nullable public SparseArray<List<StyleSpan>> getSyntaxSpans() { return syntaxSpans; }
     @Nullable public SparseArray<List<StyleSpan>> getSemanticSpans() { return semanticSpans; }
@@ -65,6 +68,7 @@ public class DecorationResult {
     @Nullable public SparseArray<List<GutterIcon>> getGutterIcons() { return gutterIcons; }
     @Nullable public SparseArray<List<PhantomText>> getPhantomTexts() { return phantomTexts; }
     @Nullable public SparseArray<List<CodeLensItem>> getCodeLensItems() { return codeLensItems; }
+    @Nullable public SparseArray<List<LinkSpan>> getLinks() { return links; }
     @NonNull public ApplyMode getSyntaxSpansMode() { return syntaxSpansMode; }
     @NonNull public ApplyMode getSemanticSpansMode() { return semanticSpansMode; }
     @NonNull public ApplyMode getInlayHintsMode() { return inlayHintsMode; }
@@ -77,6 +81,7 @@ public class DecorationResult {
     @NonNull public ApplyMode getGutterIconsMode() { return gutterIconsMode; }
     @NonNull public ApplyMode getPhantomTextsMode() { return phantomTextsMode; }
     @NonNull public ApplyMode getCodeLensItemsMode() { return codeLensItemsMode; }
+    @NonNull public ApplyMode getLinksMode() { return linksMode; }
 
     void setSyntaxSpans(@Nullable SparseArray<List<StyleSpan>> v) { this.syntaxSpans = v; }
     void setSemanticSpans(@Nullable SparseArray<List<StyleSpan>> v) { this.semanticSpans = v; }
@@ -90,6 +95,7 @@ public class DecorationResult {
     void setGutterIcons(@Nullable SparseArray<List<GutterIcon>> v) { this.gutterIcons = v; }
     void setPhantomTexts(@Nullable SparseArray<List<PhantomText>> v) { this.phantomTexts = v; }
     void setCodeLensItems(@Nullable SparseArray<List<CodeLensItem>> v) { this.codeLensItems = v; }
+    void setLinks(@Nullable SparseArray<List<LinkSpan>> v) { this.links = v; }
     void setSyntaxSpansMode(@NonNull ApplyMode mode) { this.syntaxSpansMode = mode; }
     void setSemanticSpansMode(@NonNull ApplyMode mode) { this.semanticSpansMode = mode; }
     void setInlayHintsMode(@NonNull ApplyMode mode) { this.inlayHintsMode = mode; }
@@ -102,6 +108,7 @@ public class DecorationResult {
     void setGutterIconsMode(@NonNull ApplyMode mode) { this.gutterIconsMode = mode; }
     void setPhantomTextsMode(@NonNull ApplyMode mode) { this.phantomTextsMode = mode; }
     void setCodeLensItemsMode(@NonNull ApplyMode mode) { this.codeLensItemsMode = mode; }
+    void setLinksMode(@NonNull ApplyMode mode) { this.linksMode = mode; }
 
     public DecorationResult copy() {
         DecorationResult out = new DecorationResult();
@@ -117,6 +124,7 @@ public class DecorationResult {
         out.gutterIcons = copySparseArrayOfLists(gutterIcons);
         out.phantomTexts = copySparseArrayOfLists(phantomTexts);
         out.codeLensItems = copySparseArrayOfLists(codeLensItems);
+        out.links = copySparseArrayOfLists(links);
         out.syntaxSpansMode = syntaxSpansMode;
         out.semanticSpansMode = semanticSpansMode;
         out.inlayHintsMode = inlayHintsMode;
@@ -129,6 +137,7 @@ public class DecorationResult {
         out.gutterIconsMode = gutterIconsMode;
         out.phantomTextsMode = phantomTextsMode;
         out.codeLensItemsMode = codeLensItemsMode;
+        out.linksMode = linksMode;
         return out;
     }
 
@@ -163,6 +172,7 @@ public class DecorationResult {
         public Builder gutterIcons(@Nullable SparseArray<List<GutterIcon>> value, @NonNull ApplyMode mode) { result.gutterIcons = value; result.gutterIconsMode = mode; return this; }
         public Builder phantomTexts(@Nullable SparseArray<List<PhantomText>> value, @NonNull ApplyMode mode) { result.phantomTexts = value; result.phantomTextsMode = mode; return this; }
         public Builder codeLensItems(@Nullable SparseArray<List<CodeLensItem>> value, @NonNull ApplyMode mode) { result.codeLensItems = value; result.codeLensItemsMode = mode; return this; }
+        public Builder links(@Nullable SparseArray<List<LinkSpan>> value, @NonNull ApplyMode mode) { result.links = value; result.linksMode = mode; return this; }
 
         public DecorationResult build() { return result; }
     }

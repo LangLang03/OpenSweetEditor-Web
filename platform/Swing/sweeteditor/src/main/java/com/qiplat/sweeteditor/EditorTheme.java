@@ -91,6 +91,15 @@ public class EditorTheme {
     /** Diagnostic decoration HINT level default color. */
     public Color diagnosticHintColor;
 
+    /** CodeLens text color. */
+    public Color codeLensColor;
+    /** Active CodeLens text color. */
+    public Color codeLensActiveColor;
+    /** Link text color. */
+    public Color linkColor;
+    /** Active link text color. */
+    public Color linkActiveColor;
+
     /** Linked editing active tab stop border color. */
     public Color linkedEditingActiveColor;
     /** Linked editing inactive tab stop border color. */
@@ -162,6 +171,10 @@ public class EditorTheme {
         t.diagnosticWarningColor    = argb(0xFFE0AF68);
         t.diagnosticInfoColor       = argb(0xFF7DCFFF);
         t.diagnosticHintColor       = argb(0xFF8FA3BF);
+        t.codeLensColor             = argb(0xC0AFC2E0);
+        t.codeLensActiveColor       = argb(0xFF9CB3D6);
+        t.linkColor                 = argb(0xFF4C9DFF);
+        t.linkActiveColor           = argb(0xFF8FB8FF);
         t.linkedEditingActiveColor   = argb(0xCC7AA2F7);
         t.linkedEditingInactiveColor = argb(0x667AA2F7);
         t.bracketHighlightBorderColor = argb(0xCC9ECE6A);
@@ -216,6 +229,10 @@ public class EditorTheme {
         t.diagnosticWarningColor    = argb(0xFFD97706);
         t.diagnosticInfoColor       = argb(0xFF0EA5E9);
         t.diagnosticHintColor       = argb(0xFF64748B);
+        t.codeLensColor             = argb(0xFF4B607E);
+        t.codeLensActiveColor       = argb(0xFF3A5FA0);
+        t.linkColor                 = argb(0xFF005FB8);
+        t.linkActiveColor           = argb(0xFF1D4ED8);
         t.linkedEditingActiveColor   = argb(0xCC2563EB);
         t.linkedEditingInactiveColor = argb(0x662563EB);
         t.bracketHighlightBorderColor = argb(0xCC0F766E);
@@ -245,4 +262,3 @@ public class EditorTheme {
         return new Color(argb, true);
     }
 }
-

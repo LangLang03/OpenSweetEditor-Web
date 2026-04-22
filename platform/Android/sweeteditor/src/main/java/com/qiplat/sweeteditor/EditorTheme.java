@@ -64,6 +64,15 @@ public class EditorTheme {
     /** IME composition underline color (ARGB). */
     public int compositionUnderlineColor;
 
+    /** CodeLens text color (ARGB). */
+    public int codeLensColor;
+    /** CodeLens active text color (ARGB). */
+    public int codeLensActiveColor;
+    /** Link text color (ARGB). */
+    public int linkColor;
+    /** Link active text color (ARGB). */
+    public int linkActiveColor;
+
     /** InlayHint rounded background color (ARGB). */
     public int inlayHintBgColor;
     /** InlayHint text color (ARGB, typically with transparency to distinguish from main text). */
@@ -123,6 +132,12 @@ public class EditorTheme {
     public int selectionMenuTextColor;
     /** Selection menu divider color (ARGB). */
     public int selectionMenuDividerColor;
+    /** Context menu background color (ARGB). */
+    public int contextMenuBgColor;
+    /** Context menu text color (ARGB). */
+    public int contextMenuTextColor;
+    /** Context menu divider color (ARGB). */
+    public int contextMenuDividerColor;
 
     /**
      * Theme text style mapping (extensible).
@@ -166,6 +181,10 @@ public class EditorTheme {
         t.scrollbarThumbColor       = 0x9A7282A0;
         t.scrollbarThumbActiveColor = 0xFFAABEDD;
         t.compositionUnderlineColor = 0xFF7AA2F7;
+        t.codeLensColor             = 0xC0AFC2E0;
+        t.codeLensActiveColor       = 0xFF9CB3D6;
+        t.linkColor                 = 0xFF4C9DFF;
+        t.linkActiveColor           = t.linkColor;
         t.inlayHintBgColor          = 0x223A4A66;
         t.inlayHintTextColor        = 0xC0AFC2E0;
         t.foldPlaceholderBgColor    = 0x36506C90;
@@ -191,6 +210,9 @@ public class EditorTheme {
         t.selectionMenuBgColor           = t.completionBgColor;
         t.selectionMenuTextColor         = t.completionLabelColor;
         t.selectionMenuDividerColor      = 0x33D8DEE9;
+        t.contextMenuBgColor             = t.selectionMenuBgColor;
+        t.contextMenuTextColor           = t.selectionMenuTextColor;
+        t.contextMenuDividerColor        = t.selectionMenuDividerColor;
 
         t.defineTextStyle(STYLE_KEYWORD, new TextStyle(0xFF7AA2F7, TextStyle.BOLD));
         t.defineTextStyle(STYLE_STRING, new TextStyle(0xFF9ECE6A, TextStyle.NORMAL));
@@ -228,6 +250,10 @@ public class EditorTheme {
         t.scrollbarThumbColor       = 0x80446C9C;
         t.scrollbarThumbActiveColor = 0xEE6A9AD0;
         t.compositionUnderlineColor = 0xFF2563EB;
+        t.codeLensColor             = 0xB0344A73;
+        t.codeLensActiveColor       = 0xFF3A5FA0;
+        t.linkColor                 = 0xFF4C9DFF;
+        t.linkActiveColor           = t.linkColor;
         t.inlayHintBgColor          = 0x143B82F6;
         t.inlayHintTextColor        = 0xB0344A73;
         t.foldPlaceholderBgColor    = 0x2E748DB0;
@@ -253,6 +279,9 @@ public class EditorTheme {
         t.selectionMenuBgColor           = t.completionBgColor;
         t.selectionMenuTextColor         = t.completionLabelColor;
         t.selectionMenuDividerColor      = 0x331F2937;
+        t.contextMenuBgColor             = t.selectionMenuBgColor;
+        t.contextMenuTextColor           = t.selectionMenuTextColor;
+        t.contextMenuDividerColor        = t.selectionMenuDividerColor;
 
         t.defineTextStyle(STYLE_KEYWORD, new TextStyle(0xFF3559D6, TextStyle.BOLD));
         t.defineTextStyle(STYLE_STRING, new TextStyle(0xFF0F7B6C, TextStyle.NORMAL));
@@ -269,4 +298,3 @@ public class EditorTheme {
         return t;
     }
 }
-

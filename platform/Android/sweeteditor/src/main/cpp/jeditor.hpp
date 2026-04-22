@@ -197,6 +197,10 @@ public:
         editor_options.max_undo_stack_size = static_cast<size_t>(max_undo);
         if (offset + sizeof(int64_t) <= static_cast<size_t>(options_size)) {
           std::memcpy(&editor_options.key_chord_timeout_ms, data_ptr + offset, sizeof(int64_t));
+          offset += sizeof(int64_t);
+        }
+        if (offset + sizeof(uint8_t) <= static_cast<size_t>(options_size)) {
+          editor_options.reveal_selection_end_on_select_all = data_ptr[offset] != 0;
         }
       }
     }
@@ -576,6 +580,10 @@ public:
     editor_clear_codelens(static_cast<intptr_t>(handle));
   }
 
+  static void clearLinks(jlong handle) {
+    editor_clear_links(static_cast<intptr_t>(handle));
+  }
+
   static void clearGuides(jlong handle) {
     editor_clear_guides(static_cast<intptr_t>(handle));
   }
@@ -701,6 +709,22 @@ public:
     editor_set_batch_line_codelens(static_cast<intptr_t>(handle), reinterpret_cast<const uint8_t*>(ptr), static_cast<size_t>(size));
   }
 
+  static void setLineLinks(JNIEnv* env, jclass clazz, jlong handle, jobject data, jint size) {
+    if (handle == 0 || data == nullptr || size <= 0) return;
+    void* ptr = env->GetDirectBufferAddress(data);
+    jlong capacity = env->GetDirectBufferCapacity(data);
+    if (ptr == nullptr || capacity < 0 || static_cast<jlong>(size) > capacity) return;
+    editor_set_line_links(static_cast<intptr_t>(handle), reinterpret_cast<const uint8_t*>(ptr), static_cast<size_t>(size));
+  }
+
+  static void setBatchLineLinks(JNIEnv* env, jclass clazz, jlong handle, jobject data, jint size) {
+    if (handle == 0 || data == nullptr || size <= 0) return;
+    void* ptr = env->GetDirectBufferAddress(data);
+    jlong capacity = env->GetDirectBufferCapacity(data);
+    if (ptr == nullptr || capacity < 0 || static_cast<jlong>(size) > capacity) return;
+    editor_set_batch_line_links(static_cast<intptr_t>(handle), reinterpret_cast<const uint8_t*>(ptr), static_cast<size_t>(size));
+  }
+
   static void setBatchLineDiagnostics(JNIEnv* env, jclass clazz, jlong handle, jobject data, jint size) {
     if (handle == 0 || data == nullptr || size <= 0) return;
     void* ptr = env->GetDirectBufferAddress(data);
@@ -739,6 +763,17 @@ public:
 
   static jboolean isLineVisible(jlong handle, jint line) {
     return toJBoolean(editor_is_line_visible(static_cast<intptr_t>(handle), static_cast<size_t>(line)));
+  }
+
+  static jintArray getVisibleLineRange(JNIEnv* env, jclass clazz, jlong handle) {
+    int32_t start_line = 0;
+    int32_t end_line = -1;
+    editor_get_visible_line_range(static_cast<intptr_t>(handle), &start_line, &end_line);
+    const jint values[2] = {static_cast<jint>(start_line), static_cast<jint>(end_line)};
+    jintArray result = env->NewIntArray(2);
+    if (result == nullptr) return nullptr;
+    env->SetIntArrayRegion(result, 0, 2, values);
+    return result;
   }
 
   static void setLineGutterIcons(JNIEnv* env, jclass clazz, jlong handle, jobject buffer, jint size) {
@@ -862,6 +897,13 @@ public:
     if (editor_core == nullptr) return env->NewStringUTF("");
     U8String word = editor_core->getWordAtCursor();
     return env->NewStringUTF(word.c_str());
+  }
+
+  static jstring getLinkTargetAt(JNIEnv* env, jclass clazz, jlong handle, jint line, jint column) {
+    SharedPtr<EditorCore> editor_core = getCPtrHolderValue<EditorCore>(handle);
+    if (editor_core == nullptr) return env->NewStringUTF("");
+    U8String target = editor_core->getLinkTargetAt(static_cast<size_t>(line), static_cast<size_t>(column));
+    return env->NewStringUTF(target.c_str());
   }
 
   static void setCursorPosition(jlong handle, jint line, jint column) {
@@ -1023,6 +1065,7 @@ public:
       {"nativeClearPhantomTexts", "(J)V", (void*) clearPhantomTexts},
       {"nativeClearGutterIcons", "(J)V", (void*) clearGutterIcons},
       {"nativeClearCodeLens", "(J)V", (void*) clearCodeLens},
+      {"nativeClearLinks", "(J)V", (void*) clearLinks},
       {"nativeClearGuides", "(J)V", (void*) clearGuides},
       {"nativeClearAllDecorations", "(J)V", (void*) clearAllDecorations},
       {"nativeSetIndentGuides", "(JLjava/nio/ByteBuffer;I)V", (void*) setIndentGuides},
@@ -1041,6 +1084,8 @@ public:
       {"nativeSetBatchLineGutterIcons", "(JLjava/nio/ByteBuffer;I)V", (void*) setBatchLineGutterIcons},
       {"nativeSetLineCodeLens", "(JLjava/nio/ByteBuffer;I)V", (void*) setLineCodeLens},
       {"nativeSetBatchLineCodeLens", "(JLjava/nio/ByteBuffer;I)V", (void*) setBatchLineCodeLens},
+      {"nativeSetLineLinks", "(JLjava/nio/ByteBuffer;I)V", (void*) setLineLinks},
+      {"nativeSetBatchLineLinks", "(JLjava/nio/ByteBuffer;I)V", (void*) setBatchLineLinks},
       {"nativeSetBatchLineDiagnostics", "(JLjava/nio/ByteBuffer;I)V", (void*) setBatchLineDiagnostics},
       {"nativeSetFoldRegions", "(JLjava/nio/ByteBuffer;I)V", (void*) setFoldRegions},
       {"nativeToggleFoldAt", "(JI)Z", (void*) toggleFoldAt},
@@ -1049,6 +1094,7 @@ public:
       {"nativeFoldAll", "(J)V", (void*) foldAll},
       {"nativeUnfoldAll", "(J)V", (void*) unfoldAll},
       {"nativeIsLineVisible", "(JI)Z", (void*) isLineVisible},
+      {"nativeGetVisibleLineRange", "(J)[I", (void*) getVisibleLineRange},
       {"nativeSetLineGutterIcons", "(JLjava/nio/ByteBuffer;I)V", (void*) setLineGutterIcons},
       {"nativeSetMaxGutterIcons", "(JI)V", (void*) setMaxGutterIcons},
       {"nativeSetFoldArrowMode", "(JI)V", (void*) setFoldArrowMode},
@@ -1073,6 +1119,7 @@ public:
       {"nativeGetCursorPosition", "(J)J", (void*) getCursorPosition},
       {"nativeGetWordRangeAtCursor", "(J)[J", (void*) getWordRangeAtCursor},
       {"nativeGetWordAtCursor", "(J)Ljava/lang/String;", (void*) getWordAtCursor},
+      {"nativeGetLinkTargetAt", "(JII)Ljava/lang/String;", (void*) getLinkTargetAt},
       {"nativeMoveCursorLeft", "(JZ)V", (void*) moveCursorLeft},
       {"nativeMoveCursorRight", "(JZ)V", (void*) moveCursorRight},
       {"nativeMoveCursorUp", "(JZ)V", (void*) moveCursorUp},

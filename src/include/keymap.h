@@ -45,6 +45,7 @@ namespace NS_SWEETEDITOR {
   };
   inline KeyModifier operator&(KeyModifier a, KeyModifier b) { return static_cast<KeyModifier>(static_cast<uint8_t>(a) & static_cast<uint8_t>(b)); }
   inline KeyModifier operator|(KeyModifier a, KeyModifier b) { return static_cast<KeyModifier>(static_cast<uint8_t>(a) | static_cast<uint8_t>(b)); }
+  inline bool hasAnyModifier(KeyModifier value, KeyModifier mask) { return static_cast<uint8_t>(value & mask) != 0; }
 
   /// A single key chord: one key press with optional modifiers
   struct KeyChord {

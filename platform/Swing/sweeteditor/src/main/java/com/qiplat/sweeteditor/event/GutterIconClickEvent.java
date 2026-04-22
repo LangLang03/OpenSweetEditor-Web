@@ -10,11 +10,11 @@ public final class GutterIconClickEvent extends EditorEvent {
     public final int line;
     /** Icon ID */
     public final int iconId;
-    public final PointF screenPoint;
+    public final PointF locationInEditor;
 
-    public GutterIconClickEvent(int line, int iconId, PointF screenPoint) {
+    public GutterIconClickEvent(int line, int iconId, PointF locationInEditor) {
         this.line = line;
         this.iconId = iconId;
-        this.screenPoint = screenPoint;
+        this.locationInEditor = locationInEditor;
     }
 }

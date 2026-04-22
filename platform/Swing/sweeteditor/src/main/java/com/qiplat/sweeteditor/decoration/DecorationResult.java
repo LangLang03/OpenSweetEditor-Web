@@ -9,6 +9,7 @@ import com.qiplat.sweeteditor.core.adornment.IndentGuide;
 import com.qiplat.sweeteditor.core.adornment.SeparatorGuide;
 import com.qiplat.sweeteditor.core.adornment.InlayHint;
 import com.qiplat.sweeteditor.core.adornment.CodeLensItem;
+import com.qiplat.sweeteditor.core.adornment.LinkSpan;
 import com.qiplat.sweeteditor.core.adornment.PhantomText;
 import com.qiplat.sweeteditor.core.adornment.StyleSpan;
 
@@ -36,6 +37,7 @@ public class DecorationResult {
     private Map<Integer, List<GutterIcon>> gutterIcons;
     private Map<Integer, List<PhantomText>> phantomTexts;
     private Map<Integer, List<CodeLensItem>> codeLensItems;
+    private Map<Integer, List<LinkSpan>> links;
 
     private ApplyMode syntaxSpansMode = ApplyMode.MERGE;
     private ApplyMode semanticSpansMode = ApplyMode.MERGE;
@@ -49,6 +51,7 @@ public class DecorationResult {
     private ApplyMode gutterIconsMode = ApplyMode.MERGE;
     private ApplyMode phantomTextsMode = ApplyMode.MERGE;
     private ApplyMode codeLensItemsMode = ApplyMode.MERGE;
+    private ApplyMode linksMode = ApplyMode.MERGE;
 
     public Map<Integer, List<StyleSpan>> getSyntaxSpans() { return syntaxSpans; }
     public Map<Integer, List<StyleSpan>> getSemanticSpans() { return semanticSpans; }
@@ -62,6 +65,7 @@ public class DecorationResult {
     public Map<Integer, List<GutterIcon>> getGutterIcons() { return gutterIcons; }
     public Map<Integer, List<PhantomText>> getPhantomTexts() { return phantomTexts; }
     public Map<Integer, List<CodeLensItem>> getCodeLensItems() { return codeLensItems; }
+    public Map<Integer, List<LinkSpan>> getLinks() { return links; }
     public ApplyMode getSyntaxSpansMode() { return syntaxSpansMode; }
     public ApplyMode getSemanticSpansMode() { return semanticSpansMode; }
     public ApplyMode getInlayHintsMode() { return inlayHintsMode; }
@@ -74,6 +78,7 @@ public class DecorationResult {
     public ApplyMode getGutterIconsMode() { return gutterIconsMode; }
     public ApplyMode getPhantomTextsMode() { return phantomTextsMode; }
     public ApplyMode getCodeLensItemsMode() { return codeLensItemsMode; }
+    public ApplyMode getLinksMode() { return linksMode; }
 
     void setSyntaxSpans(Map<Integer, List<StyleSpan>> v) { this.syntaxSpans = v; }
     void setSemanticSpans(Map<Integer, List<StyleSpan>> v) { this.semanticSpans = v; }
@@ -87,6 +92,7 @@ public class DecorationResult {
     void setGutterIcons(Map<Integer, List<GutterIcon>> v) { this.gutterIcons = v; }
     void setPhantomTexts(Map<Integer, List<PhantomText>> v) { this.phantomTexts = v; }
     void setCodeLensItems(Map<Integer, List<CodeLensItem>> v) { this.codeLensItems = v; }
+    void setLinks(Map<Integer, List<LinkSpan>> v) { this.links = v; }
     void setSyntaxSpansMode(ApplyMode mode) { this.syntaxSpansMode = mode; }
     void setSemanticSpansMode(ApplyMode mode) { this.semanticSpansMode = mode; }
     void setInlayHintsMode(ApplyMode mode) { this.inlayHintsMode = mode; }
@@ -99,6 +105,7 @@ public class DecorationResult {
     void setGutterIconsMode(ApplyMode mode) { this.gutterIconsMode = mode; }
     void setPhantomTextsMode(ApplyMode mode) { this.phantomTextsMode = mode; }
     void setCodeLensItemsMode(ApplyMode mode) { this.codeLensItemsMode = mode; }
+    void setLinksMode(ApplyMode mode) { this.linksMode = mode; }
 
     public DecorationResult copy() {
         DecorationResult out = new DecorationResult();
@@ -114,6 +121,7 @@ public class DecorationResult {
         out.gutterIcons = copyMapOfLists(gutterIcons);
         out.phantomTexts = copyMapOfLists(phantomTexts);
         out.codeLensItems = copyMapOfLists(codeLensItems);
+        out.links = copyMapOfLists(links);
         out.syntaxSpansMode = syntaxSpansMode;
         out.semanticSpansMode = semanticSpansMode;
         out.inlayHintsMode = inlayHintsMode;
@@ -126,6 +134,7 @@ public class DecorationResult {
         out.gutterIconsMode = gutterIconsMode;
         out.phantomTextsMode = phantomTextsMode;
         out.codeLensItemsMode = codeLensItemsMode;
+        out.linksMode = linksMode;
         return out;
     }
 
@@ -158,6 +167,7 @@ public class DecorationResult {
         public Builder gutterIcons(Map<Integer, List<GutterIcon>> value, ApplyMode mode) { result.gutterIcons = value; result.gutterIconsMode = mode; return this; }
         public Builder phantomTexts(Map<Integer, List<PhantomText>> value, ApplyMode mode) { result.phantomTexts = value; result.phantomTextsMode = mode; return this; }
         public Builder codeLensItems(Map<Integer, List<CodeLensItem>> value, ApplyMode mode) { result.codeLensItems = value; result.codeLensItemsMode = mode; return this; }
+        public Builder links(Map<Integer, List<LinkSpan>> value, ApplyMode mode) { result.links = value; result.linksMode = mode; return this; }
 
         public DecorationResult build() { return result; }
     }

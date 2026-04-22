@@ -11,6 +11,11 @@ export enum InlayType {
   Color = 2
 }
 
+export enum SeparatorStyle {
+  SINGLE = 0,
+  DOUBLE = 1
+}
+
 export interface TextStyle {
   color: number;
   backgroundColor: number;
@@ -51,7 +56,7 @@ export interface GutterIcon {
   iconId: number;
 }
 
-export interface DiagnosticItem {
+export interface Diagnostic {
   column: number;
   length: number;
   severity: number;
@@ -80,7 +85,7 @@ export interface FlowGuide {
 
 export interface SeparatorGuide {
   line: number;
-  style: number;
+  style: SeparatorStyle;
   count: number;
   textEndColumn: number;
 }

@@ -1,5 +1,7 @@
 package com.qiplat.sweeteditor.core;
 
+import com.qiplat.sweeteditor.core.foundation.IntRange;
+
 import java.lang.foreign.*;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
@@ -471,6 +473,9 @@ public final class EditorNative {
     private static final MethodHandle GET_WORD_AT_CURSOR = downcall("editor_get_word_at_cursor",
             FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.JAVA_LONG));
 
+    private static final MethodHandle GET_LINK_TARGET_AT = downcall("editor_get_link_target_at",
+            FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG));
+
     private static final MethodHandle COMP_UPDATE = downcall("editor_composition_update",
             FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
 
@@ -525,6 +530,9 @@ public final class EditorNative {
     private static final MethodHandle CLEAR_HIGHLIGHTS_LAYER = downcall("editor_clear_highlights_layer",
             FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.JAVA_BYTE));
 
+    private static final MethodHandle FREE_U8_STRING = downcall("free_u8_string",
+            FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG));
+
     private static final MethodHandle FREE_U16_STRING = downcall("free_u16_string",
             FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG));
 
@@ -565,6 +573,9 @@ public final class EditorNative {
     private static final MethodHandle GET_SCROLL_METRICS = downcall("editor_get_scroll_metrics",
             FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
 
+    private static final MethodHandle GET_VISIBLE_LINE_RANGE = downcall("editor_get_visible_line_range",
+            FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+
 
     private static final MethodHandle SET_MAX_GUTTER_ICONS = downcall("editor_set_max_gutter_icons",
             FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT));
@@ -589,6 +600,8 @@ public final class EditorNative {
     private static final MethodHandle SET_BATCH_LINE_GUTTER_ICONS = downcall("editor_set_batch_line_gutter_icons", BINARY_PAYLOAD_DESC);
     private static final MethodHandle SET_LINE_CODELENS = downcall("editor_set_line_codelens", BINARY_PAYLOAD_DESC);
     private static final MethodHandle SET_BATCH_LINE_CODELENS = downcall("editor_set_batch_line_codelens", BINARY_PAYLOAD_DESC);
+    private static final MethodHandle SET_LINE_LINKS = downcall("editor_set_line_links", BINARY_PAYLOAD_DESC);
+    private static final MethodHandle SET_BATCH_LINE_LINKS = downcall("editor_set_batch_line_links", BINARY_PAYLOAD_DESC);
     private static final MethodHandle SET_BATCH_LINE_SPANS = downcall("editor_set_batch_line_spans", BINARY_PAYLOAD_DESC);
     private static final MethodHandle REGISTER_BATCH_TEXT_STYLES = downcall("editor_register_batch_text_styles", BINARY_PAYLOAD_DESC);
     private static final MethodHandle SET_BATCH_LINE_DIAGNOSTICS = downcall("editor_set_batch_line_diagnostics", BINARY_PAYLOAD_DESC);
@@ -598,6 +611,8 @@ public final class EditorNative {
     private static final MethodHandle SET_SEPARATOR_GUIDES = downcall("editor_set_separator_guides", BINARY_PAYLOAD_DESC);
     private static final MethodHandle SET_KEYMAP = downcall("editor_set_keymap", BINARY_PAYLOAD_DESC);
     private static final MethodHandle CLEAR_CODELENS = downcall("editor_clear_codelens",
+            FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG));
+    private static final MethodHandle CLEAR_LINKS = downcall("editor_clear_links",
             FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG));
 
     // ===================== Document API =====================
@@ -984,6 +999,19 @@ public final class EditorNative {
         }
     }
 
+    public static String getLinkTargetAt(long handle, int line, int column) {
+        try {
+            MemorySegment ptr = (MemorySegment) GET_LINK_TARGET_AT.invokeExact(handle, (long) line, (long) column);
+            String text = readUtf8String(ptr);
+            if (ptr != null && !ptr.equals(MemorySegment.NULL)) {
+                freeU8String(ptr.address());
+            }
+            return text;
+        } catch (Throwable t) {
+            throw new RuntimeException(t);
+        }
+    }
+
     // ===================== IME =====================
 
     public static void compositionStart(long handle) {
@@ -1105,6 +1133,17 @@ public final class EditorNative {
             throw new RuntimeException(t);
         }
         return new float[]{px.get(ValueLayout.JAVA_FLOAT, 0), py.get(ValueLayout.JAVA_FLOAT, 0), ph.get(ValueLayout.JAVA_FLOAT, 0)};
+    }
+
+    public static IntRange getVisibleLineRange(long handle, Arena arena) {
+        MemorySegment startLine = arena.allocate(ValueLayout.JAVA_INT);
+        MemorySegment endLine = arena.allocate(ValueLayout.JAVA_INT);
+        try {
+            GET_VISIBLE_LINE_RANGE.invokeExact(handle, startLine, endLine);
+        } catch (Throwable t) {
+            throw new RuntimeException(t);
+        }
+        return new IntRange(startLine.get(ValueLayout.JAVA_INT, 0), endLine.get(ValueLayout.JAVA_INT, 0));
     }
 
     // ===================== Linked Editing =====================
@@ -1571,6 +1610,44 @@ public final class EditorNative {
         });
     }
 
+    public static void clearLinks(long handle) {
+        try {
+            CLEAR_LINKS.invokeExact(handle);
+        } catch (Throwable t) {
+            throw new RuntimeException(t);
+        }
+    }
+
+    public static void setLineLinks(long handle, byte[] payload, Arena arena) {
+        try {
+            MemorySegment seg = arena.allocateFrom(ValueLayout.JAVA_BYTE, payload);
+            SET_LINE_LINKS.invokeExact(handle, seg, (long) payload.length);
+        } catch (Throwable t) {
+            throw new RuntimeException(t);
+        }
+    }
+
+    public static void setLineLinks(long handle, MemorySegment payload, long size) {
+        invokeVoid(() -> {
+            SET_LINE_LINKS.invokeExact(handle, payload, size);
+        });
+    }
+
+    public static void setBatchLineLinks(long handle, byte[] payload, Arena arena) {
+        try {
+            MemorySegment seg = arena.allocateFrom(ValueLayout.JAVA_BYTE, payload);
+            SET_BATCH_LINE_LINKS.invokeExact(handle, seg, (long) payload.length);
+        } catch (Throwable t) {
+            throw new RuntimeException(t);
+        }
+    }
+
+    public static void setBatchLineLinks(long handle, MemorySegment payload, long size) {
+        invokeVoid(() -> {
+            SET_BATCH_LINE_LINKS.invokeExact(handle, payload, size);
+        });
+    }
+
     public static void setBatchLineSpans(long handle, byte[] payload, Arena arena) {
         try {
             MemorySegment seg = arena.allocateFrom(ValueLayout.JAVA_BYTE, payload);
@@ -1699,10 +1776,24 @@ public final class EditorNative {
         });
     }
 
+    public static void freeU8String(long ptr) {
+        invokeVoid(() -> {
+            FREE_U8_STRING.invokeExact(ptr);
+        });
+    }
+
     public static void freeU16String(long ptr) {
         invokeVoid(() -> {
             FREE_U16_STRING.invokeExact(ptr);
         });
+    }
+
+    /**
+     * Read the null-terminated UTF-8 string returned by C++
+     */
+    public static String readUtf8String(MemorySegment ptr) {
+        if (ptr.equals(MemorySegment.NULL)) return null;
+        return ptr.reinterpret(Long.MAX_VALUE).getString(0);
     }
 
     /**

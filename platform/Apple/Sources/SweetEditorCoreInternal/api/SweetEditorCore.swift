@@ -747,11 +747,22 @@ class SweetEditorCore {
             ?? CTFontCreateWithName(fontName as CFString, fontSize, nil)
         inlayHintFont = CTFontCreateWithName(baseInlayHintFontName as CFString, baseInlayHintFontSize, nil)
 
+        #if os(iOS)
+        let revealSelectionEndOnSelectAll = true
+        #else
+        let revealSelectionEndOnSelectAll = false
+        #endif
+
         let optionsPayload = SweetEditorCore.makeEditorOptionsPayload(
             touchSlop: 10.0,
             doubleTapTimeout: 300,
             longPressMs: 500,
-            maxUndoStackSize: 512
+            flingFriction: 3.5,
+            flingMinVelocity: 50.0,
+            flingMaxVelocity: 8000.0,
+            maxUndoStackSize: 512,
+            keyChordTimeoutMs: 2000,
+            revealSelectionEndOnSelectAll: revealSelectionEndOnSelectAll
         )
 
         handle = performCoreCall {
@@ -820,17 +831,31 @@ class SweetEditorCore {
         withUnsafeBytes(of: &le) { data.append(contentsOf: $0) }
     }
 
+    private static func appendU8(_ value: UInt8, to data: inout Data) {
+        data.append(value)
+    }
+
     private static func makeEditorOptionsPayload(
         touchSlop: Float,
         doubleTapTimeout: Int64,
         longPressMs: Int64,
-        maxUndoStackSize: UInt64
+        flingFriction: Float,
+        flingMinVelocity: Float,
+        flingMaxVelocity: Float,
+        maxUndoStackSize: UInt64,
+        keyChordTimeoutMs: Int64,
+        revealSelectionEndOnSelectAll: Bool
     ) -> Data {
         var data = Data()
         appendF32(touchSlop, to: &data)
         appendI64(doubleTapTimeout, to: &data)
         appendI64(longPressMs, to: &data)
+        appendF32(flingFriction, to: &data)
+        appendF32(flingMinVelocity, to: &data)
+        appendF32(flingMaxVelocity, to: &data)
         appendU64(maxUndoStackSize, to: &data)
+        appendI64(keyChordTimeoutMs, to: &data)
+        appendU8(revealSelectionEndOnSelectAll ? 1 : 0, to: &data)
         return data
     }
 
@@ -1363,6 +1388,15 @@ class SweetEditorCore {
             let ptr = editor_get_scroll_metrics(handle, &size)
             let payload = copyBinaryPayloadAndFree(ptr, size: size)
             return protocolDecoder.decodeScrollMetrics(payload)
+        }
+    }
+
+    func getVisibleLineRange() -> IntRange {
+        return performCoreCall {
+            var startLine: Int32 = 0
+            var endLine: Int32 = -1
+            editor_get_visible_line_range(handle, &startLine, &endLine)
+            return IntRange(start: Int(startLine), end: Int(endLine))
         }
     }
 

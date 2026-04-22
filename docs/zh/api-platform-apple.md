@@ -113,6 +113,13 @@ func clearInlayHints()
 func setLinePhantomTexts(line: Int, phantoms: [PhantomTextPayload])
 func setBatchLinePhantomTexts(_ phantomsByLine: [Int: [PhantomTextPayload]])
 func clearPhantomTexts()
+func setLineCodeLens(line: Int, items: [CodeLensPayload])
+func setBatchLineCodeLens(_ itemsByLine: [Int: [CodeLensPayload]])
+func clearCodeLens()
+func setLineLinks(line: Int, links: [LinkSpan])
+func setBatchLineLinks(_ linksByLine: [Int: [LinkSpan]])
+func getLinkTargetAt(line: Int, column: Int) -> String
+func clearLinks()
 func clearAllDecorations()
 
 func setLineGutterIcons(line: Int, icons: [GutterIcon])
@@ -150,6 +157,8 @@ func cancelLinkedEditing()
 
 > 兼容性说明：`SweetEditorCore` 仍保留部分 tuple/数组形态的旧重载并标注 `deprecated`，新接入建议统一使用 model 版本或 `payload: Data` 版本。
 
+`getLinkTargetAt(line:column:)` 在请求位置未命中 link 时返回空字符串。
+
 ### 括号高亮
 
 ```swift
@@ -171,6 +180,7 @@ iOS 侧在共享 Core 之上额外封装：
 - CompletionProvider：`add/remove/trigger/show/dismiss`
 - 语言配置：`setLanguageConfiguration(_:)`（同步 bracket pairs 到 Core）
 - 元数据泛型接口：`setMetadata<T: EditorMetadata>(_:)` / `getMetadata<T: EditorMetadata>() -> T?`
+- CodeLens / Link 点击回调：`onCodeLensClick`、`onLinkClick`
 - `setWrapMode(_ mode: Int)`：保留 `Int` 入口并映射到 `SweetEditorCore.WrapMode`
 
 SwiftUI 使用入口：`SweetEditorSwiftUIViewiOS`。
@@ -184,7 +194,7 @@ macOS 视图层文件：
 - `platform/Apple/Sources/SweetEditorMacOS/SweetEditorViewMacOS.swift`
 - `platform/Apple/Sources/SweetEditorMacOS/SweetEditorSwiftUIMacOS.swift`
 
-macOS 侧同样在共享 Core 之上封装 Provider、语言配置和元数据接口；能力对齐 iOS，主要差异来自平台事件系统（AppKit）与输入链路。
+macOS 侧同样在共享 Core 之上封装 Provider、语言配置、元数据以及点击回调（`onCodeLensClick`、`onLinkClick`）；能力对齐 iOS，主要差异来自平台事件系统（AppKit）与输入链路。
 
 SwiftUI 使用入口：`SweetEditorSwiftUIMacOS`。
 

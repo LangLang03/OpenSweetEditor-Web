@@ -2,12 +2,11 @@ import 'dart:io';
 
 void main() {
   final scriptFile = File(Platform.script.toFilePath());
-  final flutterDir = scriptFile.parent.parent;
+  final demoDir = scriptFile.parent.parent;
+  final flutterDir = demoDir.parent;
   final platformDir = flutterDir.parent;
   final sourceDir = Directory(_join(platformDir.path, '_res'));
-  final targetDir = Directory(
-    _join(flutterDir.path, 'demo', 'assets', 'demo_shared'),
-  );
+  final targetDir = Directory(_join(demoDir.path, 'assets', 'demo_shared'));
 
   if (!sourceDir.existsSync()) {
     stderr.writeln('Shared resource directory not found: ${sourceDir.path}');

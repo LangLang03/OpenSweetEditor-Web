@@ -11,12 +11,12 @@ public final class DoubleTapEvent extends EditorEvent {
     public final TextPosition cursorPosition;
     public final boolean hasSelection;
     public final TextRange selection;
-    public final PointF screenPoint;
+    public final PointF locationInEditor;
 
-    public DoubleTapEvent(TextPosition cursorPosition, boolean hasSelection, TextRange selection, PointF screenPoint) {
+    public DoubleTapEvent(TextPosition cursorPosition, boolean hasSelection, TextRange selection, PointF locationInEditor) {
         this.cursorPosition = cursorPosition;
         this.hasSelection = hasSelection;
         this.selection = selection;
-        this.screenPoint = screenPoint;
+        this.locationInEditor = locationInEditor;
     }
 }

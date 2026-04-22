@@ -10,6 +10,7 @@
 4. `src/include/*.h`
 5. `src/core/*.cpp`
 6. 最后再看 `platform/*`
+7. `docs/zh/guide-adding-decoration-type.md` — 添加新装饰类型的逐层指南
 
 ## 仓库地图
 

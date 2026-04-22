@@ -8,5 +8,6 @@ public enum VisualRunType {
     PHANTOM_TEXT,
     FOLD_PLACEHOLDER,
     TAB,
-    CODELENS
+    CODELENS,
+    LINK
 }

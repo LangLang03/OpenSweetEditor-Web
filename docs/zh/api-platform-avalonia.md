@@ -16,9 +16,7 @@
   - `platform/Avalonia/SweetEditor/EditorPerf.cs`
 - 共享 Demo：`platform/Avalonia/Demo.Shared/*`
 - Android 宿主：`platform/Avalonia/Demo.Android/*`
-- 桌面宿主：`platform/Avalonia/Demo.Desktop/*`
-- macOS 宿主：`platform/Avalonia/Demo.Mac/*`
-- iOS 宿主：`platform/Avalonia/Demo.iOS/*`
+- 桌面宿主：`platform/Avalonia/Demo/*`
 
 ## 架构说明
 
@@ -27,16 +25,14 @@
 - `EditorProtocol` 负责二进制 payload 解码；`EditorRenderer` 消费 `EditorRenderModel` 进行 Avalonia `DrawingContext` 绘制。
 - `SweetEditorControl` 是宿主真正持有的控件入口；`SweetEditorController` 提供声明式 / MVVM 风格下的外部控制入口。
 - Decorations / Completion / NewLine / InlineSuggestion / SelectionMenu 均在 Avalonia 层按标准拆成独立 manager/provider 模块。
-- Demo.Shared 直接依赖 `SweetLine` NuGet 包。Linux/macOS 动态库由 NuGet RID assets 提供；Android 宿主负责把 `libsweetline.asset` staging 到应用私有目录并设置 `SWEETLINE_LIB_PATH`。
+- Android Demo 直接接入 `libsweetline.so`；桌面 Demo 在未提供 SweetLine native 时自动回退到托管 fallback 高亮。
 
 ## 目录结构
 
 - `SweetEditor/`：Avalonia 控件、协议桥接、渲染、事件、provider 管理
 - `Demo.Shared/`：共享 UI、样例加载、SweetLine 运行时、图标与菜单逻辑
 - `Demo.Android/`：Avalonia Android 宿主、IME / InputPane / safe area 平台服务
-- `Demo.Desktop/`：Avalonia Desktop 宿主
-- `Demo.Mac/`：Avalonia macOS 宿主
-- `Demo.iOS/`：Avalonia iOS 宿主
+- `Demo/`：Avalonia Desktop 宿主
 - `api-platform-avalonia.md`：平台目录入口文档（当前文档在 `docs/zh` 的规范版本）
 
 ## 环境要求
@@ -55,10 +51,9 @@
 - .NET Android workload
 - Android SDK（API 34）
 - `adb`
-- Android Demo 使用 `SweetLine` NuGet 托管 API，并通过平台层提供 Android 可加载的 native library：
-  - `platform/Avalonia/Demo.Android/native/sweetline/arm64-v8a/libsweetline.asset`
-  - `platform/Avalonia/Demo.Android/native/sweetline/x86_64/libsweetline.asset`
-  - 运行时 staging 到应用私有目录后设置 `SWEETLINE_LIB_PATH`
+- Android Demo 若要启用 SweetLine native 高亮，需要：
+  - `platform/Avalonia/Demo.Android/native/sweetline/arm64-v8a/libsweetline.so`
+  - `platform/Avalonia/Demo.Android/native/sweetline/x86_64/libsweetline.so`
 
 更完整的 Termux / Android 构建说明见：
 
@@ -71,7 +66,7 @@
 ```bash
 cd platform/Avalonia
 dotnet build Avalonia.sln -c Debug
-dotnet run --project Demo.Desktop/Demo.Desktop.csproj -c Debug
+dotnet run --project Demo/Demo.csproj -c Debug
 ```
 
 ### 在仓库内构建 Android Demo
@@ -125,21 +120,20 @@ editor.GetSettings().SetWrapMode(WrapMode.WORD_BREAK);
 
 - `platform/Avalonia/Demo.Shared/UI/Samples/EmbeddedSampleRepository.cs`
 
-### SweetLine 对接
+### SweetLine native 对接
 
-Demo.Shared 直接引用 `SweetLine` NuGet 包，对接入口：
+Android 主路径直接使用 `libsweetline.so`，对接入口：
 
 - `platform/Avalonia/Demo.Shared/Decoration/DemoSweetLineRuntime.cs`
-- `platform/Avalonia/Demo.Shared/Decoration/DemoDecorationProvider.cs`
+- `platform/Avalonia/Demo.Shared/SweetLine/SweetLineNative.cs`
+- `platform/Avalonia/Demo.Shared/SweetLine/SweetLine.cs`
 
 当前对接策略：
 
-- 共享层：优先创建 NuGet 提供的 `HighlightEngine`、`DocumentAnalyzer`、`TextAnalyzer`
+- Android：优先创建 `HighlightEngine`、`DocumentAnalyzer`、`TextAnalyzer`
 - 语法规则：从嵌入资源 `platform/_res/syntaxes/*.json` 编译
 - 大文档：优先走可见区 slice / 行级分析，避免整份高亮结果回传到托管层
-- Android：由 `Demo.Android/MainActivity.cs` staging `libsweetline.asset` 并设置 `SWEETLINE_LIB_PATH`
-- 降级搜索：若 NuGet bundles 中没有对应动态库，可通过 `SWEETLINE_LIB_PATH` 指定，或将动态库拷贝到当前工作目录
-- 稳定性：Android 上避免调用当前会触发 native 崩溃的行范围增量分析路径，改用 slice/session 重新 prime
+- 桌面：若未提供 SweetLine native，则回退到托管高亮
 
 ## 公开入口类型
 
@@ -180,7 +174,6 @@ public event EventHandler<DoubleTapEventArgs>? DoubleTap
 public new event EventHandler<ContextMenuEventArgs>? ContextMenu
 public event EventHandler<InlayHintClickEventArgs>? InlayHintClick
 public event EventHandler<GutterIconClickEventArgs>? GutterIconClick
-public event EventHandler<CodeLensClickEventArgs>? CodeLensClick
 public event EventHandler<FoldToggleEventArgs>? FoldToggle
 public event EventHandler<SelectionMenuItemClickEventArgs>? SelectionMenuItemClick
 public event Action<IReadOnlyList<CompletionItem>>? CompletionItemsUpdated
@@ -321,12 +314,8 @@ public void SetLinePhantomTexts(int line, IList<PhantomText> phantoms)
 public void SetBatchLinePhantomTexts(Dictionary<int, IList<PhantomText>> phantomsByLine)
 public void SetLineGutterIcons(int line, IList<GutterIcon> icons)
 public void SetBatchLineGutterIcons(Dictionary<int, IList<GutterIcon>> iconsByLine)
-public void SetMaxGutterIcons(int count)
-public int GetMaxGutterIcons()
-public void SetLineCodeLens(int line, IList<CodeLensItem> items)
-public void SetBatchLineCodeLens(Dictionary<int, IList<CodeLensItem>> itemsByLine)
-public void SetLineDiagnostics<TDiagnostic>(int line, IList<TDiagnostic> items) where TDiagnostic : Diagnostic
-public void SetBatchLineDiagnostics<TDiagnostic>(Dictionary<int, IList<TDiagnostic>> diagsByLine) where TDiagnostic : Diagnostic
+public void SetLineDiagnostics(int line, IList<DiagnosticItem> items)
+public void SetBatchLineDiagnostics(Dictionary<int, IList<DiagnosticItem>> diagsByLine)
 public void SetIndentGuides(IList<IndentGuide> guides)
 public void SetBracketGuides(IList<BracketGuide> guides)
 public void SetFlowGuides(IList<FlowGuide> guides)
@@ -338,11 +327,9 @@ public void ClearHighlights(SpanLayer layer)
 public void ClearInlayHints()
 public void ClearPhantomTexts()
 public void ClearGutterIcons()
-public void ClearCodeLens()
 public void ClearGuides()
 public void ClearDiagnostics()
 public void ClearAllDecorations()
-public void SetMatchedBrackets(int openLine, int openColumn, int closeLine, int closeColumn)
 public void ClearMatchedBrackets()
 
 public TextEditResult InsertSnippet(string snippetTemplate)
@@ -375,7 +362,7 @@ public void Dispose()
 
 ```csharp
 TextChanged / CursorChanged / SelectionChanged / ScrollChanged / ScaleChanged / DocumentLoaded
-LongPress / DoubleTap / ContextMenu / InlayHintClick / GutterIconClick / CodeLensClick / FoldToggle
+LongPress / DoubleTap / ContextMenu / InlayHintClick / GutterIconClick / FoldToggle
 SelectionMenuItemClick / CompletionItemsUpdated / CompletionDismissed
 InlineSuggestionAccepted / InlineSuggestionDismissed
 ```
@@ -442,7 +429,6 @@ public float GetDecorationOverscanViewportMultiplier()
 - `SetTypeface(...)` 是 `SetFontFamily(...)` 的别名。
 - `SetDecorationScrollRefreshMinIntervalMs(...)` 与 `SetDecorationOverscanViewportMultiplier(...)` 用于控制装饰刷新节流与 overscan。
 - Android Demo 当前会根据移动端场景对 `GutterSticky`、文本尺寸和装饰刷新频率做默认收口。
-- `SetMaxGutterIcons(...)` 同时保留在 `EditorSettings` 与控件/控制器直接 API 上，便于与 Core 标准 API 对齐。
 
 ## Provider / 数据模型补充
 
@@ -462,11 +448,8 @@ public float GetDecorationOverscanViewportMultiplier()
 - `DecorationApplyMode`
 - `DecorationContext`
 - `DecorationResult`
-- `Diagnostic`（标准诊断模型）
-- `DiagnosticItem`（旧 Avalonia 名称，保留为兼容别名）
 - `IDecorationProvider`
 - `IDecorationReceiver`
-- `CodeLensItem`
 
 ### New Line
 
@@ -491,26 +474,23 @@ public float GetDecorationOverscanViewportMultiplier()
 - 触摸、长按、双击、拖选、IME 遮挡与 selection menu 行为由 Avalonia 宿主层做额外适配。
 - Android Demo 默认打包：
   - `libsweeteditor.so`（来自仓库 `prebuilt/android/*`）
-  - `libsweetline.asset`（来自 `Demo.Android/native/sweetline/*`，运行时 staging 为 `libsweetline.so`）
-- `MainActivity` 在 Avalonia 初始化前设置 `SWEETLINE_LIB_PATH`，共享层只依赖 `SweetLine` NuGet，不包含 Android 专用装载逻辑。
+  - `libsweetline.so`（来自 `Demo.Android/native/sweetline/*`）
 
 ### 桌面
 
-- `Demo.Desktop`、`Demo.Mac`、`Demo.iOS` 与 `Demo.Android` 共用 `Demo.Shared/MainView.cs`。
-- Linux/macOS 的 SweetLine 动态库优先由 NuGet RID assets 提供；若 bundles 中没有对应动态库，可通过 `SWEETLINE_LIB_PATH` 或当前目录动态库兜底。
-- 各宿主共用 `SweetEditorControl` / `SweetEditorController` / Provider API 契约，平台差异收口在 `IDemoPlatformServices` 实现中。
+- `Demo` 与 `Demo.Android` 共用 `Demo.Shared/MainView.cs`。
+- 若桌面环境未提供 SweetLine native，语法高亮会回退到托管实现。
+- 桌面与 Android 共用 `SweetEditorControl` / `SweetEditorController` / Provider API 契约。
 
 ## Demo 与文档入口
 
 - `platform/Avalonia/README.demo.md`
-- `platform/Avalonia/AVALONIA_INTEGRATION_STATUS.md`
+- `platform/Avalonia/Demo/README.md`
 - `platform/Avalonia/Demo.Android/README.md`
 - `platform/Avalonia/Demo.Android/termux-dotnet-android-build.md`
 
 ## 当前实现说明
 
-- 当前 Avalonia 平台已经按项目标准实现 `SweetEditorControl`、`SweetEditorController`、`EditorSettings`、provider 管理、事件系统、selection menu、inline suggestion、perf overlay、CodeLens、diagnostics、guide、matched bracket、linked editing 等宿主 API。
-- `EditorCore.Dispose()` 已释放 C++ `free_editor`，重复释放幂等；显式释放后再次访问 `EditorCore` 会抛出明确的 `ObjectDisposedException`。
-- Android Demo 主路径使用 `SweetLine` NuGet 托管 API + 平台层 native library staging，不再维护本地 SweetLine P/Invoke wrapper。
-- 尚未补齐的平台层测试工程、provider 超时策略和系统化无障碍适配属于后续 SHOULD/MAY 项；当前 Android APK 已通过构建、安装和冷启动 smoke 验证。
+- 当前 Avalonia 平台已经按项目标准实现 `SweetEditorControl`、`SweetEditorController`、`EditorSettings`、provider 管理、事件系统、selection menu、ghost、perf overlay 等宿主 API。
+- Android Demo 主路径明确要求使用 SweetLine native，不自行实现另一套高亮引擎。
 - 宿主对输入法、触摸、选区菜单、completion popup 和大文档高亮都做了平台兼容性适配；若文档与代码冲突，以代码为准。

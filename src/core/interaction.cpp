@@ -110,6 +110,16 @@ namespace NS_SWEETEDITOR {
     LOGD("EditorInteraction::dragHandleTo, selection = %s", m_context_.caret->selection.dump().c_str());
   }
 
+  bool EditorInteraction::shouldPlaceCursorOnLongPress(const PointF& screen_point) const {
+    if (m_context_.text_layout == nullptr || !m_context_.caret->has_selection) {
+      return true;
+    }
+
+    const TextRange selection = m_context_.caret->normalizedSelection();
+    const TextPosition pressed_position = m_context_.text_layout->hitTestPointer(screen_point);
+    return !selection.contains(pressed_position);
+  }
+
   void EditorInteraction::dragSelectTo(const PointF& screen_point, bool is_mouse) {
     PointF adjusted_point = screen_point;
     if (!is_mouse) {
@@ -243,13 +253,16 @@ namespace NS_SWEETEDITOR {
         intent.place_cursor = true;
       }
       result.hit_target = m_context_.text_layout->hitTestDecoration(result.tap_point);
+      if (result.hit_target.type == HitTargetType::LINK
+          && !hasAnyModifier(result.modifiers, KeyModifier::CTRL | KeyModifier::META)) {
+        result.hit_target = {};
+      }
       if (result.hit_target.type == HitTargetType::FOLD_PLACEHOLDER ||
           result.hit_target.type == HitTargetType::FOLD_GUTTER) {
         intent.toggle_fold = true;
         intent.fold_line = result.hit_target.line;
         intent.place_cursor = false;
-      } else if (result.hit_target.type == HitTargetType::CODELENS
-                 || result.hit_target.type == HitTargetType::LINK) {
+      } else if (result.hit_target.type == HitTargetType::CODELENS) {
         intent.place_cursor = false;
       }
       break;
@@ -257,7 +270,11 @@ namespace NS_SWEETEDITOR {
       intent.select_word = true;
       break;
     case GestureType::LONG_PRESS:
-      intent.place_cursor = true;
+      result.hit_target = m_context_.text_layout->hitTestDecoration(result.tap_point);
+      intent.place_cursor = shouldPlaceCursorOnLongPress(result.tap_point);
+      break;
+    case GestureType::CONTEXT_MENU:
+      result.hit_target = m_context_.text_layout->hitTestDecoration(result.tap_point);
       break;
     case GestureType::DRAG_SELECT: {
       bool is_mouse = (event.type == EventType::MOUSE_MOVE);
