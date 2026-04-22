@@ -221,6 +221,8 @@ export interface EditorSettings {
   isGutterVisible(): boolean;
   setCurrentLineRenderMode(mode: IAnyValue): void;
   getCurrentLineRenderMode(): number;
+  setCompositionEnabled(enabled: boolean): void;
+  isCompositionEnabled(): boolean;
   setAutoIndentMode(mode: IAnyValue): void;
   getAutoIndentMode(): number;
   setReadOnly(readOnly: boolean): void;
@@ -323,10 +325,10 @@ export class NewLineActionProviderManager {
 
 export type EditorEventName =
   | "TextChangedEvent" | "CursorChangedEvent" | "SelectionChangedEvent" | "ScrollChangedEvent" | "ScaleChangedEvent"
-  | "DocumentLoadedEvent" | "FoldToggleEvent" | "GutterIconClickEvent" | "InlayHintClickEvent" | "LongPressEvent"
+  | "DocumentLoadedEvent" | "FoldToggleEvent" | "GutterIconClickEvent" | "InlayHintClickEvent" | "CodeLensClickEvent" | "LinkClickEvent" | "LongPressEvent"
   | "DoubleTapEvent" | "ContextMenuEvent"
   | "TextChanged" | "CursorChanged" | "SelectionChanged" | "ScrollChanged" | "ScaleChanged"
-  | "DocumentLoaded" | "FoldToggle" | "GutterIconClick" | "InlayHintClick" | "LongPress"
+  | "DocumentLoaded" | "FoldToggle" | "GutterIconClick" | "InlayHintClick" | "CodeLensClick" | "LinkClick" | "LongPress"
   | "DoubleTap" | "ContextMenu";
 
 export interface EditorEvent<
@@ -350,6 +352,8 @@ export interface DocumentLoadedEvent extends EditorEvent<"DocumentLoadedEvent" |
 export interface FoldToggleEvent extends EditorEvent<"FoldToggleEvent" | "FoldToggle"> {}
 export interface GutterIconClickEvent extends EditorEvent<"GutterIconClickEvent" | "GutterIconClick"> {}
 export interface InlayHintClickEvent extends EditorEvent<"InlayHintClickEvent" | "InlayHintClick"> {}
+export interface CodeLensClickEvent extends EditorEvent<"CodeLensClickEvent" | "CodeLensClick"> {}
+export interface LinkClickEvent extends EditorEvent<"LinkClickEvent" | "LinkClick"> {}
 export interface LongPressEvent extends EditorEvent<"LongPressEvent" | "LongPress"> {}
 export interface DoubleTapEvent extends EditorEvent<"DoubleTapEvent" | "DoubleTap"> {}
 export interface ContextMenuEvent extends EditorEvent<"ContextMenuEvent" | "ContextMenu"> {}

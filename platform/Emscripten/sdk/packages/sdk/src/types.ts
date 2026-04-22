@@ -8,6 +8,7 @@ import type {
   IndentGuide,
   InlayHint,
   ISweetEditorWasmModule,
+  LinkSpan,
   ITextModel,
   ITextRange,
   PhantomText,
@@ -71,6 +72,7 @@ export interface IDecorationPatch {
   syntaxSpans?: ILineDataMap<StyleSpan>;
   semanticSpans?: ILineDataMap<StyleSpan>;
   inlayHints?: ILineDataMap<InlayHint>;
+  links?: ILineDataMap<LinkSpan>;
   diagnostics?: ILineDataMap<DiagnosticItem>;
   indentGuides?: IndentGuide[];
   bracketGuides?: BracketGuide[];
@@ -82,6 +84,7 @@ export interface IDecorationPatch {
   syntaxSpansMode?: number;
   semanticSpansMode?: number;
   inlayHintsMode?: number;
+  linksMode?: number;
   diagnosticsMode?: number;
   indentGuidesMode?: number;
   bracketGuidesMode?: number;
@@ -162,4 +165,3 @@ export interface IEditor {
   getNativeWidget(): SweetEditorWidget;
   dispose(): void;
 }
-

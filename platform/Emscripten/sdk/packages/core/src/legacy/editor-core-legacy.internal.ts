@@ -465,7 +465,13 @@ function iterateLineEntries(input:IAnyValue, callback:(...args: IAnyValue[]) => 
         return;
       }
       if (entry && typeof entry === "object" && Number.isFinite(entry.line)) {
-        const items = entry.items ?? entry.spans ?? entry.hints ?? entry.phantoms ?? entry.icons ?? entry.diagnostics;
+        const items = entry.items
+          ?? entry.spans
+          ?? entry.hints
+          ?? entry.phantoms
+          ?? entry.icons
+          ?? entry.links
+          ?? entry.diagnostics;
         callback(ensureLine(entry.line), asArray(items));
         return;
       }
@@ -1718,6 +1724,7 @@ export class WebEditorCore {
     }
     const lineNo = ensureLine(line);
     this._callWithVector("CodeLensItemVector", asArray(items), (item:IAnyValue) => ({
+      column: ensureColumn(item?.column),
       text: String(item?.text ?? ""),
       command_id: toInt(item?.commandId ?? item?.command_id ?? item?.command ?? item?.id, 0),
     }), (vec:IAnyValue) => {
@@ -1742,6 +1749,7 @@ export class WebEditorCore {
       "items",
       itemsByLine,
       (item:IAnyValue) => ({
+        column: ensureColumn(item?.column),
         text: String(item?.text ?? ""),
         command_id: toInt(item?.commandId ?? item?.command_id ?? item?.command ?? item?.id, 0),
       }),
@@ -1771,6 +1779,78 @@ export class WebEditorCore {
     return result;
   }
 
+  setLineLinks(line:number, links:IAnyValue[]) {
+    const fn = this._native?.setLineLinks;
+    if (typeof fn !== "function") {
+      return;
+    }
+    const lineNo = ensureLine(line);
+    this._callWithVector("LinkSpanVector", asArray(links), (item:IAnyValue) => ({
+      column: ensureColumn(item?.column),
+      length: ensureLength(item?.length),
+      target: String(item?.target ?? ""),
+    }), (vec:IAnyValue) => {
+      const result = fn.call(this._native, lineNo, vec);
+      this._notifyMutate();
+      return result;
+    });
+  }
+
+  setBatchLineLinks(linksByLine:IAnyValue) {
+    const fn = this._native?.setBatchLineLinks;
+    if (typeof fn !== "function") {
+      this.withBatch(() => {
+        iterateLineEntries(linksByLine, (line:number, links:IAnyValue[]) => {
+          this.setLineLinks(line, links);
+        });
+      });
+      return;
+    }
+    const batched = this._callBatchLineEntries(
+      "LineLinksEntryVector",
+      "LinkSpanVector",
+      "links",
+      linksByLine,
+      (item:IAnyValue) => ({
+        column: ensureColumn(item?.column),
+        length: ensureLength(item?.length),
+        target: String(item?.target ?? ""),
+      }),
+      (entryVec:IAnyValue) => {
+        const result = fn.call(this._native, entryVec);
+        return result;
+      },
+    );
+    if (batched) {
+      this._notifyMutate();
+      return;
+    }
+    this.withBatch(() => {
+      iterateLineEntries(linksByLine, (line:number, links:IAnyValue[]) => {
+        this.setLineLinks(line, links);
+      });
+    });
+  }
+
+  clearLinks() {
+    const fn = this._native?.clearLinks;
+    if (typeof fn !== "function") {
+      return undefined;
+    }
+    const result = fn.call(this._native);
+    this._notifyMutate();
+    return result;
+  }
+
+  getLinkTargetAt(line:number, column:number) {
+    const fn = this._native?.getLinkTargetAt;
+    if (typeof fn !== "function") {
+      return "";
+    }
+    const target = fn.call(this._native, ensureLine(line), ensureColumn(column));
+    return String(target ?? "");
+  }
+
   setLineDiagnostics(line:number, diagnostics:IAnyValue[]) {
     const lineNo = ensureLine(line);
     const src = asArray(diagnostics);
@@ -1778,7 +1858,6 @@ export class WebEditorCore {
       column: ensureColumn(item.column),
       length: ensureLength(item.length),
       severity: this._toNativeEnumValue("DiagnosticSeverity", item.severity, this._diagnosticSeverity.DIAG_HINT),
-      color: toInt(item.color, 0),
     }), (vec:IAnyValue) => {
       const result = this._native.setLineDiagnostics(lineNo, vec);
       this._notifyMutate();
@@ -1796,7 +1875,6 @@ export class WebEditorCore {
         column: ensureColumn(item.column),
         length: ensureLength(item.length),
         severity: this._toNativeEnumValue("DiagnosticSeverity", item.severity, this._diagnosticSeverity.DIAG_HINT),
-        color: toInt(item.color, 0),
       }),
       (entryVec:IAnyValue) => {
         const result = this._native.setBatchLineDiagnostics(entryVec);
@@ -2511,6 +2589,7 @@ export class DecorationResult {
     this.syntaxSpans = init.syntaxSpans ?? null;
     this.semanticSpans = init.semanticSpans ?? null;
     this.inlayHints = init.inlayHints ?? null;
+    this.links = init.links ?? null;
     this.diagnostics = init.diagnostics ?? null;
     this.indentGuides = init.indentGuides ?? null;
     this.bracketGuides = init.bracketGuides ?? null;
@@ -2523,6 +2602,7 @@ export class DecorationResult {
     this.syntaxSpansMode = toInt(init.syntaxSpansMode, DecorationApplyMode.MERGE);
     this.semanticSpansMode = toInt(init.semanticSpansMode, DecorationApplyMode.MERGE);
     this.inlayHintsMode = toInt(init.inlayHintsMode, DecorationApplyMode.MERGE);
+    this.linksMode = toInt(init.linksMode, DecorationApplyMode.MERGE);
     this.diagnosticsMode = toInt(init.diagnosticsMode, DecorationApplyMode.MERGE);
     this.indentGuidesMode = toInt(init.indentGuidesMode, DecorationApplyMode.MERGE);
     this.bracketGuidesMode = toInt(init.bracketGuidesMode, DecorationApplyMode.MERGE);
@@ -3381,6 +3461,7 @@ function cloneDecorationResult(result:IAnyValue) {
     syntaxSpans: cloneLineMap(result.syntaxSpans),
     semanticSpans: cloneLineMap(result.semanticSpans),
     inlayHints: cloneLineMap(result.inlayHints),
+    links: cloneLineMap(result.links),
     diagnostics: cloneLineMap(result.diagnostics),
     indentGuides: cloneList(result.indentGuides),
     bracketGuides: cloneList(result.bracketGuides),
@@ -3393,6 +3474,7 @@ function cloneDecorationResult(result:IAnyValue) {
     syntaxSpansMode: toInt(result.syntaxSpansMode, DecorationApplyMode.MERGE),
     semanticSpansMode: toInt(result.semanticSpansMode, DecorationApplyMode.MERGE),
     inlayHintsMode: toInt(result.inlayHintsMode, DecorationApplyMode.MERGE),
+    linksMode: toInt(result.linksMode, DecorationApplyMode.MERGE),
     diagnosticsMode: toInt(result.diagnosticsMode, DecorationApplyMode.MERGE),
     indentGuidesMode: toInt(result.indentGuidesMode, DecorationApplyMode.MERGE),
     bracketGuidesMode: toInt(result.bracketGuidesMode, DecorationApplyMode.MERGE),
@@ -3409,6 +3491,7 @@ function mergeDecorationPatch(target:IAnyValue, patch:IAnyValue) {
     ["syntaxSpans", "syntaxSpansMode"],
     ["semanticSpans", "semanticSpansMode"],
     ["inlayHints", "inlayHintsMode"],
+    ["links", "linksMode"],
     ["diagnostics", "diagnosticsMode"],
     ["indentGuides", "indentGuidesMode"],
     ["bracketGuides", "bracketGuidesMode"],
@@ -3845,6 +3928,7 @@ export class DecorationProviderManager {
       syntaxSpans: new Map(),
       semanticSpans: new Map(),
       inlayHints: new Map(),
+      links: new Map(),
       diagnostics: new Map(),
       indentGuides: null,
       bracketGuides: null,
@@ -3857,6 +3941,7 @@ export class DecorationProviderManager {
       syntaxSpansMode: DecorationApplyMode.MERGE,
       semanticSpansMode: DecorationApplyMode.MERGE,
       inlayHintsMode: DecorationApplyMode.MERGE,
+      linksMode: DecorationApplyMode.MERGE,
       diagnosticsMode: DecorationApplyMode.MERGE,
       indentGuidesMode: DecorationApplyMode.MERGE,
       bracketGuidesMode: DecorationApplyMode.MERGE,
@@ -3883,6 +3968,9 @@ export class DecorationProviderManager {
 
       merged.inlayHintsMode = mergeMode(merged.inlayHintsMode, snapshot.inlayHintsMode);
       appendLineMap(merged.inlayHints, snapshot.inlayHints);
+
+      merged.linksMode = mergeMode(merged.linksMode, snapshot.linksMode);
+      appendLineMap(merged.links, snapshot.links);
 
       merged.diagnosticsMode = mergeMode(merged.diagnosticsMode, snapshot.diagnosticsMode);
       appendLineMap(merged.diagnostics, snapshot.diagnostics);

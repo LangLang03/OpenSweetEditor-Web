@@ -1066,7 +1066,7 @@ namespace NS_SWEETEDITOR {
       codelens_vl.line_number_position = {m_layout_metrics_.line_number_margin, base_start_y};
       codelens_vl.kind = VisualLineKind::CODELENS;
 
-      static const U16String kSepText = {CHAR16(' '), CHAR16('|'), CHAR16(' ')};
+      static const U16String kSepText = {CHAR16('|')};
       const float sep_width = measureWidth(kSepText, FONT_STYLE_NORMAL);
       float run_x = 0;
       for (size_t ci = 0; ci < codelens_items.size(); ++ci) {

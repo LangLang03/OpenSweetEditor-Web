@@ -77,6 +77,10 @@ export class SweetEditorController {
   setTabSize(tabSize:number) { this.invoke("setTabSize", tabSize); }
   setBackspaceUnindent(enabled:boolean) { this.invoke("setBackspaceUnindent", enabled); }
   setInsertSpaces(enabled:boolean) { this.invoke("setInsertSpaces", enabled); }
+  setCompositionEnabled(enabled:boolean) { this.invoke("setCompositionEnabled", enabled); }
+  isCompositionEnabled() { return this._read("isCompositionEnabled", true); }
+  openImeCandidate() { this.invoke("openImeCandidate"); }
+  closeImeCandidate() { this.invoke("closeImeCandidate"); }
   getKeyMap() { return this._read("getKeyMap", null); }
   setEditorIconProvider(provider:IAnyValue) { this.invoke("setEditorIconProvider", provider); }
   getEditorIconProvider() { return this._read("getEditorIconProvider", null); }
@@ -161,6 +165,10 @@ export class SweetEditorController {
   setLineCodeLens(line:number, items:IAnyValue[]) { this.invoke("setLineCodeLens", line, items); }
   setBatchLineCodeLens(itemsByLine:IAnyValue) { this.invoke("setBatchLineCodeLens", itemsByLine); }
   clearCodeLens() { this.invoke("clearCodeLens"); }
+  setLineLinks(line:number, links:IAnyValue[]) { this.invoke("setLineLinks", line, links); }
+  setBatchLineLinks(linksByLine:IAnyValue) { this.invoke("setBatchLineLinks", linksByLine); }
+  clearLinks() { this.invoke("clearLinks"); }
+  getLinkTargetAt(line:number, column:number) { return this._read("getLinkTargetAt", "", line, column); }
   setLineDiagnostics(line:number, diagnostics:IAnyValue[]) { this.invoke("setLineDiagnostics", line, diagnostics); }
   setBatchLineDiagnostics(diagsByLine:IAnyValue) { this.invoke("setBatchLineDiagnostics", diagsByLine); }
   setIndentGuides(guides:IAnyValue[]) { this.invoke("setIndentGuides", guides); }

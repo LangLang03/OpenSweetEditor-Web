@@ -14,7 +14,8 @@ import {
 
 type SweetLineModuleLoader = (options?: Record<string, unknown>) => Promise<any>;
 type LanguageKind = "cpp" | "java" | "kotlin" | "lua";
-type DemoCodeLensItem = { text: string; commandId: number };
+type DemoCodeLensItem = { column: number; text: string; commandId: number };
+type DemoLinkSpan = { column: number; length: number; target: string };
 
 interface IDemoCompletionItem {
   label: string;
@@ -38,15 +39,23 @@ interface IWidgetLike {
   setLanguageConfiguration?(config: Record<string, unknown>): void;
   setScroll?(x: number, y: number): void;
   requestDecorationRefresh?(): void;
-  setLineCodeLens?(line: number, items: Array<{ text: string; commandId?: number; command_id?: number }>): void;
-  setBatchLineCodeLens?(itemsByLine: Record<number, Array<{ text: string; commandId?: number; command_id?: number }>>): void;
+  setLineCodeLens?(line: number, items: Array<{ column?: number; text: string; commandId?: number; command_id?: number }>): void;
+  setBatchLineCodeLens?(itemsByLine: Record<number, Array<{ column?: number; text: string; commandId?: number; command_id?: number }>>): void;
   clearCodeLens?(): void;
+  setLineLinks?(line: number, links: DemoLinkSpan[]): void;
+  setBatchLineLinks?(linksByLine: Record<number, DemoLinkSpan[]>): void;
+  clearLinks?(): void;
+  getLinkTargetAt?(line: number, column: number): string;
   subscribe?(eventType: string, listener: (event: any) => void): (() => void) | void;
   unsubscribe?(eventType: string, listener: (event: any) => void): void;
   getText?(): string;
   undo?(): void;
   redo?(): void;
   triggerCompletion?(): void;
+  setCompositionEnabled?(enabled: boolean): void;
+  isCompositionEnabled?(): boolean;
+  openImeCandidate?(): void;
+  closeImeCandidate?(): void;
 }
 
 const DEMO_FILE_FALLBACKS = Object.freeze({
@@ -158,6 +167,8 @@ const SYNTAX_JSON_FILES = Object.freeze(["cpp.json", "java.json", "kotlin.json",
 const CODELENS_DEMO_FILE = "CodeLensDemo.java";
 const CODELENS_EVENT_STANDARD = "CodeLensClickEvent";
 const CODELENS_EVENT_LEGACY = "CodeLensClick";
+const LINK_EVENT_STANDARD = "LinkClickEvent";
+const LINK_EVENT_LEGACY = "LinkClick";
 const DEMO_EDITOR_FONT_FAMILY = [
   "\"0xProto Nerd Font Mono\"",
   "Hack",
@@ -363,7 +374,6 @@ function buildDemoInlayAndDiagnostics(
           column: commentPos + fixmePos,
           length: 5,
           severity: 0,
-          color: 0,
         });
       }
 
@@ -374,7 +384,6 @@ function buildDemoInlayAndDiagnostics(
           column: commentPos + todoPos,
           length: 4,
           severity: 1,
-          color: 0,
         });
       }
     }
@@ -685,19 +694,103 @@ function selectCodeLensTargetLines(text: string, fileName: string, maxCount = 4)
   return normalizeCodeLensTargetLines(selected, lineCount, maxCount);
 }
 
-function buildCodeLensItemsForLine(line: number, variant: "line" | "batch"): DemoCodeLensItem[] {
+function collectWordRanges(lineText: string): Array<{ column: number; length: number; token: string }> {
+  const ranges: Array<{ column: number; length: number; token: string }> = [];
+  const regex = /\b[A-Za-z_][A-Za-z0-9_$]*\b/g;
+  for (const match of lineText.matchAll(regex)) {
+    const token = String(match[0] ?? "");
+    if (!token) {
+      continue;
+    }
+    const column = toInt(match.index, -1);
+    if (column < 0) {
+      continue;
+    }
+    ranges.push({ column, length: token.length, token });
+  }
+  return ranges;
+}
+
+function collectFallbackRange(lineText: string): { column: number; length: number; token: string } | null {
+  const firstSegment = /\S+/.exec(lineText);
+  if (!firstSegment || !firstSegment[0]) {
+    return null;
+  }
+  const column = toInt(firstSegment.index, -1);
+  if (column < 0) {
+    return null;
+  }
+  return {
+    column,
+    length: firstSegment[0].length,
+    token: firstSegment[0],
+  };
+}
+
+function buildCodeLensItemsForLine(line: number, lineText: string, variant: "line" | "batch"): DemoCodeLensItem[] {
   const lineNo = Math.max(0, toInt(line, 0));
   const base = lineNo + 1;
+  const ranges = collectWordRanges(lineText);
+  const firstColumn = ranges[0]?.column ?? 0;
+  // Keep Run/Debug in the same anchor column so only "|" controls visual spacing.
+  const secondColumn = firstColumn;
   if (variant === "batch") {
     return [
-      { text: `Batch refs on L${base}`, commandId: 3000 + base },
-      { text: `Batch run on L${base}`, commandId: 4000 + base },
+      { column: firstColumn, text: "Run", commandId: 3000 + base },
+      { column: secondColumn, text: "Debug", commandId: 4000 + base },
     ];
   }
   return [
-    { text: `Run L${base}`, commandId: 1000 + base },
-    { text: `Refs L${base}`, commandId: 2000 + base },
+    { column: firstColumn, text: "Run", commandId: 1000 + base },
+    { column: secondColumn, text: "Debug", commandId: 2000 + base },
   ];
+}
+
+function buildLinkSpansForLine(line: number, lineText: string, fileName: string, variant: "line" | "batch"): DemoLinkSpan[] {
+  const lineNo = Math.max(0, toInt(line, 0));
+  const ranges = collectWordRanges(lineText);
+  if (ranges.length === 0) {
+    const fallback = collectFallbackRange(lineText);
+    if (!fallback) {
+      return [];
+    }
+    ranges.push(fallback);
+  }
+
+  const makeTarget = (token: string, slot: number): string => {
+    const encodedFile = encodeURIComponent(fileName);
+    const encodedToken = encodeURIComponent(token);
+    return `demo://${encodedFile}/L${lineNo + 1}?token=${encodedToken}&variant=${variant}&slot=${slot}`;
+  };
+
+  const first = ranges[0];
+  if (!first) {
+    return [];
+  }
+
+  if (variant === "line") {
+    return [{
+      column: first.column,
+      length: first.length,
+      target: makeTarget(first.token, 1),
+    }];
+  }
+
+  const spans: DemoLinkSpan[] = [];
+  spans.push({
+    column: first.column,
+    length: first.length,
+    target: makeTarget(first.token, 1),
+  });
+  const last = ranges[ranges.length - 1];
+  if (last && (last.column !== first.column || last.length !== first.length)) {
+    spans.push({
+      column: last.column,
+      length: last.length,
+      target: makeTarget(last.token, 2),
+    });
+  }
+  return spans;
 }
 
 async function bootstrap(): Promise<void> {
@@ -711,6 +804,10 @@ async function bootstrap(): Promise<void> {
   const applyCodeLensBtn = document.getElementById("applyCodeLensBtn") as HTMLButtonElement | null;
   const applyBatchCodeLensBtn = document.getElementById("applyBatchCodeLensBtn") as HTMLButtonElement | null;
   const clearCodeLensBtn = document.getElementById("clearCodeLensBtn") as HTMLButtonElement | null;
+  const applyLineLinksBtn = document.getElementById("applyLineLinksBtn") as HTMLButtonElement | null;
+  const applyBatchLinksBtn = document.getElementById("applyBatchLinksBtn") as HTMLButtonElement | null;
+  const clearLinksBtn = document.getElementById("clearLinksBtn") as HTMLButtonElement | null;
+  const imeScenarioSelect = document.getElementById("imeScenarioSelect") as HTMLSelectElement | null;
   const codeLensLog = document.getElementById("codeLensLog") as HTMLElement | null;
 
   if (
@@ -724,6 +821,10 @@ async function bootstrap(): Promise<void> {
     || !applyCodeLensBtn
     || !applyBatchCodeLensBtn
     || !clearCodeLensBtn
+    || !applyLineLinksBtn
+    || !applyBatchLinksBtn
+    || !clearLinksBtn
+    || !imeScenarioSelect
   ) {
     throw new Error("Demo DOM missing required elements");
   }
@@ -736,6 +837,10 @@ async function bootstrap(): Promise<void> {
   const applyCodeLensBtnEl = applyCodeLensBtn;
   const applyBatchCodeLensBtnEl = applyBatchCodeLensBtn;
   const clearCodeLensBtnEl = clearCodeLensBtn;
+  const applyLineLinksBtnEl = applyLineLinksBtn;
+  const applyBatchLinksBtnEl = applyBatchLinksBtn;
+  const clearLinksBtnEl = clearLinksBtn;
+  const imeScenarioSelectEl = imeScenarioSelect;
   const codeLensLogEl = codeLensLog;
 
   const wasmVersion = String(Date.now());
@@ -821,8 +926,9 @@ async function bootstrap(): Promise<void> {
       return;
     }
     widget.clearCodeLens?.();
+    const lines = normalizeNewlines(text).split("\n");
     targets.forEach((line) => {
-      widget.setLineCodeLens?.(line, buildCodeLensItemsForLine(line, "line"));
+      widget.setLineCodeLens?.(line, buildCodeLensItemsForLine(line, lines[line] ?? "", "line"));
     });
     widget.requestDecorationRefresh?.();
     const humanLines = targets.map((line) => line + 1).join(", ");
@@ -844,8 +950,9 @@ async function bootstrap(): Promise<void> {
       return;
     }
     const payload: Record<number, DemoCodeLensItem[]> = {};
+    const lines = normalizeNewlines(text).split("\n");
     targets.forEach((line) => {
-      payload[line] = buildCodeLensItemsForLine(line, "batch");
+      payload[line] = buildCodeLensItemsForLine(line, lines[line] ?? "", "batch");
     });
     widget.clearCodeLens?.();
     widget.setBatchLineCodeLens?.(payload);
@@ -862,8 +969,163 @@ async function bootstrap(): Promise<void> {
     setStatus("CodeLens cleared");
   };
 
+  const applyLineLinksDemo = (): void => {
+    if (typeof widget.setLineLinks !== "function") {
+      appendCodeLensLog(codeLensLogEl, "setLineLinks is unavailable in this runtime.");
+      setStatus("Links API unavailable");
+      return;
+    }
+    const text = readEditorText();
+    const lines = normalizeNewlines(text).split("\n");
+    const targets = selectCodeLensTargetLines(text, activeFileName, 3);
+    if (targets.length === 0) {
+      appendCodeLensLog(codeLensLogEl, "No target line found for line links.");
+      setStatus("Links: no target line");
+      return;
+    }
+    widget.clearLinks?.();
+    let applied = 0;
+    let firstProbe: { line: number; column: number; expected: string } | null = null;
+    for (const line of targets) {
+      const spans = buildLinkSpansForLine(line, lines[line] ?? "", activeFileName, "line");
+      if (spans.length > 0) {
+        widget.setLineLinks?.(line, spans);
+        if (!firstProbe) {
+          const firstSpan = spans[0];
+          if (firstSpan) {
+            firstProbe = {
+              line,
+              column: toInt(firstSpan.column, 0),
+              expected: String(firstSpan.target ?? ""),
+            };
+          }
+        }
+        applied += 1;
+      }
+    }
+    if (applied <= 0) {
+      appendCodeLensLog(codeLensLogEl, "Line links produced 0 spans. Current file may have no suitable token text.");
+      setStatus("Links(line): 0 line(s)");
+      return;
+    }
+    widget.requestDecorationRefresh?.();
+    if (firstProbe && typeof widget.getLinkTargetAt === "function") {
+      const resolved = String(widget.getLinkTargetAt(firstProbe.line, firstProbe.column) ?? "");
+      const lineLabel = firstProbe.line + 1;
+      if (resolved) {
+        appendCodeLensLog(codeLensLogEl, `Link probe ok at L${lineLabel}:C${firstProbe.column}, target=${resolved}.`);
+      } else {
+        appendCodeLensLog(codeLensLogEl, `Link probe empty at L${lineLabel}:C${firstProbe.column}. expected=${firstProbe.expected}.`);
+      }
+    }
+    appendCodeLensLog(codeLensLogEl, `Applied line API links on ${applied} line(s). Hover text to verify pointer cursor + click.`);
+    setStatus(`Links(line): ${applied} line(s)`);
+  };
+
+  const applyBatchLinksDemo = (): void => {
+    if (typeof widget.setBatchLineLinks !== "function") {
+      appendCodeLensLog(codeLensLogEl, "setBatchLineLinks is unavailable in this runtime.");
+      setStatus("Links API unavailable");
+      return;
+    }
+    const text = readEditorText();
+    const lines = normalizeNewlines(text).split("\n");
+    const targets = selectCodeLensTargetLines(text, activeFileName, 4);
+    if (targets.length === 0) {
+      appendCodeLensLog(codeLensLogEl, "No target line found for batch links.");
+      setStatus("Links: no target line");
+      return;
+    }
+    const payload: Record<number, DemoLinkSpan[]> = {};
+    let firstProbe: { line: number; column: number; expected: string } | null = null;
+    for (const line of targets) {
+      const spans = buildLinkSpansForLine(line, lines[line] ?? "", activeFileName, "batch");
+      if (spans.length > 0) {
+        payload[line] = spans;
+        if (!firstProbe) {
+          const firstSpan = spans[0];
+          if (firstSpan) {
+            firstProbe = {
+              line,
+              column: toInt(firstSpan.column, 0),
+              expected: String(firstSpan.target ?? ""),
+            };
+          }
+        }
+      }
+    }
+    if (Object.keys(payload).length <= 0) {
+      appendCodeLensLog(codeLensLogEl, "Batch links produced 0 spans. Current file may have no suitable token text.");
+      setStatus("Links(batch): 0 line(s)");
+      return;
+    }
+    widget.clearLinks?.();
+    widget.setBatchLineLinks?.(payload);
+    widget.requestDecorationRefresh?.();
+    if (firstProbe && typeof widget.getLinkTargetAt === "function") {
+      const resolved = String(widget.getLinkTargetAt(firstProbe.line, firstProbe.column) ?? "");
+      const lineLabel = firstProbe.line + 1;
+      if (resolved) {
+        appendCodeLensLog(codeLensLogEl, `Batch link probe ok at L${lineLabel}:C${firstProbe.column}, target=${resolved}.`);
+      } else {
+        appendCodeLensLog(codeLensLogEl, `Batch link probe empty at L${lineLabel}:C${firstProbe.column}. expected=${firstProbe.expected}.`);
+      }
+    }
+    appendCodeLensLog(codeLensLogEl, `Applied batch API links on ${Object.keys(payload).length} line(s). Hover text to verify pointer cursor + click.`);
+    setStatus(`Links(batch): ${Object.keys(payload).length} line(s)`);
+  };
+
+  const clearLinksDemo = (): void => {
+    widget.clearLinks?.();
+    widget.requestDecorationRefresh?.();
+    appendCodeLensLog(codeLensLogEl, "Cleared all link spans.");
+    setStatus("Links cleared");
+  };
+
+  const applyCompositionImeScenario = (compositionEnabled: boolean, imeCandidateOpen: boolean): void => {
+    const label = `editor compositionEnabled=${compositionEnabled},ime候选${imeCandidateOpen ? "打开" : "关闭"}`;
+
+    if (typeof widget.setCompositionEnabled === "function") {
+      widget.setCompositionEnabled(compositionEnabled);
+    } else {
+      appendCodeLensLog(codeLensLogEl, `setCompositionEnabled is unavailable, ${label}.`);
+      setStatus(`IME scenario partial: ${label}`);
+      return;
+    }
+
+    if (imeCandidateOpen) {
+      if (typeof widget.openImeCandidate === "function") {
+        widget.openImeCandidate();
+      } else {
+        appendCodeLensLog(codeLensLogEl, `openImeCandidate is unavailable, ${label}.`);
+      }
+    } else if (typeof widget.closeImeCandidate === "function") {
+      widget.closeImeCandidate();
+    } else {
+      appendCodeLensLog(codeLensLogEl, `closeImeCandidate is unavailable, ${label}.`);
+    }
+
+    appendCodeLensLog(codeLensLogEl, `Applied ${label}.`);
+    setStatus(`IME scenario: ${label}`);
+  };
+
+  const IME_SCENARIO_PRESETS = Object.freeze({
+    compOnImeOff: { compositionEnabled: true, imeCandidateOpen: false },
+    compOnImeOn: { compositionEnabled: true, imeCandidateOpen: true },
+    compOffImeOff: { compositionEnabled: false, imeCandidateOpen: false },
+    compOffImeOn: { compositionEnabled: false, imeCandidateOpen: true },
+  });
+
+  const applySelectedImeScenario = (): void => {
+    const key = String(imeScenarioSelectEl.value || "compOnImeOff");
+    const scenario = (IME_SCENARIO_PRESETS as Record<string, { compositionEnabled: boolean; imeCandidateOpen: boolean }>)[key]
+      || IME_SCENARIO_PRESETS.compOnImeOff;
+    applyCompositionImeScenario(scenario.compositionEnabled, scenario.imeCandidateOpen);
+  };
+
   const onCodeLensClick = (event: any): void => {
     const line = toInt(event?.line ?? event?.payload?.line, -1);
+    const column = toInt(event?.column ?? event?.payload?.column, -1);
     const commandId = toInt(
       event?.commandId
       ?? event?.command_id
@@ -876,15 +1138,34 @@ async function bootstrap(): Promise<void> {
       -1,
     );
     const lineLabel = line >= 0 ? String(line + 1) : "?";
+    const columnLabel = column >= 0 ? String(column) : "?";
     const commandLabel = commandId >= 0 ? String(commandId) : "?";
-    appendCodeLensLog(codeLensLogEl, `CodeLens clicked at line ${lineLabel}, commandId=${commandLabel}.`);
-    setStatus(`CodeLens click: line ${lineLabel}, commandId ${commandLabel}`);
+    appendCodeLensLog(codeLensLogEl, `CodeLens clicked at line ${lineLabel}, column=${columnLabel}, commandId=${commandLabel}.`);
+    setStatus(`CodeLens click: L${lineLabel}:C${columnLabel}, cmd ${commandLabel}`);
+  };
+
+  const onLinkClick = (event: any): void => {
+    const line = toInt(event?.line ?? event?.payload?.line, -1);
+    const column = toInt(event?.column ?? event?.payload?.column, -1);
+    const target = String(event?.target ?? event?.payload?.target ?? "");
+    const resolved = (line >= 0 && column >= 0 && typeof widget.getLinkTargetAt === "function")
+      ? String(widget.getLinkTargetAt(line, column) ?? "")
+      : "";
+    const lineLabel = line >= 0 ? String(line + 1) : "?";
+    const columnLabel = column >= 0 ? String(column) : "?";
+    appendCodeLensLog(
+      codeLensLogEl,
+      `Link clicked at L${lineLabel}:C${columnLabel}, target=${target || "(empty)"}${resolved && resolved !== target ? `, resolved=${resolved}` : ""}.`,
+    );
+    setStatus(`Link click: L${lineLabel}:C${columnLabel}`);
   };
 
   if (typeof widget.subscribe === "function") {
     widget.subscribe(CODELENS_EVENT_STANDARD, onCodeLensClick);
     widget.subscribe(CODELENS_EVENT_LEGACY, onCodeLensClick);
-    appendCodeLensLog(codeLensLogEl, "Listening for CodeLens click events.");
+    widget.subscribe(LINK_EVENT_STANDARD, onLinkClick);
+    widget.subscribe(LINK_EVENT_LEGACY, onLinkClick);
+    appendCodeLensLog(codeLensLogEl, "Listening for CodeLens/Link click events.");
   } else {
     appendCodeLensLog(codeLensLogEl, "Widget event subscribe is unavailable; click callback test disabled.");
   }
@@ -978,7 +1259,7 @@ async function bootstrap(): Promise<void> {
       widget.requestDecorationRefresh?.();
       setStatus(`Loaded: ${normalizedFileName}`);
       if (normalizedFileName === CODELENS_DEMO_FILE) {
-        appendCodeLensLog(codeLensLogEl, "Loaded CodeLens demo file. Click \"CodeLens Batch\" or \"CodeLens Line\" to test.");
+        appendCodeLensLog(codeLensLogEl, "Loaded CodeLens demo file. Use CodeLens/Links buttons to test click events and pointer cursor.");
       }
     } catch (error) {
       console.error("Failed to load file:", normalizedFileName, error);
@@ -1061,8 +1342,31 @@ async function bootstrap(): Promise<void> {
     clearCodeLensDemo();
   });
 
+  applyLineLinksBtnEl.addEventListener("click", () => {
+    applyLineLinksDemo();
+  });
+
+  applyBatchLinksBtnEl.addEventListener("click", () => {
+    applyBatchLinksDemo();
+  });
+
+  clearLinksBtnEl.addEventListener("click", () => {
+    clearLinksDemo();
+  });
+
+  imeScenarioSelectEl.addEventListener("change", () => {
+    applySelectedImeScenario();
+  });
+
+  imeScenarioSelectEl.addEventListener("input", () => {
+    applySelectedImeScenario();
+  });
+
+  imeScenarioSelectEl.value = imeScenarioSelectEl.value || "compOnImeOff";
+
   if (fileSelectEl.value === CODELENS_DEMO_FILE) {
     applyBatchCodeLensDemo();
+    applyBatchLinksDemo();
   }
 }
 

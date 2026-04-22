@@ -131,12 +131,28 @@ const FALLBACK_HIT_TARGET_TYPE = {
   FOLD_GUTTER: 5,
   INLAY_HINT_COLOR: 6,
   CODELENS: 7,
+  LINK: 8,
+};
+
+const FALLBACK_POINTER_CURSOR_TYPE = {
+  DEFAULT: 0,
+  TEXT: 1,
+  HAND: 2,
+};
+
+const FALLBACK_VISUAL_RUN_TYPE = {
+  INLAY_HINT: 3,
+  PHANTOM_TEXT: 4,
+  FOLD_PLACEHOLDER: 5,
+  CODELENS: 7,
+  LINK: 8,
 };
 
 const DEFAULT_TOUCH_LONG_PRESS_MS = 520;
 const DEFAULT_TOUCH_LONG_PRESS_SLOP_PX = 10;
 const DEFAULT_DECORATION_SCROLL_REFRESH_MIN_INTERVAL_MS = 16;
 const DEFAULT_DECORATION_OVERSCAN_VIEWPORT_MULTIPLIER = 1.5;
+const INPUT_EVENT_DEDUP_WINDOW_MS = 120;
 
 function resolveEnum(moduleObj:IAnyValue, enumName:string, fallback:IAnyValue) {
   const enumObj = moduleObj && moduleObj[enumName];
@@ -462,6 +478,15 @@ function loadEchartsFromCdn(cdnUrl:string): Promise<IAnyValue> {
 const DEFAULT_THEME = {
   background: "#1e1e1e",
   text: "#d4d4d4",
+  codeLensText: "#8db9ff",
+  codeLensActiveText: "#c5ddff",
+  codeLensUnderline: "rgba(141, 185, 255, 0.7)",
+  codeLensActiveUnderline: "rgba(197, 221, 255, 0.96)",
+  linkText: "#4DA3FF",
+  linkActiveText: "#83c3ff",
+  linkUnderline: "rgba(77, 163, 255, 0.92)",
+  linkActiveUnderline: "rgba(131, 195, 255, 1)",
+  clickableHoverBg: "rgba(77, 163, 255, 0.14)",
   lineNumber: "#858585",
   splitLine: "#333333",
   currentLine: "rgba(255,255,255,0.06)",
@@ -485,6 +510,7 @@ export const EditorEventType = {
   CONTEXT_MENU: "ContextMenuEvent",
   INLAY_HINT_CLICK: "InlayHintClickEvent",
   CODELENS_CLICK: "CodeLensClickEvent",
+  LINK_CLICK: "LinkClickEvent",
   GUTTER_ICON_CLICK: "GutterIconClickEvent",
   FOLD_TOGGLE: "FoldToggleEvent",
   DOCUMENT_LOADED: "DocumentLoadedEvent",
@@ -501,6 +527,7 @@ const LEGACY_EDITOR_EVENT_TYPE = {
   CONTEXT_MENU: "ContextMenu",
   INLAY_HINT_CLICK: "InlayHintClick",
   CODELENS_CLICK: "CodeLensClick",
+  LINK_CLICK: "LinkClick",
   GUTTER_ICON_CLICK: "GutterIconClick",
   FOLD_TOGGLE: "FoldToggle",
   DOCUMENT_LOADED: "DocumentLoaded",
@@ -517,6 +544,7 @@ const EVENT_STANDARD_TO_LEGACY = Object.freeze({
   [EditorEventType.CONTEXT_MENU]: LEGACY_EDITOR_EVENT_TYPE.CONTEXT_MENU,
   [EditorEventType.INLAY_HINT_CLICK]: LEGACY_EDITOR_EVENT_TYPE.INLAY_HINT_CLICK,
   [EditorEventType.CODELENS_CLICK]: LEGACY_EDITOR_EVENT_TYPE.CODELENS_CLICK,
+  [EditorEventType.LINK_CLICK]: LEGACY_EDITOR_EVENT_TYPE.LINK_CLICK,
   [EditorEventType.GUTTER_ICON_CLICK]: LEGACY_EDITOR_EVENT_TYPE.GUTTER_ICON_CLICK,
   [EditorEventType.FOLD_TOGGLE]: LEGACY_EDITOR_EVENT_TYPE.FOLD_TOGGLE,
   [EditorEventType.DOCUMENT_LOADED]: LEGACY_EDITOR_EVENT_TYPE.DOCUMENT_LOADED,
@@ -533,6 +561,7 @@ const EVENT_LEGACY_TO_STANDARD = Object.freeze({
   [LEGACY_EDITOR_EVENT_TYPE.CONTEXT_MENU]: EditorEventType.CONTEXT_MENU,
   [LEGACY_EDITOR_EVENT_TYPE.INLAY_HINT_CLICK]: EditorEventType.INLAY_HINT_CLICK,
   [LEGACY_EDITOR_EVENT_TYPE.CODELENS_CLICK]: EditorEventType.CODELENS_CLICK,
+  [LEGACY_EDITOR_EVENT_TYPE.LINK_CLICK]: EditorEventType.LINK_CLICK,
   [LEGACY_EDITOR_EVENT_TYPE.GUTTER_ICON_CLICK]: EditorEventType.GUTTER_ICON_CLICK,
   [LEGACY_EDITOR_EVENT_TYPE.FOLD_TOGGLE]: EditorEventType.FOLD_TOGGLE,
   [LEGACY_EDITOR_EVENT_TYPE.DOCUMENT_LOADED]: EditorEventType.DOCUMENT_LOADED,
@@ -796,6 +825,7 @@ export class Canvas2DRenderer {
     const baselineY = this._snapY(run.y);
     const runType = toInt(run.type, 0);
     const lineHeight = this._baseFontSize * 1.3;
+    const isActive = !!run.active;
 
     if (style.background_color) {
       const backgroundRect = this._snapRect(run.x, topY, run.width, lineHeight);
@@ -803,16 +833,32 @@ export class Canvas2DRenderer {
       ctx.fillRect(backgroundRect.x, backgroundRect.y, backgroundRect.width, backgroundRect.height);
     }
 
-    if (runType === 5) {
+    if (isActive && run.width > 0 && (runType === FALLBACK_VISUAL_RUN_TYPE.CODELENS || runType === FALLBACK_VISUAL_RUN_TYPE.LINK)) {
+      const hoverRect = this._snapRect(run.x, topY, run.width, lineHeight);
+      ctx.fillStyle = this.theme.clickableHoverBg || "rgba(77, 163, 255, 0.14)";
+      ctx.fillRect(hoverRect.x, hoverRect.y, hoverRect.width, hoverRect.height);
+    }
+
+    if (runType === FALLBACK_VISUAL_RUN_TYPE.FOLD_PLACEHOLDER) {
       const foldRect = this._snapRect(run.x, topY, run.width, lineHeight);
       ctx.fillStyle = this.theme.foldPlaceholderBg;
       ctx.fillRect(foldRect.x, foldRect.y, foldRect.width, foldRect.height);
       ctx.fillStyle = this.theme.foldPlaceholderText;
-    } else if (runType === 3) {
+    } else if (runType === FALLBACK_VISUAL_RUN_TYPE.INLAY_HINT) {
       this._drawInlayHintRun(ctx, run, topY, style, text);
       return;
-    } else if (runType === 4) {
+    } else if (runType === FALLBACK_VISUAL_RUN_TYPE.PHANTOM_TEXT) {
       ctx.fillStyle = this.theme.phantomText;
+    } else if (runType === FALLBACK_VISUAL_RUN_TYPE.CODELENS) {
+      const hasExplicitColor = style?.color != null && Number(style.color) !== 0;
+      const fallback = isActive
+        ? (this.theme.codeLensActiveText || this.theme.codeLensText || this.theme.linkText)
+        : (this.theme.codeLensText || this.theme.linkText);
+      ctx.fillStyle = hasExplicitColor ? argbToCss(style.color, fallback) : fallback;
+    } else if (runType === FALLBACK_VISUAL_RUN_TYPE.LINK) {
+      const hasExplicitColor = style?.color != null && Number(style.color) !== 0;
+      const fallback = isActive ? (this.theme.linkActiveText || this.theme.linkText) : this.theme.linkText;
+      ctx.fillStyle = hasExplicitColor ? argbToCss(style.color, fallback) : fallback;
     } else {
       ctx.fillStyle = argbToCss(style.color, this.theme.text);
     }
@@ -820,6 +866,32 @@ export class Canvas2DRenderer {
     if (text.length > 0) {
       ctx.font = this._fontByStyle(style.font_style || 0);
       ctx.fillText(text, run.x, baselineY);
+    }
+
+    const shouldUnderline = (runType === FALLBACK_VISUAL_RUN_TYPE.LINK)
+      || (runType === FALLBACK_VISUAL_RUN_TYPE.CODELENS && isActive);
+    if (shouldUnderline && run.width > 0) {
+      const lineStart = this._snapX(run.x);
+      const lineEnd = this._snapX(run.x + run.width);
+      if (lineEnd > lineStart) {
+        const underlineY = this._snapY(Math.max(baselineY + 1, topY + lineHeight - 1));
+        if (runType === FALLBACK_VISUAL_RUN_TYPE.CODELENS) {
+          ctx.strokeStyle = isActive
+            ? (this.theme.codeLensActiveUnderline || this.theme.codeLensUnderline || this.theme.codeLensText || this.theme.linkText)
+            : (this.theme.codeLensUnderline || this.theme.codeLensText || this.theme.linkText);
+        } else {
+          ctx.strokeStyle = isActive
+            ? (this.theme.linkActiveUnderline || this.theme.linkUnderline || this.theme.linkText)
+            : (this.theme.linkUnderline || this.theme.linkText);
+        }
+        ctx.lineWidth = isActive
+          ? Math.max(1.5, 1.5 / this._pixelRatioY)
+          : Math.max(1, 1 / this._pixelRatioY);
+        ctx.beginPath();
+        ctx.moveTo(lineStart, underlineY);
+        ctx.lineTo(lineEnd, underlineY);
+        ctx.stroke();
+      }
     }
   }
 
@@ -1337,6 +1409,8 @@ export class SweetEditorWidget {
     this._modifier = resolveEnum(wasmModule, "Modifier", FALLBACK_MODIFIER);
     this._spanLayer = resolveEnum(wasmModule, "SpanLayer", FALLBACK_SPAN_LAYER);
     this._hitTargetType = resolveEnum(wasmModule, "HitTargetType", FALLBACK_HIT_TARGET_TYPE);
+    this._pointerCursorType = resolveEnum(wasmModule, "PointerCursorType", FALLBACK_POINTER_CURSOR_TYPE);
+    this._currentPointerCursorType = -1;
 
     this._renderer = new Canvas2DRenderer(options.theme || {});
     this._core = new WebEditorCore(
@@ -1444,6 +1518,10 @@ export class SweetEditorWidget {
     this._compositionEndTimer = 0;
     this._suppressNextInputEvent = false;
     this._suppressNextInputResetTimer = 0;
+    this._pendingBeforeInputDedup = null;
+    this._pendingCompositionCommitDedup = null;
+    this._pendingPrintableCommitDedup = null;
+    this._supportsBeforeInput = false;
     this._printableFallbackEpoch = 0;
     this._pendingPrintableFallbackTimers = new Set();
     this._documentKeyRouteActive = false;
@@ -1477,6 +1555,11 @@ export class SweetEditorWidget {
       gutterSticky: options.editorOptions?.gutterSticky ?? true,
       gutterVisible: options.editorOptions?.gutterVisible ?? true,
       currentLineRenderMode: toInt(options.editorOptions?.currentLineRenderMode, 1),
+      compositionEnabled: options.editorOptions?.compositionEnabled
+        ?? options.enableComposition
+        ?? options.settings?.compositionEnabled
+        ?? options.settings?.enableComposition
+        ?? true,
       readOnly: !!options.editorOptions?.readOnly,
       autoIndentMode: options.editorOptions?.autoIndentMode ?? null,
       maxGutterIcons: options.editorOptions?.maxGutterIcons ?? 0,
@@ -1533,7 +1616,6 @@ export class SweetEditorWidget {
     this._bindEvents();
     this._resize();
 
-    this._core.setCompositionEnabled(options.enableComposition ?? true);
     this._core.setKeyMap(this._editorKeyMap.toJSON());
     if (options.editorIconProvider) {
       this.setEditorIconProvider(options.editorIconProvider);
@@ -1756,6 +1838,43 @@ export class SweetEditorWidget {
 
   getCurrentLineRenderMode() {
     return toInt(this._settingsState.currentLineRenderMode, 1);
+  }
+
+  setCompositionEnabled(enabled:boolean) {
+    const value = !!enabled;
+    this._settingsState.compositionEnabled = value;
+    this._core.setCompositionEnabled(value);
+    this._invalidatePrintableFallback();
+    if (!value) {
+      this._isComposing = false;
+      this._compositionCommitPending = false;
+      this._compositionEndFallbackData = "";
+      this._pendingCompositionCommitDedup = null;
+      if (this._compositionEndTimer) {
+        clearTimeout(this._compositionEndTimer);
+        this._compositionEndTimer = 0;
+      }
+      this._input.value = "";
+    }
+  }
+
+  isCompositionEnabled() {
+    return !!this._core.isCompositionEnabled();
+  }
+
+  openImeCandidate() {
+    if (!this._input) {
+      return;
+    }
+    this._documentKeyRouteActive = true;
+    this._input.focus();
+  }
+
+  closeImeCandidate() {
+    if (!this._input) {
+      return;
+    }
+    this._input.blur();
   }
 
   setReadOnly(readOnly:boolean) {
@@ -2129,6 +2248,22 @@ export class SweetEditorWidget {
     this._core.clearCodeLens();
   }
 
+  setLineLinks(line:number, links:IAnyValue[]) {
+    this._core.setLineLinks(line, links);
+  }
+
+  setBatchLineLinks(linksByLine:IAnyValue) {
+    this._core.setBatchLineLinks(linksByLine);
+  }
+
+  clearLinks() {
+    this._core.clearLinks();
+  }
+
+  getLinkTargetAt(line:number, column:number) {
+    return String(this._core.getLinkTargetAt(line, column) ?? "");
+  }
+
   setLineDiagnostics(line:number, diagnostics:IAnyValue[]) {
     this._core.setLineDiagnostics(line, diagnostics);
   }
@@ -2427,6 +2562,9 @@ export class SweetEditorWidget {
     this._invalidatePrintableFallback();
     this._clearTouchLongPressTimer();
     this._suppressNextInputEvent = false;
+    this._pendingBeforeInputDedup = null;
+    this._pendingCompositionCommitDedup = null;
+    this._pendingPrintableCommitDedup = null;
     if (this._suppressNextInputResetTimer) {
       clearTimeout(this._suppressNextInputResetTimer);
       this._suppressNextInputResetTimer = 0;
@@ -2698,6 +2836,8 @@ export class SweetEditorWidget {
       isGutterVisible: () => this.isGutterVisible(),
       setCurrentLineRenderMode: (mode:IAnyValue) => this.setCurrentLineRenderMode(mode),
       getCurrentLineRenderMode: () => this.getCurrentLineRenderMode(),
+      setCompositionEnabled: (enabled:boolean) => this.setCompositionEnabled(enabled),
+      isCompositionEnabled: () => this.isCompositionEnabled(),
       setReadOnly: (readOnly:boolean) => this.setReadOnly(readOnly),
       isReadOnly: () => this.isReadOnly(),
       setAutoIndentMode: (mode:IAnyValue) => this.setAutoIndentMode(mode),
@@ -2766,6 +2906,12 @@ export class SweetEditorWidget {
     }
     if ("currentLineRenderMode" in settings) {
       this.setCurrentLineRenderMode(settings.currentLineRenderMode);
+    }
+    if ("compositionEnabled" in settings || "enableComposition" in settings) {
+      const enabled = "compositionEnabled" in settings
+        ? settings.compositionEnabled
+        : settings.enableComposition;
+      this.setCompositionEnabled(enabled);
     }
     if ("readOnly" in settings) {
       this.setReadOnly(settings.readOnly);
@@ -2996,6 +3142,39 @@ export class SweetEditorWidget {
     }
   }
 
+  _normalizePointerCursorType(value:IAnyValue) {
+    const fallbackText = toInt(this._pointerCursorType?.TEXT, FALLBACK_POINTER_CURSOR_TYPE.TEXT);
+    const normalized = toInt(value, fallbackText);
+    const pointerDefault = toInt(this._pointerCursorType?.DEFAULT, FALLBACK_POINTER_CURSOR_TYPE.DEFAULT);
+    const pointerHand = toInt(this._pointerCursorType?.HAND, FALLBACK_POINTER_CURSOR_TYPE.HAND);
+    if (normalized === pointerDefault || normalized === pointerHand || normalized === fallbackText) {
+      return normalized;
+    }
+    return fallbackText;
+  }
+
+  _pointerCursorToCss(pointerCursorType:number) {
+    if (pointerCursorType === toInt(this._pointerCursorType?.HAND, FALLBACK_POINTER_CURSOR_TYPE.HAND)) {
+      return "pointer";
+    }
+    if (pointerCursorType === toInt(this._pointerCursorType?.DEFAULT, FALLBACK_POINTER_CURSOR_TYPE.DEFAULT)) {
+      return "default";
+    }
+    return "text";
+  }
+
+  _applyPointerCursor(pointerCursorType:IAnyValue) {
+    if (!this._canvas) {
+      return;
+    }
+    const normalized = this._normalizePointerCursorType(pointerCursorType);
+    if (this._currentPointerCursorType === normalized) {
+      return;
+    }
+    this._currentPointerCursorType = normalized;
+    this._canvas.style.cursor = this._pointerCursorToCss(normalized);
+  }
+
   _dispatchHitTargetEvents(hitTarget:IAnyValue, screenPoint:IAnyValue, nativeEvent:IAnyRecord | null) {
     if (!hitTarget) {
       return;
@@ -3037,9 +3216,21 @@ export class SweetEditorWidget {
     if (hitType === this._hitTargetType.CODELENS) {
       this._emitEvent(EditorEventType.CODELENS_CLICK, {
         line,
+        column,
         commandId: iconId,
         command_id: iconId,
         iconId,
+        screenPoint,
+        nativeEvent,
+      });
+      return;
+    }
+
+    if (hitType === this._hitTargetType.LINK) {
+      this._emitEvent(EditorEventType.LINK_CLICK, {
+        line,
+        column,
+        target: this.getLinkTargetAt(line, column),
         screenPoint,
         nativeEvent,
       });
@@ -3201,6 +3392,7 @@ export class SweetEditorWidget {
     this._canvas.style.height = "100%";
     this._canvas.style.display = "block";
     this._canvas.style.touchAction = "none";
+    this._canvas.style.cursor = "text";
     this.container.appendChild(this._canvas);
 
     this._ctx = this._canvas.getContext("2d");
@@ -3247,6 +3439,7 @@ export class SweetEditorWidget {
     this._canvas.addEventListener("wheel", (e:IAnyRecord) => this._onWheel(e), { passive: false });
     this._canvas.addEventListener("contextmenu", (e:IAnyRecord) => this._onContextMenu(e));
 
+    this._supportsBeforeInput = "onbeforeinput" in this._input;
     this._input.addEventListener("keydown", (e:IAnyRecord) => this._onKeyDown(e));
     this._input.addEventListener("beforeinput", (e:IAnyRecord) => this._onBeforeInput(e));
     this._input.addEventListener("compositionstart", (e:IAnyRecord) => {
@@ -3262,8 +3455,11 @@ export class SweetEditorWidget {
       this._isComposing = true;
       this._compositionCommitPending = false;
       this._compositionEndFallbackData = "";
+      this._pendingCompositionCommitDedup = null;
       this._input.value = "";
-      this._core.compositionStart();
+      if (this._isCompositionEnabled()) {
+        this._core.compositionStart();
+      }
     });
 
     this._input.addEventListener("compositionupdate", (e:IAnyRecord) => {
@@ -3273,7 +3469,10 @@ export class SweetEditorWidget {
         data: typeof e.data === "string" ? e.data : "",
         composingText,
       });
-      this._core.compositionUpdate(composingText);
+      this._compositionEndFallbackData = composingText;
+      if (this._isCompositionEnabled()) {
+        this._core.compositionUpdate(composingText);
+      }
     });
 
     this._input.addEventListener("compositionend", (e:IAnyRecord) => {
@@ -3284,7 +3483,9 @@ export class SweetEditorWidget {
       this._invalidatePrintableFallback();
       this._isComposing = false;
       this._compositionCommitPending = true;
-      this._compositionEndFallbackData = typeof e.data === "string" ? e.data : "";
+      if (typeof e.data === "string") {
+        this._compositionEndFallbackData = e.data;
+      }
       this._input.value = "";
       this._compositionEndTimer = setTimeout(() => {
         this._compositionEndTimer = 0;
@@ -3298,16 +3499,7 @@ export class SweetEditorWidget {
         this._compositionCommitPending = false;
         const fallbackCommit = this._compositionEndFallbackData;
         this._compositionEndFallbackData = "";
-
-        const result = fallbackCommit
-          ? this._core.compositionEnd(fallbackCommit)
-          : this._core.compositionCancel();
-
-        this._handleTextEditResult(result, { action: TextChangeAction.COMPOSITION });
-        this._debugInputLog("compositionend.timer.commit", {
-          fallbackCommit,
-          changed: !!result?.changed,
-        });
+        this._commitCompositionText(fallbackCommit, e, "compositionend.timer.commit");
       }, 0);
     });
 
@@ -4124,6 +4316,55 @@ export class SweetEditorWidget {
     }
   }
 
+  _isCompositionEnabled() {
+    if (!this._core || typeof this._core.isCompositionEnabled !== "function") {
+      return true;
+    }
+    try {
+      return !!this._core.isCompositionEnabled();
+    } catch (_) {
+      return true;
+    }
+  }
+
+  _commitCompositionText(committedText:string, eventOrTime:IAnyValue = null, source:string = "composition.commit") {
+    const text = String(committedText || "");
+    const enabled = this._isCompositionEnabled();
+    if (enabled) {
+      const result = text
+        ? this._core.compositionEnd(text)
+        : this._core.compositionCancel();
+      this._handleTextEditResult(result, { action: TextChangeAction.COMPOSITION });
+      if (text) {
+        this._rememberCompositionCommitDedup(text, eventOrTime);
+      }
+      this._debugInputLog(source, {
+        mode: "composition",
+        committedText: text,
+        changed: !!result?.changed,
+      });
+      return;
+    }
+
+    if (!text) {
+      this._debugInputLog(source, {
+        mode: "insert",
+        committedText: "",
+        changed: false,
+      });
+      return;
+    }
+
+    const result = this._core.insert(text);
+    this._handleTextEditResult(result, { action: TextChangeAction.INSERT });
+    this._rememberCompositionCommitDedup(text, eventOrTime);
+    this._debugInputLog(source, {
+      mode: "insert",
+      committedText: text,
+      changed: !!result?.changed,
+    });
+  }
+
   _invalidatePrintableFallback() {
     this._printableFallbackEpoch += 1;
     if (!this._pendingPrintableFallbackTimers || this._pendingPrintableFallbackTimers.size === 0) {
@@ -4143,6 +4384,142 @@ export class SweetEditorWidget {
       this._suppressNextInputEvent = false;
       this._suppressNextInputResetTimer = 0;
     }, 0);
+  }
+
+  _eventTimeMs(event:IAnyRecord) {
+    const ts = Number(event?.timeStamp);
+    if (Number.isFinite(ts) && ts >= 0) {
+      return ts;
+    }
+    return this._nowMs();
+  }
+
+  _rememberBeforeInputDedup(event:IAnyRecord) {
+    this._pendingBeforeInputDedup = {
+      inputType: String(event?.inputType || ""),
+      text: this._extractInputText(event, false),
+      at: this._eventTimeMs(event),
+    };
+  }
+
+  _consumeBeforeInputDedup(event:IAnyRecord) {
+    const marker = this._pendingBeforeInputDedup;
+    if (!marker) {
+      return false;
+    }
+    const elapsed = this._eventTimeMs(event) - Number(marker.at || 0);
+    if (!Number.isFinite(elapsed) || elapsed < -1 || elapsed > INPUT_EVENT_DEDUP_WINDOW_MS) {
+      this._pendingBeforeInputDedup = null;
+      return false;
+    }
+
+    const inputType = String(event?.inputType || "");
+    if (inputType !== String(marker.inputType || "")) {
+      return false;
+    }
+
+    const markerText = String(marker.text || "");
+    const eventText = this._extractInputText(event, true);
+    if (markerText.length > 0 && eventText.length > 0 && markerText !== eventText) {
+      return false;
+    }
+
+    this._pendingBeforeInputDedup = null;
+    return true;
+  }
+
+  _rememberCompositionCommitDedup(text:string, eventOrTime:IAnyValue = null) {
+    const committedText = String(text || "");
+    if (!committedText) {
+      this._pendingCompositionCommitDedup = null;
+      return;
+    }
+
+    let at = this._nowMs();
+    if (typeof eventOrTime === "number" && Number.isFinite(eventOrTime)) {
+      at = eventOrTime;
+    } else if (eventOrTime && typeof eventOrTime === "object") {
+      at = this._eventTimeMs(eventOrTime);
+    }
+
+    this._pendingCompositionCommitDedup = {
+      text: committedText,
+      at,
+    };
+  }
+
+  _consumeCompositionCommitDedup(event:IAnyRecord) {
+    const marker = this._pendingCompositionCommitDedup;
+    if (!marker) {
+      return false;
+    }
+
+    const elapsed = this._eventTimeMs(event) - Number(marker.at || 0);
+    if (!Number.isFinite(elapsed) || elapsed < -1 || elapsed > INPUT_EVENT_DEDUP_WINDOW_MS) {
+      this._pendingCompositionCommitDedup = null;
+      return false;
+    }
+
+    const inputType = String(event?.inputType || "");
+    if (inputType && inputType !== "insertText" && inputType !== "insertFromComposition") {
+      return false;
+    }
+
+    const eventText = this._extractInputText(event, true);
+    const markerText = String(marker.text || "");
+    if (!eventText || eventText !== markerText) {
+      return false;
+    }
+
+    this._pendingCompositionCommitDedup = null;
+    return true;
+  }
+
+  _rememberPrintableCommitDedup(text:string, eventOrTime:IAnyValue = null) {
+    const committedText = String(text || "");
+    if (!committedText) {
+      this._pendingPrintableCommitDedup = null;
+      return;
+    }
+
+    let at = this._nowMs();
+    if (typeof eventOrTime === "number" && Number.isFinite(eventOrTime)) {
+      at = eventOrTime;
+    } else if (eventOrTime && typeof eventOrTime === "object") {
+      at = this._eventTimeMs(eventOrTime);
+    }
+
+    this._pendingPrintableCommitDedup = {
+      text: committedText,
+      at,
+    };
+  }
+
+  _consumePrintableCommitDedup(event:IAnyRecord) {
+    const marker = this._pendingPrintableCommitDedup;
+    if (!marker) {
+      return false;
+    }
+
+    const elapsed = this._eventTimeMs(event) - Number(marker.at || 0);
+    if (!Number.isFinite(elapsed) || elapsed < -1 || elapsed > INPUT_EVENT_DEDUP_WINDOW_MS) {
+      this._pendingPrintableCommitDedup = null;
+      return false;
+    }
+
+    const inputType = String(event?.inputType || "");
+    if (inputType && inputType !== "insertText") {
+      return false;
+    }
+
+    const eventText = this._extractInputText(event, true);
+    const markerText = String(marker.text || "");
+    if (!eventText || eventText !== markerText) {
+      return false;
+    }
+
+    this._pendingPrintableCommitDedup = null;
+    return true;
   }
 
   _extractInputText(event:IAnyRecord, allowValueFallback:IAnyValue = true) {
@@ -4243,6 +4620,9 @@ export class SweetEditorWidget {
   }
 
   _shouldSchedulePrintableFallback(event:IAnyRecord) {
+    if (this._supportsBeforeInput) {
+      return false;
+    }
     if (!event || event.ctrlKey || event.metaKey || event.altKey) {
       return false;
     }
@@ -4281,6 +4661,7 @@ export class SweetEditorWidget {
       }
       const result = this._core.insert(text);
       this._handleTextEditResult(result, { action: TextChangeAction.KEY });
+      this._rememberPrintableCommitDedup(text, event);
       this._debugInputLog("fallback.fire", {
         text,
         changed: !!result?.changed,
@@ -4318,9 +4699,24 @@ export class SweetEditorWidget {
       return;
     }
 
+    if (this._consumePrintableCommitDedup(e)) {
+      this._invalidatePrintableFallback();
+      if (typeof e.preventDefault === "function") {
+        e.preventDefault();
+      }
+      this._input.value = "";
+      this._suppressNextInputOnce();
+      this._debugInputLog("beforeinput.skip.duplicatePrintableFallback", {
+        inputType,
+        data: typeof e.data === "string" ? e.data : "",
+      });
+      return;
+    }
+
     const handled = this._applyDomTextInput(e, { preventDefault: true, allowValueFallback: false });
     this._debugInputLog("beforeinput.handled", { inputType, handled });
     if (handled) {
+      this._rememberBeforeInputDedup(e);
       this._invalidatePrintableFallback();
       this._suppressNextInputOnce();
     }
@@ -4339,8 +4735,41 @@ export class SweetEditorWidget {
     if (this._suppressNextInputEvent) {
       this._invalidatePrintableFallback();
       this._suppressNextInputEvent = false;
+      this._pendingBeforeInputDedup = null;
+      this._pendingCompositionCommitDedup = null;
+      this._pendingPrintableCommitDedup = null;
       this._input.value = "";
       this._debugInputLog("input.skip.suppressed", {});
+      return;
+    }
+
+    if (this._consumePrintableCommitDedup(e)) {
+      this._invalidatePrintableFallback();
+      this._input.value = "";
+      this._debugInputLog("input.skip.duplicatePrintableFallback", {
+        inputType: e.inputType || "",
+        data: typeof e.data === "string" ? e.data : "",
+      });
+      return;
+    }
+
+    if (this._consumeBeforeInputDedup(e)) {
+      this._invalidatePrintableFallback();
+      this._input.value = "";
+      this._debugInputLog("input.skip.duplicateBeforeInput", {
+        inputType: e.inputType || "",
+        data: typeof e.data === "string" ? e.data : "",
+      });
+      return;
+    }
+
+    if (this._consumeCompositionCommitDedup(e)) {
+      this._invalidatePrintableFallback();
+      this._input.value = "";
+      this._debugInputLog("input.skip.duplicateCompositionCommit", {
+        inputType: e.inputType || "",
+        data: typeof e.data === "string" ? e.data : "",
+      });
       return;
     }
 
@@ -4358,12 +4787,7 @@ export class SweetEditorWidget {
           ? e.data
           : (this._input.value || this._compositionEndFallbackData || "");
         this._compositionEndFallbackData = "";
-        const result = this._core.compositionEnd(committedText);
-        this._handleTextEditResult(result, { action: TextChangeAction.COMPOSITION });
-        this._debugInputLog("input.compositionCommit", {
-          committedText,
-          changed: !!result?.changed,
-        });
+        this._commitCompositionText(committedText, e, "input.compositionCommit");
       }
       this._input.value = "";
       this._debugInputLog("input.skip.insertFromComposition", {});
@@ -4423,9 +4847,7 @@ export class SweetEditorWidget {
   _onPointerMove(event:IAnyRecord) {
     const point = this._eventPoint(event);
     if (event.pointerType === "mouse") {
-      if (this._mousePrimaryDown || (event.buttons & 1) !== 0) {
-        this._dispatchGesture(this._eventType.MOUSE_MOVE, [point], event);
-      }
+      this._dispatchGesture(this._eventType.MOUSE_MOVE, [point], event);
       return;
     }
 
@@ -4910,6 +5332,7 @@ export class SweetEditorWidget {
     const screenPoint = points && points.length > 0
       ? { x: Number(points[0].x) || 0, y: Number(points[0].y) || 0 }
       : { x: 0, y: 0 };
+    this._applyPointerCursor(result?.pointer_cursor_type ?? result?.pointerCursorType);
     this._fireGestureEvents(result, screenPoint, domEvent);
 
     if (result && result.needs_edge_scroll) {
@@ -5165,6 +5588,7 @@ export class SweetEditorWidget {
         const model = this._core.buildRenderModel();
         buildMs = Math.max(0, this._nowMs() - buildStartAt);
         this._lastRenderModel = model;
+        this._applyPointerCursor(model?.pointer_cursor_type ?? model?.pointerCursorType);
         this._syncInputAnchor(model, rect.width, rect.height);
         const drawStartAt = this._nowMs();
         this._renderer.render(this._ctx, model, rect.width, rect.height);
@@ -5421,6 +5845,9 @@ export class SweetEditorWidget {
       this._applyInlayMode(merged.inlayHintsMode, startLine, endLine);
       this._core.setBatchLineInlayHints(merged.inlayHints);
 
+      this._applyLinkMode(merged.linksMode, startLine, endLine);
+      this._core.setBatchLineLinks(merged.links);
+
       this._applyDiagnosticMode(merged.diagnosticsMode, startLine, endLine);
       this._core.setBatchLineDiagnostics(merged.diagnostics);
 
@@ -5491,6 +5918,16 @@ export class SweetEditorWidget {
     }
     if (mode === DecorationApplyMode.REPLACE_RANGE) {
       this._core.setBatchLineDiagnostics(this._buildEmptyLineMap(startLine, endLine));
+    }
+  }
+
+  _applyLinkMode(mode:IAnyValue, startLine:number, endLine:number) {
+    if (mode === DecorationApplyMode.REPLACE_ALL) {
+      this._core.clearLinks();
+      return;
+    }
+    if (mode === DecorationApplyMode.REPLACE_RANGE) {
+      this._core.setBatchLineLinks(this._buildEmptyLineMap(startLine, endLine));
     }
   }
 

@@ -110,6 +110,11 @@ struct LineCodeLensEntry {
   Vector<CodeLensItem> items;
 };
 
+struct LineLinksEntry {
+  size_t line {0};
+  Vector<LinkSpan> links;
+};
+
 SharedPtr<EditorCore> createEditorCore(const val& callbacks, const EditorOptions& options) {
   return makeShared<EditorCore>(makeShared<JsTextMeasurer>(callbacks), options);
 }
@@ -250,6 +255,20 @@ void editorSetBatchLineCodeLens(EditorCore& editor, const Vector<LineCodeLensEnt
     native_entries.emplace_back(entry.line, entry.items);
   }
   editor.setBatchLineCodeLens(std::move(native_entries));
+}
+
+void editorSetLineLinks(EditorCore& editor, size_t line, const Vector<LinkSpan>& links) {
+  auto copy = links;
+  editor.setLineLinks(line, std::move(copy));
+}
+
+void editorSetBatchLineLinks(EditorCore& editor, const Vector<LineLinksEntry>& entries) {
+  Vector<std::pair<size_t, Vector<LinkSpan>>> native_entries;
+  native_entries.reserve(entries.size());
+  for (const auto& entry : entries) {
+    native_entries.emplace_back(entry.line, entry.links);
+  }
+  editor.setBatchLineLinks(std::move(native_entries));
 }
 
 void editorSetLineDiagnostics(EditorCore& editor, size_t line, const Vector<DiagnosticSpan>& diagnostics) {
@@ -460,7 +479,8 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
     .value("FOLD_PLACEHOLDER", HitTargetType::FOLD_PLACEHOLDER)
     .value("FOLD_GUTTER", HitTargetType::FOLD_GUTTER)
     .value("INLAY_HINT_COLOR", HitTargetType::INLAY_HINT_COLOR)
-    .value("CODELENS", HitTargetType::CODELENS);
+    .value("CODELENS", HitTargetType::CODELENS)
+    .value("LINK", HitTargetType::LINK);
 
   enum_<WrapMode>("WrapMode")
     .value("NONE", WrapMode::NONE)
@@ -494,7 +514,8 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
     .value("PHANTOM_TEXT", VisualRunType::PHANTOM_TEXT)
     .value("FOLD_PLACEHOLDER", VisualRunType::FOLD_PLACEHOLDER)
     .value("TAB", VisualRunType::TAB)
-    .value("CODELENS", VisualRunType::CODELENS);
+    .value("CODELENS", VisualRunType::CODELENS)
+    .value("LINK", VisualRunType::LINK);
 
   enum_<VisualLineKind>("VisualLineKind")
     .value("CONTENT", VisualLineKind::CONTENT)
@@ -510,6 +531,11 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
     .value("NONE", FoldState::NONE)
     .value("EXPANDED", FoldState::EXPANDED)
     .value("COLLAPSED", FoldState::COLLAPSED);
+
+  enum_<PointerCursorType>("PointerCursorType")
+    .value("DEFAULT", PointerCursorType::DEFAULT)
+    .value("TEXT", PointerCursorType::TEXT)
+    .value("HAND", PointerCursorType::HAND);
 
   enum_<GuideDirection>("GuideDirection")
     .value("HORIZONTAL", GuideDirection::HORIZONTAL)
@@ -577,7 +603,9 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
     .field("has_selection", &GestureResult::has_selection).field("selection", &GestureResult::selection)
     .field("view_scroll_x", &GestureResult::view_scroll_x).field("view_scroll_y", &GestureResult::view_scroll_y)
     .field("view_scale", &GestureResult::view_scale).field("hit_target", &GestureResult::hit_target)
-    .field("needs_edge_scroll", &GestureResult::needs_edge_scroll);
+    .field("needs_edge_scroll", &GestureResult::needs_edge_scroll).field("needs_fling", &GestureResult::needs_fling)
+    .field("needs_animation", &GestureResult::needs_animation).field("is_handle_drag", &GestureResult::is_handle_drag)
+    .field("pointer_cursor_type", &GestureResult::pointer_cursor_type);
 
   value_object<FontMetrics>("FontMetrics").field("ascent", &FontMetrics::ascent).field("descent", &FontMetrics::descent);
 
@@ -589,9 +617,12 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
     .field("icon_id", &InlayHint::icon_id).field("color", &InlayHint::color);
   value_object<PhantomText>("PhantomText").field("column", &PhantomText::column).field("text", &PhantomText::text);
   value_object<GutterIcon>("GutterIcon").field("icon_id", &GutterIcon::icon_id);
+  value_object<LinkSpan>("LinkSpan")
+    .field("column", &LinkSpan::column).field("length", &LinkSpan::length)
+    .field("target", &LinkSpan::target);
   value_object<DiagnosticSpan>("DiagnosticSpan")
     .field("column", &DiagnosticSpan::column).field("length", &DiagnosticSpan::length)
-    .field("severity", &DiagnosticSpan::severity).field("color", &DiagnosticSpan::color);
+    .field("severity", &DiagnosticSpan::severity);
   value_object<FoldRegion>("FoldRegion").field("start_line", &FoldRegion::start_line).field("end_line", &FoldRegion::end_line).field("collapsed", &FoldRegion::collapsed);
   value_object<IndentGuide>("IndentGuide").field("start", &IndentGuide::start).field("end", &IndentGuide::end);
   value_object<BracketGuide>("BracketGuide").field("parent", &BracketGuide::parent).field("end", &BracketGuide::end).field("children", &BracketGuide::children);
@@ -624,7 +655,7 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
   value_object<CompositionDecoration>("CompositionDecoration")
     .field("active", &CompositionDecoration::active).field("rect", &CompositionDecoration::rect);
   value_object<DiagnosticDecoration>("DiagnosticDecoration")
-    .field("rect", &DiagnosticDecoration::rect).field("severity", &DiagnosticDecoration::severity).field("color", &DiagnosticDecoration::color);
+    .field("rect", &DiagnosticDecoration::rect).field("severity", &DiagnosticDecoration::severity);
   value_object<GutterIconRenderItem>("GutterIconRenderItem")
     .field("logical_line", &GutterIconRenderItem::logical_line).field("icon_id", &GutterIconRenderItem::icon_id)
     .field("rect", &GutterIconRenderItem::rect);
@@ -664,7 +695,8 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
     .field("vertical_scrollbar", &EditorRenderModel::vertical_scrollbar)
     .field("horizontal_scrollbar", &EditorRenderModel::horizontal_scrollbar)
     .field("gutter_sticky", &EditorRenderModel::gutter_sticky)
-    .field("gutter_visible", &EditorRenderModel::gutter_visible);
+    .field("gutter_visible", &EditorRenderModel::gutter_visible)
+    .field("pointer_cursor_type", &EditorRenderModel::pointer_cursor_type);
 
   value_object<LayoutMetrics>("LayoutMetrics")
     .field("font_height", &LayoutMetrics::font_height).field("font_ascent", &LayoutMetrics::font_ascent)
@@ -678,7 +710,7 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
   value_object<BracketPair>("BracketPair")
     .field("open", &BracketPair::open).field("close", &BracketPair::close);
   value_object<CodeLensItem>("CodeLensItem")
-    .field("text", &CodeLensItem::text).field("command_id", &CodeLensItem::command_id);
+    .field("column", &CodeLensItem::column).field("text", &CodeLensItem::text).field("command_id", &CodeLensItem::command_id);
 
   value_object<EditorOptions>("EditorOptions")
     .field("touch_slop", &EditorOptions::touch_slop).field("double_tap_timeout", &EditorOptions::double_tap_timeout)
@@ -736,6 +768,7 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
   value_object<LineDiagnosticsEntry>("LineDiagnosticsEntry").field("line", &LineDiagnosticsEntry::line).field("diagnostics", &LineDiagnosticsEntry::diagnostics);
   value_object<TextStyleEntry>("TextStyleEntry").field("style_id", &TextStyleEntry::style_id).field("style", &TextStyleEntry::style);
   value_object<LineCodeLensEntry>("LineCodeLensEntry").field("line", &LineCodeLensEntry::line).field("items", &LineCodeLensEntry::items);
+  value_object<LineLinksEntry>("LineLinksEntry").field("line", &LineLinksEntry::line).field("links", &LineLinksEntry::links);
 
   function("editorRenderModelDump", &editorRenderModelDump);
   function("editorRenderModelToJson", &editorRenderModelToJson);
@@ -753,6 +786,7 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
   register_vector<PhantomText>("PhantomTextVector");
   register_vector<GutterIcon>("GutterIconVector");
   register_vector<CodeLensItem>("CodeLensItemVector");
+  register_vector<LinkSpan>("LinkSpanVector");
   register_vector<DiagnosticSpan>("DiagnosticSpanVector");
   register_vector<FoldRegion>("FoldRegionVector");
   register_vector<IndentGuide>("IndentGuideVector");
@@ -778,6 +812,7 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
   register_vector<LineDiagnosticsEntry>("LineDiagnosticsEntryVector");
   register_vector<TextStyleEntry>("TextStyleEntryVector");
   register_vector<LineCodeLensEntry>("LineCodeLensEntryVector");
+  register_vector<LineLinksEntry>("LineLinksEntryVector");
 
   class_<TextStyleRegistry>("TextStyleRegistry")
     .smart_ptr<SharedPtr<TextStyleRegistry>>("TextStyleRegistry")
@@ -915,6 +950,10 @@ EMSCRIPTEN_BINDINGS(sweeteditor_wasm) {
     .function("setLineCodeLens", &editorSetLineCodeLens)
     .function("setBatchLineCodeLens", &editorSetBatchLineCodeLens)
     .function("clearCodeLens", &EditorCore::clearCodeLens)
+    .function("setLineLinks", &editorSetLineLinks)
+    .function("setBatchLineLinks", &editorSetBatchLineLinks)
+    .function("clearLinks", &EditorCore::clearLinks)
+    .function("getLinkTargetAt", &EditorCore::getLinkTargetAt)
     .function("setLineDiagnostics", &editorSetLineDiagnostics)
     .function("setBatchLineDiagnostics", &editorSetBatchLineDiagnostics)
     .function("clearDiagnostics", &EditorCore::clearDiagnostics)

@@ -55,10 +55,20 @@
     <button id="applyCodeLensBtn" type="button">CodeLens Line</button>
     <button id="applyBatchCodeLensBtn" type="button">CodeLens Batch</button>
     <button id="clearCodeLensBtn" type="button">Clear CodeLens</button>
+    <button id="applyLineLinksBtn" type="button">Links Line</button>
+    <button id="applyBatchLinksBtn" type="button">Links Batch</button>
+    <button id="clearLinksBtn" type="button">Clear Links</button>
+    <label for="imeScenarioSelect">IME</label>
+    <select id="imeScenarioSelect">
+      <option value="compOnImeOff">editor compositionEnabled=true,ime候选关闭</option>
+      <option value="compOnImeOn">editor compositionEnabled=true,ime候选打开</option>
+      <option value="compOffImeOff">editor compositionEnabled=false,ime候选关闭</option>
+      <option value="compOffImeOn">editor compositionEnabled=false,ime候选打开</option>
+    </select>
     <span id="statusText" class="status">Booting...</span>
   </div>
   <div id="editor"></div>
-  <div id="codeLensLog" class="event-log">CodeLens event log ready.</div>
+  <div id="codeLensLog" class="event-log">CodeLens + Link event log ready.</div>
 </div>
 <script type="module" src="./src/main.ts"></script>
 </body>

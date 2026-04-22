@@ -89,7 +89,9 @@ export interface InlayHint { type: InlayType; column: number; text?: string | nu
 export interface PhantomText { column: number; text: string; }
 export interface FoldRegion { startLine: number; endLine: number; }
 export interface GutterIcon { iconId: number; }
-export interface DiagnosticItem { column: number; length: number; severity: number; color: number; }
+export interface CodeLensItem { column: number; text: string; commandId?: number; command_id?: number; }
+export interface LinkSpan { column: number; length: number; target: string; }
+export interface DiagnosticItem { column: number; length: number; severity: number; color?: number; }
 export interface IndentGuide { start: TextPosition; end: TextPosition; }
 export interface BracketGuide { parent: TextPosition; end: TextPosition; children: TextPosition[]; }
 export interface FlowGuide { start: TextPosition; end: TextPosition; }
@@ -142,6 +144,11 @@ export enum FoldState {
   COLLAPSED = 1,
   EXPANDED = 2,
 }
+export enum PointerCursorType {
+  DEFAULT = 0,
+  TEXT = 1,
+  HAND = 2,
+}
 export interface FoldMarkerRenderItem extends Record<string, unknown> {
   line?: number;
   state?: FoldState;
@@ -160,10 +167,13 @@ export interface BracketHighlightRect extends Record<string, unknown> {
 export enum VisualRunType {
   TEXT = 0,
   WHITESPACE = 1,
-  INLAY_HINT = 2,
-  PHANTOM_TEXT = 3,
-  FOLD_PLACEHOLDER = 4,
-  NEWLINE = 5,
+  NEWLINE = 2,
+  INLAY_HINT = 3,
+  PHANTOM_TEXT = 4,
+  FOLD_PLACEHOLDER = 5,
+  TAB = 6,
+  CODELENS = 7,
+  LINK = 8,
 }
 export interface VisualRun extends Record<string, unknown> {
   type?: VisualRunType;
@@ -181,6 +191,8 @@ export interface EditorRenderModel extends Record<string, unknown> {
   selectionRects?: SelectionRect[];
   scrollMetrics?: ScrollMetrics | null;
   scrollbarModel?: ScrollbarModel | null;
+  pointerCursorType?: PointerCursorType;
+  pointer_cursor_type?: PointerCursorType;
 }
 
 export interface TabStopGroup extends Record<string, unknown> {
